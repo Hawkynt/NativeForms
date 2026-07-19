@@ -265,10 +265,12 @@ strategy (may differ per platform; note exceptions inline).
       escapes, `PromptChar`, transactional whole-text validation with revert, `MaskCompleted`,
       `MaskedTextChanged`, raw-text extraction; whole-text transitions documented — no per-key
       caret steering yet)
-- [ ] `RichTextBox` (native where available / owner) — character styles (bold/italic/underline/
-      strikeout, `SelectionColor`/`SelectionFont`), paragraph alignment + indent, bullet lists,
-      auto-detected links + `LinkClicked`, `PlaceholderText`, RTF subset load/save (`Rtf`,
-      `LoadFile`/`SaveFile`), zoom
+- [~] `RichTextBox` (native: Win32 RICHEDIT50W via CHARFORMAT2/PARAFORMAT2/EM_STREAM, GTK
+      GtkTextView named tags; core `RichDocument` + `RtfSerializer` RTF subset as the
+      platform-neutral round-trip) — character styles, `SelectionColor`/size, paragraph
+      alignment, bullets, auto-links + `LinkClicked` (`EN_LINK` via `WM_NOTIFY` routing),
+      `Rtf` get/set, zoom done; `LoadFile`/`SaveFile`, `PlaceholderText`, paragraph indent
+      pending (GTK: literal-text bullets and code-point offsets documented)
 
 ### 7.4 Lists & selection
 - [x] `ListBox` (owner) — items, per-item icons, wheel/keyboard scroll, `DataSource` binding,
