@@ -245,9 +245,12 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `DomainUpDown`
 
 ### 7.4 Lists & selection
-- [~] `ListBox` (owner) — items, single selection, per-item icons, wheel/keyboard scroll,
-      `DataSource` binding done; multi-selection (`SelectionMode`) pending
-- [ ] `CheckedListBox` (native/owner)
+- [x] `ListBox` (owner) — items, per-item icons, wheel/keyboard scroll, `DataSource` binding,
+      `SelectionMode` (None/One/MultiSimple/MultiExtended: Ctrl/Shift click + keyboard, sorted
+      `SelectedIndices`, anchor ranges, caret via `FocusedIndex`)
+- [x] `CheckedListBox` (owner) — per-item check state over the ListBox engine (`ItemCheck`
+      veto-able before the flip, `CheckOnClick`, Space toggles selection, shared `CheckGlyph`
+      with CheckBox, check states survive item mutation)
 - [ ] `ComboBox` (native) — `DropDown`/`DropDownList`/`Simple`, **items with icons** (owner-drawn
       drop-down in native style), `PlaceholderText` hint on the edit part,
       `DataSource`/`DisplayMember`/`ValueMember`/`SelectedValue`, autocomplete
