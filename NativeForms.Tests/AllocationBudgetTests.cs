@@ -64,7 +64,8 @@ internal sealed class AllocationBudgetTests
         list.Add(2);
         var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
 
-        // Two ListChangedEventArgs (no subscriber) is the only expected allocation; assert it is tiny.
-        Assert.That(bytes, Is.LessThan(256), $"{bytes} bytes for two appends");
+        // The null-conditional in OnListChanged must short-circuit before the event args are
+        // constructed, so appends without a subscriber allocate nothing at all.
+        Assert.That(bytes, Is.Zero, $"{bytes} bytes for two appends");
     }
 }
