@@ -64,12 +64,38 @@ MVVM, MVC and MVP are all first-class: `ObservableObject`, `RelayCommand`/`Relay
 reflection-free two-way `PropertyBinding<T>` live in `Hawkynt.NativeForms.ComponentModel`. See
 `NativeForms.Demo` for a bound counter.
 
+## 📖 Documentation & supported controls
+
+The full reference lives under **[`docs/`](docs/README.md)** — an [architecture
+overview](docs/architecture.md), an [MVVM & data-binding guide](docs/mvvm.md), a [custom-control
+authoring guide](docs/custom-controls.md), and one reference page per control (usage example, API
+tables, behavior notes). What ships today:
+
+| Control | Strategy | Reference |
+|---|---|---|
+| `Form` | native | [docs/controls/form.md](docs/controls/form.md) |
+| `Button` | native | [docs/controls/button.md](docs/controls/button.md) |
+| `Label` | native | [docs/controls/label.md](docs/controls/label.md) |
+| `Panel` | owner-drawn | [docs/controls/panel.md](docs/controls/panel.md) |
+| `GroupBox` | owner-drawn | [docs/controls/groupbox.md](docs/controls/groupbox.md) |
+| `CheckBox` | owner-drawn | [docs/controls/checkbox.md](docs/controls/checkbox.md) |
+| `RadioButton` | owner-drawn | [docs/controls/radiobutton.md](docs/controls/radiobutton.md) |
+| `ProgressBar` | owner-drawn | [docs/controls/progressbar.md](docs/controls/progressbar.md) |
+| `ListBox` | owner-drawn | [docs/controls/listbox.md](docs/controls/listbox.md) |
+| `ListView` | owner-drawn | [docs/controls/listview.md](docs/controls/listview.md) |
+| `DataGridView` | owner-drawn | [docs/controls/datagridview.md](docs/controls/datagridview.md) |
+
+Plus the non-visual foundation: [`Application` & backend registration](docs/controls/application.md),
+the [`Control` base class](docs/controls/control.md), and the reflection-free MVVM primitives.
+`NativeForms.Demo` doubles as a gallery showing every shipped control with representative property
+settings.
+
 ## 📋 Status
 
-This is an actively growing toolkit. **`docs/PRD.md`** is the authoritative checklist of every control
-and feature, with the current milestone. Today's foundation: the control/backend model, native Win32
-and GTK `Form`/`Button`/`Label`, the MVVM + data-binding primitives, a demo, and a headless test
-backend. Everything else is tracked box-by-box in the PRD.
+This is an actively growing toolkit. **`docs/PRD.md`** is the authoritative checklist of every
+control and feature — per-control acceptance criteria (§7), the milestone roadmap M0–M9 (§10), and
+the tested/demo-ed/documented coverage matrix (§11). Everything not in the table above (TextBox,
+ComboBox, TreeView, TreeListView, TabControl, menus, dialogs, …) is tracked there box-by-box.
 
 ## 🛠️ Build
 
