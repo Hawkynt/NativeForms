@@ -230,12 +230,17 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] `Image` + `ImageAlign` (icon beside/behind text)
 - [~] `LinkLabel` (owner) — whole-text link: accent color + underline, hover + `Visited` states,
       click/Space → `LinkClicked`; per-character `LinkArea` ranges pending
-- [ ] `TextBox` (native) — single-line first, then:
-  - [ ] `Multiline` (scrollbars, word wrap, `AcceptsReturn`/`AcceptsTab`)
-  - [ ] `PlaceholderText` hint (cue banner: `EM_SETCUEBANNER` / `gtk_entry_set_placeholder_text`;
-        owner-drawn grey hint for multiline where the platform has none)
-  - [ ] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength`, `CharacterCasing`
-  - [ ] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), `TextChanged`, undo
+- [~] `TextBox` (native: Win32 EDIT / GTK GtkEntry + GtkTextView-in-ScrolledWindow)
+  - [x] Single-line editing, `TextChanged` (echo-guarded two-way sync, once per user edit)
+  - [x] `Multiline` (vertical scrollbar; live flip recreates the widget and re-flushes buffered
+        text/selection, same control id so `WM_COMMAND` routing survives)
+  - [x] `PlaceholderText` (single-line cue banner: `EM_SETCUEBANNER` /
+        `gtk_entry_set_placeholder_text`)
+  - [x] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength` (GTK: entry only —
+        GtkTextView has no native limit, documented), `CharacterCasing` (core-side, all backends)
+  - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live
+  - [ ] Owner-drawn grey placeholder for multiline (no native support in EDIT or GtkTextView)
+  - [ ] `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, undo API
 - [ ] `MaskedTextBox` (owner over native TextBox)
 - [ ] `RichTextBox` (native where available / owner) — character styles (bold/italic/underline/
       strikeout, `SelectionColor`/`SelectionFont`), paragraph alignment + indent, bullet lists,
