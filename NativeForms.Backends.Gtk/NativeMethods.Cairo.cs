@@ -83,6 +83,10 @@ internal static partial class NativeMethods
     [LibraryImport(Cairo)]
     internal static partial void cairo_line_to(nint cr, double x, double y);
 
+    /// <summary>Adds a circular arc sub-path centered at (<paramref name="xc"/>, <paramref name="yc"/>).</summary>
+    [LibraryImport(Cairo)]
+    internal static partial void cairo_arc(nint cr, double xc, double yc, double radius, double angle1, double angle2);
+
     /// <summary>Fills the current path with the current source and clears the path.</summary>
     [LibraryImport(Cairo)]
     internal static partial void cairo_fill(nint cr);

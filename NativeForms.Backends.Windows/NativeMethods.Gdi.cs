@@ -141,6 +141,14 @@ internal static unsafe partial class NativeMethods
     /// <summary>A solid pen.</summary>
     internal const int PS_SOLID = 0;
 
+    // --- Stock objects (GetStockObject) ---
+
+    /// <summary>The hollow (no-fill) stock brush.</summary>
+    internal const int NULL_BRUSH = 5;
+
+    /// <summary>The empty (no-draw) stock pen.</summary>
+    internal const int NULL_PEN = 8;
+
     // --- DIB usage / compression ---
 
     /// <summary>The DIB color table holds literal RGB values.</summary>
@@ -516,6 +524,15 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool Rectangle(nint hdc, int left, int top, int right, int bottom);
+
+    /// <summary>Draws an ellipse outline with the current pen and fills it with the current brush.</summary>
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool Ellipse(nint hdc, int left, int top, int right, int bottom);
+
+    /// <summary>Retrieves a handle to one of the predefined stock pens, brushes or fonts (see <c>NULL_*</c>).</summary>
+    [LibraryImport("gdi32.dll")]
+    internal static partial nint GetStockObject(int i);
 
     /// <summary>Moves the current position to the given point, optionally returning the previous one.</summary>
     [LibraryImport("gdi32.dll")]

@@ -127,7 +127,7 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [ ] Light/dark mode + high-contrast follow-the-OS, with change notifications.
 - [ ] Per-monitor DPI awareness; logical↔device pixel mapping.
 - [ ] Double-buffered canvas peer; invalidation regions; hit-testing helpers.
-- [ ] `DrawEllipse`/`FillEllipse` + rounded rects (needed for radio buttons, pills).
+- [x] `DrawEllipse`/`FillEllipse` (GDI `Ellipse`, Cairo unit-circle) — [ ] rounded rects/pills still pending.
 - [ ] Native-style primitives drawn via theme: push button, radio, combo arrow, header cell,
       grid line, scrollbar (or reuse native scrollbars where possible), selection highlight.
 
@@ -174,7 +174,7 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] `MdiParent`/MDI (or documented non-goal)
   - [ ] Icon, `TopMost`, `Opacity`
 - [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
-- [ ] `GroupBox` (native/owner)
+- [~] `GroupBox` (owner) — themed frame + caption done; child inset/layout pending
 - [ ] `TabControl` / `TabPage` (native where available, else owner)
 - [ ] `SplitContainer` / `Splitter`
 - [ ] `FlowLayoutPanel`, `TableLayoutPanel` (owner/layout)
@@ -185,7 +185,7 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] `DialogResult`, default/accept styling, image + text, `FlatStyle`
 - [~] `CheckBox` (owner) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
       tri-state `CheckState` pending
-- [ ] `RadioButton` (owner) — grouping by container, `CheckedChanged` (needs ellipse primitive)
+- [x] `RadioButton` (owner) — themed ring + accent dot, grouping by container, click/Space, `CheckedChanged`
 - [ ] `Label` (native) *(basic exists; add `AutoSize`, `TextAlign`, mnemonics)*
   - [x] Text
   - [ ] `AutoSize`, `TextAlign`, `BorderStyle`, mnemonic → focuses next control
@@ -214,7 +214,7 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.5 Range & date
 - [ ] `TrackBar` (native/owner)
-- [ ] `ProgressBar` (native) — determinate/marquee
+- [~] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill) done; marquee pending
 - [ ] `ScrollBar` (`HScrollBar`/`VScrollBar`) (native)
 - [ ] `DateTimePicker` (native/owner)
 - [ ] `MonthCalendar` (owner)

@@ -16,6 +16,12 @@ public interface IGraphics
     /// <summary>Strokes the outline of a rectangle.</summary>
     void DrawRectangle(Color color, Rectangle bounds, int thickness = 1);
 
+    /// <summary>Fills an ellipse inscribed in the given bounds.</summary>
+    void FillEllipse(Color color, Rectangle bounds);
+
+    /// <summary>Strokes the outline of an ellipse inscribed in the given bounds.</summary>
+    void DrawEllipse(Color color, Rectangle bounds, int thickness = 1);
+
     /// <summary>Draws a straight line.</summary>
     void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1);
 

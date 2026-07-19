@@ -66,6 +66,53 @@ internal sealed class Win32Graphics : IGraphics
     }
 
     /// <inheritdoc/>
+    public void FillEllipse(Color color, Rectangle bounds)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        var brush = NativeMethods.CreateSolidBrush(ToColorRef(color));
+        if (brush == 0)
+            return;
+
+        // A matching pen paints the boundary so the whole inscribed ellipse is covered.
+        var pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, 1, ToColorRef(color));
+        if (pen == 0)
+        {
+            NativeMethods.DeleteObject(brush);
+            return;
+        }
+
+        var oldBrush = NativeMethods.SelectObject(this._hdc, brush);
+        var oldPen = NativeMethods.SelectObject(this._hdc, pen);
+        NativeMethods.Ellipse(this._hdc, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+        NativeMethods.SelectObject(this._hdc, oldPen);
+        NativeMethods.SelectObject(this._hdc, oldBrush);
+        NativeMethods.DeleteObject(pen);
+        NativeMethods.DeleteObject(brush);
+    }
+
+    /// <inheritdoc/>
+    public void DrawEllipse(Color color, Rectangle bounds, int thickness = 1)
+    {
+        if (thickness <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        var pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, thickness, ToColorRef(color));
+        if (pen == 0)
+            return;
+
+        // A stock hollow brush leaves the interior untouched — only the outline is stroked.
+        var nullBrush = NativeMethods.GetStockObject(NativeMethods.NULL_BRUSH);
+        var oldPen = NativeMethods.SelectObject(this._hdc, pen);
+        var oldBrush = NativeMethods.SelectObject(this._hdc, nullBrush);
+        NativeMethods.Ellipse(this._hdc, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+        NativeMethods.SelectObject(this._hdc, oldBrush);
+        NativeMethods.SelectObject(this._hdc, oldPen);
+        NativeMethods.DeleteObject(pen);
+    }
+
+    /// <inheritdoc/>
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
     {
         var pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, thickness, ToColorRef(color));

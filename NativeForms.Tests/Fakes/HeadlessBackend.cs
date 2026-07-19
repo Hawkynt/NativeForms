@@ -152,6 +152,12 @@ internal sealed class RecordingGraphics : IGraphics
     public void DrawRectangle(Color color, Rectangle bounds, int thickness = 1)
         => this.Operations.Add($"rect {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
 
+    public void FillEllipse(Color color, Rectangle bounds)
+        => this.Operations.Add($"fillellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+
+    public void DrawEllipse(Color color, Rectangle bounds, int thickness = 1)
+        => this.Operations.Add($"ellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
         => this.Operations.Add($"line {Hex(color)} {x1},{y1}-{x2},{y2}");
 

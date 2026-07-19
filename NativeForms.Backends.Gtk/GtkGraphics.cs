@@ -35,6 +35,23 @@ internal sealed class GtkGraphics : IGraphics
     }
 
     /// <inheritdoc />
+    public void FillEllipse(Color color, Rectangle bounds)
+    {
+        SetSource(color);
+        AddEllipsePath(bounds);
+        NativeMethods.cairo_fill(_cr);
+    }
+
+    /// <inheritdoc />
+    public void DrawEllipse(Color color, Rectangle bounds, int thickness = 1)
+    {
+        SetSource(color);
+        NativeMethods.cairo_set_line_width(_cr, thickness);
+        AddEllipsePath(bounds);
+        NativeMethods.cairo_stroke(_cr);
+    }
+
+    /// <inheritdoc />
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
     {
         SetSource(color);
@@ -111,6 +128,16 @@ internal sealed class GtkGraphics : IGraphics
 
     /// <inheritdoc />
     public void PopClip() => NativeMethods.cairo_restore(_cr);
+
+    /// <summary>Adds an ellipse inscribed in <paramref name="bounds"/> to the current path via a scaled unit-circle arc.</summary>
+    private void AddEllipsePath(Rectangle bounds)
+    {
+        NativeMethods.cairo_save(_cr);
+        NativeMethods.cairo_translate(_cr, bounds.X + bounds.Width / 2.0, bounds.Y + bounds.Height / 2.0);
+        NativeMethods.cairo_scale(_cr, bounds.Width / 2.0, bounds.Height / 2.0);
+        NativeMethods.cairo_arc(_cr, 0, 0, 1, 0, 2 * Math.PI);
+        NativeMethods.cairo_restore(_cr);
+    }
 
     /// <summary>Sets the Cairo source to a solid color, mapping 0..255 channels onto 0..1.</summary>
     private void SetSource(Color color)
