@@ -1,0 +1,55 @@
+name: Build artifacts
+
+# Shared build/publish block. Called by release.yml (manual dispatch) and
+# nightly.yml (auto, on CI success). Single place that turns a commit into
+# shippable artifacts so release and nightly never diverge.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref/SHA to build (defaults to caller ref)
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Force JavaScript-based actions to run on Node 24 instead of the deprecated Node 20 ahead of
+# the 2026-06-16 hard cutover, until we bump each action to a Node-24-native major version.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0                           # version.pl counts commits
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Stamp per-package versions
+        shell: bash
+        run: perl .github/workflows/scripts/version.pl --stamp
+      - name: Pack NuGet packages (Core + backends)
+        shell: bash
+        # The toolkit ships as NuGet packages; only IsPackable projects (Core + the three backends)
+        # produce a .nupkg — the demo and tests are excluded.
+        run: dotnet pack NativeForms.sln -c Release -o dist
+      - name: Publish demo single-file, self-contained, trimmed (win-x64 + linux-x64)
+        shell: bash
+        run: |
+          FLAGS="-c Release --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:TrimMode=partial -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false"
+          for rid in win-x64 linux-x64; do
+            dotnet publish NativeForms.Demo/NativeForms.Demo.csproj $FLAGS -r "$rid" -o "stage/$rid"
+          done
+          (cd stage/win-x64   && zip -qr ../../dist/NativeForms-Demo-win-x64.zip .)
+          (cd stage/linux-x64 && tar czf ../../dist/NativeForms-Demo-linux-x64.tar.gz .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-artifacts
+          path: dist/*
+          if-no-files-found: error

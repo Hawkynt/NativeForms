@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>Hawkynt.NativeForms.Demo</AssemblyName>
+    <RootNamespace>Hawkynt.NativeForms.Demo</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- The demo is the AOT proof: it must publish clean with PublishAot=true on each platform. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+    <ProjectReference Include="..\NativeForms.Backends.Windows\NativeForms.Backends.Windows.csproj" />
+    <ProjectReference Include="..\NativeForms.Backends.Gtk\NativeForms.Backends.Gtk.csproj" />
+    <ProjectReference Include="..\NativeForms.Backends.MacOS\NativeForms.Backends.MacOS.csproj" />
+  </ItemGroup>
+
+</Project>

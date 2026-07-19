@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Hawkynt.NativeForms.Backends.MacOS</AssemblyName>
+    <RootNamespace>Hawkynt.NativeForms.Backends.MacOS</RootNamespace>
+    <PackageId>Hawkynt.NativeForms.Backends.MacOS</PackageId>
+    <Description>The macOS (Cocoa) backend for NativeForms. Placeholder: the peer surface is wired but the native implementation is still on the roadmap (see docs/PRD.md).</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Hawkynt.NativeForms.Backends.Windows</AssemblyName>
+    <RootNamespace>Hawkynt.NativeForms.Backends.Windows</RootNamespace>
+    <PackageId>Hawkynt.NativeForms.Backends.Windows</PackageId>
+    <Description>The Windows (Win32) backend for NativeForms. A thin, reflection-free, source-generated P/Invoke layer that renders NativeForms controls through native USER32 window classes (top-level windows, BUTTON, STATIC). Trim- and NativeAOT-compatible: it compiles on any OS but only runs on Windows.</Description>
+    <PackageTags>ui;winforms;gui;native;pinvoke;win32;user32;aot;trimming</PackageTags>
+
+    <!-- Headline goal of this repo: consumers can trim and NativeAOT-compile against us. -->
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <!-- Required for the [UnmanagedCallersOnly] window procedure function pointer and sizeof(struct). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+  </ItemGroup>
+
+</Project>

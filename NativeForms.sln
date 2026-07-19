@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Core", "NativeForms.Core\NativeForms.Core.csproj", "{0650A35A-7560-432A-A7C9-D253B9E70F10}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Backends.Windows", "NativeForms.Backends.Windows\NativeForms.Backends.Windows.csproj", "{E973B185-0D29-4B62-A15C-6B2EE1BCF750}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Backends.Gtk", "NativeForms.Backends.Gtk\NativeForms.Backends.Gtk.csproj", "{E6F89F56-2EEC-4F8E-ADD2-B6F34A4AF459}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Backends.MacOS", "NativeForms.Backends.MacOS\NativeForms.Backends.MacOS.csproj", "{4784BE44-10A5-49C1-A354-402969A198CC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Demo", "NativeForms.Demo\NativeForms.Demo.csproj", "{E7EA6187-1A29-4DD9-8FCB-AE56774EF797}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Tests", "NativeForms.Tests\NativeForms.Tests.csproj", "{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0650A35A-7560-432A-A7C9-D253B9E70F10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0650A35A-7560-432A-A7C9-D253B9E70F10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0650A35A-7560-432A-A7C9-D253B9E70F10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0650A35A-7560-432A-A7C9-D253B9E70F10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E973B185-0D29-4B62-A15C-6B2EE1BCF750}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E973B185-0D29-4B62-A15C-6B2EE1BCF750}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E973B185-0D29-4B62-A15C-6B2EE1BCF750}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E973B185-0D29-4B62-A15C-6B2EE1BCF750}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E6F89F56-2EEC-4F8E-ADD2-B6F34A4AF459}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E6F89F56-2EEC-4F8E-ADD2-B6F34A4AF459}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E6F89F56-2EEC-4F8E-ADD2-B6F34A4AF459}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E6F89F56-2EEC-4F8E-ADD2-B6F34A4AF459}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4784BE44-10A5-49C1-A354-402969A198CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4784BE44-10A5-49C1-A354-402969A198CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4784BE44-10A5-49C1-A354-402969A198CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4784BE44-10A5-49C1-A354-402969A198CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7EA6187-1A29-4DD9-8FCB-AE56774EF797}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7EA6187-1A29-4DD9-8FCB-AE56774EF797}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7EA6187-1A29-4DD9-8FCB-AE56774EF797}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7EA6187-1A29-4DD9-8FCB-AE56774EF797}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

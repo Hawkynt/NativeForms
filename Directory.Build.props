@@ -1,0 +1,34 @@
+<Project>
+
+  <!-- Shared defaults for every project in the repo. Kept central because NativeForms ships
+       several assemblies (Core + one backend per platform + demo + tests) that would otherwise
+       repeat the same TFM, nullable and packaging metadata. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!-- Package / authorship metadata (LGPL, same as every Hawkynt repo). -->
+  <PropertyGroup>
+    <Authors>Hawkynt</Authors>
+    <Company>Hawkynt</Company>
+    <Product>NativeForms</Product>
+    <Copyright>Copyright (c) Hawkynt</Copyright>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Hawkynt/NativeForms</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Hawkynt/NativeForms.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <!-- Release builds ship a single clean binary: no loose PDBs, symbols embedded nowhere. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+</Project>

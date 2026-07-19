@@ -1,0 +1,4 @@
+# Renders the "Sponsor" button on the repo page. Identical in every Hawkynt
+# repo — pairs with the mandatory "## ❤️ Support" README section.
+github: [Hawkynt]
+custom: ["https://www.paypal.me/hawkynt"]

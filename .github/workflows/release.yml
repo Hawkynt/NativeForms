@@ -1,0 +1,79 @@
+name: Release
+
+# Stable release — MANUAL dispatch only. The explicit "package + publish" action:
+# runs CI, builds binaries and/or packs NuGet packages (each at its OWN per-csproj
+# <Version> + commit count via version.pl --stamp), pushes packages, then cuts a
+# dated GitHub Release.
+#
+# Versions are never taken from a git tag. Because each package carries its own
+# version there is no single repo version, so the repo-level marker is the date:
+# the Release/tag is `vyyyyMMdd`. Nightlies happen automatically (nightly.yml).
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you cutting this release? (optional, for the audit log)'
+        required: false
+
+permissions:
+  contents: write
+
+# Force JavaScript-based actions to run on Node 24 instead of the deprecated Node 20 ahead of
+# the 2026-06-16 hard cutover, until we bump each action to a Node-24-native major version.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: ci
+    uses: ./.github/workflows/_build.yml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute release marker
+        run: echo "REL=v$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+
+      # Pull whichever artifacts _build produced (binaries, packages, or both).
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-artifacts
+          path: dist
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Update changelog + generate release notes (bucketed by + - * # !)
+        run: node .github/workflows/scripts/update-changelog.mjs --release "$REL" --notes RELEASE_NOTES.md
+
+      # The changelog commit happens BEFORE the release is cut, and the release
+      # tag is placed ON that commit (target_commitish below). Otherwise the
+      # bookkeeping commit would land outside the tag and pollute the NEXT
+      # release's/nightly's notes forever. The generator also filters these
+      # commits defensively (isChangelogCommit).
+      - name: Commit changelog (if it changed)
+        run: |
+          if ! git diff --quiet -- CHANGELOG.md; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.md
+            git commit -m "* update changelog for $REL [skip ci]"
+            git push
+          fi
+          echo "REL_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release (dated marker; tags vyyyyMMdd at the changelog commit)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.REL }}
+          name: ${{ env.REL }}
+          target_commitish: ${{ env.REL_SHA }}
+          files: dist/*
+          body_path: RELEASE_NOTES.md            # commit-message changelog, not GitHub's PR notes

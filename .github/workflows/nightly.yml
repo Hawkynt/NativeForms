@@ -1,0 +1,85 @@
+name: Nightly
+
+# Fires automatically after CI passes on main/master. A red CI run never produces
+# a nightly, so the "latest nightly" always points at tested code. Builds the
+# exact SHA CI validated (not branch tip). Does NOT push to NuGet.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    # `main` is the canonical default branch; `master` is accepted only while
+    # a repo's rename is pending (STANDARD.md §2, rollout step 0).
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+# Force JavaScript-based actions to run on Node 24 instead of the deprecated Node 20 ahead of
+# the 2026-06-16 hard cutover, until we bump each action to a Node-24-native major version.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_build.yml
+    with:
+      ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0                         # update-changelog.mjs reads git log
+      - name: Compute nightly tag
+        run: echo "TAG=nightly-$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-artifacts
+          path: dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # --notes-only: CHANGELOG.md is committed by release.yml exclusively;
+      # writing it here would be silently discarded with the runner workspace.
+      - name: Generate release notes (functional changes, bucketed by + - * # !)
+        run: node .github/workflows/scripts/update-changelog.mjs --nightly --notes-only --notes RELEASE_NOTES.md
+
+      # Same-day re-run: drop the existing nightly release AND its tag first.
+      # Reusing the tag would leave it pinned at the morning's SHA while the
+      # assets get replaced — the tag must point at the SHA that was actually
+      # built, or the next day's delta starts from the wrong commit.
+      - name: Replace same-day nightly (release + tag), if any
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "$TAG" --cleanup-tag --yes || true
+      - name: Publish nightly prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          target_commitish: ${{ github.event.workflow_run.head_sha || github.sha }}
+          prerelease: true
+          files: dist/*
+          body_path: RELEASE_NOTES.md            # commit-message changelog, not GitHub's PR notes
+
+  prune:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: GFS prune of old nightlies (7 daily + 4 weekly + 3 monthly)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/workflows/scripts/prune-nightlies.mjs

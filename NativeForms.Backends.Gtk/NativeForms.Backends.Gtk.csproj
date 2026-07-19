@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Hawkynt.NativeForms.Backends.Gtk</AssemblyName>
+    <RootNamespace>Hawkynt.NativeForms.Backends.Gtk</RootNamespace>
+    <PackageId>Hawkynt.NativeForms.Backends.Gtk</PackageId>
+    <Description>The Linux (GTK 3) backend for NativeForms. A thin, reflection-free P/Invoke layer that realizes NativeForms controls as native GTK widgets through libgtk-3, staying fully trim- and NativeAOT-compatible.</Description>
+    <PackageTags>ui;winforms;gui;cross-platform;native;pinvoke;gtk;gtk3;linux;aot;trimming</PackageTags>
+
+    <!-- Headline goal: consumers can trim and NativeAOT-compile against us. Every P/Invoke here is
+         source-generated (LibraryImport) and every GTK callback is an UnmanagedCallersOnly function
+         pointer, so no reflection or runtime marshalling stub is emitted. -->
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <!-- Required for the function-pointer casts used to hand GTK its C signal callbacks. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+  </ItemGroup>
+
+</Project>

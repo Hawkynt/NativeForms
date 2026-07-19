@@ -1,0 +1,37 @@
+using Hawkynt.NativeForms.Backends;
+
+namespace Hawkynt.NativeForms.Backends.MacOS;
+
+/// <summary>
+/// The macOS (Cocoa/AppKit) backend. This is currently a wired-but-unimplemented placeholder: it
+/// reports support on macOS and fails with an explicit, actionable message rather than pretending to
+/// draw. Implementing it — <c>NSApplication</c>, <c>NSWindow</c>, <c>NSButton</c>, <c>NSTextField</c>
+/// via <c>objc_msgSend</c> P/Invoke — is tracked in <c>docs/PRD.md</c>.
+/// </summary>
+public sealed class CocoaBackend : IPlatformBackend
+{
+    private const string _NotImplemented =
+        "The NativeForms Cocoa (macOS) backend is not implemented yet — see docs/PRD.md for status. "
+        + "Until then, run on Windows (Win32) or Linux (GTK).";
+
+    /// <inheritdoc/>
+    public string Name => "Cocoa";
+
+    /// <inheritdoc/>
+    public bool IsSupported => OperatingSystem.IsMacOS();
+
+    /// <inheritdoc/>
+    public IWindowPeer CreateWindow() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public IButtonPeer CreateButton() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public ILabelPeer CreateLabel() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public void Run(IWindowPeer mainWindow) => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public void Quit() { }
+}

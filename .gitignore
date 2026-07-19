@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+TestResults/
+*.trx
+
+# Publish output
+publish/
+stage/
+dist/
+
+# IDE
+.vs/
+.idea/
+*.user
+
+# Node (CI scripts)
+node_modules/
+package-lock.json
+
+# NativeAOT native build intermediates
+*.ilk
+*.pdb.map
+
+# Claude Code / agent local state
+.claude
