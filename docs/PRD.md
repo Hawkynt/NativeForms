@@ -282,26 +282,31 @@ strategy (may differ per platform; note exceptions inline).
       engine and TreeView's node model; per-node icons, keyboard expand/collapse,
       `DataSource` binding with a reflection-free children selector
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
-  - [~] Column types: [x] text, [x] image (per-cell icon) done; pending: [ ] check, [ ] button
-        (with per-cell enabled state, à la `DataGridViewDisableButtonColumn`), [ ] link,
-        [ ] combo (bound drop-down, editable), [ ] image+text (icon beside text in one cell),
-        [ ] multi-image (several icons per cell, per-icon click + tooltip), [ ] progress bar,
-        [ ] numeric up-down, [ ] date-time picker
-  - [ ] Read-only story: grid-level `ReadOnly`, per-column `ReadOnly`, per-cell conditional
-        read-only via a reflection-free row predicate (à la `DataGridViewConditionalReadOnlyAttribute`)
-  - [ ] Per-row/cell presentation via lambdas — the `Hawkynt.C--FrameworkExtensions`
-        (`System.Windows.Forms.Extensions`) attribute goodies, reimagined reflection-free as
-        selectors on the column/grid: row style + height + hidden + selectable predicates, cell
-        style/display-text/tooltip selectors, full merged rows, clickable cells
-        (`CellClick`/`CellDoubleClick`/`CellContentClick` with row/column coords), per-column
-        sort mode
-  - [~] Virtualized rows (millions of rows, constant memory) [x] done; [ ] row/column resize, [ ] frozen columns pending
+  - [~] Column types (single `DataGridViewColumn` + `Kind` enum + per-kind selectors, one
+        allocation-free paint switch): [x] text, [x] image, [x] image+text, [x] check (toggle via
+        setter, read-only-gated), [x] button (per-cell enabled à la
+        `DataGridViewDisableButtonColumn`), [x] link, [x] multi-image (per-icon click index),
+        [x] progress (shared `GlyphRenderer` fill); pending: [ ] combo, [ ] numeric up-down,
+        [ ] date-time picker (all three need the cell-editing overlay)
+  - [x] Read-only story: grid `ReadOnly`, column `ReadOnly`, per-cell `ReadOnlyCellSelector`
+        row predicate — any level wins, WinForms semantics
+  - [~] Per-row/cell presentation via lambdas (the `System.Windows.Forms.Extensions` attribute
+        goodies, reflection-free): [x] row back-color/height/hidden/selectable predicates,
+        [x] cell style/display-text/tooltip selectors, [x] clickable cells
+        (`CellClick`/`CellDoubleClick`/`CellContentClick` with model row indices — stable under
+        sorting), [x] per-column `SortMode` + `SortComparison` over an index indirection
+        (`Items` never mutated), [x] themed sort arrows; [ ] full merged rows pending
+  - [~] Virtualized rows (millions of rows, constant memory) [x] done — holds with all
+        presentation selectors active (bounded-ops test at 100k); [x] column resize (header
+        divider drag + `AllowUserToResizeColumns` + per-column `AutoSizeMode` over the visible
+        window); [ ] frozen columns pending
   - [~] [x] `DataSource`/`ObservableList<object?>` one-way binding via reflection-free `ValueSelector` done;
         [ ] cell editing, [ ] validation, [ ] formatting pending
   - [~] [x] full-row selection, [x] keyboard nav (Up/Down/PageUp/PageDown/Home/End), [x] header rendering
         in native theme done; [ ] sorting, [ ] extra selection modes, [ ] clipboard copy/paste pending
   - [~] [x] alternating row styles done; [ ] per-cell styles, [ ] DPI + dark mode pending
-  - [ ] Row headers, column drag-reorder, column auto-size modes
+  - [~] [x] Row headers (`ShowRowHeaders`/`RowHeaderWidth`, current-row marker), [x] column
+        auto-size modes; [ ] column drag-reorder pending
   - [x] Vertical virtualization (paints only the visible row range); [ ] horizontal scrollbar
         (`HorizontalOffset` shift exists; interactive scrollbar) pending
 
