@@ -12,18 +12,16 @@ public class CheckBox : OwnerDrawnControl
     private const int _BoxSize = 14;
     private const int _TextGap = 6;
 
-    private bool _checked;
-
     /// <summary>Whether the box is checked.</summary>
     public bool Checked
     {
-        get => _checked;
+        get => field;
         set
         {
-            if (_checked == value)
+            if (field == value)
                 return;
 
-            _checked = value;
+            field = value;
             this.Invalidate();
             this.OnCheckedChanged(EventArgs.Empty);
         }
@@ -72,9 +70,9 @@ public class CheckBox : OwnerDrawnControl
         var boxTop = Math.Max(0, (this.Height - _BoxSize) / 2);
         var box = new Rectangle(0, boxTop, _BoxSize, _BoxSize);
         g.FillRectangle(theme.FieldBackground, box);
-        g.DrawRectangle(_checked ? theme.Accent : theme.Border, box);
+        g.DrawRectangle(this.Checked ? theme.Accent : theme.Border, box);
 
-        if (_checked)
+        if (this.Checked)
         {
             // A check mark: two strokes from the lower-left to the upper-right.
             g.DrawLine(theme.Accent, box.X + 3, box.Y + 7, box.X + 6, box.Y + 10, 2);

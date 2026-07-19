@@ -7,34 +7,30 @@ internal sealed class BindingTests
 {
     private sealed class Person : ObservableObject
     {
-        private string _name = string.Empty;
-
         public string Name
         {
-            get => _name;
-            set => this.SetProperty(ref _name, value);
-        }
+            get => field;
+            set => this.SetProperty(ref field, value);
+        } = string.Empty;
     }
 
     /// <summary>A stand-in for a control property with a change notification, for two-way tests.</summary>
     private sealed class FakeTarget
     {
-        private string _value = string.Empty;
-
         public event EventHandler? ValueChanged;
 
         public string Value
         {
-            get => _value;
+            get => field;
             set
             {
-                if (_value == value)
+                if (field == value)
                     return;
 
-                _value = value;
+                field = value;
                 this.ValueChanged?.Invoke(this, EventArgs.Empty);
             }
-        }
+        } = string.Empty;
     }
 
     [Test]

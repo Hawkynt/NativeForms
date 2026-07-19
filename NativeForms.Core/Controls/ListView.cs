@@ -22,9 +22,6 @@ public class ListView : OwnerDrawnControl
     private int _selectedIndex = -1;
     private int _topIndex;
     private int? _itemHeight;
-    private ListViewView _view = ListViewView.Details;
-    private bool _showColumnHeaders = true;
-    private bool _fullRowSelect = true;
 
     /// <summary>Creates a list view.</summary>
     public ListView()
@@ -44,46 +41,46 @@ public class ListView : OwnerDrawnControl
     /// <summary>How items are arranged. Defaults to <see cref="ListViewView.Details"/>.</summary>
     public ListViewView View
     {
-        get => _view;
+        get => field;
         set
         {
-            if (_view == value)
+            if (field == value)
                 return;
 
-            _view = value;
+            field = value;
             this.ClampScroll();
             this.Invalidate();
         }
-    }
+    } = ListViewView.Details;
 
     /// <summary>Whether the column header row is shown (Details view only). Defaults to <see langword="true"/>.</summary>
     public bool ShowColumnHeaders
     {
-        get => _showColumnHeaders;
+        get => field;
         set
         {
-            if (_showColumnHeaders == value)
+            if (field == value)
                 return;
 
-            _showColumnHeaders = value;
+            field = value;
             this.ClampScroll();
             this.Invalidate();
         }
-    }
+    } = true;
 
     /// <summary>Whether clicking anywhere on a Details row selects it. Defaults to <see langword="true"/>.</summary>
     public bool FullRowSelect
     {
-        get => _fullRowSelect;
+        get => field;
         set
         {
-            if (_fullRowSelect == value)
+            if (field == value)
                 return;
 
-            _fullRowSelect = value;
+            field = value;
             this.Invalidate();
         }
-    }
+    } = true;
 
     /// <summary>The pixel height of a row (and of the header). Defaults to the theme row height.</summary>
     public int ItemHeight
@@ -137,7 +134,7 @@ public class ListView : OwnerDrawnControl
     protected override bool Focusable => true;
 
     /// <summary>The pixel height reserved for the header row (0 unless Details with headers shown).</summary>
-    protected int HeaderHeight => _view == ListViewView.Details && _showColumnHeaders ? this.ItemHeight : 0;
+    protected int HeaderHeight => this.View == ListViewView.Details && this.ShowColumnHeaders ? this.ItemHeight : 0;
 
     /// <summary>The number of fully visible rows in the item area.</summary>
     protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.ItemHeight);
@@ -225,7 +222,7 @@ public class ListView : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, this.Width, this.Height));
 
-        if (_view == ListViewView.Details)
+        if (this.View == ListViewView.Details)
             this.PaintDetails(g, theme);
         else
             this.PaintList(g, theme);

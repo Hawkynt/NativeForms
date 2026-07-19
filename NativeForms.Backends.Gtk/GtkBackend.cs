@@ -13,8 +13,6 @@ public sealed class GtkBackend : IPlatformBackend
     private static readonly object _initGate = new();
     private static bool _initialized;
 
-    private GtkTheme? _theme;
-
     /// <summary>Calls <c>gtk_init</c> exactly once, before any widget is created or the loop runs.</summary>
     private static void EnsureInitialized()
     {
@@ -43,7 +41,7 @@ public sealed class GtkBackend : IPlatformBackend
         get
         {
             EnsureInitialized();
-            return _theme ??= new GtkTheme();
+            return field ??= new GtkTheme();
         }
     }
 

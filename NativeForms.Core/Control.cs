@@ -17,10 +17,6 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public abstract class Control
 {
-    private string _text = string.Empty;
-    private Rectangle _bounds;
-    private bool _visible = true;
-    private bool _enabled = true;
     private IControlPeer? _peer;
 
     /// <summary>Initializes the control and its (initially empty) child collection.</summary>
@@ -29,29 +25,29 @@ public abstract class Control
     /// <summary>The caption text: a button label, a form's title bar, a label's text.</summary>
     public string Text
     {
-        get => _text;
+        get => field;
         set
         {
             value ??= string.Empty;
-            if (_text == value)
+            if (field == value)
                 return;
 
-            _text = value;
+            field = value;
             _peer?.SetText(value);
             this.OnTextChanged(EventArgs.Empty);
         }
-    }
+    } = string.Empty;
 
     /// <summary>Position and size relative to the parent's client area, in pixels.</summary>
     public Rectangle Bounds
     {
-        get => _bounds;
+        get => field;
         set
         {
-            if (_bounds == value)
+            if (field == value)
                 return;
 
-            _bounds = value;
+            field = value;
             _peer?.SetBounds(value);
         }
     }
@@ -59,72 +55,72 @@ public abstract class Control
     /// <summary>The top-left corner of <see cref="Bounds"/>.</summary>
     public Point Location
     {
-        get => _bounds.Location;
-        set => this.Bounds = new(value, _bounds.Size);
+        get => this.Bounds.Location;
+        set => this.Bounds = new(value, this.Bounds.Size);
     }
 
     /// <summary>The size of <see cref="Bounds"/>.</summary>
     public Size Size
     {
-        get => _bounds.Size;
-        set => this.Bounds = new(_bounds.Location, value);
+        get => this.Bounds.Size;
+        set => this.Bounds = new(this.Bounds.Location, value);
     }
 
     /// <summary>The x-coordinate of the left edge.</summary>
     public int Left
     {
-        get => _bounds.X;
-        set => this.Location = new(value, _bounds.Y);
+        get => this.Bounds.X;
+        set => this.Location = new(value, this.Bounds.Y);
     }
 
     /// <summary>The y-coordinate of the top edge.</summary>
     public int Top
     {
-        get => _bounds.Y;
-        set => this.Location = new(_bounds.X, value);
+        get => this.Bounds.Y;
+        set => this.Location = new(this.Bounds.X, value);
     }
 
     /// <summary>The width in pixels.</summary>
     public int Width
     {
-        get => _bounds.Width;
-        set => this.Size = new(value, _bounds.Height);
+        get => this.Bounds.Width;
+        set => this.Size = new(value, this.Bounds.Height);
     }
 
     /// <summary>The height in pixels.</summary>
     public int Height
     {
-        get => _bounds.Height;
-        set => this.Size = new(_bounds.Width, value);
+        get => this.Bounds.Height;
+        set => this.Size = new(this.Bounds.Width, value);
     }
 
     /// <summary>Whether the widget is shown.</summary>
     public bool Visible
     {
-        get => _visible;
+        get => field;
         set
         {
-            if (_visible == value)
+            if (field == value)
                 return;
 
-            _visible = value;
+            field = value;
             _peer?.SetVisible(value);
         }
-    }
+    } = true;
 
     /// <summary>Whether the widget accepts user interaction.</summary>
     public bool Enabled
     {
-        get => _enabled;
+        get => field;
         set
         {
-            if (_enabled == value)
+            if (field == value)
                 return;
 
-            _enabled = value;
+            field = value;
             _peer?.SetEnabled(value);
         }
-    }
+    } = true;
 
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
@@ -164,10 +160,10 @@ public abstract class Control
     {
         var peer = this.CreatePeer(backend);
         _peer = peer;
-        peer.SetBounds(_bounds);
-        peer.SetText(_text);
-        peer.SetEnabled(_enabled);
-        peer.SetVisible(_visible);
+        peer.SetBounds(this.Bounds);
+        peer.SetText(this.Text);
+        peer.SetEnabled(this.Enabled);
+        peer.SetVisible(this.Visible);
         this.OnRealized(peer);
         return peer;
     }

@@ -21,13 +21,8 @@ public class DataGridView : OwnerDrawnControl
 
     private int _selectedRowIndex = -1;
     private int _topRow;
-    private int _horizontalOffset;
     private int? _rowHeight;
     private int? _columnHeaderHeight;
-    private bool _showColumnHeaders = true;
-    private bool _showGridLines = true;
-    private bool _alternatingRows;
-    private Color _alternatingRowColor = Color.FromArgb(0xFF, 0xF6, 0xF6, 0xF6);
 
     /// <summary>Creates a data grid.</summary>
     public DataGridView()
@@ -67,32 +62,32 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>Whether the column-header row is painted. Defaults to <see langword="true"/>.</summary>
     public bool ShowColumnHeaders
     {
-        get => _showColumnHeaders;
+        get => field;
         set
         {
-            _showColumnHeaders = value;
+            field = value;
             this.Invalidate();
         }
-    }
+    } = true;
 
     /// <summary>Whether grid lines are painted. Defaults to <see langword="true"/>.</summary>
     public bool ShowGridLines
     {
-        get => _showGridLines;
+        get => field;
         set
         {
-            _showGridLines = value;
+            field = value;
             this.Invalidate();
         }
-    }
+    } = true;
 
     /// <summary>Whether every other data row is tinted with <see cref="AlternatingRowColor"/>.</summary>
     public bool AlternatingRows
     {
-        get => _alternatingRows;
+        get => field;
         set
         {
-            _alternatingRows = value;
+            field = value;
             this.Invalidate();
         }
     }
@@ -100,21 +95,21 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>The background tint of alternating rows when <see cref="AlternatingRows"/> is enabled.</summary>
     public Color AlternatingRowColor
     {
-        get => _alternatingRowColor;
+        get => field;
         set
         {
-            _alternatingRowColor = value;
+            field = value;
             this.Invalidate();
         }
-    }
+    } = Color.FromArgb(0xFF, 0xF6, 0xF6, 0xF6);
 
     /// <summary>The horizontal scroll offset in pixels; columns are shifted left by this amount.</summary>
     public int HorizontalOffset
     {
-        get => _horizontalOffset;
+        get => field;
         set
         {
-            _horizontalOffset = Math.Max(0, value);
+            field = Math.Max(0, value);
             this.Invalidate();
         }
     }
@@ -167,7 +162,7 @@ public class DataGridView : OwnerDrawnControl
     protected override bool Focusable => true;
 
     /// <summary>The pixel height of the column-header row, or 0 when hidden.</summary>
-    protected int HeaderHeight => _showColumnHeaders ? this.ColumnHeaderHeight : 0;
+    protected int HeaderHeight => this.ShowColumnHeaders ? this.ColumnHeaderHeight : 0;
 
     /// <summary>The number of fully visible data rows.</summary>
     protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.RowHeight);
@@ -259,14 +254,15 @@ public class DataGridView : OwnerDrawnControl
         var columnCount = columns.Count;
         var rowHeight = this.RowHeight;
         var header = this.HeaderHeight;
-        var showGridLines = _showGridLines;
+        var horizontalOffset = this.HorizontalOffset;
+        var showGridLines = this.ShowGridLines;
 
-        if (_showColumnHeaders)
+        if (this.ShowColumnHeaders)
         {
             var headerRect = new Rectangle(0, 0, width, header);
             g.FillRectangle(theme.HeaderBackground, headerRect);
 
-            var hx = -_horizontalOffset;
+            var hx = -horizontalOffset;
             for (var c = 0; c < columnCount; ++c)
             {
                 var column = columns[c];
@@ -287,12 +283,12 @@ public class DataGridView : OwnerDrawnControl
             var selected = i == _selectedRowIndex;
             if (selected)
                 g.FillRectangle(theme.SelectionBackground, rowRect);
-            else if (_alternatingRows && (i & 1) == 1)
-                g.FillRectangle(_alternatingRowColor, rowRect);
+            else if (this.AlternatingRows && (i & 1) == 1)
+                g.FillRectangle(this.AlternatingRowColor, rowRect);
 
             var item = this.Items[i];
             var textColor = selected ? theme.SelectionText : theme.ControlText;
-            var cx = -_horizontalOffset;
+            var cx = -horizontalOffset;
             for (var c = 0; c < columnCount; ++c)
             {
                 var column = columns[c];
@@ -317,7 +313,7 @@ public class DataGridView : OwnerDrawnControl
 
         if (showGridLines)
         {
-            var gx = -_horizontalOffset;
+            var gx = -horizontalOffset;
             for (var c = 0; c < columnCount; ++c)
             {
                 gx += columns[c].Width;

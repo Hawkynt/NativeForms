@@ -10,8 +10,6 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// </summary>
 public sealed class Win32Backend : IPlatformBackend
 {
-    private ITheme? _theme;
-
     /// <inheritdoc/>
     public string Name => "Win32";
 
@@ -21,7 +19,7 @@ public sealed class Win32Backend : IPlatformBackend
     /// <inheritdoc/>
     // Built lazily and cached: constructing it queries the OS, so we defer that until a control paints
     // (and never touch USER32/GDI just by instantiating the backend on a non-Windows host).
-    public ITheme Theme => this._theme ??= new Win32Theme();
+    public ITheme Theme => field ??= new Win32Theme();
 
     /// <inheritdoc/>
     public IWindowPeer CreateWindow() => new WindowPeer();

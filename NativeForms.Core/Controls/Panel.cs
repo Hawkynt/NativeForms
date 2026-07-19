@@ -21,21 +21,19 @@ public enum BorderStyle
 /// </summary>
 public class Panel : OwnerDrawnControl
 {
-    private BorderStyle _borderStyle = BorderStyle.None;
-
     /// <summary>The border drawn around the panel.</summary>
     public BorderStyle BorderStyle
     {
-        get => _borderStyle;
+        get => field;
         set
         {
-            if (_borderStyle == value)
+            if (field == value)
                 return;
 
-            _borderStyle = value;
+            field = value;
             this.Invalidate();
         }
-    }
+    } = BorderStyle.None;
 
     /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
@@ -44,7 +42,7 @@ public class Panel : OwnerDrawnControl
         var full = new Rectangle(0, 0, this.Width, this.Height);
         g.FillRectangle(this.Theme.ControlBackground, full);
 
-        switch (_borderStyle)
+        switch (this.BorderStyle)
         {
             case BorderStyle.FixedSingle:
                 g.DrawRectangle(this.Theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));

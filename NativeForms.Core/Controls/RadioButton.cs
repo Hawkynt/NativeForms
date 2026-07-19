@@ -13,18 +13,16 @@ public class RadioButton : OwnerDrawnControl
     private const int _CircleSize = 14;
     private const int _TextGap = 6;
 
-    private bool _checked;
-
     /// <summary>Whether this button is the selected one in its group.</summary>
     public bool Checked
     {
-        get => _checked;
+        get => field;
         set
         {
-            if (_checked == value)
+            if (field == value)
                 return;
 
-            _checked = value;
+            field = value;
             if (value)
                 this.UncheckSiblings();
 
@@ -88,9 +86,9 @@ public class RadioButton : OwnerDrawnControl
         var circleTop = Math.Max(0, (this.Height - _CircleSize) / 2);
         var circle = new Rectangle(0, circleTop, _CircleSize, _CircleSize);
         g.FillEllipse(theme.FieldBackground, circle);
-        g.DrawEllipse(_checked ? theme.Accent : theme.Border, circle);
+        g.DrawEllipse(this.Checked ? theme.Accent : theme.Border, circle);
 
-        if (_checked)
+        if (this.Checked)
         {
             var inset = _CircleSize / 4;
             var dot = new Rectangle(circle.X + inset, circle.Y + inset, _CircleSize - 2 * inset, _CircleSize - 2 * inset);

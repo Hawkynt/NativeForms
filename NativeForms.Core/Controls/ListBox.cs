@@ -17,7 +17,6 @@ public class ListBox : OwnerDrawnControl
     private int _selectedIndex = -1;
     private int _topIndex;
     private int? _itemHeight;
-    private Func<object?, string> _displaySelector = static item => item?.ToString() ?? string.Empty;
 
     /// <summary>Creates a list box.</summary>
     public ListBox()
@@ -32,13 +31,13 @@ public class ListBox : OwnerDrawnControl
     /// <summary>Produces the display text for an item. Defaults to <c>ToString()</c>.</summary>
     public Func<object?, string> DisplaySelector
     {
-        get => _displaySelector;
+        get => field;
         set
         {
-            _displaySelector = value ?? (static item => item?.ToString() ?? string.Empty);
+            field = value ?? (static item => item?.ToString() ?? string.Empty);
             this.Invalidate();
         }
-    }
+    } = static item => item?.ToString() ?? string.Empty;
 
     /// <summary>Optional selector producing an icon for an item; <see langword="null"/> for none.</summary>
     public Func<object?, IImage?>? ImageSelector { get; set; }
@@ -182,6 +181,7 @@ public class ListBox : OwnerDrawnControl
         g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, this.Width, this.Height));
 
         var rowHeight = this.ItemHeight;
+        var displaySelector = this.DisplaySelector;
         var last = Math.Min(this.Items.Count, _topIndex + this.VisibleRowCount + 1);
         for (var i = _topIndex; i < last; ++i)
         {
@@ -202,7 +202,7 @@ public class ListBox : OwnerDrawnControl
 
             var textColor = selected ? theme.SelectionText : theme.ControlText;
             var textRect = new Rectangle(textLeft, y, this.Width - textLeft, rowHeight);
-            g.DrawText(_displaySelector(this.Items[i]), theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
+            g.DrawText(displaySelector(this.Items[i]), theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
         }
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
