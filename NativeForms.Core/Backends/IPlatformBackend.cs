@@ -37,6 +37,9 @@ public interface IPlatformBackend
     /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
     IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);
 
+    /// <summary>Creates a stopped UI-thread timer peer.</summary>
+    ITimerPeer CreateTimer();
+
     /// <summary>
     /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>
     /// is called. Must be invoked on the thread that created the widgets.

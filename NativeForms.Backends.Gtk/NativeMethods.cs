@@ -189,6 +189,25 @@ internal static partial class NativeMethods
     [LibraryImport(GLib)]
     internal static partial void g_free(nint mem);
 
+    // --- Timers ---------------------------------------------------------------------------------
+
+    /// <summary>Value of <c>G_PRIORITY_DEFAULT</c> — the priority ordinary main-loop sources run at.</summary>
+    internal const int G_PRIORITY_DEFAULT = 0;
+
+    /// <summary>
+    /// Registers <paramref name="function"/> (a <c>GSourceFunc</c> function pointer) to be invoked by
+    /// the main loop every <paramref name="interval"/> milliseconds, threading <paramref name="data"/>
+    /// through as the callback's <c>user_data</c>. The source keeps firing while the callback returns
+    /// 1 (<c>G_SOURCE_CONTINUE</c>). <paramref name="notify"/> is a <c>GDestroyNotify</c> function
+    /// pointer (0 = none). Returns the source id for <see cref="g_source_remove"/>.
+    /// </summary>
+    [LibraryImport(GLib)]
+    internal static partial uint g_timeout_add_full(int priority, uint interval, nint function, nint data, nint notify);
+
+    /// <summary>Removes the main-loop source with the given id, stopping its callbacks. Returns <c>TRUE</c> (1) when found.</summary>
+    [LibraryImport(GLib)]
+    internal static partial int g_source_remove(uint tag);
+
     // --- Signals --------------------------------------------------------------------------------
 
     /// <summary>

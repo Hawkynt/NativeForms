@@ -9,7 +9,12 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public static class Application
 {
-    private static IPlatformBackend? _backend;
+    /// <summary>
+    /// The backend the message loop is currently running on, or <see langword="null"/> outside
+    /// <see cref="Run(Form)"/>. Components that need a backend after startup — <see cref="Timer"/>,
+    /// for example — resolve it here instead of dragging one through every constructor.
+    /// </summary>
+    internal static IPlatformBackend? Current { get; private set; }
 
     /// <summary>
     /// Shows <paramref name="mainForm"/> and runs the message loop until it closes, choosing the
@@ -23,11 +28,18 @@ public static class Application
         ArgumentNullException.ThrowIfNull(mainForm);
         ArgumentNullException.ThrowIfNull(backend);
 
-        _backend = backend;
-        var window = mainForm.RealizeWindow(backend);
-        backend.Run(window);
+        Current = backend;
+        try
+        {
+            var window = mainForm.RealizeWindow(backend);
+            backend.Run(window);
+        }
+        finally
+        {
+            Current = null;
+        }
     }
 
     /// <summary>Requests the running message loop to exit.</summary>
-    public static void Exit() => _backend?.Quit();
+    public static void Exit() => Current?.Quit();
 }

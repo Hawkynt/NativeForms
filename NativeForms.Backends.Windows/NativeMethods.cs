@@ -249,4 +249,17 @@ internal static partial class NativeMethods
     /// <summary>Posts a <c>WM_QUIT</c> message, asking the message loop to terminate.</summary>
     [LibraryImport("user32.dll")]
     internal static partial void PostQuitMessage(int nExitCode);
+
+    /// <summary>
+    /// Creates an interval timer. Called with a null HWND and a zero event id, USER32 allocates a
+    /// fresh timer and returns its id; <paramref name="lpTimerFunc"/> (a <c>TIMERPROC</c> function
+    /// pointer) is then invoked by the message loop's <c>WM_TIMER</c> dispatch. Returns 0 on failure.
+    /// </summary>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nuint SetTimer(nint hWnd, nuint nIDEvent, uint uElapse, nint lpTimerFunc);
+
+    /// <summary>Destroys a timer. For window-less timers, pass a null HWND and the id <see cref="SetTimer"/> returned.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool KillTimer(nint hWnd, nuint uIDEvent);
 }

@@ -12,8 +12,13 @@ namespace Hawkynt.NativeForms.Tests.Fakes;
 internal sealed class HeadlessBackend : IPlatformBackend
 {
     public List<HeadlessPeer> Created { get; } = [];
+    public List<HeadlessTimerPeer> Timers { get; } = [];
     public bool DidRun { get; private set; }
     public bool DidQuit { get; private set; }
+
+    /// <summary>Optional callback invoked inside <see cref="Run"/>, standing in for the work a real
+    /// message loop would dispatch while it pumps (timer arming, event handlers, …).</summary>
+    public Action? RunAction { get; set; }
 
     public string Name => "Headless";
     public bool IsSupported => true;
@@ -25,7 +30,19 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
 
-    public void Run(IWindowPeer mainWindow) => this.DidRun = true;
+    public ITimerPeer CreateTimer()
+    {
+        var peer = new HeadlessTimerPeer();
+        this.Timers.Add(peer);
+        return peer;
+    }
+
+    public void Run(IWindowPeer mainWindow)
+    {
+        this.DidRun = true;
+        this.RunAction?.Invoke();
+    }
+
     public void Quit() => this.DidQuit = true;
 
     private T Track<T>(T peer) where T : HeadlessPeer
@@ -72,6 +89,38 @@ internal sealed class HeadlessButtonPeer : HeadlessPeer, IButtonPeer
 }
 
 internal sealed class HeadlessLabelPeer : HeadlessPeer, ILabelPeer;
+
+/// <summary>A timer peer that records every Start/Stop and lets tests raise ticks by hand.</summary>
+internal sealed class HeadlessTimerPeer : ITimerPeer
+{
+    public List<int> StartedIntervals { get; } = [];
+    public int StopCount { get; private set; }
+    public bool IsRunning { get; private set; }
+    public bool Disposed { get; private set; }
+
+    public event EventHandler? Tick;
+
+    public void Start(int intervalMs)
+    {
+        this.StartedIntervals.Add(intervalMs);
+        this.IsRunning = true;
+    }
+
+    public void Stop()
+    {
+        ++this.StopCount;
+        this.IsRunning = false;
+    }
+
+    public void Dispose()
+    {
+        this.IsRunning = false;
+        this.Disposed = true;
+    }
+
+    /// <summary>Raises <see cref="Tick"/> as the platform message loop would.</summary>
+    public void FireTick() => this.Tick?.Invoke(this, EventArgs.Empty);
+}
 
 internal sealed class HeadlessImage(int width, int height) : IImage
 {

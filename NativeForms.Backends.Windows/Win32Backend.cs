@@ -38,6 +38,9 @@ public sealed class Win32Backend : IPlatformBackend
         => new Win32Image(width, height, argb);
 
     /// <inheritdoc/>
+    public ITimerPeer CreateTimer() => new Win32TimerPeer();
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow)
     {
         ArgumentNullException.ThrowIfNull(mainWindow);

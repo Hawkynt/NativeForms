@@ -35,6 +35,9 @@ public sealed class CocoaBackend : IPlatformBackend
         => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public ITimerPeer CreateTimer() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public IButtonPeer CreateButton() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

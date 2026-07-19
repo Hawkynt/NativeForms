@@ -60,6 +60,13 @@ public sealed class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public ITimerPeer CreateTimer()
+    {
+        EnsureInitialized();
+        return new GtkTimerPeer();
+    }
+
+    /// <inheritdoc />
     public IWindowPeer CreateWindow()
     {
         EnsureInitialized();

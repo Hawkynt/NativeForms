@@ -55,3 +55,20 @@ public interface IButtonPeer : IControlPeer
 public interface ILabelPeer : IControlPeer
 {
 }
+
+/// <summary>
+/// A recurring UI-thread timer source — the native side of a <see cref="Timer"/>. Ticks are delivered
+/// by the platform message loop, so they always arrive on the thread that pumps it. Starting a peer
+/// that is already running restarts it with the new interval.
+/// </summary>
+public interface ITimerPeer : IDisposable
+{
+    /// <summary>Begins (or restarts) periodic ticking every <paramref name="intervalMs"/> milliseconds.</summary>
+    void Start(int intervalMs);
+
+    /// <summary>Stops ticking. The peer stays usable and can be started again.</summary>
+    void Stop();
+
+    /// <summary>Raised on the UI thread once per elapsed interval.</summary>
+    event EventHandler? Tick;
+}

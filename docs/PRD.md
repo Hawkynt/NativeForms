@@ -173,6 +173,8 @@ strategy (may differ per platform; note exceptions inline).
       Controls, Click/TextChanged, realize/peer lifecycle)
 - [x] `ControlCollection`
 - [x] Backend abstraction (`IPlatformBackend`, peer interfaces, `BackendRegistry`)
+- [x] `Timer` (WinForms-shaped, `ITimerPeer`: WM_TIMER on Win32, `g_timeout` on GTK, fireable
+      headless fake; deferred arm until a backend runs) — drives marquee/caret/tooltip/autorepeat
 - [ ] `Component`/`IContainer` + designer-free component model
 - [ ] `Cursor`, `Cursors`; `Control.Cursor`
 - [ ] Focus model (`Focus()`, `TabIndex`, `TabStop`, `Enter`/`Leave`/`GotFocus`/`LostFocus`)
