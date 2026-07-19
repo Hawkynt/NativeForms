@@ -2,16 +2,6 @@ using System.Drawing;
 
 namespace Hawkynt.NativeForms;
 
-/// <summary>The axis a control (or its splitter) runs along, matching <c>System.Windows.Forms.Orientation</c>.</summary>
-public enum Orientation
-{
-    /// <summary>A horizontal bar — a <see cref="SplitContainer"/> stacks its panels vertically.</summary>
-    Horizontal,
-
-    /// <summary>A vertical bar — a <see cref="SplitContainer"/> puts its panels side by side.</summary>
-    Vertical,
-}
-
 /// <summary>
 /// An owner-drawn container split into two <see cref="Panel"/>s by a draggable bar. The panels are
 /// permanent nested children; the splitter is the only strip of the control's own surface left
