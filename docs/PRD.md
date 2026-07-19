@@ -245,22 +245,34 @@ strategy (may differ per platform; note exceptions inline).
   - [~] [x] full-row selection, [x] keyboard nav (Up/Down/PageUp/PageDown/Home/End), [x] header rendering
         in native theme done; [ ] sorting, [ ] extra selection modes, [ ] clipboard copy/paste pending
   - [~] [x] alternating row styles done; [ ] per-cell styles, [ ] DPI + dark mode pending
+  - [ ] Row headers, column drag-reorder, column auto-size modes
   - [x] Vertical virtualization (paints only the visible row range); [ ] horizontal scrollbar
         (`HorizontalOffset` shift exists; interactive scrollbar) pending
 
 ### 7.5 Range & date
 - [ ] `TrackBar` (native/owner)
-- [~] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill) done; marquee pending
+- [~] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill) done; `Style.Marquee`
+      (animated, allocation-free), `Step`/`PerformStep`, vertical orientation pending
 - [ ] `ScrollBar` (`HScrollBar`/`VScrollBar`) (native)
 - [ ] `DateTimePicker` (native/owner)
 - [ ] `MonthCalendar` (owner)
 
 ### 7.6 Menus, toolbars, status
-- [ ] `MenuStrip` / `ToolStripMenuItem` (native menu bar where available, else owner)
-- [ ] `ContextMenuStrip`
-- [ ] `ToolStrip` / `ToolStripButton` / separators / dropdowns (owner in native theme)
-- [ ] `StatusStrip` / `ToolStripStatusLabel`
-- [ ] `ToolTip`
+- [ ] `MenuStrip` / `ToolStripMenuItem` (native menu bar where available — Win32 `HMENU`,
+      `GtkMenuBar`, NSMenu — else owner)
+  - [ ] Items with **icon + text**, separators, nested submenus
+  - [ ] Checked and radio-checked items
+  - [ ] Keyboard: mnemonics (`&File`), shortcut keys (Ctrl+S) — displayed and handled
+  - [ ] `ICommand` wiring (auto enable/disable via `CanExecute`, see §3)
+- [ ] `ContextMenuStrip` — `Control.ContextMenuStrip` assignment, opens on right-click/menu key
+      at the cursor, same item model as `MenuStrip`
+- [ ] `ToolStrip` (owner in native theme) — `ToolStripButton` (icon + optional text), toggle
+      buttons, separators, `ToolStripDropDownButton`/`ToolStripSplitButton`, overflow when the
+      bar is too narrow, `ImageList` sharing
+- [ ] `StatusStrip` — `ToolStripStatusLabel` (incl. `Spring` autosizing), embedded progress bar
+      panel, size grip
+- [ ] `ToolTip` — per-control text (native tooltip where available), show/hide delays,
+      works on owner-drawn controls (incl. per-item tips in lists/trees/grids)
 
 ### 7.7 Media & misc
 - [ ] `PictureBox` (owner) — `SizeMode`, image formats
@@ -338,7 +350,7 @@ neighborhood ships.
   Button/Label/CheckBox/RadioButton/GroupBox caption/tab headers (§8 uniform image API),
   PictureBox, small PNG/ICO decoding. `[ ]`
 - **M7 — Text & value editors.** RichTextBox, MaskedTextBox, NumericUpDown/DomainUpDown,
-  TrackBar, ScrollBars, DateTimePicker, MonthCalendar. `[ ]`
+  TrackBar, ScrollBars, ProgressBar marquee, DateTimePicker, MonthCalendar. `[ ]`
 - **M8 — Chrome & dialogs.** MenuStrip/ContextMenuStrip, ToolStrip (incl. SplitButton/
   DropDownButton), StatusStrip, ToolTip, NotifyIcon, MessageBox + file/folder/color/font dialogs,
   ToggleSwitch/SearchBox extras. `[ ]`
