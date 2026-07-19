@@ -83,9 +83,12 @@ internal sealed class HeadlessImage(int width, int height) : IImage
 /// <summary>A canvas peer whose events tests can raise directly, with a recording graphics surface.</summary>
 internal sealed class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
 {
+    public List<IControlPeer> Children { get; } = [];
     public bool Focusable { get; private set; }
     public bool FocusRequested { get; private set; }
     public int InvalidateCount { get; private set; }
+
+    public void AddChild(IControlPeer child) => this.Children.Add(child);
 
     public event EventHandler<PaintEventArgs>? Paint;
     public event EventHandler<MouseEventArgs>? MouseDown;

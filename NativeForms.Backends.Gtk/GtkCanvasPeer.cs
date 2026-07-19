@@ -7,11 +7,16 @@ using Hawkynt.NativeForms.Drawing;
 namespace Hawkynt.NativeForms.Backends.Gtk;
 
 /// <summary>
-/// The GTK peer for an owner-drawn control, wrapping a focusable <c>GtkDrawingArea</c>. It turns the
-/// widget's "draw" and input signals into the toolkit's paint/mouse/key/focus events, so every custom
-/// control renders through <see cref="GtkGraphics"/> and drives the same event surface. Like the other
-/// child peers it is realized lazily: the widget, its event mask and its signal handlers are created
-/// the first time the owning window drops it into its <c>GtkFixed</c>.
+/// The GTK peer for an owner-drawn control, wrapping a focusable <c>GtkFixed</c> that is given its
+/// own GDK window and marked app-paintable — it emits the same "draw" signal a <c>GtkDrawingArea</c>
+/// would, but can additionally host native children at absolute coordinates, which is what makes it
+/// an <see cref="IContainerPeer"/>. The widget's "draw" and input signals become the toolkit's
+/// paint/mouse/key/focus events, so every custom control renders through <see cref="GtkGraphics"/>
+/// and drives the same event surface; our draw handler runs before GTK's default container draw, so
+/// the owner-drawn background always ends up underneath the children. Like the other child peers it
+/// is realized lazily: the widget, its event mask and its signal handlers are created the first time
+/// the owning container drops it into its <c>GtkFixed</c>, and children added before that moment are
+/// buffered and placed as soon as the widget exists.
 /// </summary>
 internal sealed class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 {
@@ -26,6 +31,10 @@ internal sealed class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         | NativeMethods.GDK_FOCUS_CHANGE_MASK;
 
     private bool _focusable = true;
+
+    /// <summary>Child peers hosted by this surface. Created on first use so leaf canvases (the
+    /// overwhelming majority) pay nothing for the container role.</summary>
+    private List<GtkControlPeer>? _children;
 
     /// <inheritdoc />
     public event EventHandler<PaintEventArgs>? Paint;
@@ -61,13 +70,27 @@ internal sealed class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     public event EventHandler? LostFocus;
 
     /// <inheritdoc />
-    protected override nint CreateWidget() => NativeMethods.gtk_drawing_area_new();
+    protected override nint CreateWidget()
+    {
+        // A GtkFixed rather than a GtkDrawingArea: same "draw" signal, but it can also host native
+        // children. GtkFixed is window-less by default, so give it its own GDK window (before
+        // realization) to receive input, and app-paintable so the theme leaves the pixels to us.
+        var widget = NativeMethods.gtk_fixed_new();
+        NativeMethods.gtk_widget_set_has_window(widget, Bool(true));
+        NativeMethods.gtk_widget_set_app_paintable(widget, Bool(true));
+        return widget;
+    }
 
     /// <inheritdoc />
     protected override void OnWidgetRealized()
     {
         NativeMethods.gtk_widget_set_can_focus(_widget, Bool(_focusable));
         NativeMethods.gtk_widget_add_events(_widget, GdkEventMask);
+
+        // Place children that were added while this canvas had no widget of its own yet.
+        if (_children is not null)
+            foreach (var child in _children)
+                child.Realize(_widget);
 
         _selfHandle = GCHandle.Alloc(this);
         var data = GCHandle.ToIntPtr(_selfHandle);
@@ -89,6 +112,17 @@ internal sealed class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     /// <summary>Connects one native signal to a Cdecl function pointer with this peer as user data.</summary>
     private void Connect(string signal, nint handler, nint data)
         => NativeMethods.g_signal_connect_data(_widget, signal, handler, data, 0, 0);
+
+    /// <inheritdoc />
+    public void AddChild(IControlPeer child)
+    {
+        if (child is not GtkControlPeer peer)
+            return;
+
+        (_children ??= []).Add(peer);
+        if (_widget != 0)
+            peer.Realize(_widget);
+    }
 
     /// <inheritdoc />
     public void Invalidate(Rectangle bounds)

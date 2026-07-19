@@ -12,7 +12,10 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// The window procedure — a static <see cref="UnmanagedCallersOnlyAttribute"/> function pointer, never a
 /// managed delegate — recovers the peer from the static <see cref="_canvases"/> map keyed by HWND, then
 /// translates native paint, mouse, keyboard and focus messages into the <see cref="ICanvasPeer"/> events
-/// the managed control subscribes to.
+/// the managed control subscribes to. As an <see cref="IContainerPeer"/> it also hosts nested child
+/// HWNDs on top of its painted surface, exactly like <see cref="WindowPeer"/> hosts them in a form's
+/// client area: children added before this canvas has its own HWND are buffered and parented the
+/// moment it is created.
 /// </summary>
 internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
 {
@@ -23,6 +26,12 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
 
     private static int _classRegistered;
     private static nint _classNamePtr;
+
+    /// <summary>Child controls hosted by this surface, keyed by their HMENU control identifier. Created
+    /// on first use so leaf canvases (the overwhelming majority) pay nothing for the container role.</summary>
+    private Dictionary<int, Win32ChildPeer>? _children;
+
+    private int _nextControlId = 1000;
 
     private bool _focusable;
 
@@ -70,8 +79,30 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     {
         EnsureClassRegistered();
         base.CreateChildHandle(parent, controlId);
+        if (this.Handle == 0)
+            return;
+
+        _canvases[this.Handle] = this;
+
+        // Flush children that were added while this canvas had no HWND of its own yet.
+        if (this._children is null)
+            return;
+
+        foreach (var (childId, child) in this._children)
+            child.CreateChildHandle(this.Handle, childId);
+    }
+
+    /// <inheritdoc/>
+    public void AddChild(IControlPeer child)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        if (child is not Win32ChildPeer childPeer)
+            throw new ArgumentException($"Expected a {nameof(Win32ChildPeer)} but got {child.GetType()}.", nameof(child));
+
+        var controlId = this._nextControlId++;
+        (this._children ??= new())[controlId] = childPeer;
         if (this.Handle != 0)
-            _canvases[this.Handle] = this;
+            childPeer.CreateChildHandle(this.Handle, controlId);
     }
 
     /// <inheritdoc/>
@@ -117,6 +148,13 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
             _canvases.TryRemove(this.Handle, out _);
 
         base.Dispose();
+    }
+
+    /// <summary>Routes a <c>WM_COMMAND</c> notification from a hosted native child to its peer.</summary>
+    private void OnCommandMessage(nint wParam)
+    {
+        if (this._children is not null && this._children.TryGetValue((int)(wParam & 0xFFFF), out var child))
+            child.OnCommand((int)((wParam >> 16) & 0xFFFF));
     }
 
     /// <summary>Paints the update region by driving the managed <see cref="Paint"/> handler over a GDI surface.</summary>
@@ -223,6 +261,12 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                 case NativeMethods.WM_ERASEBKGND:
                     // Report the background as erased so Windows never paints it under us.
                     return 1;
+
+                case NativeMethods.WM_COMMAND:
+                    // A non-zero lParam means a hosted native child (its HWND) is notifying us.
+                    if (lParam != 0)
+                        peer.OnCommandMessage(wParam);
+                    return 0;
 
                 case NativeMethods.WM_PAINT:
                     peer.OnPaintMessage(hwnd);

@@ -9,11 +9,11 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// state until the native widget exists, then applies every subsequent write to the live widget.
 /// </summary>
 /// <remarks>
-/// Child peers (buttons, labels) are created lazily: the core sets their buffered state during
-/// realization, and the owning window's <see cref="GtkWindowPeer.AddChild"/> calls
-/// <see cref="Realize"/> to create the widget, flush the buffer and drop it into the window's
-/// <c>GtkFixed</c>. The window peer creates its own widget eagerly and overrides the pieces that
-/// differ (title, sizing).
+/// Child peers (buttons, labels, canvases) are created lazily: the core sets their buffered state
+/// during realization, and the owning container — <see cref="GtkWindowPeer.AddChild"/> or
+/// <see cref="GtkCanvasPeer.AddChild"/> — calls <see cref="Realize"/> to create the widget, flush
+/// the buffer and drop it into that container's <c>GtkFixed</c>. The window peer creates its own
+/// widget eagerly and overrides the pieces that differ (title, sizing).
 /// </remarks>
 internal abstract class GtkControlPeer : IControlPeer
 {

@@ -108,11 +108,19 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void gtk_label_set_text(nint label, string str);
 
-    // --- Owner-draw canvas (GtkDrawingArea) -----------------------------------------------------
+    // --- Owner-draw canvas ----------------------------------------------------------------------
 
-    /// <summary>Creates a bare <c>GtkDrawingArea</c> — the blank surface owner-drawn controls paint on.</summary>
+    /// <summary>
+    /// Sets whether the widget creates its own <c>GdkWindow</c> when realized. Must be called before
+    /// realization; the canvas needs it so a (normally window-less) <c>GtkFixed</c> can receive input
+    /// events and clip its drawing.
+    /// </summary>
     [LibraryImport(Gtk)]
-    internal static partial nint gtk_drawing_area_new();
+    internal static partial void gtk_widget_set_has_window(nint widget, int hasWindow);
+
+    /// <summary>Marks the widget as painting every pixel itself so the theme leaves its background alone.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_set_app_paintable(nint widget, int appPaintable);
 
     /// <summary>Sets whether a widget accepts keyboard focus (<c>gboolean</c> is passed as 1/0).</summary>
     [LibraryImport(Gtk)]

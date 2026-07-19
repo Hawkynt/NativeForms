@@ -21,22 +21,20 @@ public class Form : Control
     /// <summary>Raises <see cref="FormClosed"/>.</summary>
     protected virtual void OnFormClosed(EventArgs e) => this.FormClosed?.Invoke(this, e);
 
+    /// <inheritdoc/>
+    private protected override void OnUnrealized() => _window = null;
+
     /// <summary>
     /// Realizes this form and its children against <paramref name="backend"/>, then shows it. Returns
     /// the native window peer that <see cref="Application.Run(Form)"/> hands to the message loop.
+    /// Child realization happens inside <see cref="Control.RealizeSelf"/>, which walks the whole
+    /// control tree depth-first.
     /// </summary>
     internal IWindowPeer RealizeWindow(IPlatformBackend backend)
     {
         var window = (IWindowPeer)this.RealizeSelf(backend);
         _window = window;
         window.Closed += (_, _) => this.OnFormClosed(EventArgs.Empty);
-
-        foreach (var child in this.Controls)
-        {
-            var childPeer = child.RealizeSelf(backend);
-            window.AddChild(childPeer);
-        }
-
         window.Show();
         return window;
     }

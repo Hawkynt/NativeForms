@@ -182,9 +182,12 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] Layout engine: anchoring, docking, `AutoSize`, `TableLayoutPanel`/`FlowLayoutPanel` semantics
 
 ### 7.2 Top-level & containers
-- [ ] **Nested child realization** — today only the `Form`'s *direct* children get native peers
-      (`Form.RealizeWindow`); controls inside `Panel`/`GroupBox`/future containers must realize
-      recursively (with coordinates relative to the container) for container nesting to be real
+- [x] **Nested child realization** — `IContainerPeer` (window + every canvas peer) hosts children;
+      `Control.RealizeSelf` realizes recursively with parent-relative coordinates; late
+      `Controls.Add` realizes immediately; `Remove`/`Clear` dispose the peer tree and the control
+      re-realizes from buffered state
+  - [ ] `IContainerPeer.RemoveChild` so Win32/GTK containers drop their bookkeeping entry for a
+        removed child before the container itself dies (today the stale entry is harmless)
 - [~] `Form` (native) — title, client area, close event, Show *(realize/show done; below pending)*
   - [x] Realize + show + close event
   - [ ] `StartPosition`, `FormBorderStyle`, `WindowState` (min/max/normal), `MinimizeBox`/`MaximizeBox`

@@ -23,12 +23,20 @@ public interface IControlPeer : IDisposable
     void SetEnabled(bool enabled);
 }
 
-/// <summary>A top-level window peer — the native side of a <see cref="Form"/>.</summary>
-public interface IWindowPeer : IControlPeer
+/// <summary>
+/// The native side of a control that hosts other controls: a window's client area or an owner-drawn
+/// surface. Mirrors Windows Forms, where any control is a potential parent — realizing a control
+/// tree walks it depth-first, handing each child peer to its container.
+/// </summary>
+public interface IContainerPeer : IControlPeer
 {
-    /// <summary>Re-parents a child peer into this window's client area, creating its native widget.</summary>
+    /// <summary>Re-parents a child peer into this container's client area, creating its native widget.</summary>
     void AddChild(IControlPeer child);
+}
 
+/// <summary>A top-level window peer — the native side of a <see cref="Form"/>.</summary>
+public interface IWindowPeer : IContainerPeer
+{
     /// <summary>Makes the window visible and ready to receive input.</summary>
     void Show();
 

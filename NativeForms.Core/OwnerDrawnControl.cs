@@ -38,6 +38,9 @@ public abstract class OwnerDrawnControl : Control
         return canvas;
     }
 
+    /// <inheritdoc/>
+    private protected override void OnUnrealized() => _canvas = null;
+
     private protected override void OnRealized(IControlPeer peer)
     {
         if (peer is not ICanvasPeer canvas)

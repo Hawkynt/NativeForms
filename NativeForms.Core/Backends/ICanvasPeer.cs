@@ -7,8 +7,10 @@ namespace Hawkynt.NativeForms.Backends;
 /// control in the toolkit is realized onto one of these, so a backend implements drawing and input
 /// exactly once (in its canvas peer) rather than once per control. The peer raises paint and input
 /// events; the managed control responds by drawing through the supplied <see cref="Drawing.IGraphics"/>.
+/// It is also a <see cref="IContainerPeer"/> — owner-drawn containers (panels, group boxes) host
+/// native children on top of their painted surface, just like any Windows Forms control can.
 /// </summary>
-public interface ICanvasPeer : IControlPeer
+public interface ICanvasPeer : IContainerPeer
 {
     /// <summary>Raised when a region needs repainting.</summary>
     event EventHandler<PaintEventArgs>? Paint;

@@ -18,6 +18,7 @@ namespace Hawkynt.NativeForms;
 public abstract class Control
 {
     private IControlPeer? _peer;
+    private IPlatformBackend? _backend;
 
     /// <summary>Initializes the control and its (initially empty) child collection.</summary>
     protected Control() => this.Controls = new(this);
@@ -152,19 +153,61 @@ public abstract class Control
     /// <summary>Hook for subclasses to wire native events once the peer exists.</summary>
     private protected virtual void OnRealized(IControlPeer peer) { }
 
+    /// <summary>Hook for subclasses to drop their typed peer references when the peer tree is torn down.</summary>
+    private protected virtual void OnUnrealized() { }
+
     /// <summary>
-    /// Creates this control's peer and pushes its buffered state into it. Child realization is driven
-    /// by the owning window (see <see cref="Form"/>).
+    /// Creates this control's peer and pushes its buffered state into it. When the peer can host
+    /// children (<see cref="IContainerPeer"/>), the entire subtree is realized depth-first and each
+    /// child peer is parented into this one — any control is a potential parent, exactly like
+    /// Windows Forms.
     /// </summary>
     internal IControlPeer RealizeSelf(IPlatformBackend backend)
     {
         var peer = this.CreatePeer(backend);
         _peer = peer;
+        _backend = backend;
         peer.SetBounds(this.Bounds);
         peer.SetText(this.Text);
         peer.SetEnabled(this.Enabled);
         peer.SetVisible(this.Visible);
         this.OnRealized(peer);
+
+        if (peer is IContainerPeer container)
+            for (var i = 0; i < this.Controls.Count; ++i)
+                container.AddChild(this.Controls[i].RealizeSelf(backend));
+
         return peer;
+    }
+
+    /// <summary>
+    /// Realizes a child that was added after this control was already realized as a container. A
+    /// no-op before realization — the child is picked up by the normal depth-first walk later.
+    /// </summary>
+    internal void RealizeAddedChild(Control child)
+    {
+        if (_peer is not IContainerPeer container || _backend is null)
+            return;
+
+        container.AddChild(child.RealizeSelf(_backend));
+    }
+
+    /// <summary>
+    /// Disposes this control's peer and every descendant peer, children first. The managed state
+    /// (text, bounds, children …) stays intact, so the control is back to its unrealized shape and
+    /// can be realized again — for example after being re-added to a live container.
+    /// </summary>
+    internal void DisposePeerTree()
+    {
+        for (var i = 0; i < this.Controls.Count; ++i)
+            this.Controls[i].DisposePeerTree();
+
+        if (_peer is null)
+            return;
+
+        _peer.Dispose();
+        _peer = null;
+        _backend = null;
+        this.OnUnrealized();
     }
 }
