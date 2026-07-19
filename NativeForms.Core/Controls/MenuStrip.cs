@@ -14,8 +14,9 @@ namespace Hawkynt.NativeForms;
 /// <remarks>
 /// The bar is owner-drawn on every backend for now; the native menu bar mapping (Win32 <c>HMENU</c>,
 /// <c>GtkMenuBar</c>, <c>NSMenu</c>) is tracked in <c>docs/PRD.md</c> §7.6. Shortcuts are dispatched
-/// from this control's own key pipeline, so they fire while the bar (or one of its popups) has
-/// focus; form-wide dispatch needs the toolkit's focus/key-preview model, also tracked there.
+/// from this control's own key pipeline, so they fire while the bar itself has focus and no
+/// drop-down is open; form-wide dispatch needs the toolkit's focus/key-preview model, also
+/// tracked there.
 /// </remarks>
 public class MenuStrip : OwnerDrawnControl
 {
