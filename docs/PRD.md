@@ -277,10 +277,12 @@ strategy (may differ per platform; note exceptions inline).
       (arrows walk rows, Right into child, Left to parent, +/−/*/Space), `EnsureVisible`,
       virtualized paint over the lazily re-flattened visible-node list (100k nodes bounded) done;
       label editing (TextBox overlay) and state images pending
-- [ ] `TreeListView` (owner) — TreeView × ListView-Details hybrid (expandable hierarchy in the
-      first column + regular sub-item columns); reuses ListView's header/column/virtualization
-      engine and TreeView's node model; per-node icons, keyboard expand/collapse,
-      `DataSource` binding with a reflection-free children selector
+- [~] `TreeListView` (owner) — TreeView × ListView-Details hybrid done: hierarchy in the first
+      column + selector-driven sub-item columns (`TreeListViewColumn`), shared engine pieces
+      factored (`ITreeNodeHost`, `TreeRowList`, `TreeNavigation`, `HeaderRowPainter`,
+      `ExpandGlyph` — glyphs pixel-identical to TreeView), per-node icons, full keyboard parity,
+      virtualized at 100k nodes, `SetDataSource` with reflection-free children selector +
+      cycle-bounding depth guard; column sorting, interactive column resize, label editing pending
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
   - [~] Column types (single `DataGridViewColumn` + `Kind` enum + per-kind selectors, one
         allocation-free paint switch): [x] text, [x] image, [x] image+text, [x] check (toggle via
