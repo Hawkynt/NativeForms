@@ -71,31 +71,29 @@ overview](docs/architecture.md), an [MVVM & data-binding guide](docs/mvvm.md), a
 authoring guide](docs/custom-controls.md), and one reference page per control (usage example, API
 tables, behavior notes). What ships today:
 
-| Control | Strategy | Reference |
-|---|---|---|
-| `Form` | native | [docs/controls/form.md](docs/controls/form.md) |
-| `Button` | native | [docs/controls/button.md](docs/controls/button.md) |
-| `Label` | native | [docs/controls/label.md](docs/controls/label.md) |
-| `Panel` | owner-drawn | [docs/controls/panel.md](docs/controls/panel.md) |
-| `GroupBox` | owner-drawn | [docs/controls/groupbox.md](docs/controls/groupbox.md) |
-| `CheckBox` | owner-drawn | [docs/controls/checkbox.md](docs/controls/checkbox.md) |
-| `RadioButton` | owner-drawn | [docs/controls/radiobutton.md](docs/controls/radiobutton.md) |
-| `ProgressBar` | owner-drawn | [docs/controls/progressbar.md](docs/controls/progressbar.md) |
-| `ListBox` | owner-drawn | [docs/controls/listbox.md](docs/controls/listbox.md) |
-| `ListView` | owner-drawn | [docs/controls/listview.md](docs/controls/listview.md) |
-| `DataGridView` | owner-drawn | [docs/controls/datagridview.md](docs/controls/datagridview.md) |
+| Family | Controls (each links to its reference page) |
+|---|---|
+| Windows & dialogs | [`Form`](docs/controls/form.md) (modal, border styles, window state, icon, topmost, opacity) · [`MessageBox` + file/folder/color/font dialogs](docs/controls/dialogs.md) |
+| Text & input | [`TextBox`](docs/controls/textbox.md) · [`MaskedTextBox`](docs/controls/maskedtextbox.md) · [`RichTextBox`](docs/controls/richtextbox.md) · [`SearchBox`](docs/controls/searchbox.md) · [`NumericUpDown`](docs/controls/numericupdown.md) · [`DomainUpDown`](docs/controls/domainupdown.md) |
+| Buttons & toggles | [`Button`](docs/controls/button.md) · [`CheckBox`](docs/controls/checkbox.md) · [`RadioButton`](docs/controls/radiobutton.md) · [`ToggleSwitch`](docs/controls/toggleswitch.md) · [`SplitButton` / `DropDownButton`](docs/controls/splitbutton.md) · [`LinkLabel`](docs/controls/linklabel.md) |
+| Labels & media | [`Label`](docs/controls/label.md) · [`PictureBox`](docs/controls/picturebox.md) · [`ImageList`](docs/controls/imagelist.md) (icons + badges) |
+| Ranges & dates | [`TrackBar`](docs/controls/trackbar.md) · [`HScrollBar` / `VScrollBar`](docs/controls/scrollbar.md) · [`ProgressBar`](docs/controls/progressbar.md) (incl. marquee) · [`DateTimePicker`](docs/controls/datetimepicker.md) · [`MonthCalendar`](docs/controls/monthcalendar.md) |
+| Lists & trees | [`ListBox`](docs/controls/listbox.md) · [`CheckedListBox`](docs/controls/checkedlistbox.md) · [`ComboBox`](docs/controls/combobox.md) · [`ListView`](docs/controls/listview.md) (5 views, groups) · [`TreeView`](docs/controls/treeview.md) · [`TreeListView`](docs/controls/treelistview.md) |
+| Data grid | [`DataGridView`](docs/controls/datagridview.md) — virtualized, 9 column kinds, editing, sorting, frozen columns, reorder, merged rows, clipboard |
+| Containers & layout | [`Panel`](docs/controls/panel.md) (AutoScroll) · [`GroupBox`](docs/controls/groupbox.md) · [`TabControl`](docs/controls/tabcontrol.md) · [`SplitContainer`](docs/controls/splitcontainer.md) · [`Expander`](docs/controls/expander.md) · [`FlowLayoutPanel`](docs/controls/flowlayoutpanel.md) · [`TableLayoutPanel`](docs/controls/tablelayoutpanel.md) |
+| Menus, toolbars, status | [`MenuStrip`](docs/controls/menustrip.md) · [`ContextMenuStrip`](docs/controls/contextmenustrip.md) · [`ToolStrip`](docs/controls/toolstrip.md) · [`StatusStrip`](docs/controls/statusstrip.md) · [`ToolTip`](docs/controls/tooltip.md) · [`NotifyIcon`](docs/controls/notifyicon.md) |
+| Non-visual | [`Application` & backends](docs/controls/application.md) · [`Control` base class](docs/controls/control.md) · [`Timer`](docs/controls/timer.md) |
 
-Plus the non-visual foundation: [`Application` & backend registration](docs/controls/application.md),
-the [`Control` base class](docs/controls/control.md), and the reflection-free MVVM primitives.
-`NativeForms.Demo` doubles as a gallery showing every shipped control with representative property
-settings.
+`NativeForms.Demo` doubles as a tabbed gallery showing every one of these controls with
+representative property settings, plus the MVVM counter wiring.
 
 ## 📋 Status
 
-This is an actively growing toolkit. **`docs/PRD.md`** is the authoritative checklist of every
-control and feature — per-control acceptance criteria (§7), the milestone roadmap M0–M9 (§10), and
-the tested/demo-ed/documented coverage matrix (§11). Everything not in the table above (TextBox,
-ComboBox, TreeView, TreeListView, TabControl, menus, dialogs, …) is tracked there box-by-box.
+**`docs/PRD.md`** is the authoritative checklist of every control and feature — per-control
+acceptance criteria (§7), the milestone roadmap (§10), and the tested/demo-ed/documented coverage
+matrix (§11). The full WinForms-shaped control inventory above is implemented and tested; the PRD
+tracks the remaining per-control refinements (focus model, DPI/dark-mode live switching, macOS
+backend, and the items it explicitly marks later/optional) box-by-box.
 
 ## 🛠️ Build
 
