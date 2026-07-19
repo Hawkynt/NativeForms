@@ -214,7 +214,10 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] Optional per-tab close button (modern tabbed-UI affordance)
 - [x] `SplitContainer` (owner) — horizontal/vertical orientation, live splitter drag +
       `SplitterMoved`, min-size clamps, keyboard splitter movement
-- [ ] `FlowLayoutPanel`, `TableLayoutPanel` (owner/layout)
+- [~] `FlowLayoutPanel` (all four `FlowDirection`s, `WrapContents`, `Control.Margin`,
+      AutoScroll interplay) and `TableLayoutPanel` (absolute/percent/auto-size styles, spans,
+      auto-placement, cell borders) done; grid auto-grow, invisible-child skip, Anchor/Dock
+      interplay pending
 - [x] `Panel.AutoScroll` — themed scrollbars (shared `ScrollBarRenderer`), wheel + thumb drag,
       children scrolled via the logical→peer bounds mapping seam (`AutoScrollPosition`)
 
