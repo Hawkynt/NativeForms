@@ -196,12 +196,16 @@ strategy (may differ per platform; note exceptions inline).
         removed child before the container itself dies (today the stale entry is harmless)
 - [~] `Form` (native) — title, client area, close event, Show *(realize/show done; below pending)*
   - [x] Realize + show + close event
-  - [ ] `StartPosition`, `FormBorderStyle`, `WindowState` (min/max/normal), `MinimizeBox`/`MaximizeBox`
-  - [ ] `MinimumSize`/`MaximumSize`, resize events, `AcceptButton`/`CancelButton`
+  - [x] `StartPosition` (core-side against `GetScreenSize`/owner), `FormBorderStyle` (live
+        Win32 style toggling, GTK resizable/decorated/type hints), `WindowState` with peer
+        write-back sync, `MinimizeBox`/`MaximizeBox` (GTK advisory)
+  - [~] `MinimumSize`/`MaximumSize` (WM_GETMINMAXINFO / geometry hints) + `Resize`/`SizeChanged`
+        with echo-free peer write-back done; `AcceptButton`/`CancelButton` Enter/Escape routing
+        blocked on the §7.1 focus model
   - [~] `ShowDialog()` modal + `DialogResult` (nested native loops, owner disable/transient,
         `AcceptButton`/`CancelButton` properties; Enter/Escape routing blocked on §7.1 focus model)
-  - [ ] `MdiParent`/MDI (or documented non-goal)
-  - [ ] Icon, `TopMost`, `Opacity`
+  - [x] `MdiParent`/MDI — documented non-goal in the `Form` remarks
+  - [x] Icon (raw-ARGB `SetIcon`, decoder-free), `TopMost`, `Opacity` (compositor-dependent on Linux)
 - [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
 - [~] `GroupBox` (owner) — themed frame + caption, caption image (icon before the text in the
       frame gap), real nested children done; child inset/layout convenience pending
