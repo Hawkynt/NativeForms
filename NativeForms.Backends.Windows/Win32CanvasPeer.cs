@@ -207,11 +207,19 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
         this.MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, LoWord(lParam), HiWord(lParam), 0));
     }
 
-    /// <summary>Raises <see cref="MouseWheel"/>, extracting the signed notch delta from the high word.</summary>
+    /// <summary>Raises <see cref="MouseWheel"/>, extracting the signed notch delta from the high word
+    /// and the modifier keys from the low-word key-state flags.</summary>
     private void OnMouseWheelMessage(nint wParam, nint lParam)
     {
         var delta = (short)((wParam >> 16) & 0xFFFF);
-        this.MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, LoWord(lParam), HiWord(lParam), delta));
+        var keyState = (uint)(wParam & 0xFFFF);
+        var modifiers = KeyModifiers.None;
+        if ((keyState & NativeMethods.MK_SHIFT) != 0)
+            modifiers |= KeyModifiers.Shift;
+        if ((keyState & NativeMethods.MK_CONTROL) != 0)
+            modifiers |= KeyModifiers.Control;
+
+        this.MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, LoWord(lParam), HiWord(lParam), delta, modifiers));
     }
 
     /// <summary>Raises a key-changed event, mapping the virtual key and current modifier state.</summary>

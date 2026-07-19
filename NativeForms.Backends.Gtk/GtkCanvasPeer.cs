@@ -174,8 +174,8 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     private void RaiseMouseMove(int x, int y)
         => MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
 
-    private void RaiseMouseWheel(int delta, int x, int y)
-        => MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta));
+    private void RaiseMouseWheel(int delta, int x, int y, KeyModifiers modifiers)
+        => MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta, modifiers));
 
     private void RaiseMouseLeave() => MouseLeave?.Invoke(this, EventArgs.Empty);
 
@@ -326,7 +326,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
                     _ => 0,
                 };
                 if (delta != 0)
-                    peer.RaiseMouseWheel(delta, (int)e.X, (int)e.Y);
+                    peer.RaiseMouseWheel(delta, (int)e.X, (int)e.Y, ToModifiers(e.State));
             }
         }
 

@@ -134,10 +134,10 @@ public class CheckedListBox : ListBox
     /// <inheritdoc/>
     protected override void OnDrawRow(IGraphics g, int index, Rectangle bounds, bool selected)
     {
-        var boxTop = bounds.Y + Math.Max(0, (bounds.Height - CheckGlyph.BoxSize) / 2);
-        CheckGlyph.Draw(g, this.Theme, bounds.X + 2, boxTop, _checkStates[index]);
+        var boxTop = bounds.Y + Math.Max(0, (bounds.Height - GlyphRenderer.CheckBoxSize) / 2);
+        GlyphRenderer.DrawCheckBox(g, this.Theme, new(bounds.X + 2, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), _checkStates[index]);
 
-        var indent = CheckGlyph.BoxSize + _GlyphGap + 2;
+        var indent = GlyphRenderer.CheckBoxSize + _GlyphGap + 2;
         base.OnDrawRow(g, index, new Rectangle(bounds.X + indent, bounds.Y, bounds.Width - indent, bounds.Height), selected);
     }
 

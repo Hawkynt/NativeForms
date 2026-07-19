@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
@@ -73,20 +74,5 @@ public class ProgressBar : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, this.Width, this.Height));
-
-        var range = _maximum - _minimum;
-        if (range > 0 && this.Width > 2 && this.Height > 2)
-        {
-            var track = this.Width - 2;
-            var filled = (int)((long)track * (_value - _minimum) / range);
-            if (filled > 0)
-                g.FillRectangle(theme.Accent, new Rectangle(1, 1, filled, this.Height - 2));
-        }
-
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
-    }
+        => GlyphRenderer.DrawProgressBar(e.Graphics, this.Theme, new Rectangle(0, 0, this.Width, this.Height), _value, _minimum, _maximum);
 }

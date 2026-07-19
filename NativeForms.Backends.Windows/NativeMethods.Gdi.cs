@@ -43,6 +43,12 @@ internal static unsafe partial class NativeMethods
     /// <summary>The mouse wheel turned.</summary>
     internal const uint WM_MOUSEWHEEL = 0x020A;
 
+    /// <summary>Shift is held — <c>wParam</c> key-state flag of mouse messages.</summary>
+    internal const uint MK_SHIFT = 0x0004;
+
+    /// <summary>Control is held — <c>wParam</c> key-state flag of mouse messages.</summary>
+    internal const uint MK_CONTROL = 0x0008;
+
     /// <summary>The pointer left the client area (requested via <see cref="TrackMouseEvent"/>).</summary>
     internal const uint WM_MOUSELEAVE = 0x02A3;
 

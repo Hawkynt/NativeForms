@@ -66,10 +66,11 @@ public class CheckBox : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
 
-        var boxTop = Math.Max(0, (this.Height - CheckGlyph.BoxSize) / 2);
-        CheckGlyph.Draw(g, theme, 0, boxTop, this.Checked);
+        var boxTop = Math.Max(0, (this.Height - GlyphRenderer.CheckBoxSize) / 2);
+        var box = new Rectangle(0, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize);
+        GlyphRenderer.DrawCheckBox(g, theme, box, this.Checked);
 
-        var textRect = new Rectangle(CheckGlyph.BoxSize + _TextGap, 0, this.Width - CheckGlyph.BoxSize - _TextGap, this.Height);
+        var textRect = new Rectangle(GlyphRenderer.CheckBoxSize + _TextGap, 0, this.Width - GlyphRenderer.CheckBoxSize - _TextGap, this.Height);
         g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, ContentAlignment.MiddleLeft);
     }
 }

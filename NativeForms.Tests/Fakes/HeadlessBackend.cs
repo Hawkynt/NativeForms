@@ -257,8 +257,8 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public void RaiseMouseMove(int x, int y)
         => this.MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
 
-    public void RaiseMouseWheel(int delta, int x = 0, int y = 0)
-        => this.MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta));
+    public void RaiseMouseWheel(int delta, int x = 0, int y = 0, KeyModifiers modifiers = KeyModifiers.None)
+        => this.MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta, modifiers));
 
     public void RaiseKeyDown(Keys key, KeyModifiers modifiers = KeyModifiers.None)
         => this.KeyDown?.Invoke(this, new KeyEventArgs(key, modifiers));

@@ -18,7 +18,7 @@ namespace Hawkynt.NativeForms;
 public class TreeView : OwnerDrawnControl
 {
     private const int _GlyphBox = 9;
-    private const int _CheckCellWidth = CheckGlyph.BoxSize + 4;
+    private const int _CheckCellWidth = GlyphRenderer.CheckBoxSize + 4;
     private const int _IconGap = 4;
     private const int _TextPad = 2;
     private const int _DoubleClickMs = 500;
@@ -455,8 +455,8 @@ public class TreeView : OwnerDrawnControl
         var x = contentLeft;
         if (this.CheckBoxes)
         {
-            var boxTop = y + ((rowHeight - CheckGlyph.BoxSize) / 2);
-            CheckGlyph.Draw(g, theme, x + 2, boxTop, node.Checked);
+            var boxTop = y + ((rowHeight - GlyphRenderer.CheckBoxSize) / 2);
+            GlyphRenderer.DrawCheckBox(g, theme, new(x + 2, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), node.Checked);
             x += _CheckCellWidth;
         }
 

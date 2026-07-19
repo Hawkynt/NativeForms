@@ -14,11 +14,15 @@ public sealed class PaintEventArgs(IGraphics graphics, Rectangle clipRectangle) 
 }
 
 /// <summary>Describes a mouse event, matching <c>System.Windows.Forms.MouseEventArgs</c> plus the
-/// modifier keys held at the time — multi-selection gestures (Ctrl/Shift+click) need them.</summary>
+/// modifier keys held at the time — multi-selection gestures (Ctrl/Shift+click) and
+/// Shift+wheel scrolling need them.</summary>
 public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers = KeyModifiers.None) : EventArgs
 {
     /// <summary>The button that changed state (or <see cref="MouseButtons.None"/> for moves).</summary>
     public MouseButtons Button { get; } = button;
+
+    /// <summary>The keyboard modifier flags held while the event happened.</summary>
+    public KeyModifiers Modifiers { get; } = modifiers;
 
     /// <summary>The x-coordinate in the control's client space.</summary>
     public int X { get; } = x;
@@ -28,9 +32,6 @@ public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta,
 
     /// <summary>The signed wheel delta (0 for non-wheel events).</summary>
     public int Delta { get; } = delta;
-
-    /// <summary>The modifier keys held while the event happened.</summary>
-    public KeyModifiers Modifiers { get; } = modifiers;
 
     /// <summary>Whether Shift was held.</summary>
     public bool Shift => (this.Modifiers & KeyModifiers.Shift) != 0;
