@@ -20,11 +20,63 @@ internal sealed class HeadlessBackend : IPlatformBackend
     /// message loop would dispatch while it pumps (timer arming, event handlers, …).</summary>
     public Action? RunAction { get; set; }
 
+    /// <summary>Optional callback invoked inside <see cref="HeadlessWindowPeer.RunModal"/>, standing in
+    /// for the nested modal loop — tests use it to click buttons or close the dialog.</summary>
+    public Action<HeadlessWindowPeer>? ModalAction { get; set; }
+
+    /// <summary>Every <see cref="ShowMessageBox"/> call, in the order it arrived.</summary>
+    public List<(string Text, string Caption, MessageBoxButtons Buttons, MessageBoxIcon Icon)> MessageBoxes { get; } = [];
+
+    /// <summary>The scripted verdict <see cref="ShowMessageBox"/> returns.</summary>
+    public DialogResult MessageBoxResult { get; set; } = DialogResult.OK;
+
+    /// <summary>The options of the most recent <see cref="ShowFileDialog"/> call.</summary>
+    public FileDialogOptions? LastFileDialog { get; private set; }
+
+    /// <summary>The scripted paths <see cref="ShowFileDialog"/> returns (null = user cancelled).</summary>
+    public string[]? FileDialogResult { get; set; }
+
+    /// <summary>The initial color of the most recent <see cref="ShowColorDialog"/> call.</summary>
+    public Color? LastColorDialogColor { get; private set; }
+
+    /// <summary>The scripted color <see cref="ShowColorDialog"/> returns (null = user cancelled).</summary>
+    public Color? ColorDialogResult { get; set; }
+
+    /// <summary>The initial font of the most recent <see cref="ShowFontDialog"/> call.</summary>
+    public Font? LastFontDialogFont { get; private set; }
+
+    /// <summary>The scripted font <see cref="ShowFontDialog"/> returns (null = user cancelled).</summary>
+    public Font? FontDialogResult { get; set; }
+
     public string Name => "Headless";
     public bool IsSupported => true;
     public ITheme Theme => DefaultTheme.Instance;
 
-    public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer());
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+    {
+        this.MessageBoxes.Add((text, caption, buttons, icon));
+        return this.MessageBoxResult;
+    }
+
+    public string[]? ShowFileDialog(in FileDialogOptions options)
+    {
+        this.LastFileDialog = options;
+        return this.FileDialogResult;
+    }
+
+    public Color? ShowColorDialog(Color color)
+    {
+        this.LastColorDialogColor = color;
+        return this.ColorDialogResult;
+    }
+
+    public Font? ShowFontDialog(Font font)
+    {
+        this.LastFontDialogFont = font;
+        return this.FontDialogResult;
+    }
+
+    public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer(this));
     public IButtonPeer CreateButton() => this.Track(new HeadlessButtonPeer());
     public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
     public ITextBoxPeer CreateTextBox() => this.Track(new HeadlessTextBoxPeer());
@@ -76,15 +128,43 @@ internal abstract class HeadlessPeer : IControlPeer
     public void Dispose() => this.Disposed = true;
 }
 
-internal sealed class HeadlessWindowPeer : HeadlessPeer, IWindowPeer
+internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : HeadlessPeer, IWindowPeer
 {
     public List<IControlPeer> Children { get; } = [];
     public bool Shown { get; private set; }
+
+    /// <summary>Whether <see cref="RunModal"/> ran this window as a modal dialog.</summary>
+    public bool WasModal { get; private set; }
+
+    /// <summary>The owner peer <see cref="RunModal"/> received, or null.</summary>
+    public IWindowPeer? ModalOwner { get; private set; }
+
+    /// <summary>How often <see cref="Close"/> was called.</summary>
+    public int CloseCount { get; private set; }
 
     public event EventHandler? Closed;
 
     public void AddChild(IControlPeer child) => this.Children.Add(child);
     public void Show() => this.Shown = true;
+
+    /// <summary>Records the modality, then hands control to the test's
+    /// <see cref="HeadlessBackend.ModalAction"/> — the stand-in for the nested native loop, inside
+    /// which test code closes the dialog.</summary>
+    public void RunModal(IWindowPeer? owner)
+    {
+        this.WasModal = true;
+        this.ModalOwner = owner;
+        this.Shown = true;
+        backend?.ModalAction?.Invoke(this);
+    }
+
+    /// <summary>Closes the window as the native close button would: hides it and raises <see cref="Closed"/>.</summary>
+    public void Close()
+    {
+        ++this.CloseCount;
+        this.Shown = false;
+        this.RaiseClosed();
+    }
 
     public void RaiseClosed() => this.Closed?.Invoke(this, EventArgs.Empty);
 }

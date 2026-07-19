@@ -44,6 +44,19 @@ public interface IWindowPeer : IContainerPeer
     /// <summary>Makes the window visible and ready to receive input.</summary>
     void Show();
 
+    /// <summary>
+    /// Shows the window modally: input to <paramref name="owner"/> (when given) is blocked and a
+    /// nested native message loop runs until the window closes. On close the window is hidden — not
+    /// destroyed — so the caller still owns the peer and disposes it normally. Blocks until closed.
+    /// </summary>
+    void RunModal(IWindowPeer? owner);
+
+    /// <summary>
+    /// Closes the window as the native close button would: <see cref="Closed"/> is raised, and a
+    /// modal loop started by <see cref="RunModal"/> ends.
+    /// </summary>
+    void Close();
+
     /// <summary>Raised when the user closes the window (native close button, Alt+F4, ⌘Q …).</summary>
     event EventHandler? Closed;
 }

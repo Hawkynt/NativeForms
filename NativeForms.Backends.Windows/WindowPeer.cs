@@ -31,6 +31,12 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
 
     private int _nextControlId = 1000;
 
+    /// <summary>Whether a <see cref="RunModal"/> loop currently owns this window.</summary>
+    private bool _modal;
+
+    /// <summary>Whether the modal window was closed (hidden); ends the <see cref="RunModal"/> loop.</summary>
+    private bool _modalClosed;
+
     /// <inheritdoc/>
     public event EventHandler? Closed;
 
@@ -73,6 +79,60 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     /// <inheritdoc/>
     public void Show() => NativeMethods.ShowWindow(Handle, NativeMethods.SW_SHOW);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The Win32 modal recipe: disable the owner, show this window, and pump a nested
+    /// <c>GetMessage</c> loop bound to this window's lifetime. Closing hides the window (see
+    /// <c>WM_CLOSE</c> in <see cref="WndProc"/>) rather than destroying it, so the peer survives the
+    /// loop and the core disposes it normally afterwards. A <c>WM_QUIT</c> arriving mid-dialog is
+    /// re-posted so the outer application loop unwinds too.
+    /// </remarks>
+    public void RunModal(IWindowPeer? owner)
+    {
+        var ownerHandle = (owner as WindowPeer)?.Handle ?? 0;
+        _modal = true;
+        _modalClosed = false;
+        if (ownerHandle != 0)
+            NativeMethods.EnableWindow(ownerHandle, false);
+
+        try
+        {
+            this.Show();
+            while (!_modalClosed && Handle != 0)
+            {
+                var result = NativeMethods.GetMessageW(out var msg, 0, 0, 0);
+
+                // 0 => WM_QUIT (meant for the outer loop: re-post it and unwind); -1 => error.
+                if (result is 0 or -1)
+                {
+                    if (result == 0)
+                        NativeMethods.PostQuitMessage(0);
+
+                    break;
+                }
+
+                NativeMethods.TranslateMessage(in msg);
+                NativeMethods.DispatchMessageW(in msg);
+            }
+        }
+        finally
+        {
+            _modal = false;
+            if (ownerHandle != 0)
+            {
+                NativeMethods.EnableWindow(ownerHandle, true);
+                NativeMethods.SetActiveWindow(ownerHandle);
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Close()
+    {
+        if (Handle != 0)
+            NativeMethods.SendMessageW(Handle, NativeMethods.WM_CLOSE, 0, 0);
+    }
+
     /// <summary>Routes a <c>WM_COMMAND</c> notification to the child identified by its control id.</summary>
     private void OnCommand(int controlId, int notifyCode)
     {
@@ -80,12 +140,8 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
             child.OnCommand(notifyCode);
     }
 
-    /// <summary>Raises <see cref="Closed"/> and abandons the (now destroyed) native handle.</summary>
-    private void RaiseClosed()
-    {
-        Closed?.Invoke(this, EventArgs.Empty);
-        Handle = 0;
-    }
+    /// <summary>Raises <see cref="Closed"/>.</summary>
+    private void RaiseClosed() => Closed?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Registers the shared window class exactly once for the lifetime of the process.</summary>
     private static void EnsureClassRegistered()
@@ -133,14 +189,33 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                 return 0;
 
             case NativeMethods.WM_CLOSE:
+                // A modal window hides instead of dying: the peer must outlive its nested loop so
+                // the core can read state and dispose it after ShowDialog returns.
+                if (_windows.TryGetValue(hwnd, out var closingModal) && closingModal._modal)
+                {
+                    NativeMethods.ShowWindow(hwnd, NativeMethods.SW_HIDE);
+                    closingModal._modalClosed = true;
+                    closingModal.RaiseClosed();
+                    return 0;
+                }
+
                 NativeMethods.DestroyWindow(hwnd);
                 return 0;
 
             case NativeMethods.WM_DESTROY:
-                if (_windows.TryRemove(hwnd, out var closingWindow))
-                    closingWindow.RaiseClosed();
+                if (_windows.TryRemove(hwnd, out var destroyedWindow))
+                {
+                    // A modal window already announced its close on WM_CLOSE; destruction is then
+                    // just the core disposing the peer and must neither re-notify nor quit the loop.
+                    var notify = !destroyedWindow._modalClosed;
+                    destroyedWindow.Handle = 0;
+                    if (notify)
+                    {
+                        destroyedWindow.RaiseClosed();
+                        NativeMethods.PostQuitMessage(0);
+                    }
+                }
 
-                NativeMethods.PostQuitMessage(0);
                 return 0;
         }
 

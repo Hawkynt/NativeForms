@@ -133,13 +133,15 @@ internal abstract class GtkControlPeer : IControlPeer
     /// <inheritdoc />
     public virtual void Dispose()
     {
-        if (_selfHandle.IsAllocated)
-            _selfHandle.Free();
-
+        // Destroy before freeing the pinning handle: destroying can emit signals ("destroy",
+        // "focus-out-event" …) whose callbacks recover the peer through that handle.
         if (_widget != 0)
         {
             NativeMethods.gtk_widget_destroy(_widget);
             _widget = 0;
         }
+
+        if (_selfHandle.IsAllocated)
+            _selfHandle.Free();
     }
 }

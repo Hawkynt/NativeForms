@@ -69,6 +69,13 @@ public class Button : Control
         }
     } = TextImageRelation.ImageBeforeText;
 
+    /// <summary>
+    /// The verdict a click reports to the owning <see cref="Form"/>. Anything other than
+    /// <see cref="DialogResult.None"/> makes a click set <see cref="Form.DialogResult"/>, which in
+    /// turn closes the form when it is shown modally — exactly the WinForms dialog contract.
+    /// </summary>
+    public DialogResult DialogResult { get; set; }
+
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateButton();
 
     private protected override void OnRealized(IControlPeer peer)
@@ -86,4 +93,20 @@ public class Button : Control
 
     /// <summary>Forwards the buffered image triple to the realized peer.</summary>
     private void PushImage() => _buttonPeer?.SetImage(this.Image, this.ImageAlign, this.TextImageRelation);
+
+    /// <summary>Raises <see cref="Control.Click"/>, then reports <see cref="DialogResult"/> to the owning form.</summary>
+    protected override void OnClick(EventArgs e)
+    {
+        base.OnClick(e);
+
+        if (this.DialogResult == DialogResult.None)
+            return;
+
+        for (var parent = this.Parent; parent is not null; parent = parent.Parent)
+            if (parent is Form form)
+            {
+                form.DialogResult = this.DialogResult;
+                return;
+            }
+    }
 }

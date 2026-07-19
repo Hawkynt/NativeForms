@@ -59,6 +59,10 @@ internal sealed class BackendRegistryTests
         public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => throw new NotSupportedException();
         public System.Drawing.Size MeasureText(string text, Font font) => throw new NotSupportedException();
         public ITimerPeer CreateTimer() => throw new NotSupportedException();
+        public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon) => throw new NotSupportedException();
+        public string[]? ShowFileDialog(in FileDialogOptions options) => throw new NotSupportedException();
+        public System.Drawing.Color? ShowColorDialog(System.Drawing.Color color) => throw new NotSupportedException();
+        public Font? ShowFontDialog(Font font) => throw new NotSupportedException();
         public void Run(IWindowPeer mainWindow) { }
         public void Quit() { }
     }

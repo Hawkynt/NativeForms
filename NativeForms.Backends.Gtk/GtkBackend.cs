@@ -9,7 +9,7 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// GTK main loop. Reflection-free and AOT-safe: every native call is a source-generated P/Invoke and
 /// every signal callback is an unmanaged function pointer.
 /// </summary>
-public sealed class GtkBackend : IPlatformBackend
+public sealed partial class GtkBackend : IPlatformBackend
 {
     private static readonly object _initGate = new();
     private static bool _initialized;

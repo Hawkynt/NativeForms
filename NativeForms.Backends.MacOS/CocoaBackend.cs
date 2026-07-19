@@ -54,6 +54,19 @@ public sealed class CocoaBackend : IPlatformBackend
     public ITextBoxPeer CreateTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+        => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public string[]? ShowFileDialog(in FileDialogOptions options) => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public Color? ShowColorDialog(Color color) => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public Font? ShowFontDialog(Font font) => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

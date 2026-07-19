@@ -9,7 +9,7 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// peers and pumps the classic <c>GetMessage</c>/<c>TranslateMessage</c>/<c>DispatchMessage</c> loop.
 /// The type compiles on any OS; <see cref="IsSupported"/> gates it to Windows at run time.
 /// </summary>
-public sealed class Win32Backend : IPlatformBackend
+public sealed partial class Win32Backend : IPlatformBackend
 {
     /// <inheritdoc/>
     public string Name => "Win32";

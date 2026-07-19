@@ -55,6 +55,31 @@ public interface IPlatformBackend
     Size MeasureText(string text, Font font);
 
     /// <summary>
+    /// Shows the platform's native message box, application-modal, and blocks until the user picks a
+    /// button. Returns which button was pressed.
+    /// </summary>
+    DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon);
+
+    /// <summary>
+    /// Shows the platform's native file, save or folder dialog, application-modal. Returns the chosen
+    /// absolute path(s) — one element unless <see cref="FileDialogOptions.Multiselect"/> — or
+    /// <see langword="null"/> when the user cancelled.
+    /// </summary>
+    string[]? ShowFileDialog(in FileDialogOptions options);
+
+    /// <summary>
+    /// Shows the platform's native color picker preselecting <paramref name="color"/>,
+    /// application-modal. Returns the chosen color, or <see langword="null"/> when cancelled.
+    /// </summary>
+    Color? ShowColorDialog(Color color);
+
+    /// <summary>
+    /// Shows the platform's native font picker preselecting <paramref name="font"/>,
+    /// application-modal. Returns the chosen font, or <see langword="null"/> when cancelled.
+    /// </summary>
+    Font? ShowFontDialog(Font font);
+
+    /// <summary>
     /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>
     /// is called. Must be invoked on the thread that created the widgets.
     /// </summary>
