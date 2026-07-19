@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends;
@@ -42,6 +43,13 @@ public interface IPlatformBackend
 
     /// <summary>Creates a stopped UI-thread timer peer.</summary>
     ITimerPeer CreateTimer();
+
+    /// <summary>
+    /// Measures the pixel size <paramref name="text"/> would occupy in <paramref name="font"/>, without
+    /// needing a paint surface — the seam auto-sizing controls use before and between paints. Uses the
+    /// same native text engine as <see cref="IGraphics.MeasureText"/>, so both agree.
+    /// </summary>
+    Size MeasureText(string text, Font font);
 
     /// <summary>
     /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>

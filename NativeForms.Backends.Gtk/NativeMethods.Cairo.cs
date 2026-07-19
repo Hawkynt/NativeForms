@@ -121,6 +121,18 @@ internal static partial class NativeMethods
     [LibraryImport(PangoCairo)]
     internal static partial void pango_cairo_show_layout(nint cr, nint layout);
 
+    /// <summary>Returns the default PangoCairo font map (owned by Pango; do not unref).</summary>
+    [LibraryImport(PangoCairo)]
+    internal static partial nint pango_cairo_font_map_get_default();
+
+    /// <summary>Creates a new <c>PangoContext</c> connected to the font map; caller unrefs it.</summary>
+    [LibraryImport(Pango)]
+    internal static partial nint pango_font_map_create_context(nint fontMap);
+
+    /// <summary>Creates an empty <c>PangoLayout</c> for the given context; caller unrefs it.</summary>
+    [LibraryImport(Pango)]
+    internal static partial nint pango_layout_new(nint context);
+
     /// <summary>Sets the layout's text; <paramref name="length"/> of -1 means the whole NUL-terminated string.</summary>
     [LibraryImport(Pango, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void pango_layout_set_text(nint layout, string text, int length);

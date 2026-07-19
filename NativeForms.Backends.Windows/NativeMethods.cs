@@ -32,6 +32,9 @@ internal static partial class NativeMethods
     /// <summary>The control can receive keyboard focus via Tab.</summary>
     internal const uint WS_TABSTOP = 0x00010000;
 
+    /// <summary>A thin single-line border around the window.</summary>
+    internal const uint WS_BORDER = 0x00800000;
+
     // --- Button styles (BUTTON class) ---
 
     /// <summary>A standard push button that posts <c>WM_COMMAND</c> when clicked.</summary>
@@ -41,6 +44,18 @@ internal static partial class NativeMethods
 
     /// <summary>Left-aligned static text.</summary>
     internal const uint SS_LEFT = 0x00000000;
+
+    /// <summary>Horizontally centered static text.</summary>
+    internal const uint SS_CENTER = 0x00000001;
+
+    /// <summary>Right-aligned static text.</summary>
+    internal const uint SS_RIGHT = 0x00000002;
+
+    /// <summary>Do not interpret <c>&amp;</c> as a mnemonic prefix.</summary>
+    internal const uint SS_NOPREFIX = 0x00000080;
+
+    /// <summary>Vertically center the content (single-line text only).</summary>
+    internal const uint SS_CENTERIMAGE = 0x00000200;
 
     // --- ShowWindow commands ---
 

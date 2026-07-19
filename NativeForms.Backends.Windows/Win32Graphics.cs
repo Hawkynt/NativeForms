@@ -137,7 +137,7 @@ internal sealed class Win32Graphics : IGraphics
         if (string.IsNullOrEmpty(text))
             return;
 
-        var hFont = this.CreateFont(font);
+        var hFont = CreateFont(font, this._dpi);
         if (hFont == 0)
             return;
 
@@ -153,28 +153,34 @@ internal sealed class Win32Graphics : IGraphics
     }
 
     /// <inheritdoc/>
-    public Size MeasureText(string text, Font font)
+    public Size MeasureText(string text, Font font) => MeasureText(this._hdc, text, font, this._dpi);
+
+    /// <summary>
+    /// Measures <paramref name="text"/> in <paramref name="font"/> on an arbitrary DC — shared by the
+    /// per-paint instance above and <see cref="Win32Backend.MeasureText"/>, which brings a screen DC.
+    /// </summary>
+    internal static Size MeasureText(nint hdc, string text, Font font, int dpi)
     {
         if (string.IsNullOrEmpty(text))
             return Size.Empty;
 
-        var hFont = this.CreateFont(font);
+        var hFont = CreateFont(font, dpi);
         if (hFont == 0)
             return Size.Empty;
 
-        var oldFont = NativeMethods.SelectObject(this._hdc, hFont);
+        var oldFont = NativeMethods.SelectObject(hdc, hFont);
         Size result;
 
         if (text.IndexOf('\n') < 0)
         {
-            NativeMethods.GetTextExtentPoint32W(this._hdc, text, text.Length, out var size);
+            NativeMethods.GetTextExtentPoint32W(hdc, text, text.Length, out var size);
             result = new Size(size.cx, size.cy);
         }
         else
         {
             var rect = new NativeMethods.RECT();
             NativeMethods.DrawTextW(
-                this._hdc,
+                hdc,
                 text,
                 text.Length,
                 ref rect,
@@ -182,7 +188,7 @@ internal sealed class Win32Graphics : IGraphics
             result = new Size(rect.right - rect.left, rect.bottom - rect.top);
         }
 
-        NativeMethods.SelectObject(this._hdc, oldFont);
+        NativeMethods.SelectObject(hdc, oldFont);
         NativeMethods.DeleteObject(hFont);
         return result;
     }
@@ -297,10 +303,10 @@ internal sealed class Win32Graphics : IGraphics
         return format;
     }
 
-    /// <summary>Realizes a <see cref="Font"/> descriptor into a GDI <c>HFONT</c> sized for this DC's DPI.</summary>
-    private nint CreateFont(Font font)
+    /// <summary>Realizes a <see cref="Font"/> descriptor into a GDI <c>HFONT</c> sized for the given DPI.</summary>
+    private static nint CreateFont(Font font, int dpi)
     {
-        var height = -NativeMethods.MulDiv((int)Math.Round(font.SizeInPoints), this._dpi, 72);
+        var height = -NativeMethods.MulDiv((int)Math.Round(font.SizeInPoints), dpi, 72);
         var weight = (font.Style & FontStyle.Bold) != 0 ? NativeMethods.FW_BOLD : NativeMethods.FW_NORMAL;
         var italic = (font.Style & FontStyle.Italic) != 0 ? 1u : 0u;
         var underline = (font.Style & FontStyle.Underline) != 0 ? 1u : 0u;

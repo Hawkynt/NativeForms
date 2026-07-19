@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends;
 
@@ -57,6 +58,24 @@ public interface IButtonPeer : IControlPeer
 /// <summary>A static text peer — the native side of a <see cref="Label"/>.</summary>
 public interface ILabelPeer : IControlPeer
 {
+    /// <summary>
+    /// Aligns the text within the label's bounds. Win32 static controls honor the horizontal component
+    /// plus a coarse vertical centering only (<c>SS_CENTERIMAGE</c>); GTK maps to the label's
+    /// x/y-alignment and honors all nine anchors.
+    /// </summary>
+    void SetTextAlign(ContentAlignment alignment);
+
+    /// <summary>
+    /// Draws (or removes) a single flat border around the label. Win32 applies the <c>WS_BORDER</c>
+    /// style bit; GTK has no native frame on a label, so the value is not rendered there.
+    /// </summary>
+    void SetBorderStyle(BorderStyle borderStyle);
+
+    /// <summary>
+    /// Whether <c>&amp;</c> in the text marks the following character as a mnemonic and renders it
+    /// underlined (<c>&amp;&amp;</c> escapes a literal ampersand).
+    /// </summary>
+    void SetUseMnemonic(bool useMnemonic);
 }
 
 /// <summary>

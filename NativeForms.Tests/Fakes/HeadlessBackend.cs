@@ -30,6 +30,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
     public IPopupPeer CreatePopup() => this.Track(new HeadlessPopupPeer());
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
+    public Size MeasureText(string text, Font font) => RecordingGraphics.Measure(text);
 
     public ITimerPeer CreateTimer()
     {
@@ -94,7 +95,16 @@ internal sealed class HeadlessButtonPeer : HeadlessPeer, IButtonPeer
     public void RaiseClicked() => this.Clicked?.Invoke(this, EventArgs.Empty);
 }
 
-internal sealed class HeadlessLabelPeer : HeadlessPeer, ILabelPeer;
+internal sealed class HeadlessLabelPeer : HeadlessPeer, ILabelPeer
+{
+    public ContentAlignment TextAlign { get; private set; }
+    public BorderStyle BorderStyle { get; private set; }
+    public bool UseMnemonic { get; private set; } = true;
+
+    public void SetTextAlign(ContentAlignment alignment) => this.TextAlign = alignment;
+    public void SetBorderStyle(BorderStyle borderStyle) => this.BorderStyle = borderStyle;
+    public void SetUseMnemonic(bool useMnemonic) => this.UseMnemonic = useMnemonic;
+}
 
 /// <summary>A timer peer that records every Start/Stop and lets tests raise ticks by hand.</summary>
 internal sealed class HeadlessTimerPeer : ITimerPeer
@@ -255,8 +265,10 @@ internal sealed class RecordingGraphics : IGraphics
     public void DrawText(string text, Font font, Color color, Rectangle bounds, ContentAlignment alignment = ContentAlignment.TopLeft)
         => this.Operations.Add($"text \"{text}\" {Hex(color)} {alignment} @{bounds.X},{bounds.Y}");
 
-    public Size MeasureText(string text, Font font)
-        => new((text?.Length ?? 0) * _CharWidth, _LineHeight);
+    public Size MeasureText(string text, Font font) => Measure(text);
+
+    /// <summary>The deterministic measurement shared with <see cref="HeadlessBackend.MeasureText"/>.</summary>
+    internal static Size Measure(string text) => new((text?.Length ?? 0) * _CharWidth, _LineHeight);
 
     public void DrawImage(IImage image, Rectangle bounds)
         => this.Operations.Add($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y}");

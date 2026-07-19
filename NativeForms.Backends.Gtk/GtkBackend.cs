@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -71,6 +72,37 @@ public sealed class GtkBackend : IPlatformBackend
     {
         EnsureInitialized();
         return new GtkTimerPeer();
+    }
+
+    /// <inheritdoc />
+    public Size MeasureText(string text, Font font)
+    {
+        if (string.IsNullOrEmpty(text))
+            return Size.Empty;
+
+        EnsureInitialized();
+
+        // A layout on a context from the default font map measures identically to the per-paint
+        // PangoCairo layout, but needs no Cairo surface — so it works before anything is realized.
+        var context = NativeMethods.pango_font_map_create_context(NativeMethods.pango_cairo_font_map_get_default());
+        try
+        {
+            var layout = NativeMethods.pango_layout_new(context);
+            try
+            {
+                GtkGraphics.ConfigureLayout(layout, text, font);
+                NativeMethods.pango_layout_get_pixel_size(layout, out var width, out var height);
+                return new Size(width, height);
+            }
+            finally
+            {
+                NativeMethods.g_object_unref(layout);
+            }
+        }
+        finally
+        {
+            NativeMethods.g_object_unref(context);
+        }
     }
 
     /// <inheritdoc />

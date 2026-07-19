@@ -139,6 +139,18 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void gtk_label_set_text(nint label, string str);
 
+    /// <summary>Sets the text of a label (UTF-8), underlining the character after each <c>_</c> as a mnemonic.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_label_set_text_with_mnemonic(nint label, string str);
+
+    /// <summary>Sets the horizontal alignment of a label's text (0 = left, 0.5 = center, 1 = right).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_label_set_xalign(nint label, float xalign);
+
+    /// <summary>Sets the vertical alignment of a label's text (0 = top, 0.5 = middle, 1 = bottom).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_label_set_yalign(nint label, float yalign);
+
     // --- Owner-draw canvas ----------------------------------------------------------------------
 
     /// <summary>

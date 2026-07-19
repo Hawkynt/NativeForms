@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -39,6 +40,9 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     public ITimerPeer CreateTimer() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public Size MeasureText(string text, Font font) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
     public IButtonPeer CreateButton() => throw new PlatformNotSupportedException(_NotImplemented);

@@ -147,6 +147,17 @@ internal sealed class GtkGraphics : IGraphics
     private nint CreateLayout(string text, Font font)
     {
         var layout = NativeMethods.pango_cairo_create_layout(_cr);
+        ConfigureLayout(layout, text, font);
+        return layout;
+    }
+
+    /// <summary>
+    /// Loads text and a font description into an existing layout — shared by the per-paint
+    /// <see cref="CreateLayout"/> and <see cref="GtkBackend.MeasureText"/>, which brings a layout on a
+    /// default Pango context so it can measure without a Cairo surface.
+    /// </summary>
+    internal static void ConfigureLayout(nint layout, string text, Font font)
+    {
         NativeMethods.pango_layout_set_text(layout, text, -1);
 
         var description = NativeMethods.pango_font_description_new();
@@ -161,7 +172,6 @@ internal sealed class GtkGraphics : IGraphics
 
         NativeMethods.pango_layout_set_font_description(layout, description);
         NativeMethods.pango_font_description_free(description);
-        return layout;
     }
 
     /// <summary>Left edge of text of the given width within <paramref name="bounds"/> for the alignment.</summary>

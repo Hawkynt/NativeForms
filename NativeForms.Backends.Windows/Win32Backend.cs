@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -42,6 +43,24 @@ public sealed class Win32Backend : IPlatformBackend
 
     /// <inheritdoc/>
     public ITimerPeer CreateTimer() => new Win32TimerPeer();
+
+    /// <inheritdoc/>
+    public Size MeasureText(string text, Font font)
+    {
+        var hdc = NativeMethods.GetDC(0);
+        if (hdc == 0)
+            return Size.Empty;
+
+        try
+        {
+            var dpi = NativeMethods.GetDeviceCaps(hdc, NativeMethods.LOGPIXELSY);
+            return Win32Graphics.MeasureText(hdc, text, font, dpi > 0 ? dpi : 96);
+        }
+        finally
+        {
+            NativeMethods.ReleaseDC(0, hdc);
+        }
+    }
 
     /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow)
