@@ -301,8 +301,8 @@ strategy (may differ per platform; note exceptions inline).
         allocation-free paint switch): [x] text, [x] image, [x] image+text, [x] check (toggle via
         setter, read-only-gated), [x] button (per-cell enabled à la
         `DataGridViewDisableButtonColumn`), [x] link, [x] multi-image (per-icon click index),
-        [x] progress (shared `GlyphRenderer` fill); pending: [ ] combo, [ ] numeric up-down,
-        [ ] date-time picker (all three need the cell-editing overlay)
+        [x] progress (shared `GlyphRenderer` fill), [x] combo (popup list),
+        [x] numeric up-down (hosted editor), [x] date-time picker (CalendarCore popup)
   - [x] Read-only story: grid `ReadOnly`, column `ReadOnly`, per-cell `ReadOnlyCellSelector`
         row predicate — any level wins, WinForms semantics
   - [~] Per-row/cell presentation via lambdas (the `System.Windows.Forms.Extensions` attribute
@@ -310,18 +310,23 @@ strategy (may differ per platform; note exceptions inline).
         [x] cell style/display-text/tooltip selectors, [x] clickable cells
         (`CellClick`/`CellDoubleClick`/`CellContentClick` with model row indices — stable under
         sorting), [x] per-column `SortMode` + `SortComparison` over an index indirection
-        (`Items` never mutated), [x] themed sort arrows; [ ] full merged rows pending
+        (`Items` never mutated), [x] themed sort arrows, [x] full merged rows
+        (`FullRowTextSelector`: one full-width cell, skipped by navigation/selection/editing)
   - [~] Virtualized rows (millions of rows, constant memory) [x] done — holds with all
         presentation selectors active (bounded-ops test at 100k); [x] column resize (header
         divider drag + `AllowUserToResizeColumns` + per-column `AutoSizeMode` over the visible
-        window); [ ] frozen columns pending
-  - [~] [x] `DataSource`/`ObservableList<object?>` one-way binding via reflection-free `ValueSelector` done;
-        [ ] cell editing, [ ] validation, [ ] formatting pending
+        window); [x] frozen columns (leading pinned run over a clipped scrolled run)
+  - [~] [x] `DataSource`/`ObservableList<object?>` one-way binding via reflection-free `ValueSelector`,
+        [x] cell editing (hosted editors, F2/double-click/typing, commit/cancel semantics incl.
+        scroll-out commit), [x] validation (`CellValidating` veto) done; [ ] formatting beyond
+        selectors pending
   - [~] [x] full-row selection, [x] keyboard nav (Up/Down/PageUp/PageDown/Home/End), [x] header rendering
-        in native theme done; [ ] sorting, [ ] extra selection modes, [ ] clipboard copy/paste pending
+        in native theme, [x] sorting, [x] `MultiSelect` (Ctrl/Shift, display-order ranges),
+        [x] clipboard copy (TSV via `IPlatformBackend.SetClipboardText`) done; [ ] paste pending
   - [~] [x] alternating row styles done; [ ] per-cell styles, [ ] DPI + dark mode pending
   - [~] [x] Row headers (`ShowRowHeaders`/`RowHeaderWidth`, current-row marker), [x] column
-        auto-size modes; [ ] column drag-reorder pending
+        auto-size modes, [x] column drag-reorder (`DisplayIndex` indirection, model `Columns`
+        untouched)
   - [x] Vertical virtualization (paints only the visible row range); [ ] horizontal scrollbar
         (`HorizontalOffset` shift exists; interactive scrollbar) pending
 
