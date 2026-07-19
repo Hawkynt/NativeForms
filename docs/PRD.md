@@ -86,7 +86,8 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 - [ ] `Control.DataBindings.Add("Text", vm, nameof(vm.Name), TwoWay)` convenience over `PropertyBinding`
 - [ ] `ICommand` wiring on `Button`/`ToolStripButton`/menu items (auto enable/disable via `CanExecute`)
 - [~] List/selection binding: `ListBox.DataSource` + reflection-free `DisplaySelector`/`ImageSelector`
-      done; `ComboBox`/`ListView`/`DataGridView` + `ValueMember`/`SelectedValue` pending
+      done; `DataGridView.DataSource`/`Columns` + reflection-free `ValueSelector`/`ImageSelector`
+      (one-way, cell-level) done; `ComboBox`/`ListView` + `ValueMember`/`SelectedValue` pending
 
 ---
 
@@ -202,15 +203,21 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `CheckedListBox` (native/owner)
 - [ ] `ComboBox` (native) — `DropDown`/`DropDownList`/`Simple`, **items with icons** (owner-drawn
       drop-down in native style), `DataSource`/`DisplayMember`/`ValueMember`, autocomplete
-- [ ] `ListView` (owner, native metrics) — Details/LargeIcon/SmallIcon/List/Tile views, columns,
-      `ImageList` icons, checkboxes, sorting, groups, virtual mode, editing labels
+- [~] `ListView` (owner, native metrics) — Details + List views, columns (`Width`/`TextAlign`),
+      per-item icons, sub-items, single selection, header row, wheel/keyboard scroll, virtualized
+      paint done; LargeIcon/SmallIcon/Tile views, groups, checkboxes, virtual-mode item API, label
+      editing, sorting and multi-selection pending
 - [ ] `TreeView` (owner/native) — nodes, `ImageList`, checkboxes, expand/collapse, editing, virtual
-- [ ] `DataGridView` (owner) — **flagship owner-drawn control**:
-  - [ ] Column types: text, check, button, combo, image, link
-  - [ ] Virtualized rows (millions of rows, constant memory), row/column resize, frozen columns
-  - [ ] Cell editing, validation, formatting, `DataSource` binding (`ObservableList<T>`)
-  - [ ] Sorting, selection modes, clipboard copy/paste, keyboard nav, header rendering in native theme
-  - [ ] Alternating row styles, per-cell styles, DPI + dark mode
+- [~] `DataGridView` (owner) — **flagship owner-drawn control**:
+  - [~] Column types: [x] text + [x] image (per-cell icon) done; check/button/combo/link pending
+  - [~] Virtualized rows (millions of rows, constant memory) [x] done; [ ] row/column resize, [ ] frozen columns pending
+  - [~] [x] `DataSource`/`ObservableList<object?>` one-way binding via reflection-free `ValueSelector` done;
+        [ ] cell editing, [ ] validation, [ ] formatting pending
+  - [~] [x] full-row selection, [x] keyboard nav (Up/Down/PageUp/PageDown/Home/End), [x] header rendering
+        in native theme done; [ ] sorting, [ ] extra selection modes, [ ] clipboard copy/paste pending
+  - [~] [x] alternating row styles done; [ ] per-cell styles, [ ] DPI + dark mode pending
+  - [x] Vertical virtualization (paints only the visible row range); [ ] horizontal scrollbar
+        (`HorizontalOffset` shift exists; interactive scrollbar) pending
 
 ### 7.5 Range & date
 - [ ] `TrackBar` (native/owner)
@@ -256,7 +263,7 @@ strategy (may differ per platform; note exceptions inline).
 
 ## 9. Quality gates
 - [~] Unit tests (NUnit 4) for platform-agnostic behavior — model, realization, registry, binding,
-      owner-drawn control paint/input (38 tests); grows with each control.
+      owner-drawn control paint/input (53 tests); grows with each control.
 - [x] Headless backend for tests (`HeadlessBackend` + recording `ICanvasPeer`/`RecordingGraphics`) so
       control paint and input are testable without a display.
 - [x] Trim + AOT publish of the demo in CI on each OS with trim warnings as errors (headline goal).
@@ -275,8 +282,10 @@ strategy (may differ per platform; note exceptions inline).
   GTK Cairo canvas peers, native themes, decoder-free icons, Panel/CheckBox/ListBox, `ObservableList<T>`,
   headless canvas + allocation budgets. `[~]` (remaining: ellipse primitive, dark-mode notifications,
   LinkLabel/PictureBox)
-- **M3 — Lists.** ListBox/ComboBox(+icons)/CheckedListBox, list binding + `ObservableList<T>`. `[ ]`
-- **M4 — DataGridView + ListView + TreeView** (virtualized, bound, editable). `[ ]`
+- **M3 — Lists.** `[~]` ListBox (+icons/binding) done; ComboBox(+icons, needs dropdown popup) and
+  CheckedListBox pending.
+- **M4 — DataGridView + ListView + TreeView.** `[~]` DataGridView (virtualized, bound, selection) and
+  ListView (Details/List, virtualized) done; cell editing/sorting/resize and TreeView pending.
 - **M5 — Menus/toolbars/status/dialogs.** `[ ]`
 - **M6 — Accessibility, DPI polish, macOS (Cocoa) backend.** `[ ]`
 
