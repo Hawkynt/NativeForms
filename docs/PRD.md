@@ -280,10 +280,12 @@ strategy (may differ per platform; note exceptions inline).
       `MaxDropDownItems`, `DataSource` + `DisplaySelector`/`ValueSelector`/`SelectedValue`
       (lambda-shaped DisplayMember/ValueMember) done; `Simple` style and autocomplete pending
       (autocomplete needs key events on `ITextBoxPeer`)
-- [~] `ListView` (owner, native metrics) — Details + List views, columns (`Width`/`TextAlign`),
-      per-item icons, sub-items, single selection, header row, wheel/keyboard scroll, virtualized
-      paint done; LargeIcon/SmallIcon/Tile views, groups, checkboxes, virtual-mode item API, label
-      editing, sorting and multi-selection pending
+- [~] `ListView` (owner, native metrics) — Details/List/LargeIcon/SmallIcon/Tile views, columns,
+      per-item icons (`Large`/`SmallImageList` + `ImageIndex`), sub-items, groups (flattened
+      header rows), checkboxes (`ItemCheck` veto + corner overlay in icon views), MultiExtended
+      selection (ListBox engine parity), in-place sorting (`ColumnClick`, `Sorting`,
+      `ItemSorter`, stable `ObservableList.Sort`), label editing (hosted TextBox, F2), header
+      sort arrows, virtualized paint in every view done; virtual-mode item API pending
 - [~] `TreeView` (owner) — nodes with expand/collapse (themed +/− glyphs, cancelable
       Before/After pipeline), per-node icons (`ImageIndex`/`SelectedImageIndex` via `ImageList`,
       lazily materialized), checkboxes (`AfterCheck`, shared `CheckGlyph`), full keyboard nav
