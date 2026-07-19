@@ -85,6 +85,9 @@ public enum Keys
     /// <summary>Insert.</summary>
     Insert = 0x2D,
 
+    /// <summary>F4 (toggles combo drop-downs, like the classic toolkits).</summary>
+    F4 = 0x73,
+
     /// <summary>Delete.</summary>
     Delete = 0x2E,
 

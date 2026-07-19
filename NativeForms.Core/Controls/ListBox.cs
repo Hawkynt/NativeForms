@@ -460,10 +460,15 @@ public class ListBox : OwnerDrawnControl
     /// the remaining, right-shifted bounds.
     /// </summary>
     protected virtual void OnDrawRow(IGraphics g, int index, Rectangle bounds, bool selected)
+        => DrawRowContent(g, this.Theme, bounds, this.DisplaySelector(this.Items[index]), this.ImageSelector?.Invoke(this.Items[index]), selected);
+
+    /// <summary>
+    /// Paints the icon-plus-text body of one list row — the single row renderer every list-shaped
+    /// surface shares (list box rows, combo drop-down rows), so they stay pixel-identical.
+    /// </summary>
+    internal static void DrawRowContent(IGraphics g, ITheme theme, Rectangle bounds, string text, IImage? icon, bool selected)
     {
-        var theme = this.Theme;
         var textLeft = bounds.X + 2;
-        var icon = this.ImageSelector?.Invoke(this.Items[index]);
         if (icon is not null)
         {
             var iconSize = bounds.Height - 4;
@@ -473,7 +478,7 @@ public class ListBox : OwnerDrawnControl
 
         var textColor = selected ? theme.SelectionText : theme.ControlText;
         var textRect = new Rectangle(textLeft, bounds.Y, bounds.Right - textLeft, bounds.Height);
-        g.DrawText(this.DisplaySelector(this.Items[index]), theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
+        g.DrawText(text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
     }
 
     /// <summary>A live, allocation-free mapping of the selected indices onto their items.</summary>
