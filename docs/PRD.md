@@ -253,8 +253,6 @@ strategy (may differ per platform; note exceptions inline).
       strikeout, `SelectionColor`/`SelectionFont`), paragraph alignment + indent, bullet lists,
       auto-detected links + `LinkClicked`, `PlaceholderText`, RTF subset load/save (`Rtf`,
       `LoadFile`/`SaveFile`), zoom
-- [ ] `NumericUpDown` (native/owner)
-- [ ] `DomainUpDown`
 
 ### 7.4 Lists & selection
 - [x] `ListBox` (owner) — items, per-item icons, wheel/keyboard scroll, `DataSource` binding,
@@ -316,7 +314,16 @@ strategy (may differ per platform; note exceptions inline).
         (`HorizontalOffset` shift exists; interactive scrollbar) pending
 
 ### 7.5 Range & date
-- [ ] `TrackBar` (native/owner)
+- [x] `TrackBar` (owner) — Min/Max/Value, `TickFrequency` ticks, horizontal/vertical, themed
+      groove + accent fill + thumb, track paging + thumb scrub, Win32 key directions
+- [x] `NumericUpDown` / `DomainUpDown` (owner spinner + hosted native TextBox editor) — decimal
+      clamping/`Increment`/`DecimalPlaces`, domain matching + `Wrap`, themed spin buttons with
+      timer-driven autorepeat (shared `AutoRepeat` engine); commit points documented (no focus
+      model yet)
+- [x] `HScrollBar`/`VScrollBar` (owner) — proportional thumb, channel paging, arrow autorepeat,
+      Win32 `Maximum − LargeChange + 1` semantics, `Scroll` vs `ValueChanged` split
+  - [ ] Unify the two internal scrollbar renderers (`Drawing.ScrollBarRenderer` used by
+        `Panel.AutoScroll` vs the `ScrollBar` control's own) into one implementation
 - [x] `MonthCalendar` (owner) — `CalendarCore` engine (title + nav arrows, `FirstDayOfWeek`
       header, 6×7 grid with leading/trailing greying, today accent, single + Shift/drag range
       selection capped by `MaxSelectionCount`, `Min`/`MaxDate` clamps, full keyboard set incl.
@@ -325,9 +332,8 @@ strategy (may differ per platform; note exceptions inline).
       Custom invariant formats, `ShowCheckBox`/`Checked` greying, closed Up/Down day stepping,
       Alt+Down/F4, commit/cancel semantics done; `BoldedDates`, per-part focus, time spinner
       editing pending
-- [~] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill) done; `Style.Marquee`
-      (animated, allocation-free), `Step`/`PerformStep`, vertical orientation pending
-- [ ] `ScrollBar` (`HScrollBar`/`VScrollBar`) (native)
+- [x] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill), `Style.Marquee`
+      (timer-driven sweep, allocation-free per tick), `Step`/`PerformStep`, vertical orientation
 
 ### 7.6 Menus, toolbars, status
 - [ ] `MenuStrip` / `ToolStripMenuItem` (native menu bar where available — Win32 `HMENU`,
