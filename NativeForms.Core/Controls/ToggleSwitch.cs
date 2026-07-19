@@ -1,0 +1,111 @@
+using System.Drawing;
+using Hawkynt.NativeForms.Drawing;
+
+namespace Hawkynt.NativeForms;
+
+/// <summary>
+/// An owner-drawn on/off switch — the modern <see cref="CheckBox"/> alternative: a pill-shaped track
+/// (accent-filled while on, border-grey while off) with a themed thumb that sits left for off and
+/// right for on, and an optional caption beside it. Toggles on click or Space and raises
+/// <see cref="CheckedChanged"/>. The thumb snaps to its new side; there is no slide animation.
+/// </summary>
+public class ToggleSwitch : OwnerDrawnControl
+{
+    /// <summary>The pixel width of the track pill.</summary>
+    internal const int TrackWidth = 36;
+
+    /// <summary>The pixel height of the track pill — also the diameter of its rounded ends.</summary>
+    internal const int TrackHeight = 16;
+
+    /// <summary>The inset of the thumb circle within the track.</summary>
+    private const int _ThumbMargin = 2;
+
+    /// <summary>The gap between the track and the caption.</summary>
+    private const int _TextGap = 6;
+
+    /// <summary>Whether the switch is on.</summary>
+    public bool Checked
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+            this.OnCheckedChanged(EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Raised when <see cref="Checked"/> changes.</summary>
+    public event EventHandler? CheckedChanged;
+
+    /// <inheritdoc/>
+    protected override bool Focusable => true;
+
+    /// <summary>Raises <see cref="CheckedChanged"/>.</summary>
+    protected virtual void OnCheckedChanged(EventArgs e) => this.CheckedChanged?.Invoke(this, e);
+
+    /// <summary>Toggles the switch and raises <see cref="Control.Click"/>.</summary>
+    protected void Toggle()
+    {
+        this.Checked = !this.Checked;
+        this.OnClick(EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (this.Enabled && e.Button == MouseButtons.Left && new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
+            this.Toggle();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (!this.Enabled || e.KeyCode is not Keys.Space)
+            return;
+
+        this.Toggle();
+        e.Handled = true;
+    }
+
+    /// <inheritdoc/>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var theme = this.Theme;
+        g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+
+        // The track: an ellipse at each end plus the center rectangle forms the pill — there is no
+        // rounded-rectangle primitive. The accent only shows on an enabled, on switch; a disabled
+        // one keeps the grey track and reports its state through the thumb side alone.
+        var top = Math.Max(0, (this.Height - TrackHeight) / 2);
+        var trackColor = this.Enabled && this.Checked ? theme.Accent : theme.Border;
+        g.FillEllipse(trackColor, new(0, top, TrackHeight, TrackHeight));
+        g.FillEllipse(trackColor, new(TrackWidth - TrackHeight, top, TrackHeight, TrackHeight));
+        g.FillRectangle(trackColor, new(TrackHeight / 2, top, TrackWidth - TrackHeight, TrackHeight));
+
+        // The thumb: a field-colored circle hugging the off (left) or on (right) end of the track.
+        var diameter = TrackHeight - (2 * _ThumbMargin);
+        var thumbX = this.Checked ? TrackWidth - diameter - _ThumbMargin : _ThumbMargin;
+        var thumb = new Rectangle(thumbX, top + _ThumbMargin, diameter, diameter);
+        g.FillEllipse(theme.FieldBackground, thumb);
+        g.DrawEllipse(theme.Border, thumb);
+
+        if (this.Text.Length == 0)
+            return;
+
+        var content = new Rectangle(TrackWidth + _TextGap, 0, this.Width - TrackWidth - _TextGap, this.Height);
+        ContentLayout.Arrange(
+            content,
+            Size.Empty,
+            g.MeasureText(this.Text, theme.DefaultFont),
+            TextImageRelation.ImageBeforeText,
+            ContentAlignment.MiddleLeft,
+            out _,
+            out var textRect);
+        g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, ContentAlignment.MiddleLeft);
+    }
+}
