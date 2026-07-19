@@ -55,6 +55,23 @@ internal sealed class ObservableListTests
     }
 
     [Test]
+    public void Sort_reorders_stably_and_raises_single_reset()
+    {
+        var list = new ObservableList<string>(["bb", "c", "aa", "b"]);
+        var events = new List<ListChangedEventArgs>();
+        list.ListChanged += (_, e) => events.Add(e);
+
+        list.Sort(static (a, b) => a.Length - b.Length); // equal lengths must keep their order
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(list, Is.EqualTo(new[] { "c", "b", "bb", "aa" }));
+            Assert.That(events, Has.Count.EqualTo(1));
+            Assert.That(events[0].ChangeType, Is.EqualTo(ListChangeType.Reset));
+        });
+    }
+
+    [Test]
     public void Indexer_set_raises_replaced()
     {
         var list = new ObservableList<string>(["a"]);

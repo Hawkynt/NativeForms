@@ -1,9 +1,7 @@
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// How a <see cref="ListView"/> arranges its items, matching <c>System.Windows.Forms.View</c>. Only
-/// <see cref="Details"/> and <see cref="List"/> are painted today; the icon and tile layouts are
-/// reserved for a later milestone and currently fall back to the <see cref="List"/> layout.
+/// How a <see cref="ListView"/> arranges its items, matching <c>System.Windows.Forms.View</c>.
 /// </summary>
 public enum ListViewView
 {
@@ -13,12 +11,12 @@ public enum ListViewView
     /// <summary>Single-column vertical list of item text and icon.</summary>
     List,
 
-    /// <summary>Large icons above wrapped labels. TODO: not yet implemented.</summary>
+    /// <summary>A grid of cells: the large icon centered above the label.</summary>
     LargeIcon,
 
-    /// <summary>Small icons beside labels. TODO: not yet implemented.</summary>
+    /// <summary>Small icon beside the label, cells flowing left-to-right in rows.</summary>
     SmallIcon,
 
-    /// <summary>Large icon with a block of item text. TODO: not yet implemented.</summary>
+    /// <summary>Large icon at the left of a text block: the label above the first sub-item.</summary>
     Tile,
 }

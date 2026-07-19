@@ -111,6 +111,42 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         this.OnListChanged(ListChangeType.Reset, -1);
     }
 
+    /// <summary>
+    /// Reorders the items in place by the given comparison — stably, so equal items keep their
+    /// relative order — raising a single <see cref="ListChangeType.Reset"/> notification.
+    /// </summary>
+    /// <param name="comparison">Orders any two items.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="comparison"/> is <see langword="null"/>.</exception>
+    public void Sort(Comparison<T> comparison)
+    {
+        ArgumentNullException.ThrowIfNull(comparison);
+        var count = _items.Count;
+        if (count < 2)
+            return;
+
+        // Sort an index map with the original position as tie-break, then permute once — this is
+        // what makes the (inherently unstable) Array.Sort behave stably.
+        var map = new int[count];
+        for (var i = 0; i < count; ++i)
+            map[i] = i;
+
+        var items = _items;
+        Array.Sort(map, (a, b) =>
+        {
+            var result = comparison(items[a], items[b]);
+            return result != 0 ? result : a - b;
+        });
+
+        var sorted = new T[count];
+        for (var i = 0; i < count; ++i)
+            sorted[i] = items[map[i]];
+
+        for (var i = 0; i < count; ++i)
+            items[i] = sorted[i];
+
+        this.OnListChanged(ListChangeType.Reset, -1);
+    }
+
     /// <inheritdoc/>
     public bool Contains(T item) => _items.Contains(item);
 
