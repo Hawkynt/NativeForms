@@ -263,10 +263,12 @@ strategy (may differ per platform; note exceptions inline).
       per-item icons, sub-items, single selection, header row, wheel/keyboard scroll, virtualized
       paint done; LargeIcon/SmallIcon/Tile views, groups, checkboxes, virtual-mode item API, label
       editing, sorting and multi-selection pending
-- [ ] `TreeView` (owner) — nodes with expand/collapse (themed glyphs), per-node icons
-      (`ImageIndex`/`SelectedImageIndex` + state images via `ImageList`), checkboxes, label editing,
-      `BeforeExpand`/`AfterSelect` events, keyboard nav (arrows/+/−/*), virtualized paint over the
-      flattened visible-node list (same engine discipline as ListView)
+- [~] `TreeView` (owner) — nodes with expand/collapse (themed +/− glyphs, cancelable
+      Before/After pipeline), per-node icons (`ImageIndex`/`SelectedImageIndex` via `ImageList`,
+      lazily materialized), checkboxes (`AfterCheck`, shared `CheckGlyph`), full keyboard nav
+      (arrows walk rows, Right into child, Left to parent, +/−/*/Space), `EnsureVisible`,
+      virtualized paint over the lazily re-flattened visible-node list (100k nodes bounded) done;
+      label editing (TextBox overlay) and state images pending
 - [ ] `TreeListView` (owner) — TreeView × ListView-Details hybrid (expandable hierarchy in the
       first column + regular sub-item columns); reuses ListView's header/column/virtualization
       engine and TreeView's node model; per-node icons, keyboard expand/collapse,
