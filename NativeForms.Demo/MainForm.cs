@@ -1,375 +1,288 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.ComponentModel;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Demo;
 
 /// <summary>
-/// The demo window: a gallery with one captioned section per shipped control, each configured with
-/// non-default property values. The button section keeps the original MVVM wiring — an <c>ICommand</c>
-/// for the action and a one-way <see cref="PropertyBinding{T}"/> pushing the view-model's text onto a
-/// label — and a second binding drives a progress bar from the same counter.
+/// The demo window: a tabbed gallery with one page per control family — basics, input, lists, the
+/// data grid and layout containers — under a full set of window chrome (menu, tool and status
+/// strips). Every shipped control appears with representative non-default property values, and the
+/// original MVVM click counter lives on the Basics page: a <see cref="RelayCommand"/> drives the
+/// view-model while two <see cref="PropertyBinding{T}"/>s push its state onto a label and a
+/// progress bar.
 /// </summary>
 /// <remarks>
-/// There is no layout engine yet, so every control sits at absolute <see cref="Control.Bounds"/> in
-/// three labelled columns. Only the form's direct children are realized, so the <see cref="Panel"/>
-/// and <see cref="GroupBox"/> sections show the frames themselves with the other controls placed
-/// beside them, and all radio buttons on the form share one exclusivity group. Icons are omitted
-/// throughout because an <see cref="IImage"/> only exists once a backend is realized.
+/// There is no dock/anchor engine yet, so the chrome rows and the tab control are re-docked by hand
+/// from <see cref="Form.Resize"/> and everything inside a page sits at absolute
+/// <see cref="Control.Bounds"/>. All icons are generated as ARGB pixel arrays — flat squares and
+/// discs in distinct colors — so the demo ships without image files or decoders.
 /// </remarks>
-internal sealed class MainForm : Form
+internal sealed partial class MainForm : Form
 {
-    private const int _Column1 = 20;
-    private const int _Column2 = 340;
-    private const int _Column3 = 680;
-    private const int _ColumnWidth = 300;
+    private const int _MenuHeight = 24;
+    private const int _ToolHeight = 28;
+    private const int _StatusHeight = 24;
+    private const int _IconSize = 16;
+
+    // Indices into _icons, in the order BuildIcons adds them.
+    private const int _IconNew = 0;
+    private const int _IconOpen = 1;
+    private const int _IconSave = 2;
+    private const int _IconRun = 3;
+    private const int _IconGear = 4;
+    private const int _IconFolder = 5;
+    private const int _IconFile = 6;
+    private const int _IconRed = 7;
+    private const int _IconGreen = 8;
+    private const int _IconBlue = 9;
+    private const int _IconYellow = 10;
+    private const int _IconPurple = 11;
 
     private readonly CounterViewModel _viewModel = new();
+    private readonly IPlatformBackend _backend = BackendRegistry.Resolve();
+    private readonly ImageList _icons = new(_IconSize);
+    private readonly ToolTip _toolTip = new();
+
+    private readonly MenuStrip _menu;
+    private readonly ToolStrip _tools;
+    private readonly TabControl _tabs;
+    private readonly StatusStrip _status;
+    private readonly ToolStripStatusLabel _statusLabel = new("Ready.");
+    private readonly ToolStripProgressBarItem _statusProgress = new() { Width = 120, Value = 40 };
 
     // Held so the bindings are not garbage-collected for the window's lifetime.
-    private readonly PropertyBinding<string> _labelBinding;
-    private readonly PropertyBinding<int> _progressBinding;
+    private PropertyBinding<string>? _labelBinding;
+    private PropertyBinding<int>? _progressBinding;
 
     public MainForm()
     {
         this.Text = "NativeForms Gallery";
-        this.Bounds = new(Point.Empty, new Size(1000, 700));
+        this.Bounds = new(Point.Empty, new Size(1000, 720));
+        this.MinimumSize = new(820, 560);
+        this.StartPosition = FormStartPosition.CenterScreen;
+        this.SetIcon(_IconSize, _IconSize, DiscPixels(_IconSize, Color.RoyalBlue));
 
-        _labelBinding = this.BuildButtonSection();
-        this.BuildLabelSection();
-        this.BuildCheckBoxSection();
-        this.BuildRadioButtonSection();
-        _progressBinding = this.BuildProgressBarSection();
-        this.BuildContainerSection();
-        this.BuildListBoxSection();
-        this.BuildListViewSection();
-        this.BuildDataGridViewSection();
+        this.BuildIcons();
+        _menu = this.BuildMenuStrip();
+        _tools = this.BuildToolStrip();
+        _status = this.BuildStatusStrip();
+
+        _tabs = new() { ImageList = _icons };
+        _tabs.TabPages.AddRange(
+            this.BuildBasicsPage(),
+            this.BuildInputPage(),
+            this.BuildListsPage(),
+            this.BuildGridPage(),
+            this.BuildLayoutPage());
+
+        this.Controls.AddRange(_menu, _tools, _tabs, _status);
+        this.LayoutChrome();
+        this.Resize += (_, _) => this.LayoutChrome();
     }
 
-    /// <summary>Adds a section caption label at the given position.</summary>
-    private void AddCaption(string text, int x, int y)
-        => this.Controls.Add(new Label { Bounds = new(x, y, _ColumnWidth, 20), Text = text });
+    /// <summary>Re-docks the chrome rows and the tab control to the current window size.</summary>
+    private void LayoutChrome()
+    {
+        var width = this.Width;
+        var height = this.Height;
+        _menu.Bounds = new(0, 0, width, _MenuHeight);
+        _tools.Bounds = new(0, _MenuHeight, width, _ToolHeight);
+        _status.Bounds = new(0, height - _StatusHeight, width, _StatusHeight);
+        var top = _MenuHeight + _ToolHeight;
+        _tabs.Bounds = new(0, top, width, Math.Max(0, height - top - _StatusHeight));
+    }
+
+    /// <summary>Reports a one-line message into the status strip.</summary>
+    private void SetStatus(string text) => _statusLabel.Text = text;
+
+    /// <summary>Adds a section caption label to a parent at the given position.</summary>
+    private static Label Caption(string text, int x, int y)
+        => new() { Bounds = new(x, y, 300, 18), Text = text };
+
+    // --- Chrome -----------------------------------------------------------------------------------
 
     /// <summary>
-    /// Buttons: the MVVM click counter (command in, bound label out), a disabled button and a hidden
-    /// one. Returns the label binding so the constructor can keep it alive.
+    /// The menu bar: a File menu with icons, shortcut display, a checkable Autosave item and an Exit
+    /// item calling <see cref="Application.Exit"/>, plus a Help menu opening a native message box.
     /// </summary>
-    private PropertyBinding<string> BuildButtonSection()
+    private MenuStrip BuildMenuStrip()
     {
-        this.AddCaption("Button", _Column1, 15);
+        var strip = new MenuStrip();
 
-        var counterLabel = new Label
+        var file = new ToolStripMenuItem("&File");
+        var newItem = new ToolStripMenuItem("&New") { ImageList = _icons, ImageIndex = _IconNew };
+        newItem.Click += (_, _) => this.SetStatus("File → New clicked.");
+        var open = new ToolStripMenuItem("&Open…")
         {
-            Bounds = new(_Column1, 40, _ColumnWidth, 22),
-            Text = _viewModel.Display,
+            ImageList = _icons,
+            ImageIndex = _IconOpen,
+            ShortcutKeys = Keys.Control | Keys.O,
         };
-
-        var clickButton = new Button
+        open.Click += (_, _) => this.SetStatus("File → Open clicked.");
+        var save = new ToolStripMenuItem("&Save")
         {
-            Bounds = new(_Column1, 68, 140, 32),
-            Text = "Click me",
+            ImageList = _icons,
+            ImageIndex = _IconSave,
+            ShortcutKeys = Keys.Control | Keys.S,
         };
-        clickButton.Click += (_, _) => _viewModel.Increment.Execute(null);
+        save.Click += (_, _) => this.SetStatus("File → Save clicked.");
+        var autosave = new ToolStripMenuItem("&Autosave") { CheckOnClick = true, Checked = true };
+        autosave.CheckedChanged += (_, _) => this.SetStatus($"Autosave is {(autosave.Checked ? "on" : "off")}.");
+        var exit = new ToolStripMenuItem("E&xit");
+        exit.Click += (_, _) => Application.Exit();
+        file.DropDownItems.Add(newItem);
+        file.DropDownItems.Add(open);
+        file.DropDownItems.Add(save);
+        file.DropDownItems.Add(new ToolStripSeparator());
+        file.DropDownItems.Add(autosave);
+        file.DropDownItems.Add(new ToolStripSeparator());
+        file.DropDownItems.Add(exit);
 
-        var disabledButton = new Button
-        {
-            Bounds = new(_Column1 + 150, 68, 130, 32),
-            Text = "Disabled",
-            Enabled = false,
-        };
+        var help = new ToolStripMenuItem("&Help");
+        var about = new ToolStripMenuItem("&About…") { ShortcutKeyDisplayString = "F1" };
+        about.Click += (_, _) =>
+            MessageBox.Show(
+                "A WinForms-shaped UI toolkit rendering through native widgets.",
+                "About NativeForms",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        help.DropDownItems.Add(about);
 
-        var hiddenButton = new Button
-        {
-            Bounds = new(_Column1, 108, 140, 32),
-            Text = "Hidden",
-            Visible = false,
-        };
-
-        var hiddenNote = new Label
-        {
-            Bounds = new(_Column1 + 150, 113, 130, 22),
-            Text = "<- Visible = false",
-        };
-
-        this.Controls.AddRange(counterLabel, clickButton, disabledButton, hiddenButton, hiddenNote);
-
-        return new(
-            _viewModel,
-            nameof(CounterViewModel.Count),
-            () => _viewModel.Display,
-            text => counterLabel.Text = text);
-    }
-
-    /// <summary>Labels: a plain one and a disabled one painted in the theme's disabled text color.</summary>
-    private void BuildLabelSection()
-    {
-        this.AddCaption("Label", _Column1, 160);
-
-        var plain = new Label
-        {
-            Bounds = new(_Column1, 185, _ColumnWidth, 22),
-            Text = "A plain single-line label.",
-        };
-
-        var disabled = new Label
-        {
-            Bounds = new(_Column1, 209, _ColumnWidth, 22),
-            Text = "A disabled label (Enabled = false).",
-            Enabled = false,
-        };
-
-        this.Controls.AddRange(plain, disabled);
-    }
-
-    /// <summary>
-    /// Check boxes: one reporting <see cref="CheckBox.CheckedChanged"/> into a feedback label, one
-    /// pre-checked and one disabled.
-    /// </summary>
-    private void BuildCheckBoxSection()
-    {
-        this.AddCaption("CheckBox", _Column1, 250);
-
-        var toggle = new CheckBox
-        {
-            Bounds = new(_Column1, 275, _ColumnWidth, 20),
-            Text = "Toggle me",
-        };
-
-        var preChecked = new CheckBox
-        {
-            Bounds = new(_Column1, 301, _ColumnWidth, 20),
-            Text = "Checked from the start",
-            Checked = true,
-        };
-
-        var disabled = new CheckBox
-        {
-            Bounds = new(_Column1, 327, _ColumnWidth, 20),
-            Text = "Disabled",
-            Enabled = false,
-        };
-
-        var feedback = new Label
-        {
-            Bounds = new(_Column1, 353, _ColumnWidth, 22),
-            Text = "The first box is unchecked.",
-        };
-        toggle.CheckedChanged += (_, _)
-            => feedback.Text = toggle.Checked ? "The first box is checked." : "The first box is unchecked.";
-
-        this.Controls.AddRange(toggle, preChecked, disabled, feedback);
+        strip.Items.AddRange(file, help);
+        return strip;
     }
 
     /// <summary>
-    /// Radio buttons: three exclusive options reporting the selection into a feedback label. They are
-    /// siblings on the form, so selecting one unchecks the others.
+    /// The toolbar: three icon buttons, a checkable toggle button and a split button whose drop-down
+    /// offers run variants. Every click is reported into the status strip.
     /// </summary>
-    private void BuildRadioButtonSection()
+    private ToolStrip BuildToolStrip()
     {
-        this.AddCaption("RadioButton", _Column1, 395);
+        var strip = new ToolStrip();
 
-        var small = new RadioButton { Bounds = new(_Column1, 420, _ColumnWidth, 20), Text = "Small" };
-        var medium = new RadioButton { Bounds = new(_Column1, 446, _ColumnWidth, 20), Text = "Medium" };
-        var large = new RadioButton { Bounds = new(_Column1, 472, _ColumnWidth, 20), Text = "Large" };
+        var newButton = new ToolStripButton { ImageList = _icons, ImageIndex = _IconNew };
+        newButton.Click += (_, _) => this.SetStatus("Toolbar: New clicked.");
+        var openButton = new ToolStripButton { ImageList = _icons, ImageIndex = _IconOpen };
+        openButton.Click += (_, _) => this.SetStatus("Toolbar: Open clicked.");
+        var saveButton = new ToolStripButton { ImageList = _icons, ImageIndex = _IconSave };
+        saveButton.Click += (_, _) => this.SetStatus("Toolbar: Save clicked.");
 
-        var feedback = new Label
+        var pin = new ToolStripButton("Pin")
         {
-            Bounds = new(_Column1, 498, _ColumnWidth, 22),
-            Text = "Selected size: (none)",
+            ImageList = _icons,
+            ImageIndex = _IconGear,
+            CheckOnClick = true,
         };
+        pin.CheckedChanged += (_, _) => this.SetStatus($"Toolbar: Pin is {(pin.Checked ? "on" : "off")}.");
 
-        void Report(RadioButton radio) => radio.CheckedChanged += (_, _) =>
-        {
-            if (radio.Checked)
-                feedback.Text = $"Selected size: {radio.Text}";
-        };
+        var run = new ToolStripSplitButton("Run") { ImageList = _icons, ImageIndex = _IconRun };
+        run.Click += (_, _) => this.SetStatus("Toolbar: Run clicked.");
+        var runTests = new ToolStripMenuItem("Run &tests");
+        runTests.Click += (_, _) => this.SetStatus("Toolbar: Run tests picked.");
+        var runProfiled = new ToolStripMenuItem("Run with &profiler");
+        runProfiled.Click += (_, _) => this.SetStatus("Toolbar: Run with profiler picked.");
+        run.DropDownItems.Add(runTests);
+        run.DropDownItems.Add(runProfiled);
 
-        Report(small);
-        Report(medium);
-        Report(large);
-        medium.Checked = true;
-
-        this.Controls.AddRange(small, medium, large, feedback);
+        strip.Items.AddRange(newButton, openButton, saveButton, new ToolStripSeparator(), pin, new ToolStripSeparator(), run);
+        return strip;
     }
 
-    /// <summary>
-    /// Progress bars: static values at 0, 50 and 100 percent plus a fourth bar bound to the click
-    /// counter (ten percent per click). Returns the value binding so the constructor can keep it alive.
-    /// </summary>
-    private PropertyBinding<int> BuildProgressBarSection()
+    /// <summary>The status bar: the message label, a spring filler and a progress item.</summary>
+    private StatusStrip BuildStatusStrip()
     {
-        this.AddCaption("ProgressBar", _Column2, 15);
-
-        var empty = new ProgressBar { Bounds = new(_Column2, 40, 230, 18), Value = 0 };
-        var half = new ProgressBar { Bounds = new(_Column2, 64, 230, 18), Value = 50 };
-        var full = new ProgressBar { Bounds = new(_Column2, 88, 230, 18), Value = 100 };
-        var counterBar = new ProgressBar { Bounds = new(_Column2, 112, 230, 18) };
-
-        var emptyLabel = new Label { Bounds = new(_Column2 + 240, 38, 60, 20), Text = "0 %" };
-        var halfLabel = new Label { Bounds = new(_Column2 + 240, 62, 60, 20), Text = "50 %" };
-        var fullLabel = new Label { Bounds = new(_Column2 + 240, 86, 60, 20), Text = "100 %" };
-        var counterNote = new Label
-        {
-            Bounds = new(_Column2, 136, _ColumnWidth, 22),
-            Text = "The last bar follows the click counter.",
-        };
-
-        this.Controls.AddRange(empty, half, full, counterBar, emptyLabel, halfLabel, fullLabel, counterNote);
-
-        return new(
-            _viewModel,
-            nameof(CounterViewModel.Count),
-            () => _viewModel.Count * 10,
-            value => counterBar.Value = value);
+        var strip = new StatusStrip();
+        strip.Items.AddRange(_statusLabel, new ToolStripStatusLabel { Spring = true }, _statusProgress);
+        return strip;
     }
 
-    /// <summary>
-    /// Containers: one panel per <see cref="BorderStyle"/> and a captioned group box. Only the form's
-    /// direct children are realized, so the frames are shown empty with everything else beside them.
-    /// </summary>
-    private void BuildContainerSection()
+    // --- Generated icons --------------------------------------------------------------------------
+
+    /// <summary>Fills the shared icon list; the <c>_Icon*</c> constants index into it.</summary>
+    private void BuildIcons()
     {
-        this.AddCaption("Panel + GroupBox", _Column2, 175);
-
-        var single = new Panel { Bounds = new(_Column2, 200, 88, 64), BorderStyle = BorderStyle.FixedSingle };
-        var threeD = new Panel { Bounds = new(_Column2 + 106, 200, 88, 64), BorderStyle = BorderStyle.Fixed3D };
-        var borderless = new Panel { Bounds = new(_Column2 + 212, 200, 88, 64) };
-
-        var singleLabel = new Label { Bounds = new(_Column2, 268, 100, 18), Text = "FixedSingle" };
-        var threeDLabel = new Label { Bounds = new(_Column2 + 106, 268, 100, 18), Text = "Fixed3D" };
-        var borderlessLabel = new Label { Bounds = new(_Column2 + 212, 268, 88, 18), Text = "None" };
-
-        var group = new GroupBox
-        {
-            Bounds = new(_Column2, 294, _ColumnWidth, 76),
-            Text = "Group caption",
-        };
-
-        var note = new Label
-        {
-            Bounds = new(_Column2, 378, _ColumnWidth, 22),
-            Text = "Frames only; controls sit beside them.",
-        };
-
-        this.Controls.AddRange(single, threeD, borderless, singleLabel, threeDLabel, borderlessLabel, group, note);
+        _icons.Add(SquarePixels(_IconSize, Color.CornflowerBlue)); // _IconNew
+        _icons.Add(SquarePixels(_IconSize, Color.Orange));         // _IconOpen
+        _icons.Add(SquarePixels(_IconSize, Color.MediumSeaGreen)); // _IconSave
+        _icons.Add(DiscPixels(_IconSize, Color.ForestGreen));      // _IconRun
+        _icons.Add(DiscPixels(_IconSize, Color.SlateGray));        // _IconGear
+        _icons.Add(SquarePixels(_IconSize, Color.Goldenrod));      // _IconFolder
+        _icons.Add(SquarePixels(_IconSize, Color.Silver));         // _IconFile
+        _icons.Add(DiscPixels(_IconSize, Color.Crimson));          // _IconRed
+        _icons.Add(DiscPixels(_IconSize, Color.MediumSeaGreen));   // _IconGreen
+        _icons.Add(DiscPixels(_IconSize, Color.RoyalBlue));        // _IconBlue
+        _icons.Add(DiscPixels(_IconSize, Color.Gold));             // _IconYellow
+        _icons.Add(DiscPixels(_IconSize, Color.MediumOrchid));     // _IconPurple
     }
 
-    /// <summary>ListBox: weekday items at a custom row height, selection echoed into a label.</summary>
-    private void BuildListBoxSection()
+    /// <summary>A native square icon in the given fill color, for controls that take an image directly.</summary>
+    private IImage SquareImage(Color fill) => _backend.CreateImage(_IconSize, _IconSize, SquarePixels(_IconSize, fill));
+
+    /// <summary>A native disc icon in the given fill color, for controls that take an image directly.</summary>
+    private IImage DiscImage(Color fill) => _backend.CreateImage(_IconSize, _IconSize, DiscPixels(_IconSize, fill));
+
+    /// <summary>A filled square with a one-pixel darker border inside a one-pixel transparent inset.</summary>
+    private static int[] SquarePixels(int size, Color fill)
     {
-        this.AddCaption("ListBox", _Column2, 415);
-
-        var listBox = new ListBox
+        var border = Darken(fill).ToArgb();
+        var body = fill.ToArgb();
+        var pixels = new int[size * size];
+        for (var y = 1; y < size - 1; ++y)
+        for (var x = 1; x < size - 1; ++x)
         {
-            Bounds = new(_Column2, 440, _ColumnWidth, 136),
-            ItemHeight = 20,
-        };
-        listBox.Items.AddRange(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]);
+            var edge = x == 1 || y == 1 || x == size - 2 || y == size - 2;
+            pixels[(y * size) + x] = edge ? border : body;
+        }
 
-        var feedback = new Label
-        {
-            Bounds = new(_Column2, 582, _ColumnWidth, 22),
-            Text = "Selected: (none)",
-        };
-        listBox.SelectedIndexChanged += (_, _) => feedback.Text = $"Selected: {listBox.SelectedItem}";
-        listBox.SelectedIndex = 2;
-
-        this.Controls.AddRange(listBox, feedback);
+        return pixels;
     }
 
-    /// <summary>
-    /// List views: a Details layout with three columns, sub-item cells and a taller row height, plus a
-    /// second instance switched to the List layout.
-    /// </summary>
-    private void BuildListViewSection()
+    /// <summary>A filled disc with a one-pixel darker rim on a transparent background.</summary>
+    private static int[] DiscPixels(int size, Color fill)
     {
-        this.AddCaption("ListView (Details)", _Column3, 15);
-
-        var details = new ListView
+        var border = Darken(fill).ToArgb();
+        var body = fill.ToArgb();
+        var pixels = new int[size * size];
+        var center = (size - 1) / 2f;
+        var radius = (size / 2f) - 1f;
+        for (var y = 0; y < size; ++y)
+        for (var x = 0; x < size; ++x)
         {
-            Bounds = new(_Column3, 40, _ColumnWidth, 180),
-            ItemHeight = 24,
-        };
-        details.Columns.AddRange([
-            new ColumnHeader("Name", 120),
-            new ColumnHeader("Size", 80),
-            new ColumnHeader("Type", 96),
-        ]);
-        details.Items.AddRange([
-            new ListViewItem("Readme.md", "4 KB", "Markdown"),
-            new ListViewItem("MainForm.cs", "12 KB", "Source"),
-            new ListViewItem("Logo.png", "48 KB", "Image"),
-            new ListViewItem("Data.bin", "1 MB", "Binary"),
-            new ListViewItem("Notes.txt", "2 KB", "Text"),
-        ]);
+            var dx = x - center;
+            var dy = y - center;
+            var distance = MathF.Sqrt((dx * dx) + (dy * dy));
+            if (distance > radius)
+                continue;
 
-        var feedback = new Label
-        {
-            Bounds = new(_Column3, 226, _ColumnWidth, 22),
-            Text = "Selected: (none)",
-        };
-        details.SelectedIndexChanged += (_, _) => feedback.Text = $"Selected: {details.SelectedItem?.Text ?? "(none)"}";
-        details.SelectedIndex = 0;
+            pixels[(y * size) + x] = distance > radius - 1.2f ? border : body;
+        }
 
-        this.AddCaption("ListView (List)", _Column3, 495);
-
-        var list = new ListView
-        {
-            Bounds = new(_Column3, 520, _ColumnWidth, 110),
-            View = ListViewView.List,
-        };
-        list.Items.AddRange([
-            new ListViewItem("Alpha"),
-            new ListViewItem("Beta"),
-            new ListViewItem("Gamma"),
-            new ListViewItem("Delta"),
-        ]);
-
-        this.Controls.AddRange(details, feedback, list);
+        return pixels;
     }
 
-    /// <summary>
-    /// Data grid: rows bound through the grid's <see cref="ObservableList{T}"/>, columns mapped by
-    /// reflection-free selectors, with alternating row tint, a taller row height and a right-aligned
-    /// numeric column. Selection is echoed into a label.
-    /// </summary>
-    private void BuildDataGridViewSection()
+    /// <summary>A horizontal blend between two colors, shaded darker toward the bottom.</summary>
+    private static int[] GradientPixels(int width, int height, Color from, Color to)
     {
-        this.AddCaption("DataGridView", _Column3, 260);
-
-        var grid = new DataGridView
+        var pixels = new int[width * height];
+        for (var y = 0; y < height; ++y)
         {
-            Bounds = new(_Column3, 285, _ColumnWidth, 172),
-            RowHeight = 24,
-            AlternatingRows = true,
-        };
-        grid.Columns.Add(new DataGridViewColumn("Part", static row => ((Part)row!).Name) { Width = 140 });
-        grid.Columns.Add(new DataGridViewColumn("Stock", static row => ((Part)row!).Stock)
-        {
-            Width = 80,
-            Alignment = ContentAlignment.MiddleRight,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Unit", static row => ((Part)row!).Unit) { Width = 76 });
-        grid.Items.AddRange([
-            new Part("Bolt M3", 240, "pcs"),
-            new Part("Nut M3", 180, "pcs"),
-            new Part("Washer", 500, "pcs"),
-            new Part("Spring", 32, "pcs"),
-            new Part("O-Ring", 75, "pcs"),
-        ]);
+            var shade = 255 - (y * 96 / Math.Max(1, height - 1));
+            for (var x = 0; x < width; ++x)
+            {
+                var t = x * 255 / Math.Max(1, width - 1);
+                var r = ((from.R * (255 - t)) + (to.R * t)) * shade / (255 * 255);
+                var g = ((from.G * (255 - t)) + (to.G * t)) * shade / (255 * 255);
+                var b = ((from.B * (255 - t)) + (to.B * t)) * shade / (255 * 255);
+                pixels[(y * width) + x] = Color.FromArgb(255, r, g, b).ToArgb();
+            }
+        }
 
-        var feedback = new Label
-        {
-            Bounds = new(_Column3, 462, _ColumnWidth, 22),
-            Text = "Selected: (none)",
-        };
-        grid.SelectionChanged += (_, _)
-            => feedback.Text = grid.SelectedItem is Part part ? $"Selected: {part.Name}" : "Selected: (none)";
-        grid.SelectedRowIndex = 1;
-
-        this.Controls.AddRange(grid, feedback);
+        return pixels;
     }
 
-    /// <summary>A row item for the data-grid section.</summary>
-    private sealed record Part(string Name, int Stock, string Unit);
+    /// <summary>The same hue at two thirds of the brightness, used for icon borders.</summary>
+    private static Color Darken(Color color)
+        => Color.FromArgb(color.A, color.R * 2 / 3, color.G * 2 / 3, color.B * 2 / 3);
 }
