@@ -87,6 +87,26 @@ public sealed partial class GtkBackend : IPlatformBackend
             + "StatusNotifier (D-Bus) integration is tracked in docs/PRD.md §7.7.");
 
     /// <inheritdoc />
+    public Size GetScreenSize()
+    {
+        EnsureInitialized();
+        var display = NativeMethods.gdk_display_get_default();
+        if (display == 0)
+            return Size.Empty;
+
+        // The primary monitor when the desktop marks one, otherwise the first.
+        var monitor = NativeMethods.gdk_display_get_primary_monitor(display);
+        if (monitor == 0)
+            monitor = NativeMethods.gdk_display_get_monitor(display, 0);
+
+        if (monitor == 0)
+            return Size.Empty;
+
+        NativeMethods.gdk_monitor_get_geometry(monitor, out var geometry);
+        return new(geometry.Width, geometry.Height);
+    }
+
+    /// <inheritdoc />
     public Size MeasureText(string text, Font font)
     {
         if (string.IsNullOrEmpty(text))

@@ -29,8 +29,23 @@ internal static partial class NativeMethods
     /// <summary>Places the window above all non-topmost windows and keeps it there.</summary>
     internal const nint HWND_TOPMOST = -1;
 
+    /// <summary>Places the window above all non-topmost windows, revoking topmost status.</summary>
+    internal const nint HWND_NOTOPMOST = -2;
+
+    /// <summary>Keeps the current size while repositioning.</summary>
+    internal const uint SWP_NOSIZE = 0x0001;
+
+    /// <summary>Keeps the current position while repositioning.</summary>
+    internal const uint SWP_NOMOVE = 0x0002;
+
+    /// <summary>Keeps the current Z order while repositioning.</summary>
+    internal const uint SWP_NOZORDER = 0x0004;
+
     /// <summary>Does not activate the window while repositioning it.</summary>
     internal const uint SWP_NOACTIVATE = 0x0010;
+
+    /// <summary>Re-sends <c>WM_NCCALCSIZE</c> so freshly toggled frame styles take effect.</summary>
+    internal const uint SWP_FRAMECHANGED = 0x0020;
 
     /// <summary>Shows the window as part of the repositioning.</summary>
     internal const uint SWP_SHOWWINDOW = 0x0040;

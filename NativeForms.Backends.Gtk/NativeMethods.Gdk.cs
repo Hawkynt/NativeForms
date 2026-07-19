@@ -99,6 +99,47 @@ internal static partial class NativeMethods
     /// <summary>Retrieves a window's origin (its top-left corner) in root-window (screen) coordinates.</summary>
     [LibraryImport(Gdk)]
     internal static partial void gdk_window_get_origin(nint window, out int x, out int y);
+
+    // --- Monitors -------------------------------------------------------------------------------
+
+    /// <summary>Returns the display's primary <c>GdkMonitor</c>, or 0 when none is marked primary.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_display_get_primary_monitor(nint display);
+
+    /// <summary>Returns the display's <paramref name="monitorNum"/>-th <c>GdkMonitor</c>.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_display_get_monitor(nint display, int monitorNum);
+
+    /// <summary>Reads a monitor's geometry in application pixels.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial void gdk_monitor_get_geometry(nint monitor, out GdkRectangle geometry);
+
+    // --- GdkWindowState bits --------------------------------------------------------------------
+
+    /// <summary>The window is minimized (iconified).</summary>
+    internal const int GDK_WINDOW_STATE_ICONIFIED = 1 << 1;
+
+    /// <summary>The window is maximized.</summary>
+    internal const int GDK_WINDOW_STATE_MAXIMIZED = 1 << 2;
+
+    // --- GdkPixbuf (the window-icon pipeline) ---------------------------------------------------
+
+    private const string GdkPixbuf = "libgdk_pixbuf-2.0.so.0";
+
+    /// <summary>Value of <c>GDK_COLORSPACE_RGB</c> — the only colorspace GdkPixbuf supports.</summary>
+    internal const int GDK_COLORSPACE_RGB = 0;
+
+    /// <summary>Allocates an uninitialized pixbuf owning its own pixel buffer.</summary>
+    [LibraryImport(GdkPixbuf)]
+    internal static partial nint gdk_pixbuf_new(int colorspace, int hasAlpha, int bitsPerSample, int width, int height);
+
+    /// <summary>Returns the pixbuf's pixel buffer (rows of R,G,B,A bytes, straight alpha).</summary>
+    [LibraryImport(GdkPixbuf)]
+    internal static partial nint gdk_pixbuf_get_pixels(nint pixbuf);
+
+    /// <summary>Returns the byte distance between the starts of consecutive pixbuf rows.</summary>
+    [LibraryImport(GdkPixbuf)]
+    internal static partial int gdk_pixbuf_get_rowstride(nint pixbuf);
 }
 
 /// <summary>A GDK rectangle — also a widget's <c>GtkAllocation</c>: integer position and size.</summary>
@@ -220,6 +261,52 @@ internal struct GdkEventScroll
 
     /// <summary>The scroll direction (<c>GdkScrollDirection</c>).</summary>
     public int Direction;
+}
+
+/// <summary>The fields of <c>GdkEventConfigure</c> — a top-level window's new position and size.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct GdkEventConfigure
+{
+    /// <summary>The <c>GdkEventType</c> discriminator.</summary>
+    public int Type;
+
+    /// <summary>The event window (<c>GdkWindow*</c>).</summary>
+    public nint Window;
+
+    /// <summary>Whether the event was synthesized.</summary>
+    public sbyte SendEvent;
+
+    /// <summary>New x-position in root-window (screen) coordinates.</summary>
+    public int X;
+
+    /// <summary>New y-position in root-window (screen) coordinates.</summary>
+    public int Y;
+
+    /// <summary>New client width in pixels.</summary>
+    public int Width;
+
+    /// <summary>New client height in pixels.</summary>
+    public int Height;
+}
+
+/// <summary>The fields of <c>GdkEventWindowState</c> — which <c>GDK_WINDOW_STATE_*</c> bits flipped.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct GdkEventWindowState
+{
+    /// <summary>The <c>GdkEventType</c> discriminator.</summary>
+    public int Type;
+
+    /// <summary>The event window (<c>GdkWindow*</c>).</summary>
+    public nint Window;
+
+    /// <summary>Whether the event was synthesized.</summary>
+    public sbyte SendEvent;
+
+    /// <summary>The state bits that changed in this event.</summary>
+    public int ChangedMask;
+
+    /// <summary>The complete state after the change.</summary>
+    public int NewWindowState;
 }
 
 /// <summary>The leading fields of <c>GdkEventKey</c> — enough to read modifiers and the key symbol.</summary>

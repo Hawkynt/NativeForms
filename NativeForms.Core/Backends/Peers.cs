@@ -57,8 +57,72 @@ public interface IWindowPeer : IContainerPeer
     /// </summary>
     void Close();
 
+    /// <summary>
+    /// Applies the window frame. Win32 toggles the style bits (<c>WS_THICKFRAME</c>,
+    /// <c>WS_CAPTION</c>, <c>WS_EX_TOOLWINDOW</c> …) on the live HWND and refreshes the frame; GTK
+    /// maps to <c>gtk_window_set_resizable</c>/<c>set_decorated</c>/<c>set_type_hint</c>, where the
+    /// window manager decides the final look.
+    /// </summary>
+    void SetBorderStyle(FormBorderStyle borderStyle);
+
+    /// <summary>
+    /// Minimizes, maximizes or restores the window. Before <see cref="Show"/> the wish is buffered
+    /// and honored by the initial show; the resulting native state change is reported back through
+    /// <see cref="WindowStateChanged"/>.
+    /// </summary>
+    void SetWindowState(FormWindowState state);
+
+    /// <summary>
+    /// Whether the caption shows a minimize button. Win32 toggles <c>WS_MINIMIZEBOX</c>; GTK cannot
+    /// toggle individual caption buttons, so the value is advisory there — the peer folds it into the
+    /// window's type hint (both boxes off reads as a dialog) and the window manager decides.
+    /// </summary>
+    void SetMinimizeBox(bool visible);
+
+    /// <summary>
+    /// Whether the caption shows a maximize button. Win32 toggles <c>WS_MAXIMIZEBOX</c>; GTK treats
+    /// it as advisory exactly like <see cref="SetMinimizeBox"/>.
+    /// </summary>
+    void SetMaximizeBox(bool visible);
+
+    /// <summary>
+    /// Clamps user resizing to the given limits; an empty size (or a zero component) means
+    /// unconstrained on that axis. Win32 answers <c>WM_GETMINMAXINFO</c> with the values; GTK
+    /// forwards them as geometry hints.
+    /// </summary>
+    void SetSizeLimits(Size minimum, Size maximum);
+
+    /// <summary>
+    /// Replaces the window's caption/taskbar icon from 32-bit ARGB pixels (row-major, length =
+    /// width * height) — the same decoder-free pipeline as <see cref="INotifyIconPeer.SetIcon"/>.
+    /// </summary>
+    void SetIcon(int width, int height, ReadOnlySpan<int> argb);
+
+    /// <summary>Keeps the window above all normal windows.</summary>
+    void SetTopMost(bool topMost);
+
+    /// <summary>
+    /// Sets the window's overall opacity, 0 (invisible) … 1 (opaque). Win32 uses a layered window
+    /// (<c>WS_EX_LAYERED</c> + <c>SetLayeredWindowAttributes</c>); GTK uses
+    /// <c>gtk_widget_set_opacity</c>, which needs a compositing window manager to show through.
+    /// </summary>
+    void SetOpacity(double opacity);
+
     /// <summary>Raised when the user closes the window (native close button, Alt+F4, ⌘Q …).</summary>
     event EventHandler? Closed;
+
+    /// <summary>
+    /// Raised when the native window is moved or resized (by the user or the window manager),
+    /// carrying the new bounds in this platform's window coordinates. The core adopts them without
+    /// echoing a <see cref="IControlPeer.SetBounds"/> back.
+    /// </summary>
+    event EventHandler<Rectangle>? BoundsChangedByUser;
+
+    /// <summary>
+    /// Raised when the native window is minimized, maximized or restored — from <c>WM_SIZE</c>'s
+    /// state word on Win32, from the <c>window-state-event</c> signal on GTK.
+    /// </summary>
+    event EventHandler<FormWindowState>? WindowStateChanged;
 }
 
 /// <summary>A push-button peer — the native side of a <see cref="Button"/>.</summary>

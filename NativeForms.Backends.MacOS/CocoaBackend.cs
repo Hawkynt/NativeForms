@@ -45,6 +45,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public INotifyIconPeer CreateNotifyIcon() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public Size GetScreenSize() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public Size MeasureText(string text, Font font) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

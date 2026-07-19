@@ -145,8 +145,9 @@ internal sealed unsafe class Win32NotifyIconPeer : INotifyIconPeer
     }
 
     /// <summary>Builds a 32bpp alpha <c>HICON</c> from ARGB pixels: a premultiplied DIB color plane
-    /// (via <see cref="Win32Image"/>) plus an empty monochrome mask.</summary>
-    private static nint CreateIcon(int width, int height, ReadOnlySpan<int> argb)
+    /// (via <see cref="Win32Image"/>) plus an empty monochrome mask. Shared with
+    /// <see cref="WindowPeer.SetIcon"/>, which wants the exact same handle for <c>WM_SETICON</c>.</summary>
+    internal static nint CreateIcon(int width, int height, ReadOnlySpan<int> argb)
     {
         using var color = new Win32Image(width, height, argb);
         if (color.Handle == 0)

@@ -54,6 +54,12 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public bool IsSupported => true;
     public ITheme Theme => DefaultTheme.Instance;
 
+    /// <summary>The fake screen size <see cref="GetScreenSize"/> reports; settable so tests can
+    /// assert the core's centering math against a known geometry.</summary>
+    public Size ScreenSize { get; set; } = new(1920, 1080);
+
+    public Size GetScreenSize() => this.ScreenSize;
+
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
     {
         this.MessageBoxes.Add((text, caption, buttons, icon));
@@ -152,10 +158,89 @@ internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : Head
     /// <summary>How often <see cref="Close"/> was called.</summary>
     public int CloseCount { get; private set; }
 
+    // Window-management state, recorded exactly as the core pushes it.
+    public FormBorderStyle BorderStyle { get; private set; } = FormBorderStyle.Sizable;
+    public FormWindowState WindowState { get; private set; }
+    public bool MinimizeBox { get; private set; } = true;
+    public bool MaximizeBox { get; private set; } = true;
+    public Size MinimumSize { get; private set; }
+    public Size MaximumSize { get; private set; }
+    public int IconWidth { get; private set; }
+    public int IconHeight { get; private set; }
+    public int[]? IconPixels { get; private set; }
+    public bool TopMost { get; private set; }
+    public double Opacity { get; private set; } = 1d;
+
+    /// <summary>Every window-management Set* call, in the order it arrived — the echo detector.</summary>
+    public List<string> Calls { get; } = [];
+
     public event EventHandler? Closed;
+    public event EventHandler<Rectangle>? BoundsChangedByUser;
+    public event EventHandler<FormWindowState>? WindowStateChanged;
 
     public void AddChild(IControlPeer child) => this.Children.Add(child);
     public void Show() => this.Shown = true;
+
+    public void SetBorderStyle(FormBorderStyle borderStyle)
+    {
+        this.BorderStyle = borderStyle;
+        this.Calls.Add($"borderStyle={borderStyle}");
+    }
+
+    public void SetWindowState(FormWindowState state)
+    {
+        this.WindowState = state;
+        this.Calls.Add($"state={state}");
+    }
+
+    public void SetMinimizeBox(bool visible)
+    {
+        this.MinimizeBox = visible;
+        this.Calls.Add($"minimizeBox={visible}");
+    }
+
+    public void SetMaximizeBox(bool visible)
+    {
+        this.MaximizeBox = visible;
+        this.Calls.Add($"maximizeBox={visible}");
+    }
+
+    public void SetSizeLimits(Size minimum, Size maximum)
+    {
+        this.MinimumSize = minimum;
+        this.MaximumSize = maximum;
+        this.Calls.Add($"sizeLimits={minimum.Width}x{minimum.Height},{maximum.Width}x{maximum.Height}");
+    }
+
+    public void SetIcon(int width, int height, ReadOnlySpan<int> argb)
+    {
+        this.IconWidth = width;
+        this.IconHeight = height;
+        this.IconPixels = argb.ToArray();
+        this.Calls.Add($"icon={width}x{height}");
+    }
+
+    public void SetTopMost(bool topMost)
+    {
+        this.TopMost = topMost;
+        this.Calls.Add($"topMost={topMost}");
+    }
+
+    public void SetOpacity(double opacity)
+    {
+        this.Opacity = opacity;
+        this.Calls.Add($"opacity={opacity}");
+    }
+
+    /// <summary>Reports a native move/resize as the platform would (no <see cref="IControlPeer.SetBounds"/> involved).</summary>
+    public void FireBoundsChanged(Rectangle bounds) => this.BoundsChangedByUser?.Invoke(this, bounds);
+
+    /// <summary>Reports a native minimize/maximize/restore as the platform would.</summary>
+    public void FireWindowStateChanged(FormWindowState state)
+    {
+        this.WindowState = state;
+        this.WindowStateChanged?.Invoke(this, state);
+    }
 
     /// <summary>Records the modality, then hands control to the test's
     /// <see cref="HeadlessBackend.ModalAction"/> — the stand-in for the nested native loop, inside

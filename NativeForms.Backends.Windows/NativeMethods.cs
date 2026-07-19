@@ -23,6 +23,21 @@ internal static partial class NativeMethods
     /// <summary>The standard overlapped top-level window (caption, border, sysmenu, min/max).</summary>
     internal const uint WS_OVERLAPPEDWINDOW = 0x00CF0000;
 
+    /// <summary>A title bar (implies a border).</summary>
+    internal const uint WS_CAPTION = 0x00C00000;
+
+    /// <summary>A system menu in the title bar (the close button lives here).</summary>
+    internal const uint WS_SYSMENU = 0x00080000;
+
+    /// <summary>A sizing border the user can drag.</summary>
+    internal const uint WS_THICKFRAME = 0x00040000;
+
+    /// <summary>A minimize button in the title bar.</summary>
+    internal const uint WS_MINIMIZEBOX = 0x00020000;
+
+    /// <summary>A maximize button in the title bar.</summary>
+    internal const uint WS_MAXIMIZEBOX = 0x00010000;
+
     /// <summary>A child window; requires a parent HWND.</summary>
     internal const uint WS_CHILD = 0x40000000;
 
@@ -106,24 +121,81 @@ internal static partial class NativeMethods
     /// <summary>Sets the grey cue-banner hint (lParam LPCWSTR); single-line EDIT controls only.</summary>
     internal const uint EM_SETCUEBANNER = 0x1501;
 
+    // --- Extended window styles (dwExStyle) ---
+
+    /// <summary>A double border without a system-menu icon — the classic dialog frame.</summary>
+    internal const uint WS_EX_DLGMODALFRAME = 0x00000001;
+
+    /// <summary>The window sits above all non-topmost windows (managed via <c>SetWindowPos</c>).</summary>
+    internal const uint WS_EX_TOPMOST = 0x00000008;
+
+    /// <summary>A layered window whose opacity <see cref="SetLayeredWindowAttributes"/> controls.</summary>
+    internal const uint WS_EX_LAYERED = 0x00080000;
+
     // --- ShowWindow commands ---
 
     /// <summary>Hides the window.</summary>
     internal const int SW_HIDE = 0;
 
+    /// <summary>Activates and shows the window minimized.</summary>
+    internal const int SW_SHOWMINIMIZED = 2;
+
+    /// <summary>Activates and shows the window maximized.</summary>
+    internal const int SW_SHOWMAXIMIZED = 3;
+
     /// <summary>Activates and shows the window at its current size and position.</summary>
     internal const int SW_SHOW = 5;
+
+    /// <summary>Minimizes the window.</summary>
+    internal const int SW_MINIMIZE = 6;
+
+    /// <summary>Activates and restores the window from its minimized or maximized state.</summary>
+    internal const int SW_RESTORE = 9;
 
     // --- Window messages ---
 
     /// <summary>Sent when a window is being destroyed (after it is removed from the screen).</summary>
     internal const uint WM_DESTROY = 0x0002;
 
+    /// <summary>Sent after a window has been moved; the client origin is packed into lParam.</summary>
+    internal const uint WM_MOVE = 0x0003;
+
+    /// <summary>Sent after a window's size changed; wParam carries the <c>SIZE_*</c> state word.</summary>
+    internal const uint WM_SIZE = 0x0005;
+
     /// <summary>Sent as a signal that a window should be closed (native close button, Alt+F4).</summary>
     internal const uint WM_CLOSE = 0x0010;
 
+    /// <summary>Sent while a window is being sized/moved so it can constrain the tracking rectangle.</summary>
+    internal const uint WM_GETMINMAXINFO = 0x0024;
+
+    /// <summary>Associates an icon with the window; wParam is <see cref="ICON_SMALL"/>/<see cref="ICON_BIG"/>, lParam the HICON.</summary>
+    internal const uint WM_SETICON = 0x0080;
+
     /// <summary>Sent to a parent when a child control (e.g. a button) generates a notification.</summary>
     internal const uint WM_COMMAND = 0x0111;
+
+    // --- WM_SIZE state words (wParam) ---
+
+    /// <summary>The window was resized without being minimized or maximized.</summary>
+    internal const int SIZE_RESTORED = 0;
+
+    /// <summary>The window was minimized.</summary>
+    internal const int SIZE_MINIMIZED = 1;
+
+    /// <summary>The window was maximized.</summary>
+    internal const int SIZE_MAXIMIZED = 2;
+
+    // --- WM_SETICON icon slots (wParam) ---
+
+    /// <summary>The small icon (title bar, taskbar).</summary>
+    internal const nint ICON_SMALL = 0;
+
+    /// <summary>The big icon (Alt+Tab).</summary>
+    internal const nint ICON_BIG = 1;
+
+    /// <summary>The alpha argument of <see cref="SetLayeredWindowAttributes"/> is valid.</summary>
+    internal const uint LWA_ALPHA = 0x00000002;
 
     // --- Notification codes (WM_COMMAND high word) ---
 
@@ -217,6 +289,29 @@ internal static partial class NativeMethods
         public int bottom;
     }
 
+    /// <summary>
+    /// The tracking limits a window fills in while handling <see cref="WM_GETMINMAXINFO"/>: the
+    /// <c>ptMinTrackSize</c>/<c>ptMaxTrackSize</c> pair caps user resizing.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MINMAXINFO
+    {
+        /// <summary>Reserved.</summary>
+        public POINT ptReserved;
+
+        /// <summary>The maximized size of the window.</summary>
+        public POINT ptMaxSize;
+
+        /// <summary>The maximized position of the window.</summary>
+        public POINT ptMaxPosition;
+
+        /// <summary>The smallest size the user can drag the window to.</summary>
+        public POINT ptMinTrackSize;
+
+        /// <summary>The largest size the user can drag the window to.</summary>
+        public POINT ptMaxTrackSize;
+    }
+
     /// <summary>A thread message as returned by <see cref="GetMessageW"/>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct MSG
@@ -297,6 +392,16 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool ClientToScreen(nint hWnd, ref POINT lpPoint);
+
+    /// <summary>Retrieves a window's bounding rectangle in screen coordinates.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetWindowRect(nint hWnd, out RECT lpRect);
+
+    /// <summary>Sets the opacity (and optional color key) of a <see cref="WS_EX_LAYERED"/> window.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetLayeredWindowAttributes(nint hWnd, uint crKey, byte bAlpha, uint dwFlags);
 
     /// <summary>Calls the default window procedure for messages this backend does not handle.</summary>
     [LibraryImport("user32.dll")]

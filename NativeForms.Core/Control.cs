@@ -19,6 +19,7 @@ public abstract class Control
 {
     private IControlPeer? _peer;
     private IPlatformBackend? _backend;
+    private Rectangle _bounds;
 
     /// <summary>Initializes the control and its (initially empty) child collection.</summary>
     protected Control() => this.Controls = new(this);
@@ -42,13 +43,13 @@ public abstract class Control
     /// <summary>Position and size relative to the parent's client area, in pixels.</summary>
     public Rectangle Bounds
     {
-        get => field;
+        get => _bounds;
         set
         {
-            if (field == value)
+            if (_bounds == value)
                 return;
 
-            field = value;
+            _bounds = value;
             this.PushPeerBounds();
             this.OnBoundsChanged();
             this.Parent?.OnChildLayoutChanged(this);
@@ -230,6 +231,20 @@ public abstract class Control
     /// veto it without clobbering the child's logical visibility.
     /// </summary>
     private protected virtual bool GetChildPeerVisible(Control child) => child.Visible;
+
+    /// <summary>
+    /// Adopts bounds the native peer reports (a user resize or move) without echoing them back into
+    /// the widget — the write-back half of the two-way sync, guarded by value comparison exactly
+    /// like the <see cref="TextBox"/> text sync.
+    /// </summary>
+    internal void SetBoundsFromPeer(Rectangle bounds)
+    {
+        if (_bounds == bounds)
+            return;
+
+        _bounds = bounds;
+        this.OnBoundsChanged();
+    }
 
     /// <summary>Re-applies this control's effective bounds to its peer through the parent's mapping.</summary>
     internal void PushPeerBounds()

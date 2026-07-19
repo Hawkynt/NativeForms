@@ -75,6 +75,111 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_window_move(nint window, int x, int y);
 
+    // --- Window management ----------------------------------------------------------------------
+
+    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_NORMAL</c> — an ordinary application window.</summary>
+    internal const int GDK_WINDOW_TYPE_HINT_NORMAL = 0;
+
+    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_DIALOG</c> — window managers typically drop the
+    /// minimize/maximize buttons for it.</summary>
+    internal const int GDK_WINDOW_TYPE_HINT_DIALOG = 1;
+
+    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_UTILITY</c> — a small persistent tool window.</summary>
+    internal const int GDK_WINDOW_TYPE_HINT_UTILITY = 5;
+
+    /// <summary>Value of <c>GDK_HINT_MIN_SIZE</c> — the geometry's minimum size is valid.</summary>
+    internal const int GDK_HINT_MIN_SIZE = 1 << 1;
+
+    /// <summary>Value of <c>GDK_HINT_MAX_SIZE</c> — the geometry's maximum size is valid.</summary>
+    internal const int GDK_HINT_MAX_SIZE = 1 << 2;
+
+    /// <summary>Whether the user can resize the window (<c>gboolean</c> is passed as 1/0).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_resizable(nint window, int resizable);
+
+    /// <summary>Whether the window manager decorates the window with a frame and title bar.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_decorated(nint window, int setting);
+
+    /// <summary>Advises the window manager what kind of window this is (a <c>GdkWindowTypeHint</c> value).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_type_hint(nint window, int hint);
+
+    /// <summary>Asks the window manager to minimize (iconify) the window.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_iconify(nint window);
+
+    /// <summary>Asks the window manager to restore the window from its minimized state.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_deiconify(nint window);
+
+    /// <summary>Asks the window manager to maximize the window.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_maximize(nint window);
+
+    /// <summary>Asks the window manager to restore the window from its maximized state.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_unmaximize(nint window);
+
+    /// <summary>Asks the window manager to keep the window above all normal windows.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_keep_above(nint window, int setting);
+
+    /// <summary>Sets the widget's overall opacity (0..1); on a top-level this needs a compositor.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_set_opacity(nint widget, double opacity);
+
+    /// <summary>Sets the window's icon from a <c>GdkPixbuf</c> (the window takes its own reference).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_icon(nint window, nint icon);
+
+    /// <summary>Constrains interactive resizing with the valid fields of <paramref name="geometry"/>
+    /// (per <paramref name="geomMask"/>, a <c>GdkWindowHints</c> bitmask).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_geometry_hints(nint window, nint geometryWidget, in GdkGeometry geometry, int geomMask);
+
+    /// <summary>
+    /// The window-geometry constraints <see cref="gtk_window_set_geometry_hints"/> consumes. Only the
+    /// fields whose <c>GdkWindowHints</c> bit is set in the mask are read; layout mirrors the C
+    /// struct (eight <c>gint</c>s, two <c>gdouble</c>s, one <c>GdkGravity</c>).
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct GdkGeometry
+    {
+        /// <summary>The smallest width the user can resize to.</summary>
+        public int MinWidth;
+
+        /// <summary>The smallest height the user can resize to.</summary>
+        public int MinHeight;
+
+        /// <summary>The largest width the user can resize to.</summary>
+        public int MaxWidth;
+
+        /// <summary>The largest height the user can resize to.</summary>
+        public int MaxHeight;
+
+        /// <summary>Ignored here (base size hint).</summary>
+        public int BaseWidth;
+
+        /// <summary>Ignored here (base size hint).</summary>
+        public int BaseHeight;
+
+        /// <summary>Ignored here (resize increment hint).</summary>
+        public int WidthInc;
+
+        /// <summary>Ignored here (resize increment hint).</summary>
+        public int HeightInc;
+
+        /// <summary>Ignored here (aspect-ratio hint).</summary>
+        public double MinAspect;
+
+        /// <summary>Ignored here (aspect-ratio hint).</summary>
+        public double MaxAspect;
+
+        /// <summary>Ignored here (<c>GdkGravity</c> placement hint).</summary>
+        public int WinGravity;
+    }
+
     // --- Generic widget operations --------------------------------------------------------------
 
     /// <summary>Recursively shows <paramref name="widget"/> and all of its descendants.</summary>

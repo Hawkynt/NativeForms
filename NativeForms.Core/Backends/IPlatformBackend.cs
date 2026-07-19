@@ -58,6 +58,13 @@ public interface IPlatformBackend
     INotifyIconPeer CreateNotifyIcon();
 
     /// <summary>
+    /// The pixel size of the primary screen. The core uses it to place forms whose
+    /// <see cref="Form.StartPosition"/> asks for centering — the policy stays platform-agnostic and
+    /// the peers only ever see the resulting bounds.
+    /// </summary>
+    Size GetScreenSize();
+
+    /// <summary>
     /// Measures the pixel size <paramref name="text"/> would occupy in <paramref name="font"/>, without
     /// needing a paint surface — the seam auto-sizing controls use before and between paints. Uses the
     /// same native text engine as <see cref="IGraphics.MeasureText"/>, so both agree.

@@ -54,6 +54,12 @@ public sealed partial class Win32Backend : IPlatformBackend
     public INotifyIconPeer CreateNotifyIcon() => new Win32NotifyIconPeer();
 
     /// <inheritdoc/>
+    public Size GetScreenSize()
+        => new(
+            NativeMethods.GetSystemMetrics(NativeMethods.SM_CXSCREEN),
+            NativeMethods.GetSystemMetrics(NativeMethods.SM_CYSCREEN));
+
+    /// <inheritdoc/>
     public Size MeasureText(string text, Font font)
     {
         var hdc = NativeMethods.GetDC(0);

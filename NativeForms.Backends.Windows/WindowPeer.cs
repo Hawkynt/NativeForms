@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Drawing;
 using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
 
@@ -37,8 +38,26 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     /// <summary>Whether the modal window was closed (hidden); ends the <see cref="RunModal"/> loop.</summary>
     private bool _modalClosed;
 
+    /// <summary>Whether <see cref="Show"/> ran; before that, a window-state wish stays buffered.</summary>
+    private bool _shown;
+
+    private FormBorderStyle _borderStyle = FormBorderStyle.Sizable;
+    private FormWindowState _windowState;
+    private bool _minimizeBox = true;
+    private bool _maximizeBox = true;
+    private Size _minSize;
+    private Size _maxSize;
+    private double _opacity = 1d;
+    private nint _icon;
+
     /// <inheritdoc/>
     public event EventHandler? Closed;
+
+    /// <inheritdoc/>
+    public event EventHandler<Rectangle>? BoundsChangedByUser;
+
+    /// <inheritdoc/>
+    public event EventHandler<FormWindowState>? WindowStateChanged;
 
     /// <summary>Creates the (hidden) native top-level window and registers it for message routing.</summary>
     public WindowPeer()
@@ -77,7 +96,207 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     }
 
     /// <inheritdoc/>
-    public void Show() => NativeMethods.ShowWindow(Handle, NativeMethods.SW_SHOW);
+    public void Show()
+    {
+        _shown = true;
+        NativeMethods.ShowWindow(Handle, _windowState switch
+        {
+            FormWindowState.Minimized => NativeMethods.SW_SHOWMINIMIZED,
+            FormWindowState.Maximized => NativeMethods.SW_SHOWMAXIMIZED,
+            _ => NativeMethods.SW_SHOW,
+        });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// All the frame-related bits (<c>WS_THICKFRAME</c>, <c>WS_CAPTION</c>, <c>WS_EX_TOOLWINDOW</c> …)
+    /// are toggled live via <c>SetWindowLongPtr</c> + <c>SWP_FRAMECHANGED</c> rather than by
+    /// recreating the HWND: destroying a top-level window would take every child HWND with it, and
+    /// USER32 supports flipping these particular styles on a live window (WinForms does the same).
+    /// </remarks>
+    public void SetBorderStyle(FormBorderStyle borderStyle)
+    {
+        _borderStyle = borderStyle;
+        this.ApplyFrameStyle();
+    }
+
+    /// <inheritdoc/>
+    public void SetWindowState(FormWindowState state)
+    {
+        _windowState = state;
+        if (Handle == 0 || !_shown)
+            return;
+
+        NativeMethods.ShowWindow(Handle, state switch
+        {
+            FormWindowState.Minimized => NativeMethods.SW_MINIMIZE,
+            FormWindowState.Maximized => NativeMethods.SW_SHOWMAXIMIZED,
+            _ => NativeMethods.SW_RESTORE,
+        });
+    }
+
+    /// <inheritdoc/>
+    public void SetMinimizeBox(bool visible)
+    {
+        _minimizeBox = visible;
+        this.ApplyFrameStyle();
+    }
+
+    /// <inheritdoc/>
+    public void SetMaximizeBox(bool visible)
+    {
+        _maximizeBox = visible;
+        this.ApplyFrameStyle();
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The limits are stored and served from the <c>WM_GETMINMAXINFO</c> handler in
+    /// <see cref="WndProc"/>, which USER32 consults on every interactive size change.</remarks>
+    public void SetSizeLimits(Size minimum, Size maximum)
+    {
+        _minSize = minimum;
+        _maxSize = maximum;
+    }
+
+    /// <inheritdoc/>
+    public void SetIcon(int width, int height, ReadOnlySpan<int> argb)
+    {
+        var icon = Win32NotifyIconPeer.CreateIcon(width, height, argb);
+        if (icon == 0)
+            return;
+
+        var previous = _icon;
+        _icon = icon;
+        if (Handle != 0)
+        {
+            NativeMethods.SendMessageW(Handle, NativeMethods.WM_SETICON, NativeMethods.ICON_SMALL, icon);
+            NativeMethods.SendMessageW(Handle, NativeMethods.WM_SETICON, NativeMethods.ICON_BIG, icon);
+        }
+
+        if (previous != 0)
+            NativeMethods.DestroyIcon(previous);
+    }
+
+    /// <inheritdoc/>
+    public void SetTopMost(bool topMost)
+    {
+        if (Handle == 0)
+            return;
+
+        NativeMethods.SetWindowPos(
+            Handle,
+            topMost ? NativeMethods.HWND_TOPMOST : NativeMethods.HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+    }
+
+    /// <inheritdoc/>
+    public void SetOpacity(double opacity)
+    {
+        _opacity = Math.Clamp(opacity, 0d, 1d);
+        if (Handle == 0)
+            return;
+
+        var exStyle = (uint)NativeMethods.GetWindowLongPtrW(Handle, NativeMethods.GWL_EXSTYLE);
+        if (_opacity < 1d)
+        {
+            // A layered window composites at the given alpha; toggling the bit on is cheap and sticky.
+            NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWL_EXSTYLE, (nint)(exStyle | NativeMethods.WS_EX_LAYERED));
+            NativeMethods.SetLayeredWindowAttributes(Handle, 0, (byte)Math.Round(_opacity * 255), NativeMethods.LWA_ALPHA);
+        }
+        else
+        {
+            // Fully opaque: drop the layered bit so the window renders on the fast, unlayered path again.
+            NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWL_EXSTYLE, (nint)(exStyle & ~NativeMethods.WS_EX_LAYERED));
+        }
+    }
+
+    /// <summary>
+    /// Recomputes the window's style bits from the buffered border style and caption-button wishes
+    /// and refreshes the frame in place (<c>SWP_FRAMECHANGED</c>). The visibility bit and the
+    /// externally managed extended bits (layered, topmost) are preserved.
+    /// </summary>
+    private void ApplyFrameStyle()
+    {
+        if (Handle == 0)
+            return;
+
+        var visible = (uint)NativeMethods.GetWindowLongPtrW(Handle, NativeMethods.GWL_STYLE) & NativeMethods.WS_VISIBLE;
+        var style = _borderStyle switch
+        {
+            FormBorderStyle.None => NativeMethods.WS_POPUP,
+            FormBorderStyle.FixedSingle => NativeMethods.WS_CAPTION | NativeMethods.WS_SYSMENU | NativeMethods.WS_BORDER,
+            FormBorderStyle.FixedDialog => NativeMethods.WS_CAPTION | NativeMethods.WS_SYSMENU,
+            FormBorderStyle.FixedToolWindow => NativeMethods.WS_CAPTION | NativeMethods.WS_SYSMENU,
+            _ => NativeMethods.WS_CAPTION | NativeMethods.WS_SYSMENU | NativeMethods.WS_THICKFRAME,
+        };
+
+        // Caption buttons exist only on captioned, non-tool frames.
+        if (_borderStyle is not FormBorderStyle.None and not FormBorderStyle.FixedToolWindow)
+        {
+            if (_minimizeBox)
+                style |= NativeMethods.WS_MINIMIZEBOX;
+            if (_maximizeBox)
+                style |= NativeMethods.WS_MAXIMIZEBOX;
+        }
+
+        var exStyle = (uint)NativeMethods.GetWindowLongPtrW(Handle, NativeMethods.GWL_EXSTYLE);
+        exStyle &= NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TOPMOST;
+        exStyle |= _borderStyle switch
+        {
+            FormBorderStyle.FixedDialog => NativeMethods.WS_EX_DLGMODALFRAME,
+            FormBorderStyle.FixedToolWindow => NativeMethods.WS_EX_TOOLWINDOW,
+            _ => 0,
+        };
+
+        NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWL_STYLE, (nint)(style | visible));
+        NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWL_EXSTYLE, (nint)exStyle);
+        NativeMethods.SetWindowPos(
+            Handle,
+            0,
+            0,
+            0,
+            0,
+            0,
+            NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER
+            | NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_FRAMECHANGED);
+    }
+
+    /// <summary>
+    /// Handles a native size change: syncs the minimized/maximized/restored state (raising
+    /// <see cref="WindowStateChanged"/> on a real transition) and reports the new bounds. A
+    /// minimized window reports no bounds — its rectangle is the meaningless off-screen icon spot.
+    /// </summary>
+    private void OnNativeSizeChanged(int stateWord)
+    {
+        var state = stateWord switch
+        {
+            NativeMethods.SIZE_MINIMIZED => FormWindowState.Minimized,
+            NativeMethods.SIZE_MAXIMIZED => FormWindowState.Maximized,
+            _ => FormWindowState.Normal,
+        };
+
+        if (state != _windowState)
+        {
+            _windowState = state;
+            WindowStateChanged?.Invoke(this, state);
+        }
+
+        if (state != FormWindowState.Minimized)
+            this.RaiseNativeBounds();
+    }
+
+    /// <summary>Reports the window's current screen rectangle through <see cref="BoundsChangedByUser"/>.</summary>
+    private void RaiseNativeBounds()
+    {
+        if (Handle == 0 || BoundsChangedByUser is not { } handler || !NativeMethods.GetWindowRect(Handle, out var rect))
+            return;
+
+        handler.Invoke(this, new Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top));
+    }
 
     /// <inheritdoc/>
     /// <remarks>
@@ -206,6 +425,40 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
 
                 return 0;
 
+            case NativeMethods.WM_SIZE:
+                if (_windows.TryGetValue(hwnd, out var sizedWindow))
+                    sizedWindow.OnNativeSizeChanged((int)wParam);
+
+                return 0;
+
+            case NativeMethods.WM_MOVE:
+                if (_windows.TryGetValue(hwnd, out var movedWindow))
+                    movedWindow.RaiseNativeBounds();
+
+                return 0;
+
+            case NativeMethods.WM_GETMINMAXINFO:
+                // USER32 asks for the resize-tracking limits; answer from the buffered size limits
+                // (zero components stay at the system defaults the struct arrives with).
+                if (_windows.TryGetValue(hwnd, out var limitedWindow))
+                {
+                    var info = (NativeMethods.MINMAXINFO*)lParam;
+                    var min = limitedWindow._minSize;
+                    var max = limitedWindow._maxSize;
+                    if (min.Width > 0)
+                        info->ptMinTrackSize.x = min.Width;
+                    if (min.Height > 0)
+                        info->ptMinTrackSize.y = min.Height;
+                    if (max.Width > 0)
+                        info->ptMaxTrackSize.x = max.Width;
+                    if (max.Height > 0)
+                        info->ptMaxTrackSize.y = max.Height;
+
+                    return 0;
+                }
+
+                break;
+
             case NativeMethods.WM_CLOSE:
                 // A modal window hides instead of dying: the peer must outlive its nested loop so
                 // the core can read state and dispose it after ShowDialog returns.
@@ -247,5 +500,11 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
             _windows.TryRemove(Handle, out _);
 
         base.Dispose();
+
+        if (_icon == 0)
+            return;
+
+        NativeMethods.DestroyIcon(_icon);
+        _icon = 0;
     }
 }

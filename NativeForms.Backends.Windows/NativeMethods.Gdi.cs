@@ -95,6 +95,12 @@ internal static unsafe partial class NativeMethods
     /// <summary>Width of a vertical scroll bar, in pixels.</summary>
     internal const int SM_CXVSCROLL = 0;
 
+    /// <summary>Width of the primary screen, in pixels.</summary>
+    internal const int SM_CXSCREEN = 0;
+
+    /// <summary>Height of the primary screen, in pixels.</summary>
+    internal const int SM_CYSCREEN = 1;
+
     // --- Device caps (GetDeviceCaps indices) ---
 
     /// <summary>Logical pixels per inch along the screen height (the vertical DPI).</summary>
@@ -202,6 +208,9 @@ internal static unsafe partial class NativeMethods
 
     /// <summary>The window-style (<c>WS_*</c>) long, read/written via <see cref="GetWindowLongPtrW"/>.</summary>
     internal const int GWL_STYLE = -16;
+
+    /// <summary>The extended window-style (<c>WS_EX_*</c>) long.</summary>
+    internal const int GWL_EXSTYLE = -20;
 
     /// <summary>The paint information filled in by <see cref="BeginPaint"/>.</summary>
     [StructLayout(LayoutKind.Sequential)]
