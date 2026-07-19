@@ -13,4 +13,10 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <!-- Tests assert against internal seams (peer wiring, lazy materialization) that must not
+       become public API just to be testable. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hawkynt.NativeForms.Tests" />
+  </ItemGroup>
+
 </Project>

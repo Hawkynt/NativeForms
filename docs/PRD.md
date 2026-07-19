@@ -305,10 +305,10 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.7 Media & misc
 - [ ] `PictureBox` (owner) — `SizeMode`, image formats
-- [ ] `ImageList` (icon storage shared by list/tree/combo/toolbar) — usable **before** realization:
-      holds ARGB pixel data and materializes `IImage`s lazily once a backend exists (today
-      `IPlatformBackend.CreateImage` forces backend access at construction time, which blocks
-      icon use in plain form code and in the demo gallery)
+- [~] `ImageList` (icon storage shared by list/tree/combo/toolbar) — pre-realization storage done:
+      holds ARGB pixel data with no backend present, materializes `IImage`s lazily per backend and
+      caches per index (`ImageList.GetImage`), fixed `ImageSize`, dispose drops native bitmaps but
+      keeps pixels; pending: wiring into controls (`ImageIndex`/`ImageKey`), badge overlays (§7.9)
 - [ ] `NotifyIcon` (tray)
 - [ ] `WebBrowser/WebView` (native host) — likely later / optional
 - [ ] `PropertyGrid` (owner) — later
