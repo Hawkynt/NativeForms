@@ -49,7 +49,8 @@ public abstract class Control
                 return;
 
             field = value;
-            _peer?.SetBounds(value);
+            this.PushPeerBounds();
+            this.OnBoundsChanged();
         }
     }
 
@@ -105,7 +106,7 @@ public abstract class Control
                 return;
 
             field = value;
-            _peer?.SetVisible(value);
+            this.PushPeerVisible();
         }
     } = true;
 
@@ -169,6 +170,31 @@ public abstract class Control
     /// <summary>Hook for subclasses to drop their typed peer references when the peer tree is torn down.</summary>
     private protected virtual void OnUnrealized() { }
 
+    /// <summary>Hook for subclasses that lay out children whenever their own bounds change.</summary>
+    private protected virtual void OnBoundsChanged() { }
+
+    /// <summary>
+    /// Maps a child's logical <see cref="Bounds"/> to the rectangle its peer occupies inside this
+    /// container. The default is the identity; scrolling containers shift the result by their scroll
+    /// offset so native children physically move while the child's logical bounds stay put.
+    /// </summary>
+    private protected virtual Rectangle GetChildPeerBounds(Control child) => child.Bounds;
+
+    /// <summary>
+    /// Whether a child's peer should currently be shown. The default honors the child's own
+    /// <see cref="Visible"/>; containers that hide their content wholesale (a collapsed expander)
+    /// veto it without clobbering the child's logical visibility.
+    /// </summary>
+    private protected virtual bool GetChildPeerVisible(Control child) => child.Visible;
+
+    /// <summary>Re-applies this control's effective bounds to its peer through the parent's mapping.</summary>
+    internal void PushPeerBounds()
+        => _peer?.SetBounds(this.Parent is { } parent ? parent.GetChildPeerBounds(this) : this.Bounds);
+
+    /// <summary>Re-applies this control's effective visibility to its peer through the parent's veto.</summary>
+    internal void PushPeerVisible()
+        => _peer?.SetVisible(this.Parent is { } parent ? parent.GetChildPeerVisible(this) : this.Visible);
+
     /// <summary>
     /// Creates this control's peer and pushes its buffered state into it. When the peer can host
     /// children (<see cref="IContainerPeer"/>), the entire subtree is realized depth-first and each
@@ -180,10 +206,10 @@ public abstract class Control
         var peer = this.CreatePeer(backend);
         _peer = peer;
         _backend = backend;
-        peer.SetBounds(this.Bounds);
+        this.PushPeerBounds();
         peer.SetText(this.Text);
         peer.SetEnabled(this.Enabled);
-        peer.SetVisible(this.Visible);
+        this.PushPeerVisible();
         this.OnRealized(peer);
 
         if (peer is IContainerPeer container)
