@@ -341,21 +341,23 @@ strategy (may differ per platform; note exceptions inline).
       (timer-driven sweep, allocation-free per tick), `Step`/`PerformStep`, vertical orientation
 
 ### 7.6 Menus, toolbars, status
-- [ ] `MenuStrip` / `ToolStripMenuItem` (native menu bar where available — Win32 `HMENU`,
-      `GtkMenuBar`, NSMenu — else owner)
-  - [ ] Items with **icon + text**, separators, nested submenus
-  - [ ] Checked and radio-checked items
-  - [ ] Keyboard: mnemonics (`&File`), shortcut keys (Ctrl+S) — displayed and handled
-  - [ ] `ICommand` wiring (auto enable/disable via `CanExecute`, see §3)
-- [ ] `ContextMenuStrip` — `Control.ContextMenuStrip` assignment, opens on right-click/menu key
-      at the cursor, same item model as `MenuStrip`
-- [ ] `ToolStrip` (owner in native theme) — `ToolStripButton` (icon + optional text), toggle
-      buttons, separators, `ToolStripDropDownButton`/`ToolStripSplitButton`, overflow when the
-      bar is too narrow, `ImageList` sharing
-- [ ] `StatusStrip` — `ToolStripStatusLabel` (incl. `Spring` autosizing), embedded progress bar
-      panel, size grip
-- [ ] `ToolTip` — per-control text (native tooltip where available), show/hide delays,
-      works on owner-drawn controls (incl. per-item tips in lists/trees/grids)
+- [~] `MenuStrip` / `ToolStripMenuItem` — owner-drawn via popup peers on all backends (one
+      `MenuDropDown` engine drives menus, context menus, drop-down buttons, overflow); the
+      native menu bar mapping (Win32 `HMENU`, `GtkMenuBar`, NSMenu) is a tracked follow-up
+  - [x] Items with **icon + text**, separators, nested cascading submenus
+  - [x] Checked and radio-checked items (`CheckOnClick`, `CheckedGroup`)
+  - [~] Keyboard: mnemonics rendered + activated while the bar/menu has focus; shortcut keys
+        (`Keys` chords) displayed and dispatched via `ProcessShortcut`; form-wide routing and
+        Alt bar activation blocked on the §7.1 focus model
+  - [x] `ICommand` wiring (auto enable/disable via `CanExecute`)
+- [~] `ContextMenuStrip` — `Control.ContextMenuStrip` + right-click at the cursor on
+      owner-drawn controls; native-widget controls pending (peer right-click events)
+- [x] `ToolStrip` (owner) — icon+text buttons, toggles, separators,
+      `ToolStripDropDownButton`/`ToolStripSplitButton`, overflow chevron popup, `ImageList`
+- [x] `StatusStrip` — `ToolStripStatusLabel` (incl. `Spring`), embedded progress item (shared
+      renderer), size grip
+- [~] `ToolTip` — owner-drawn controls with Initial/AutoPop delays via `Timer` + popup done;
+      native-widget controls and per-item tips in lists/trees/grids pending
 
 ### 7.7 Media & misc
 - [x] `PictureBox` (owner) — `Image`, `SizeMode` (Normal/Stretch/Center/Zoom letterbox), `BorderStyle`
@@ -363,7 +365,8 @@ strategy (may differ per platform; note exceptions inline).
       holds ARGB pixel data with no backend present, materializes `IImage`s lazily per backend and
       caches per index (`ImageList.GetImage`), fixed `ImageSize`, dispose drops native bitmaps but
       keeps pixels; pending: wiring into controls (`ImageIndex`/`ImageKey`), badge overlays (§7.9)
-- [ ] `NotifyIcon` (tray)
+- [~] `NotifyIcon` (tray) — Win32 `Shell_NotifyIconW` with message-only callback window done;
+      GTK throws (GtkStatusIcon deprecated; StatusNotifier/D-Bus is the tracked follow-up)
 - [ ] `WebBrowser/WebView` (native host) — likely later / optional
 - [ ] `PropertyGrid` (owner) — later
 
