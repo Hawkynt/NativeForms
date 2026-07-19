@@ -131,6 +131,10 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] `DrawEllipse`/`FillEllipse` (GDI `Ellipse`, Cairo unit-circle) — [ ] rounded rects/pills still pending.
 - [ ] Native-style primitives drawn via theme: push button, radio, combo arrow, header cell,
       grid line, scrollbar (or reuse native scrollbars where possible), selection highlight.
+- [ ] Shared icon+text content layout helper (`ContentAlignment` + `TextImageRelation` semantics,
+      mnemonic-aware) used by **every** control that renders image + text — Button, Label, CheckBox,
+      RadioButton, GroupBox caption, tab headers, list/tree/grid cells — so image placement is
+      implemented once and behaves identically everywhere.
 
 ---
 
@@ -175,25 +179,42 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] `MdiParent`/MDI (or documented non-goal)
   - [ ] Icon, `TopMost`, `Opacity`
 - [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
-- [~] `GroupBox` (owner) — themed frame + caption done; child inset/layout pending
+- [~] `GroupBox` (owner) — themed frame + caption done; child inset/layout, caption image
+      (icon before the caption text, fieldset-style) pending
 - [ ] `TabControl` / `TabPage` (native where available, else owner)
+  - [ ] Tab headers with **icon + text** (`ImageList` + per-page `ImageIndex`/`ImageKey`)
+  - [ ] `Alignment` (top/bottom/left/right), header scroll/overflow when tabs don't fit
+  - [ ] `SelectedIndex`/`SelectedTab`, `SelectedIndexChanged`, keyboard nav (Ctrl+Tab, arrows)
+  - [ ] Optional per-tab close button (modern tabbed-UI affordance)
 - [ ] `SplitContainer` / `Splitter`
 - [ ] `FlowLayoutPanel`, `TableLayoutPanel` (owner/layout)
 - [ ] `ToolStripContainer`, `Panel` scrolling
 
 ### 7.3 Buttons & simple inputs
 - [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
-  - [ ] `DialogResult`, default/accept styling, image + text, `FlatStyle`
+  - [ ] `DialogResult`, default/accept styling, `FlatStyle`
+  - [ ] Image + text (`Image`, `ImageAlign`, `TextImageRelation`; native where the toolkit
+        supports it — `BM_SETIMAGE`/GTK button image — else owner-drawn)
 - [~] `CheckBox` (owner) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
-      tri-state `CheckState` pending
-- [x] `RadioButton` (owner) — themed ring + accent dot, grouping by container, click/Space, `CheckedChanged`
+      tri-state `CheckState`, image + text next to the box pending
+- [~] `RadioButton` (owner) — themed ring + accent dot, grouping by container, click/Space,
+      `CheckedChanged` done; image + text next to the ring pending
 - [ ] `Label` (native) *(basic exists; add `AutoSize`, `TextAlign`, mnemonics)*
   - [x] Text
   - [ ] `AutoSize`, `TextAlign`, `BorderStyle`, mnemonic → focuses next control
+  - [ ] `Image` + `ImageAlign` (icon beside/behind text)
 - [ ] `LinkLabel` (owner)
-- [ ] `TextBox` (native) — `Multiline`, `PasswordChar`, `ReadOnly`, `MaxLength`, selection, `TextChanged`
+- [ ] `TextBox` (native) — single-line first, then:
+  - [ ] `Multiline` (scrollbars, word wrap, `AcceptsReturn`/`AcceptsTab`)
+  - [ ] `PlaceholderText` hint (cue banner: `EM_SETCUEBANNER` / `gtk_entry_set_placeholder_text`;
+        owner-drawn grey hint for multiline where the platform has none)
+  - [ ] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength`, `CharacterCasing`
+  - [ ] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), `TextChanged`, undo
 - [ ] `MaskedTextBox` (owner over native TextBox)
-- [ ] `RichTextBox` (native where available / owner)
+- [ ] `RichTextBox` (native where available / owner) — character styles (bold/italic/underline/
+      strikeout, `SelectionColor`/`SelectionFont`), paragraph alignment + indent, bullet lists,
+      auto-detected links + `LinkClicked`, `PlaceholderText`, RTF subset load/save (`Rtf`,
+      `LoadFile`/`SaveFile`), zoom
 - [ ] `NumericUpDown` (native/owner)
 - [ ] `DomainUpDown`
 
@@ -202,12 +223,20 @@ strategy (may differ per platform; note exceptions inline).
       `DataSource` binding done; multi-selection (`SelectionMode`) pending
 - [ ] `CheckedListBox` (native/owner)
 - [ ] `ComboBox` (native) — `DropDown`/`DropDownList`/`Simple`, **items with icons** (owner-drawn
-      drop-down in native style), `DataSource`/`DisplayMember`/`ValueMember`, autocomplete
+      drop-down in native style), `PlaceholderText` hint on the edit part,
+      `DataSource`/`DisplayMember`/`ValueMember`/`SelectedValue`, autocomplete
 - [~] `ListView` (owner, native metrics) — Details + List views, columns (`Width`/`TextAlign`),
       per-item icons, sub-items, single selection, header row, wheel/keyboard scroll, virtualized
       paint done; LargeIcon/SmallIcon/Tile views, groups, checkboxes, virtual-mode item API, label
       editing, sorting and multi-selection pending
-- [ ] `TreeView` (owner/native) — nodes, `ImageList`, checkboxes, expand/collapse, editing, virtual
+- [ ] `TreeView` (owner) — nodes with expand/collapse (themed glyphs), per-node icons
+      (`ImageIndex`/`SelectedImageIndex` + state images via `ImageList`), checkboxes, label editing,
+      `BeforeExpand`/`AfterSelect` events, keyboard nav (arrows/+/−/*), virtualized paint over the
+      flattened visible-node list (same engine discipline as ListView)
+- [ ] `TreeListView` (owner) — TreeView × ListView-Details hybrid (expandable hierarchy in the
+      first column + regular sub-item columns); reuses ListView's header/column/virtualization
+      engine and TreeView's node model; per-node icons, keyboard expand/collapse,
+      `DataSource` binding with a reflection-free children selector
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
   - [~] Column types: [x] text + [x] image (per-cell icon) done; check/button/combo/link pending
   - [~] Virtualized rows (millions of rows, constant memory) [x] done; [ ] row/column resize, [ ] frozen columns pending
@@ -247,6 +276,13 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `ColorDialog`, `FontDialog`
 - [ ] `PrintDialog`/printing (later / optional)
 
+### 7.9 Modern extras (controls users expect today; owner-drawn, native-themed)
+- [ ] `ToggleSwitch` (owner) — on/off slider as the modern CheckBox alternative
+- [ ] `SplitButton` / `DropDownButton` (owner) — button with attached drop-down menu
+- [ ] `Expander` (owner) — collapsible header + content panel (fieldset that folds)
+- [ ] `SearchBox` — `TextBox` preset: placeholder hint + search icon + clear (×) button
+- [ ] Badge/overlay support on `ImageList` images (small composed status icons)
+
 ---
 
 ## 8. Cross-cutting features
@@ -257,6 +293,10 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] Localization of built-in strings (dialog buttons etc.)
 - [ ] Drag & drop, clipboard
 - [ ] `ImageList`/icon decoding without heavy image libs (small PNG/ICO decoder or native)
+- [ ] **Uniform image API across all controls**: either a direct `Image` property (Button, Label,
+      CheckBox, RadioButton, GroupBox, PictureBox) or `ImageList` + `ImageIndex`/`ImageKey`
+      (ComboBox, ListBox, ListView, TreeView, TreeListView, TabControl, toolbars) — same pattern,
+      same rendering path (§5 shared icon+text layout), everywhere
 - [ ] Threading: UI-thread affinity, `Control.Invoke`/`BeginInvoke`, `SynchronizationContext`
 
 ---
@@ -272,22 +312,38 @@ strategy (may differ per platform; note exceptions inline).
 
 ---
 
-## 10. Milestones
+## 10. Milestones (the completion roadmap)
 
-- **M0 — Foundation (current).** Core control model, backend abstraction, native Win32 + GTK
+Every §7 box belongs to a milestone below, except items marked "later / optional" inline
+(WebBrowser/WebView, PropertyGrid, printing, MDI) — those are decided when their milestone
+neighborhood ships.
+
+- **M0 — Foundation.** Core control model, backend abstraction, native Win32 + GTK
   Button/Label/Form, macOS placeholder, MVVM primitives + binding, demo, tests, CI. `[~]`
-- **M1 — Input & layout.** Focus/keyboard/mouse, Font/colors, anchor/dock + TableLayout/FlowLayout,
-  TextBox, CheckBox, RadioButton, Panel/GroupBox. `[ ]`
-- **M2 — Owner-draw & theming.** `IGraphics`/`ITheme`/`ICanvasPeer`/`OwnerDrawnControl`, Win32 GDI +
-  GTK Cairo canvas peers, native themes, decoder-free icons, Panel/CheckBox/ListBox, `ObservableList<T>`,
-  headless canvas + allocation budgets. `[~]` (remaining: ellipse primitive, dark-mode notifications,
-  LinkLabel/PictureBox)
-- **M3 — Lists.** `[~]` ListBox (+icons/binding) done; ComboBox(+icons, needs dropdown popup) and
-  CheckedListBox pending.
-- **M4 — DataGridView + ListView + TreeView.** `[~]` DataGridView (virtualized, bound, selection) and
-  ListView (Details/List, virtualized) done; cell editing/sorting/resize and TreeView pending.
-- **M5 — Menus/toolbars/status/dialogs.** `[ ]`
-- **M6 — Accessibility, DPI polish, macOS (Cocoa) backend.** `[ ]`
+- **M1 — Input & layout.** Focus/keyboard/mouse plumbing on every control, Font/colors/Padding,
+  `Cursor`/`Cursors`, `Component`/`IContainer`, anchor/dock + `TableLayoutPanel`/
+  `FlowLayoutPanel`, Label polish (AutoSize/TextAlign/mnemonics), TextBox (single-line →
+  multiline → `PlaceholderText` hint). `[~]` (CheckBox/RadioButton/Panel/GroupBox base done)
+- **M2 — Owner-draw & theming.** `IGraphics`/`ITheme`/`ICanvasPeer`/`OwnerDrawnControl`, GDI + Cairo
+  canvas peers, native themes, decoder-free icons, headless canvas + allocation budgets. `[~]`
+  (remaining: shared icon+text layout helper (§5), rounded rects, double buffering, dark-mode
+  notifications, LinkLabel)
+- **M3 — Lists & selection.** ListBox multi-selection, ComboBox (icons in drop-down, placeholder,
+  popup, autocomplete, value binding), CheckedListBox. `[~]`
+- **M4 — Grids & trees.** DataGridView (cell editing, sorting, resize, more column types), ListView
+  (icon/tile views, groups, checkboxes, sorting), **TreeView**, **TreeListView**. `[~]`
+- **M5 — Containers & tabs.** TabControl/TabPage (incl. icon tab headers), SplitContainer,
+  `Panel.AutoScroll`, Expander. `[ ]`
+- **M6 — Images everywhere.** `ImageList` + `ImageIndex`/`ImageKey` pattern, image + text on
+  Button/Label/CheckBox/RadioButton/GroupBox caption/tab headers (§8 uniform image API),
+  PictureBox, small PNG/ICO decoding. `[ ]`
+- **M7 — Text & value editors.** RichTextBox, MaskedTextBox, NumericUpDown/DomainUpDown,
+  TrackBar, ScrollBars, DateTimePicker, MonthCalendar. `[ ]`
+- **M8 — Chrome & dialogs.** MenuStrip/ContextMenuStrip, ToolStrip (incl. SplitButton/
+  DropDownButton), StatusStrip, ToolTip, NotifyIcon, MessageBox + file/folder/color/font dialogs,
+  ToggleSwitch/SearchBox extras. `[ ]`
+- **M9 — Platform polish.** Accessibility, per-monitor DPI, live dark-mode/high-contrast, RTL,
+  drag & drop/clipboard, threading (`Control.Invoke`), macOS (Cocoa) backend. `[ ]`
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
