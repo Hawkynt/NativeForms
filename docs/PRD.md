@@ -7,7 +7,9 @@
 This document is the **authoritative, living checklist**. Every control and feature is tracked here
 with `[ ]` / `[x]` boxes. When code and this document disagree, this document wins unless it is being
 revised in the same change. Keep boxes honest: a box is `[x]` only when implemented **and** covered
-by a test (and, for visuals, verified on the target platform).
+by a test (and, for visuals, verified on the target platform). Beyond the box, a feature counts as
+**finished** only when it is also shown in the demo gallery and documented under `docs/` — §11
+tracks that coverage per feature.
 
 Status legend: `[ ]` not started · `[~]` partial · `[x]` done & tested · `native` = wraps a native
 widget · `owner` = we draw it ourselves in the native theme.
@@ -46,7 +48,7 @@ widget · `owner` = we draw it ourselves in the native theme.
 ```
 Hawkynt.NativeForms                (Core: controls, layout, events, App)   [platform-agnostic]
  ├─ .ComponentModel                (ObservableObject, RelayCommand, bindings)
- ├─ .Drawing                       (owner-draw abstraction: IGraphics, ITheme, geometry)   [planned]
+ ├─ .Drawing                       (owner-draw abstraction: IGraphics, ITheme, geometry)
  └─ .Backends                      (IPlatformBackend + peer interfaces)
 Hawkynt.NativeForms.Backends.Windows   (Win32/user32/comctl32/uxtheme via [LibraryImport])
 Hawkynt.NativeForms.Backends.Gtk       (GTK 3 via [LibraryImport])
@@ -57,9 +59,9 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
   message loop through `IPlatformBackend.Run`.
 - **Peers** are the native side of a control (`IControlPeer`, `IWindowPeer`, `IButtonPeer`, …). They
   buffer state before realization and flush it when the native widget is created.
-- **Owner-drawn controls** (planned `.Drawing`) render onto an `IGraphics` surface the backend
-  exposes for a "canvas" peer, using an `ITheme` that reports the OS accent color, control
-  background, selection color, font, and standard metrics so custom controls look native.
+- **Owner-drawn controls** (`.Drawing`) render onto an `IGraphics` surface the backend exposes for
+  a "canvas" peer, using an `ITheme` that reports the OS accent color, control background,
+  selection color, font, and standard metrics so custom controls look native.
 
 ### AOT/interop rules (enforced, not aspirational)
 - `[LibraryImport]` source-generated P/Invoke only — never `[DllImport]`.
@@ -75,7 +77,7 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 
 | Pattern | How NativeForms supports it |
 |---|---|
-| **MVVM** | `ObservableObject` view-models, `RelayCommand`/`RelayCommand<T>` (`ICommand`), and `PropertyBinding<T>` two-way binding between VM properties and control properties. `[ ]` `Control.DataBindings` sugar layer. |
+| **MVVM** | `ObservableObject` view-models, `RelayCommand`/`RelayCommand<T>` (`ICommand`), and `PropertyBinding<T>` two-way binding between VM properties and control properties. `[ ]` lambda binding sugar layer. |
 | **MVC** | Controls raise events; a controller mediates model↔view. Provided by the plain event surface + one-way `PropertyBinding` from model to view. |
 | **MVP** | Views expose interfaces (`interface IFooView`); a presenter drives them. NativeForms controls are interface-friendly (events + properties); `[ ]` ship a small `IView`/passive-view sample. |
 
@@ -83,7 +85,11 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 - [x] `RelayCommand`, `RelayCommand<T>`
 - [x] `PropertyBinding<T>` (OneWay / TwoWay / OneWayToSource / OneTime), reflection-free
 - [x] `BindingList<T>` replacement: `ObservableList<T>` (IList<T> + granular `ListChanged`), reflection-free
-- [ ] `Control.DataBindings.Add("Text", vm, nameof(vm.Name), TwoWay)` convenience over `PropertyBinding`
+- [ ] Lambda binding sugar over `PropertyBinding<T>` — string-free, reflection-free:
+      `label.Bind(vm, nameof(vm.Count), v => v.Display, (c, text) => c.Text = text)` plus two-way
+      overloads. The WinForms string API (`DataBindings.Add("Text", vm, "Name")`) is a **non-goal**:
+      it needs reflection. Plain `Func<,>`/`Action<,>` delegates only — no `Expression<>` trees
+      (interpreted under NativeAOT)
 - [ ] `ICommand` wiring on `Button`/`ToolStripButton`/menu items (auto enable/disable via `CanExecute`)
 - [~] List/selection binding: `ListBox.DataSource` + reflection-free `DisplaySelector`/`ImageSelector`
       done; `DataGridView.DataSource`/`Columns` + reflection-free `ValueSelector`/`ImageSelector`
@@ -141,10 +147,13 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 ## 6. Data binding internals — `[ ]` planned beyond the primitive
 
 - [x] `PropertyBinding<T>` primitive (delegates, no reflection).
+- [ ] **Lambdas everywhere**: every binding/configuration surface (bindings, column value/image/
+      style selectors, read-only predicates, display-text/tooltip providers) accepts plain
+      `Func<>`/`Action<>` lambdas — never string member names, never `Expression<>` trees.
 - [ ] Source-generated `[Bindable]`/property-accessor generator so `DataSource`+`DisplayMember`
       resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe).
-- [ ] `ObservableList<T>` + `IReadOnlyObservableList<T>` with granular change events (add/remove/
-      move/replace/reset) for virtualized list controls.
+- [~] `ObservableList<T>` with granular change events (add/remove/replace/reset) for virtualized
+      list controls done; `Move` change type + `IReadOnlyObservableList<T>` pending.
 - [ ] Format/parse converters (`IValueConverter`-style) for two-way text↔value.
 - [ ] Validation hooks (`INotifyDataErrorInfo`-style), error surfacing on controls.
 - [ ] Binding to nested paths (`a.b.c`) via chained typed selectors.
@@ -171,6 +180,9 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] Layout engine: anchoring, docking, `AutoSize`, `TableLayoutPanel`/`FlowLayoutPanel` semantics
 
 ### 7.2 Top-level & containers
+- [ ] **Nested child realization** — today only the `Form`'s *direct* children get native peers
+      (`Form.RealizeWindow`); controls inside `Panel`/`GroupBox`/future containers must realize
+      recursively (with coordinates relative to the container) for container nesting to be real
 - [~] `Form` (native) — title, client area, close event, Show *(realize/show done; below pending)*
   - [x] Realize + show + close event
   - [ ] `StartPosition`, `FormBorderStyle`, `WindowState` (min/max/normal), `MinimizeBox`/`MaximizeBox`
@@ -238,7 +250,19 @@ strategy (may differ per platform; note exceptions inline).
       engine and TreeView's node model; per-node icons, keyboard expand/collapse,
       `DataSource` binding with a reflection-free children selector
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
-  - [~] Column types: [x] text + [x] image (per-cell icon) done; check/button/combo/link pending
+  - [~] Column types: [x] text, [x] image (per-cell icon) done; pending: [ ] check, [ ] button
+        (with per-cell enabled state, à la `DataGridViewDisableButtonColumn`), [ ] link,
+        [ ] combo (bound drop-down, editable), [ ] image+text (icon beside text in one cell),
+        [ ] multi-image (several icons per cell, per-icon click + tooltip), [ ] progress bar,
+        [ ] numeric up-down, [ ] date-time picker
+  - [ ] Read-only story: grid-level `ReadOnly`, per-column `ReadOnly`, per-cell conditional
+        read-only via a reflection-free row predicate (à la `DataGridViewConditionalReadOnlyAttribute`)
+  - [ ] Per-row/cell presentation via lambdas — the `Hawkynt.C--FrameworkExtensions`
+        (`System.Windows.Forms.Extensions`) attribute goodies, reimagined reflection-free as
+        selectors on the column/grid: row style + height + hidden + selectable predicates, cell
+        style/display-text/tooltip selectors, full merged rows, clickable cells
+        (`CellClick`/`CellDoubleClick`/`CellContentClick` with row/column coords), per-column
+        sort mode
   - [~] Virtualized rows (millions of rows, constant memory) [x] done; [ ] row/column resize, [ ] frozen columns pending
   - [~] [x] `DataSource`/`ObservableList<object?>` one-way binding via reflection-free `ValueSelector` done;
         [ ] cell editing, [ ] validation, [ ] formatting pending
@@ -276,7 +300,10 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.7 Media & misc
 - [ ] `PictureBox` (owner) — `SizeMode`, image formats
-- [ ] `ImageList` (icon storage shared by list/tree/combo/toolbar)
+- [ ] `ImageList` (icon storage shared by list/tree/combo/toolbar) — usable **before** realization:
+      holds ARGB pixel data and materializes `IImage`s lazily once a backend exists (today
+      `IPlatformBackend.CreateImage` forces backend access at construction time, which blocks
+      icon use in plain form code and in the demo gallery)
 - [ ] `NotifyIcon` (tray)
 - [ ] `WebBrowser/WebView` (native host) — likely later / optional
 - [ ] `PropertyGrid` (owner) — later
@@ -321,6 +348,11 @@ strategy (may differ per platform; note exceptions inline).
 - [x] Trim + AOT publish of the demo in CI on each OS with trim warnings as errors (headline goal).
 - [x] Footprint regression thresholds via `AllocationBudgetTests` (runs every CI, all OSes).
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
+- [~] **Demo gallery**: `NativeForms.Demo` shows every shipped control with representative property
+      settings; every new control lands with a gallery section (coverage tracked in §11).
+- [~] **Reference documentation**: every shipped control/subsystem has a page under `docs/`
+      (usage example + API tables + notes); the README links into the docs and carries the control
+      index (coverage tracked in §11).
 
 ---
 
@@ -359,3 +391,36 @@ neighborhood ships.
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
+
+---
+
+## 11. Coverage matrix — tested · demo-ed · documented
+
+A §7 box may be `[x]` (implemented + unit-tested) while the feature is still invisible to users.
+This matrix tracks the rest of "done": a section in the `NativeForms.Demo` gallery and a reference
+page under `docs/`. Every change that ships a control/feature extends this table in the same commit.
+`—` = not applicable.
+
+| Feature | Tests | Demo | Docs |
+|---|---|---|---|
+| Architecture (core/peer/realization) | ✔ | — | [architecture.md](architecture.md) |
+| `Application` + `BackendRegistry` | ✔ | ✔ | [controls/application.md](controls/application.md) |
+| `Control` base | ✔ | ✔ | [controls/control.md](controls/control.md) |
+| `Form` | ✔ | ✔ | [controls/form.md](controls/form.md) |
+| `Button` | ✔ | ✔ | [controls/button.md](controls/button.md) |
+| `Label` | ✔ | ✔ | [controls/label.md](controls/label.md) |
+| `Panel` | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
+| `GroupBox` | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |
+| `CheckBox` | ✔ | ✔ | [controls/checkbox.md](controls/checkbox.md) |
+| `RadioButton` | ✔ | ✔ | [controls/radiobutton.md](controls/radiobutton.md) |
+| `ProgressBar` | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
+| `ListBox` | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |
+| `ListView` | ✔ | ✔ | [controls/listview.md](controls/listview.md) |
+| `DataGridView` | ✔ | ✔ | [controls/datagridview.md](controls/datagridview.md) |
+| MVVM primitives + binding | ✔ | ✔ | [mvvm.md](mvvm.md) |
+| Owner-draw engine (`IGraphics`/`ITheme`/canvas) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
+
+Known gallery gaps (limited by pending §7 boxes, not by the gallery): no icons anywhere
+(`IImage` requires a resolved backend — see the `ImageList` box in §7.7), containers shown as
+empty frames (nested child realization, §7.2), single radio group (grouping is per-container and
+the gallery is flat).
