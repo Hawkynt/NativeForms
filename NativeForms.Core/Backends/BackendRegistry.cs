@@ -16,8 +16,8 @@ public static class BackendRegistry
     private static readonly object _gate = new();
 
     /// <summary>
-    /// Adds a backend. Idempotent per concrete type: registering the same backend type twice (for
-    /// example via both an explicit call and its module initializer) keeps only the first.
+    /// Adds a backend. Idempotent per concrete type: registering the same backend type twice
+    /// keeps only the first.
     /// </summary>
     public static void Register(IPlatformBackend backend)
     {
