@@ -53,6 +53,16 @@ public interface IButtonPeer : IControlPeer
 {
     /// <summary>Raised when the button is activated (click, Space, Enter).</summary>
     event EventHandler? Clicked;
+
+    /// <summary>
+    /// Shows <paramref name="image"/> on the button face, or clears it for <see langword="null"/>.
+    /// Each backend maps the triple as honestly as its toolkit allows: GTK renders image and text side
+    /// by side and honors <paramref name="relation"/> through the button's image position; Win32
+    /// attaches the bitmap via <c>BM_SETIMAGE</c> and renders it alone (<c>BS_BITMAP</c>) while the
+    /// caption is empty — image and text together need themed common controls, and neither backend
+    /// renders <paramref name="imageAlign"/>, which is forwarded as advisory state.
+    /// </summary>
+    void SetImage(IImage? image, ContentAlignment imageAlign, TextImageRelation relation);
 }
 
 /// <summary>A static text peer — the native side of a <see cref="Label"/>.</summary>
@@ -76,6 +86,15 @@ public interface ILabelPeer : IControlPeer
     /// underlined (<c>&amp;&amp;</c> escapes a literal ampersand).
     /// </summary>
     void SetUseMnemonic(bool useMnemonic);
+
+    /// <summary>
+    /// Shows <paramref name="image"/> in the label, or clears it for <see langword="null"/>. No
+    /// toolkit renders image and text in one static widget, so backends render the image natively only
+    /// while the caption is empty (Win32 <c>SS_BITMAP</c> static, GTK swaps in a <c>GtkImage</c>); a
+    /// captioned label keeps its text and the image stays pending. <paramref name="imageAlign"/> is
+    /// forwarded as advisory state — the native image-only renderings ignore it.
+    /// </summary>
+    void SetImage(IImage? image, ContentAlignment imageAlign);
 }
 
 /// <summary>

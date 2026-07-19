@@ -91,7 +91,18 @@ internal sealed class HeadlessWindowPeer : HeadlessPeer, IWindowPeer
 
 internal sealed class HeadlessButtonPeer : HeadlessPeer, IButtonPeer
 {
+    public IImage? Image { get; private set; }
+    public ContentAlignment ImageAlign { get; private set; }
+    public TextImageRelation ImageRelation { get; private set; }
+
     public event EventHandler? Clicked;
+
+    public void SetImage(IImage? image, ContentAlignment imageAlign, TextImageRelation relation)
+    {
+        this.Image = image;
+        this.ImageAlign = imageAlign;
+        this.ImageRelation = relation;
+    }
 
     public void RaiseClicked() => this.Clicked?.Invoke(this, EventArgs.Empty);
 }
@@ -101,10 +112,18 @@ internal sealed class HeadlessLabelPeer : HeadlessPeer, ILabelPeer
     public ContentAlignment TextAlign { get; private set; }
     public BorderStyle BorderStyle { get; private set; }
     public bool UseMnemonic { get; private set; } = true;
+    public IImage? Image { get; private set; }
+    public ContentAlignment ImageAlign { get; private set; }
 
     public void SetTextAlign(ContentAlignment alignment) => this.TextAlign = alignment;
     public void SetBorderStyle(BorderStyle borderStyle) => this.BorderStyle = borderStyle;
     public void SetUseMnemonic(bool useMnemonic) => this.UseMnemonic = useMnemonic;
+
+    public void SetImage(IImage? image, ContentAlignment imageAlign)
+    {
+        this.Image = image;
+        this.ImageAlign = imageAlign;
+    }
 }
 
 /// <summary>A text-box peer that records every edit-specific setting and lets tests simulate user edits.</summary>
@@ -339,7 +358,7 @@ internal sealed class RecordingGraphics : IGraphics
     internal static Size Measure(string text) => new((text?.Length ?? 0) * _CharWidth, _LineHeight);
 
     public void DrawImage(IImage image, Rectangle bounds)
-        => this.Operations.Add($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y}");
+        => this.Operations.Add($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
 
     public void PushClip(Rectangle bounds) => this.Operations.Add($"clip {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
 

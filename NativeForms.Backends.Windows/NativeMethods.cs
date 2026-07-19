@@ -40,7 +40,22 @@ internal static partial class NativeMethods
     /// <summary>A standard push button that posts <c>WM_COMMAND</c> when clicked.</summary>
     internal const uint BS_PUSHBUTTON = 0x00000000;
 
+    /// <summary>The button displays the bitmap attached via <c>BM_SETIMAGE</c> instead of text.</summary>
+    internal const uint BS_BITMAP = 0x00000080;
+
+    /// <summary>Attaches an image to a button; wParam is the image type, lParam the handle.</summary>
+    internal const uint BM_SETIMAGE = 0x00F7;
+
     // --- Static (label) styles (STATIC class) ---
+
+    /// <summary>The static displays the bitmap attached via <c>STM_SETIMAGE</c> (a type value, not a flag).</summary>
+    internal const uint SS_BITMAP = 0x0000000E;
+
+    /// <summary>Attaches an image to a static control; wParam is the image type, lParam the handle.</summary>
+    internal const uint STM_SETIMAGE = 0x0172;
+
+    /// <summary>Image-type argument for <c>BM_SETIMAGE</c>/<c>STM_SETIMAGE</c>: an <c>HBITMAP</c>.</summary>
+    internal const nint IMAGE_BITMAP = 0;
 
     /// <summary>Left-aligned static text.</summary>
     internal const uint SS_LEFT = 0x00000000;

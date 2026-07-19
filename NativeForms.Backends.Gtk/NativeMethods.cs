@@ -151,6 +151,36 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_label_set_yalign(nint label, float yalign);
 
+    // --- Widget images ---------------------------------------------------------------------------
+
+    /// <summary>The image sits left of the button's label (a <c>GtkPositionType</c> value).</summary>
+    internal const int GTK_POS_LEFT = 0;
+
+    /// <summary>The image sits right of the button's label.</summary>
+    internal const int GTK_POS_RIGHT = 1;
+
+    /// <summary>The image sits above the button's label.</summary>
+    internal const int GTK_POS_TOP = 2;
+
+    /// <summary>The image sits below the button's label.</summary>
+    internal const int GTK_POS_BOTTOM = 3;
+
+    /// <summary>Creates a <c>GtkImage</c> widget displaying the given Cairo surface.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_image_new_from_surface(nint surface);
+
+    /// <summary>Sets (or with 0 clears) the image widget shown beside a button's label.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_button_set_image(nint button, nint image);
+
+    /// <summary>Positions the button's image relative to its label (a <c>GtkPositionType</c> value).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_button_set_image_position(nint button, int position);
+
+    /// <summary>Shows the button's image even when the theme's <c>gtk-button-images</c> setting is off.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_button_set_always_show_image(nint button, int alwaysShow);
+
     // --- Text entry (single-line) ---------------------------------------------------------------
 
     /// <summary>Creates an empty single-line text entry.</summary>

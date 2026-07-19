@@ -85,6 +85,43 @@ public class Label : Control
         }
     } = true;
 
+    /// <summary>
+    /// The image shown by the label, or <see langword="null"/>. Rendered natively only while
+    /// <see cref="Control.Text"/> is empty (Win32 shows an <c>SS_BITMAP</c> static, GTK swaps in a
+    /// <c>GtkImage</c>) — no toolkit renders image and text in one static widget, so a captioned
+    /// label keeps its text and the image stays pending there (see <c>docs/PRD.md</c> §7.3).
+    /// </summary>
+    public IImage? Image
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            _labelPeer?.SetImage(value, this.ImageAlign);
+        }
+    }
+
+    /// <summary>
+    /// Where the image anchors within the label's bounds. Advisory for now: the native image-only
+    /// renderings ignore it (Win32 pins the bitmap top-left, GTK centers it). Defaults to
+    /// <see cref="ContentAlignment.MiddleCenter"/>, matching Windows Forms.
+    /// </summary>
+    public ContentAlignment ImageAlign
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            _labelPeer?.SetImage(this.Image, value);
+        }
+    } = ContentAlignment.MiddleCenter;
+
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateLabel();
 
     /// <inheritdoc/>
@@ -97,6 +134,7 @@ public class Label : Control
         label.SetTextAlign(this.TextAlign);
         label.SetBorderStyle(this.BorderStyle);
         label.SetUseMnemonic(this.UseMnemonic);
+        label.SetImage(this.Image, this.ImageAlign);
         this.ApplyAutoSize();
     }
 

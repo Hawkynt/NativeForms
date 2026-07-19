@@ -26,6 +26,23 @@ public class CheckBox : OwnerDrawnControl
         }
     }
 
+    /// <summary>
+    /// An optional icon rendered between the check square and the caption through the shared content
+    /// layout; the text shifts right to make room.
+    /// </summary>
+    public IImage? Image
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    }
+
     /// <summary>Raised when <see cref="Checked"/> changes.</summary>
     public event EventHandler? CheckedChanged;
 
@@ -70,7 +87,22 @@ public class CheckBox : OwnerDrawnControl
         var box = new Rectangle(0, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize);
         GlyphRenderer.DrawCheckBox(g, theme, box, this.Checked);
 
-        var textRect = new Rectangle(GlyphRenderer.CheckBoxSize + _TextGap, 0, this.Width - GlyphRenderer.CheckBoxSize - _TextGap, this.Height);
-        g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, ContentAlignment.MiddleLeft);
+        var content = new Rectangle(GlyphRenderer.CheckBoxSize + _TextGap, 0, this.Width - GlyphRenderer.CheckBoxSize - _TextGap, this.Height);
+        var textColor = this.Enabled ? theme.ControlText : theme.DisabledText;
+        if (this.Image is { } image)
+        {
+            ContentLayout.Arrange(
+                content,
+                new Size(image.Width, image.Height),
+                g.MeasureText(this.Text, theme.DefaultFont),
+                TextImageRelation.ImageBeforeText,
+                ContentAlignment.MiddleLeft,
+                out var imageRect,
+                out var textRect);
+            g.DrawImage(image, imageRect);
+            g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
+        }
+        else
+            g.DrawText(this.Text, theme.DefaultFont, textColor, content, ContentAlignment.MiddleLeft);
     }
 }

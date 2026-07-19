@@ -269,7 +269,7 @@ internal sealed class DataGridViewColumnTypesTests
         // 18px icon at the cell padding, text shifted right past icon + gap: 4 + 18 + 4 = 26.
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations, Does.Contain("image 8x8 @4,24"), "icon before text");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @4,24")), Is.True, "icon before text");
             Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@26,22")), Is.True, "text after icon");
         });
     }
@@ -291,8 +291,8 @@ internal sealed class DataGridViewColumnTypesTests
         // 18px icons in 22px slots: first at x=4, second at x=26.
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations, Does.Contain("image 2x2 @4,24"));
-            Assert.That(g.Operations, Does.Contain("image 3x3 @26,24"));
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 2x2 @4,24")), Is.True);
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 3x3 @26,24")), Is.True);
         });
     }
 

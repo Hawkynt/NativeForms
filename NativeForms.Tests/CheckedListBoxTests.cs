@@ -192,7 +192,7 @@ internal sealed class CheckedListBoxTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image ") && o.EndsWith("@22,2")), Is.True, "icon past the glyph");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image ") && o.Contains("@22,2,")), Is.True, "icon past the glyph");
             Assert.That(g.Operations.Exists(o => o.StartsWith("text \"a\"") && o.EndsWith("@44,0")), Is.True, "text past the icon");
         });
     }

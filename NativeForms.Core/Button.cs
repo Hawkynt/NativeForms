@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
@@ -8,11 +9,81 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class Button : Control
 {
+    private IButtonPeer? _buttonPeer;
+
+    /// <summary>
+    /// The image shown on the button face, or <see langword="null"/> for a text-only button. Rendered
+    /// natively: GTK shows image and text side by side; a plain Win32 button renders the bitmap alone
+    /// while <see cref="Control.Text"/> is empty and needs themed common controls (a visual-styles
+    /// manifest) to draw image and text together — with classic rendering a captioned button keeps
+    /// its text only.
+    /// </summary>
+    public IImage? Image
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.PushImage();
+        }
+    }
+
+    /// <summary>
+    /// Where the image anchors within the button face. Advisory for now: neither the Win32 button nor
+    /// the GTK button offers free image placement, so no backend renders it; the value is forwarded
+    /// so a capable backend can honor it. Defaults to <see cref="ContentAlignment.MiddleCenter"/>,
+    /// matching Windows Forms.
+    /// </summary>
+    public ContentAlignment ImageAlign
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.PushImage();
+        }
+    } = ContentAlignment.MiddleCenter;
+
+    /// <summary>
+    /// How image and text share the button face. GTK honors the four directional values through the
+    /// button's image position (<see cref="TextImageRelation.Overlay"/> renders as
+    /// <see cref="TextImageRelation.ImageBeforeText"/>); Win32 push buttons offer no placement
+    /// control, so the image sits wherever the theme puts it.
+    /// </summary>
+    public TextImageRelation TextImageRelation
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.PushImage();
+        }
+    } = TextImageRelation.ImageBeforeText;
+
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateButton();
 
     private protected override void OnRealized(IControlPeer peer)
     {
-        if (peer is IButtonPeer button)
-            button.Clicked += (_, _) => this.OnClick(EventArgs.Empty);
+        if (peer is not IButtonPeer button)
+            return;
+
+        _buttonPeer = button;
+        button.Clicked += (_, _) => this.OnClick(EventArgs.Empty);
+        this.PushImage();
     }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized() => _buttonPeer = null;
+
+    /// <summary>Forwards the buffered image triple to the realized peer.</summary>
+    private void PushImage() => _buttonPeer?.SetImage(this.Image, this.ImageAlign, this.TextImageRelation);
 }

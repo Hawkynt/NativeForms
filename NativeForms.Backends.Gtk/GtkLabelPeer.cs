@@ -8,19 +8,36 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// The GTK peer for a static-text label, wrapping a <c>GtkLabel</c>. Alignment maps onto the label's
 /// x/y-alignment; mnemonic text is translated from the WinForms <c>&amp;</c> convention to GTK's
 /// <c>_</c> convention before it reaches the widget. GTK has no native frame on a label, so
-/// <see cref="SetBorderStyle"/> is not rendered here.
+/// <see cref="SetBorderStyle"/> is not rendered here. A <c>GtkLabel</c> cannot show an image: with an
+/// image and an empty caption the peer swaps the widget for a <c>GtkImage</c> (and back when text
+/// returns); rendering image and text together would need a composite <c>GtkBox</c>, so a captioned
+/// label keeps its text and does not render the image. The image alignment is not rendered either.
 /// </summary>
 internal sealed class GtkLabelPeer : GtkControlPeer, ILabelPeer
 {
     private ContentAlignment _textAlign;
     private bool _useMnemonic = true;
+    private GtkImage? _image;
+    private bool _widgetIsImage;
+
+    /// <summary>Whether the peer should render the bitmap instead of text.</summary>
+    private bool IsImageOnly => _image is { Surface: not 0 } && _text.Length == 0;
 
     /// <inheritdoc />
-    protected override nint CreateWidget() => NativeMethods.gtk_label_new(string.Empty);
+    protected override nint CreateWidget()
+    {
+        _widgetIsImage = this.IsImageOnly;
+        return _widgetIsImage
+            ? NativeMethods.gtk_image_new_from_surface(_image!.Surface)
+            : NativeMethods.gtk_label_new(string.Empty);
+    }
 
     /// <inheritdoc />
     protected override void OnWidgetRealized()
     {
+        if (_widgetIsImage)
+            return;
+
         this.ApplyText(_text);
         this.ApplyAlignment();
     }
@@ -28,6 +45,15 @@ internal sealed class GtkLabelPeer : GtkControlPeer, ILabelPeer
     /// <inheritdoc />
     protected override void ApplyText(string text)
     {
+        if (_widgetIsImage != this.IsImageOnly)
+        {
+            this.RecreateWidget();
+            return;
+        }
+
+        if (_widgetIsImage)
+            return;
+
         if (_useMnemonic)
             NativeMethods.gtk_label_set_text_with_mnemonic(_widget, TranslateMnemonics(text));
         else
@@ -41,8 +67,35 @@ internal sealed class GtkLabelPeer : GtkControlPeer, ILabelPeer
             return;
 
         _textAlign = alignment;
-        if (_widget != 0)
+        if (_widget != 0 && !_widgetIsImage)
             this.ApplyAlignment();
+    }
+
+    /// <inheritdoc />
+    public void SetImage(IImage? image, ContentAlignment imageAlign)
+    {
+        var native = image as GtkImage;
+        if (ReferenceEquals(_image, native))
+            return;
+
+        _image = native;
+
+        // Only a change in what is actually rendered warrants touching the widget: staying a text
+        // label needs nothing, while entering, leaving or re-imaging the bitmap rendering swaps it.
+        if (_widget != 0 && (_widgetIsImage || this.IsImageOnly))
+            this.RecreateWidget();
+    }
+
+    /// <summary>Destroys the current widget and realizes a fresh one of the now-correct kind in place.</summary>
+    private void RecreateWidget()
+    {
+        if (_widget == 0)
+            return;
+
+        NativeMethods.gtk_widget_destroy(_widget);
+        _widget = 0;
+        if (_parentFixed != 0)
+            this.Realize(_parentFixed);
     }
 
     /// <inheritdoc />

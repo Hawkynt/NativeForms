@@ -8,15 +8,22 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// handling are style bits fixed at window creation, so the peer buffers them and — matching the
 /// buffered-then-flushed pattern — recreates the HWND in place when one changes after realization.
 /// Win32 statics honor the horizontal alignment plus a coarse vertical centering
-/// (<c>SS_CENTERIMAGE</c>, single-line) only.
+/// (<c>SS_CENTERIMAGE</c>, single-line) only. A static is either text or bitmap, never both: with an
+/// image and an empty caption (judged at handle creation) the peer builds an <c>SS_BITMAP</c> static
+/// and attaches the bitmap via <c>STM_SETIMAGE</c>; a captioned label keeps its text and does not
+/// render the image. The image alignment has no <c>SS_BITMAP</c> mapping and is not rendered.
 /// </summary>
 internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
 {
     private ContentAlignment _textAlign;
     private BorderStyle _borderStyle;
     private bool _useMnemonic = true;
+    private Win32Image? _image;
     private nint _parent;
     private int _controlId;
+
+    /// <summary>Whether the static renders the bitmap instead of text.</summary>
+    private bool IsImageOnly => _image is not null && _text.Length == 0;
 
     /// <inheritdoc/>
     protected override string WindowClass => "STATIC";
@@ -26,6 +33,9 @@ internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
     {
         get
         {
+            if (this.IsImageOnly)
+                return NativeMethods.SS_BITMAP | (_borderStyle != BorderStyle.None ? NativeMethods.WS_BORDER : 0);
+
             var style = _textAlign switch
             {
                 ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter
@@ -54,6 +64,9 @@ internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
         _parent = parent;
         _controlId = controlId;
         base.CreateChildHandle(parent, controlId);
+
+        if (this.IsImageOnly && _image is { Handle: not 0 } image)
+            NativeMethods.SendMessageW(Handle, NativeMethods.STM_SETIMAGE, NativeMethods.IMAGE_BITMAP, image.Handle);
     }
 
     /// <inheritdoc/>
@@ -83,6 +96,17 @@ internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
             return;
 
         _useMnemonic = useMnemonic;
+        this.RecreateHandle();
+    }
+
+    /// <inheritdoc/>
+    public void SetImage(IImage? image, ContentAlignment imageAlign)
+    {
+        var native = image as Win32Image;
+        if (ReferenceEquals(_image, native))
+            return;
+
+        _image = native;
         this.RecreateHandle();
     }
 
