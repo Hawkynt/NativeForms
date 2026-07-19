@@ -154,7 +154,9 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe).
 - [~] `ObservableList<T>` with granular change events (add/remove/replace/reset) for virtualized
       list controls done; `Move` change type + `IReadOnlyObservableList<T>` pending.
-- [ ] Format/parse converters (`IValueConverter`-style) for two-way text↔value.
+- [ ] Format/parse converters (`IValueConverter`-style, as delegate pairs) for two-way text↔value.
+- [ ] Binding fallbacks: default value when the source is unset, null-replace value when the
+      source yields `null` (per binding, reflection-free).
 - [ ] Validation hooks (`INotifyDataErrorInfo`-style), error surfacing on controls.
 - [ ] Binding to nested paths (`a.b.c`) via chained typed selectors.
 
