@@ -203,14 +203,18 @@ strategy (may differ per platform; note exceptions inline).
 - [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
 - [~] `GroupBox` (owner) — themed frame + caption done; child inset/layout, caption image
       (icon before the caption text, fieldset-style) pending
-- [ ] `TabControl` / `TabPage` (native where available, else owner)
-  - [ ] Tab headers with **icon + text** (`ImageList` + per-page `ImageIndex`/`ImageKey`)
-  - [ ] `Alignment` (top/bottom/left/right), header scroll/overflow when tabs don't fit
-  - [ ] `SelectedIndex`/`SelectedTab`, `SelectedIndexChanged`, keyboard nav (Ctrl+Tab, arrows)
+- [~] `TabControl` / `TabPage` (owner, themed header strip; pages host real nested children)
+  - [x] Tab headers with **icon + text** (`ImageList` + per-page `ImageIndex`), accent underline
+        on the active tab, hover feedback
+  - [~] Header overflow scroll arrows done; `Alignment` bottom/left/right pending
+  - [x] `SelectedIndex`/`SelectedTab`, `SelectedIndexChanged`, keyboard nav (Ctrl+Tab wrap,
+        arrows), content area auto-applied to pages on resize/switch
   - [ ] Optional per-tab close button (modern tabbed-UI affordance)
-- [ ] `SplitContainer` / `Splitter`
+- [x] `SplitContainer` (owner) — horizontal/vertical orientation, live splitter drag +
+      `SplitterMoved`, min-size clamps, keyboard splitter movement
 - [ ] `FlowLayoutPanel`, `TableLayoutPanel` (owner/layout)
-- [ ] `ToolStripContainer`, `Panel` scrolling
+- [x] `Panel.AutoScroll` — themed scrollbars (shared `ScrollBarRenderer`), wheel + thumb drag,
+      children scrolled via the logical→peer bounds mapping seam (`AutoScrollPosition`)
 
 ### 7.3 Buttons & simple inputs
 - [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
@@ -346,7 +350,8 @@ strategy (may differ per platform; note exceptions inline).
 ### 7.9 Modern extras (controls users expect today; owner-drawn, native-themed)
 - [ ] `ToggleSwitch` (owner) — on/off slider as the modern CheckBox alternative
 - [ ] `SplitButton` / `DropDownButton` (owner) — button with attached drop-down menu
-- [ ] `Expander` (owner) — collapsible header + content panel (fieldset that folds)
+- [x] `Expander` (owner) — collapsible header (themed triangle + caption, click/Space) +
+      content whose child peers hide while collapsed; height restores on expand
 - [ ] `SearchBox` — `TextBox` preset: placeholder hint + search icon + clear (×) button
 - [ ] Badge/overlay support on `ImageList` images (small composed status icons)
 
