@@ -100,12 +100,12 @@ internal sealed class PanelScrollTests
 
         // Extent 180, viewport 100: the vertical track is the right 16px column.
         var track = new Rectangle(100 - _ScrollBarSize, 0, _ScrollBarSize, 100);
-        var thumb = ScrollBarRenderer.GetThumb(track, vertical: true, extent: 180, viewport: 100, position: 0);
+        var thumb = Drawing.ScrollBarRenderer.GetThumb(track, vertical: true, extent: 180, viewport: 100, position: 0);
         canvas.RaiseMouseDown(thumb.X + (thumb.Width / 2), thumb.Y + 2);
         canvas.RaiseMouseMove(thumb.X + (thumb.Width / 2), thumb.Y + 22);
         canvas.RaiseMouseUp(thumb.X + (thumb.Width / 2), thumb.Y + 22);
 
-        var expected = ScrollBarRenderer.PositionFromThumbDelta(track, vertical: true, extent: 180, viewport: 100, startPosition: 0, pixelDelta: 20);
+        var expected = Drawing.ScrollBarRenderer.PositionFromThumbDelta(track, vertical: true, extent: 180, viewport: 100, startPosition: 0, pixelDelta: 20);
         Assert.Multiple(() =>
         {
             Assert.That(expected, Is.GreaterThan(0), "sanity: the drag must map to a scroll");
