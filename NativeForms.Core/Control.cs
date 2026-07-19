@@ -51,6 +51,7 @@ public abstract class Control
             field = value;
             this.PushPeerBounds();
             this.OnBoundsChanged();
+            this.Parent?.OnChildLayoutChanged(this);
         }
     }
 
@@ -124,6 +125,24 @@ public abstract class Control
         }
     } = true;
 
+    /// <summary>
+    /// The spacing layout containers (<see cref="FlowLayoutPanel"/>, <see cref="TableLayoutPanel"/>)
+    /// keep around this control. Plain containers position children by <see cref="Bounds"/> alone
+    /// and ignore it.
+    /// </summary>
+    public Padding Margin
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Parent?.OnChildLayoutChanged(this);
+        }
+    }
+
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
 
@@ -179,6 +198,24 @@ public abstract class Control
 
     /// <summary>Hook for subclasses that lay out children whenever their own bounds change.</summary>
     private protected virtual void OnBoundsChanged() { }
+
+    /// <summary>Hook for layout containers: a child joined <see cref="Controls"/>.</summary>
+    private protected virtual void OnChildAdded(Control child) { }
+
+    /// <summary>Hook for layout containers: a child left <see cref="Controls"/>.</summary>
+    private protected virtual void OnChildRemoved(Control child) { }
+
+    /// <summary>
+    /// Hook for layout containers: a child's <see cref="Bounds"/> or <see cref="Margin"/> changed —
+    /// including by the container's own layout pass, so containers guard against re-entry.
+    /// </summary>
+    private protected virtual void OnChildLayoutChanged(Control child) { }
+
+    /// <summary>Routes <see cref="ControlCollection.Add"/> to the <see cref="OnChildAdded"/> hook.</summary>
+    internal void NotifyChildAdded(Control child) => this.OnChildAdded(child);
+
+    /// <summary>Routes <see cref="ControlCollection.Remove"/> to the <see cref="OnChildRemoved"/> hook.</summary>
+    internal void NotifyChildRemoved(Control child) => this.OnChildRemoved(child);
 
     /// <summary>
     /// Maps a child's logical <see cref="Bounds"/> to the rectangle its peer occupies inside this

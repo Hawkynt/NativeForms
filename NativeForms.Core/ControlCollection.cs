@@ -30,6 +30,7 @@ public sealed class ControlCollection : IReadOnlyList<Control>
         control.Parent = _owner;
         _items.Add(control);
         _owner.RealizeAddedChild(control);
+        _owner.NotifyChildAdded(control);
     }
 
     /// <summary>Adds several controls in order.</summary>
@@ -51,6 +52,7 @@ public sealed class ControlCollection : IReadOnlyList<Control>
 
         control.Parent = null;
         control.DisposePeerTree();
+        _owner.NotifyChildRemoved(control);
         return true;
     }
 
@@ -64,6 +66,7 @@ public sealed class ControlCollection : IReadOnlyList<Control>
         {
             control.Parent = null;
             control.DisposePeerTree();
+            _owner.NotifyChildRemoved(control);
         }
 
         _items.Clear();
