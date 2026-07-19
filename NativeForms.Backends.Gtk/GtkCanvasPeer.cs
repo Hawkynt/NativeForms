@@ -165,11 +165,11 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         Paint?.Invoke(this, new PaintEventArgs(graphics, new Rectangle(0, 0, width, height)));
     }
 
-    private void RaiseMouseDown(MouseButtons button, int x, int y)
-        => MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0));
+    private void RaiseMouseDown(MouseButtons button, int x, int y, KeyModifiers modifiers)
+        => MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
-    private void RaiseMouseUp(MouseButtons button, int x, int y)
-        => MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0));
+    private void RaiseMouseUp(MouseButtons button, int x, int y, KeyModifiers modifiers)
+        => MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
     private void RaiseMouseMove(int x, int y)
         => MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
@@ -265,7 +265,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             unsafe
             {
                 ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
-                peer.RaiseMouseDown(ToButton(e.Button), (int)e.X, (int)e.Y);
+                peer.RaiseMouseDown(ToButton(e.Button), (int)e.X, (int)e.Y, ToModifiers(e.State));
             }
         }
 
@@ -282,7 +282,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             unsafe
             {
                 ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
-                peer.RaiseMouseUp(ToButton(e.Button), (int)e.X, (int)e.Y);
+                peer.RaiseMouseUp(ToButton(e.Button), (int)e.X, (int)e.Y, ToModifiers(e.State));
             }
         }
 

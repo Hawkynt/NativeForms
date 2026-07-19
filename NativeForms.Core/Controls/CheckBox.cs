@@ -9,7 +9,6 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class CheckBox : OwnerDrawnControl
 {
-    private const int _BoxSize = 14;
     private const int _TextGap = 6;
 
     /// <summary>Whether the box is checked.</summary>
@@ -67,19 +66,10 @@ public class CheckBox : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
 
-        var boxTop = Math.Max(0, (this.Height - _BoxSize) / 2);
-        var box = new Rectangle(0, boxTop, _BoxSize, _BoxSize);
-        g.FillRectangle(theme.FieldBackground, box);
-        g.DrawRectangle(this.Checked ? theme.Accent : theme.Border, box);
+        var boxTop = Math.Max(0, (this.Height - CheckGlyph.BoxSize) / 2);
+        CheckGlyph.Draw(g, theme, 0, boxTop, this.Checked);
 
-        if (this.Checked)
-        {
-            // A check mark: two strokes from the lower-left to the upper-right.
-            g.DrawLine(theme.Accent, box.X + 3, box.Y + 7, box.X + 6, box.Y + 10, 2);
-            g.DrawLine(theme.Accent, box.X + 6, box.Y + 10, box.X + 11, box.Y + 3, 2);
-        }
-
-        var textRect = new Rectangle(_BoxSize + _TextGap, 0, this.Width - _BoxSize - _TextGap, this.Height);
+        var textRect = new Rectangle(CheckGlyph.BoxSize + _TextGap, 0, this.Width - CheckGlyph.BoxSize - _TextGap, this.Height);
         g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, ContentAlignment.MiddleLeft);
     }
 }

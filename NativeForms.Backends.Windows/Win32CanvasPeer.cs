@@ -188,9 +188,10 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
         }
     }
 
-    /// <summary>Raises a button-changed event, decoding the client-space coordinates from the message.</summary>
+    /// <summary>Raises a button-changed event, decoding the client-space coordinates from the message
+    /// and the live modifier-key state.</summary>
     private void RaiseMouse(EventHandler<MouseEventArgs>? handler, MouseButtons button, nint lParam)
-        => handler?.Invoke(this, new MouseEventArgs(button, LoWord(lParam), HiWord(lParam), 0));
+        => handler?.Invoke(this, new MouseEventArgs(button, LoWord(lParam), HiWord(lParam), 0, CurrentModifiers()));
 
     /// <summary>Raises <see cref="MouseMove"/> and (re)arms leave tracking for the surface.</summary>
     private void OnMouseMoveMessage(nint lParam)

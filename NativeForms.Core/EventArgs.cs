@@ -13,8 +13,9 @@ public sealed class PaintEventArgs(IGraphics graphics, Rectangle clipRectangle) 
     public Rectangle ClipRectangle { get; } = clipRectangle;
 }
 
-/// <summary>Describes a mouse event, matching <c>System.Windows.Forms.MouseEventArgs</c>.</summary>
-public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta) : EventArgs
+/// <summary>Describes a mouse event, matching <c>System.Windows.Forms.MouseEventArgs</c> plus the
+/// modifier keys held at the time — multi-selection gestures (Ctrl/Shift+click) need them.</summary>
+public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers = KeyModifiers.None) : EventArgs
 {
     /// <summary>The button that changed state (or <see cref="MouseButtons.None"/> for moves).</summary>
     public MouseButtons Button { get; } = button;
@@ -27,6 +28,18 @@ public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta)
 
     /// <summary>The signed wheel delta (0 for non-wheel events).</summary>
     public int Delta { get; } = delta;
+
+    /// <summary>The modifier keys held while the event happened.</summary>
+    public KeyModifiers Modifiers { get; } = modifiers;
+
+    /// <summary>Whether Shift was held.</summary>
+    public bool Shift => (this.Modifiers & KeyModifiers.Shift) != 0;
+
+    /// <summary>Whether Control was held.</summary>
+    public bool Control => (this.Modifiers & KeyModifiers.Control) != 0;
+
+    /// <summary>Whether Alt was held.</summary>
+    public bool Alt => (this.Modifiers & KeyModifiers.Alt) != 0;
 
     /// <summary>The pointer location.</summary>
     public Point Location => new(this.X, this.Y);

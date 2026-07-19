@@ -180,11 +180,11 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
         return graphics;
     }
 
-    public void RaiseMouseDown(int x, int y, MouseButtons button = MouseButtons.Left)
-        => this.MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0));
+    public void RaiseMouseDown(int x, int y, MouseButtons button = MouseButtons.Left, KeyModifiers modifiers = KeyModifiers.None)
+        => this.MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
-    public void RaiseMouseUp(int x, int y, MouseButtons button = MouseButtons.Left)
-        => this.MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0));
+    public void RaiseMouseUp(int x, int y, MouseButtons button = MouseButtons.Left, KeyModifiers modifiers = KeyModifiers.None)
+        => this.MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
     public void RaiseMouseMove(int x, int y)
         => this.MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
