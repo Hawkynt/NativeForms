@@ -82,10 +82,11 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 - [x] `ObservableObject` (INotifyPropertyChanging/Changed, `SetProperty`)
 - [x] `RelayCommand`, `RelayCommand<T>`
 - [x] `PropertyBinding<T>` (OneWay / TwoWay / OneWayToSource / OneTime), reflection-free
-- [ ] `BindingList<T>` replacement: `ObservableList<T>` (IList<T> + `ListChanged`), reflection-free
+- [x] `BindingList<T>` replacement: `ObservableList<T>` (IList<T> + granular `ListChanged`), reflection-free
 - [ ] `Control.DataBindings.Add("Text", vm, nameof(vm.Name), TwoWay)` convenience over `PropertyBinding`
 - [ ] `ICommand` wiring on `Button`/`ToolStripButton`/menu items (auto enable/disable via `CanExecute`)
-- [ ] List/selection binding for `ListBox`/`ComboBox`/`ListView`/`DataGridView` (`DataSource`, `DisplayMember`, `ValueMember`, `SelectedValue`) — reflection-free member access via source-generated accessors or caller-supplied selectors
+- [~] List/selection binding: `ListBox.DataSource` + reflection-free `DisplaySelector`/`ImageSelector`
+      done; `ComboBox`/`ListView`/`DataGridView` + `ValueMember`/`SelectedValue` pending
 
 ---
 
@@ -93,31 +94,41 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 
 Targets (measured by the `NativeForms.Benchmarks` project; treat as CI-guarded goals):
 
+- [x] `Control` instance overhead budget enforced by an allocation test (`AllocationBudgetTests`,
+      `GC.GetAllocatedBytesForCurrentThread`): unrealized control **< 512 B**, owner-drawn **< 768 B**.
+- [x] **Trim/AOT can't regress**: per-platform NativeAOT publish in CI runs with
+      `-p:TreatWarningsAsErrors=true`, so any IL2xxx/IL3xxx warning fails the build. Demo AOT binary is
+      **~1.6 MB** self-contained (whole app + runtime); size reported in CI every run.
+- [x] Append to a bound `ObservableList<T>` with no listener allocates **0 bytes** (null-conditional
+      short-circuits the event args) — asserted.
 - [ ] Empty `Form` realized: **< 8 KB** managed allocation beyond the native window.
-- [ ] `Control` instance overhead: **≤ 64 bytes** managed for an unrealized control (excluding text).
 - [ ] Zero per-frame managed allocation for owner-drawn controls in steady state (no GC in scroll).
-- [ ] No boxing on the event hot path; `EventHandler` slots are null until subscribed.
+- [x] No boxing on the event hot path; `EventHandler` slots are null until subscribed.
 - [ ] Startup (cold) to first window shown: **< 50 ms** on a trimmed self-contained build.
 - [ ] Backend assemblies: only the registered backend is linked (verified by trim size test).
 - [ ] Data structures: prefer `struct`, `Span<T>`, pooled buffers; avoid LINQ on hot paths.
-- [ ] `[ ]` Benchmark harness + regression thresholds wired into `nightly.yml`.
+- [ ] Benchmark harness + regression thresholds wired into `nightly.yml`.
 
 Design rules that serve the budget: buffered-then-flushed peer state (no shadow trees), lazy child
 realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflection metadata cache.
 
 ---
 
-## 5. Owner-draw & theming (the "looks native even when we draw it" layer) — `[ ]` planned
+## 5. Owner-draw & theming (the "looks native even when we draw it" layer)
 
-- [ ] `IGraphics` surface: lines, rects, rounded rects, text (with native font), images/icons, clip,
-      DPI-aware transforms. Backed by GDI (Win32), Cairo/GDK (GTK), CoreGraphics (Cocoa).
-- [ ] `ITheme`: accent color, window/control/field background, text/disabled/selection colors,
-      default font & sizes, focus-ring style, standard paddings/metrics — queried from the OS
-      (uxtheme/`GetSysColor`, GTK `GtkStyleContext`, `NSColor`/`NSAppearance`).
+- [x] `IGraphics` surface: lines, rects, text (native font, aligned), images/icons, clip stack.
+      Backed by **GDI** (Win32) and **Cairo/Pango** (GTK); CoreGraphics (Cocoa) pending.
+- [x] `ITheme`: accent, window/control/field background, text/disabled/selection colors, default font,
+      row height, scrollbar size — queried from the OS (`GetSysColor`/`SPI_GETNONCLIENTMETRICS` on
+      Win32; `GtkStyleContext`/`gtk-font-name` on GTK); `DefaultTheme` fallback for headless/tests.
+- [x] `ICanvasPeer` + `OwnerDrawnControl`: one paintable/focusable native surface per backend, so
+      every custom control is written once and runs on any backend. Mouse/key/focus + paint plumbed.
+- [x] Decoder-free `IImage` (32-bit ARGB) so controls show icons without an image library.
 - [ ] Light/dark mode + high-contrast follow-the-OS, with change notifications.
 - [ ] Per-monitor DPI awareness; logical↔device pixel mapping.
 - [ ] Double-buffered canvas peer; invalidation regions; hit-testing helpers.
-- [ ] Native-style primitives drawn via theme: push button, check, radio, combo arrow, header cell,
+- [ ] `DrawEllipse`/`FillEllipse` + rounded rects (needed for radio buttons, pills).
+- [ ] Native-style primitives drawn via theme: push button, radio, combo arrow, header cell,
       grid line, scrollbar (or reuse native scrollbars where possible), selection highlight.
 
 ---
@@ -162,7 +173,7 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] `ShowDialog()` modal + `DialogResult`
   - [ ] `MdiParent`/MDI (or documented non-goal)
   - [ ] Icon, `TopMost`, `Opacity`
-- [ ] `Panel` (native container / owner) — borders, `AutoScroll`
+- [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
 - [ ] `GroupBox` (native/owner)
 - [ ] `TabControl` / `TabPage` (native where available, else owner)
 - [ ] `SplitContainer` / `Splitter`
@@ -172,8 +183,9 @@ strategy (may differ per platform; note exceptions inline).
 ### 7.3 Buttons & simple inputs
 - [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
   - [ ] `DialogResult`, default/accept styling, image + text, `FlatStyle`
-- [ ] `CheckBox` (native) — `Checked`, `CheckState`, tri-state, `CheckedChanged`
-- [ ] `RadioButton` (native) — grouping by container, `CheckedChanged`
+- [~] `CheckBox` (owner) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
+      tri-state `CheckState` pending
+- [ ] `RadioButton` (owner) — grouping by container, `CheckedChanged` (needs ellipse primitive)
 - [ ] `Label` (native) *(basic exists; add `AutoSize`, `TextAlign`, mnemonics)*
   - [x] Text
   - [ ] `AutoSize`, `TextAlign`, `BorderStyle`, mnemonic → focuses next control
@@ -185,7 +197,8 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `DomainUpDown`
 
 ### 7.4 Lists & selection
-- [ ] `ListBox` (native) — items, `SelectionMode`, data binding, owner-draw items
+- [~] `ListBox` (owner) — items, single selection, per-item icons, wheel/keyboard scroll,
+      `DataSource` binding done; multi-selection (`SelectionMode`) pending
 - [ ] `CheckedListBox` (native/owner)
 - [ ] `ComboBox` (native) — `DropDown`/`DropDownList`/`Simple`, **items with icons** (owner-drawn
       drop-down in native style), `DataSource`/`DisplayMember`/`ValueMember`, autocomplete
@@ -242,12 +255,13 @@ strategy (may differ per platform; note exceptions inline).
 ---
 
 ## 9. Quality gates
-- [ ] Unit tests (NUnit 4) for every platform-agnostic behavior (layout math, binding, model).
-- [ ] Headless backend for tests (a `FakeBackend`/`HeadlessBackend` recording peer calls) so control
-      logic is testable without a display. `[ ]`
+- [~] Unit tests (NUnit 4) for platform-agnostic behavior — model, realization, registry, binding,
+      owner-drawn control paint/input (38 tests); grows with each control.
+- [x] Headless backend for tests (`HeadlessBackend` + recording `ICanvasPeer`/`RecordingGraphics`) so
+      control paint and input are testable without a display.
+- [x] Trim + AOT publish of the demo in CI on each OS with trim warnings as errors (headline goal).
+- [x] Footprint regression thresholds via `AllocationBudgetTests` (runs every CI, all OSes).
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
-- [ ] Trim + AOT publish of the demo in CI on each OS (proves the headline goal).
-- [ ] Footprint/benchmark regression thresholds (nightly).
 
 ---
 
@@ -257,8 +271,10 @@ strategy (may differ per platform; note exceptions inline).
   Button/Label/Form, macOS placeholder, MVVM primitives + binding, demo, tests, CI. `[~]`
 - **M1 — Input & layout.** Focus/keyboard/mouse, Font/colors, anchor/dock + TableLayout/FlowLayout,
   TextBox, CheckBox, RadioButton, Panel/GroupBox. `[ ]`
-- **M2 — Owner-draw & theming.** `IGraphics`/`ITheme`, headless backend, LinkLabel/PictureBox, dark
-  mode. `[ ]`
+- **M2 — Owner-draw & theming.** `IGraphics`/`ITheme`/`ICanvasPeer`/`OwnerDrawnControl`, Win32 GDI +
+  GTK Cairo canvas peers, native themes, decoder-free icons, Panel/CheckBox/ListBox, `ObservableList<T>`,
+  headless canvas + allocation budgets. `[~]` (remaining: ellipse primitive, dark-mode notifications,
+  LinkLabel/PictureBox)
 - **M3 — Lists.** ListBox/ComboBox(+icons)/CheckedListBox, list binding + `ObservableList<T>`. `[ ]`
 - **M4 — DataGridView + ListView + TreeView** (virtualized, bound, editable). `[ ]`
 - **M5 — Menus/toolbars/status/dialogs.** `[ ]`

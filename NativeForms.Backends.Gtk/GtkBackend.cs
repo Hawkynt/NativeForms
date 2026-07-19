@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.Gtk;
 
@@ -11,6 +12,8 @@ public sealed class GtkBackend : IPlatformBackend
 {
     private static readonly object _initGate = new();
     private static bool _initialized;
+
+    private GtkTheme? _theme;
 
     /// <summary>Calls <c>gtk_init</c> exactly once, before any widget is created or the loop runs.</summary>
     private static void EnsureInitialized()
@@ -33,6 +36,30 @@ public sealed class GtkBackend : IPlatformBackend
 
     /// <inheritdoc />
     public bool IsSupported => OperatingSystem.IsLinux();
+
+    /// <inheritdoc />
+    public ITheme Theme
+    {
+        get
+        {
+            EnsureInitialized();
+            return _theme ??= new GtkTheme();
+        }
+    }
+
+    /// <inheritdoc />
+    public ICanvasPeer CreateCanvas()
+    {
+        EnsureInitialized();
+        return new GtkCanvasPeer();
+    }
+
+    /// <inheritdoc />
+    public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
+    {
+        EnsureInitialized();
+        return new GtkImage(width, height, argb);
+    }
 
     /// <inheritdoc />
     public IWindowPeer CreateWindow()

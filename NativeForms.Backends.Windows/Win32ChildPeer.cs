@@ -18,7 +18,7 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
     /// <paramref name="controlId"/> as the HMENU control identifier so <c>WM_COMMAND</c> notifications
     /// can be routed back to this peer, then flushes buffered state.
     /// </summary>
-    internal void CreateChildHandle(nint parent, int controlId)
+    internal virtual void CreateChildHandle(nint parent, int controlId)
     {
         var style = NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE | ExtraStyle;
         Handle = NativeMethods.CreateWindowExW(

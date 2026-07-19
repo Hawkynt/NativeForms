@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.Windows;
 
@@ -9,11 +10,18 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// </summary>
 public sealed class Win32Backend : IPlatformBackend
 {
+    private ITheme? _theme;
+
     /// <inheritdoc/>
     public string Name => "Win32";
 
     /// <inheritdoc/>
     public bool IsSupported => OperatingSystem.IsWindows();
+
+    /// <inheritdoc/>
+    // Built lazily and cached: constructing it queries the OS, so we defer that until a control paints
+    // (and never touch USER32/GDI just by instantiating the backend on a non-Windows host).
+    public ITheme Theme => this._theme ??= new Win32Theme();
 
     /// <inheritdoc/>
     public IWindowPeer CreateWindow() => new WindowPeer();
@@ -23,6 +31,13 @@ public sealed class Win32Backend : IPlatformBackend
 
     /// <inheritdoc/>
     public ILabelPeer CreateLabel() => new LabelPeer();
+
+    /// <inheritdoc/>
+    public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();
+
+    /// <inheritdoc/>
+    public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
+        => new Win32Image(width, height, argb);
 
     /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow)

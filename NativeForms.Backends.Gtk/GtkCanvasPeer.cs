@@ -1,0 +1,359 @@
+using System.Drawing;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
+
+namespace Hawkynt.NativeForms.Backends.Gtk;
+
+/// <summary>
+/// The GTK peer for an owner-drawn control, wrapping a focusable <c>GtkDrawingArea</c>. It turns the
+/// widget's "draw" and input signals into the toolkit's paint/mouse/key/focus events, so every custom
+/// control renders through <see cref="GtkGraphics"/> and drives the same event surface. Like the other
+/// child peers it is realized lazily: the widget, its event mask and its signal handlers are created
+/// the first time the owning window drops it into its <c>GtkFixed</c>.
+/// </summary>
+internal sealed class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
+{
+    private const int GdkEventMask =
+        NativeMethods.GDK_BUTTON_PRESS_MASK
+        | NativeMethods.GDK_BUTTON_RELEASE_MASK
+        | NativeMethods.GDK_POINTER_MOTION_MASK
+        | NativeMethods.GDK_SCROLL_MASK
+        | NativeMethods.GDK_KEY_PRESS_MASK
+        | NativeMethods.GDK_KEY_RELEASE_MASK
+        | NativeMethods.GDK_LEAVE_NOTIFY_MASK
+        | NativeMethods.GDK_FOCUS_CHANGE_MASK;
+
+    private bool _focusable = true;
+
+    /// <inheritdoc />
+    public event EventHandler<PaintEventArgs>? Paint;
+
+    /// <inheritdoc />
+    public event EventHandler<MouseEventArgs>? MouseDown;
+
+    /// <inheritdoc />
+    public event EventHandler<MouseEventArgs>? MouseUp;
+
+    /// <inheritdoc />
+    public event EventHandler<MouseEventArgs>? MouseMove;
+
+    /// <inheritdoc />
+    public event EventHandler<MouseEventArgs>? MouseWheel;
+
+    /// <inheritdoc />
+    public event EventHandler? MouseLeave;
+
+    /// <inheritdoc />
+    public event EventHandler<KeyEventArgs>? KeyDown;
+
+    /// <inheritdoc />
+    public event EventHandler<KeyEventArgs>? KeyUp;
+
+    /// <inheritdoc />
+    public event EventHandler<KeyPressEventArgs>? KeyPress;
+
+    /// <inheritdoc />
+    public event EventHandler? GotFocus;
+
+    /// <inheritdoc />
+    public event EventHandler? LostFocus;
+
+    /// <inheritdoc />
+    protected override nint CreateWidget() => NativeMethods.gtk_drawing_area_new();
+
+    /// <inheritdoc />
+    protected override void OnWidgetRealized()
+    {
+        NativeMethods.gtk_widget_set_can_focus(_widget, Bool(_focusable));
+        NativeMethods.gtk_widget_add_events(_widget, GdkEventMask);
+
+        _selfHandle = GCHandle.Alloc(this);
+        var data = GCHandle.ToIntPtr(_selfHandle);
+        unsafe
+        {
+            Connect("draw", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDraw, data);
+            Connect("button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonPress, data);
+            Connect("button-release-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonRelease, data);
+            Connect("motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnMotion, data);
+            Connect("scroll-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnScroll, data);
+            Connect("leave-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnLeave, data);
+            Connect("key-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyPress, data);
+            Connect("key-release-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyRelease, data);
+            Connect("focus-in-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusIn, data);
+            Connect("focus-out-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusOut, data);
+        }
+    }
+
+    /// <summary>Connects one native signal to a Cdecl function pointer with this peer as user data.</summary>
+    private void Connect(string signal, nint handler, nint data)
+        => NativeMethods.g_signal_connect_data(_widget, signal, handler, data, 0, 0);
+
+    /// <inheritdoc />
+    public void Invalidate(Rectangle bounds)
+    {
+        if (_widget != 0)
+            NativeMethods.gtk_widget_queue_draw_area(_widget, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+    }
+
+    /// <inheritdoc />
+    public void InvalidateAll()
+    {
+        if (_widget != 0)
+            NativeMethods.gtk_widget_queue_draw(_widget);
+    }
+
+    /// <inheritdoc />
+    public void Focus()
+    {
+        if (_widget != 0)
+            NativeMethods.gtk_widget_grab_focus(_widget);
+    }
+
+    /// <inheritdoc />
+    public void SetFocusable(bool focusable)
+    {
+        _focusable = focusable;
+        if (_widget != 0)
+            NativeMethods.gtk_widget_set_can_focus(_widget, Bool(focusable));
+    }
+
+    // --- Event raisers (called from the native callbacks) ---------------------------------------
+
+    /// <summary>Wraps the Cairo context and raises <see cref="Paint"/> for the whole allocation.</summary>
+    private void RaisePaint(nint cr)
+    {
+        var width = NativeMethods.gtk_widget_get_allocated_width(_widget);
+        var height = NativeMethods.gtk_widget_get_allocated_height(_widget);
+        var graphics = new GtkGraphics(cr);
+        Paint?.Invoke(this, new PaintEventArgs(graphics, new Rectangle(0, 0, width, height)));
+    }
+
+    private void RaiseMouseDown(MouseButtons button, int x, int y)
+        => MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0));
+
+    private void RaiseMouseUp(MouseButtons button, int x, int y)
+        => MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0));
+
+    private void RaiseMouseMove(int x, int y)
+        => MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+
+    private void RaiseMouseWheel(int delta, int x, int y)
+        => MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta));
+
+    private void RaiseMouseLeave() => MouseLeave?.Invoke(this, EventArgs.Empty);
+
+    private void RaiseKeyDown(Keys key, KeyModifiers modifiers)
+        => KeyDown?.Invoke(this, new KeyEventArgs(key, modifiers));
+
+    private void RaiseKeyUp(Keys key, KeyModifiers modifiers)
+        => KeyUp?.Invoke(this, new KeyEventArgs(key, modifiers));
+
+    private void RaiseKeyPress(char keyChar) => KeyPress?.Invoke(this, new KeyPressEventArgs(keyChar));
+
+    private void RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
+
+    private void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
+
+    // --- Mapping helpers ------------------------------------------------------------------------
+
+    /// <summary>Maps a GDK button number (1/2/3) to a <see cref="MouseButtons"/> value.</summary>
+    private static MouseButtons ToButton(uint button) => button switch
+    {
+        1 => MouseButtons.Left,
+        2 => MouseButtons.Middle,
+        3 => MouseButtons.Right,
+        _ => MouseButtons.None,
+    };
+
+    /// <summary>Maps a GDK modifier mask to <see cref="KeyModifiers"/>.</summary>
+    private static KeyModifiers ToModifiers(uint state)
+    {
+        var modifiers = KeyModifiers.None;
+        if ((state & NativeMethods.GDK_SHIFT_MASK) != 0)
+            modifiers |= KeyModifiers.Shift;
+        if ((state & NativeMethods.GDK_CONTROL_MASK) != 0)
+            modifiers |= KeyModifiers.Control;
+        if ((state & NativeMethods.GDK_MOD1_MASK) != 0)
+            modifiers |= KeyModifiers.Alt;
+        return modifiers;
+    }
+
+    /// <summary>Maps a GDK key symbol to the toolkit's <see cref="Keys"/> (or <see cref="Keys.None"/>).</summary>
+    private static Keys ToKey(uint keyval) => keyval switch
+    {
+        NativeMethods.GDK_KEY_BackSpace => Keys.Back,
+        NativeMethods.GDK_KEY_Tab => Keys.Tab,
+        NativeMethods.GDK_KEY_Return or NativeMethods.GDK_KEY_KP_Enter => Keys.Enter,
+        NativeMethods.GDK_KEY_Escape => Keys.Escape,
+        NativeMethods.GDK_KEY_space => Keys.Space,
+        NativeMethods.GDK_KEY_Page_Up => Keys.PageUp,
+        NativeMethods.GDK_KEY_Page_Down => Keys.PageDown,
+        NativeMethods.GDK_KEY_End => Keys.End,
+        NativeMethods.GDK_KEY_Home => Keys.Home,
+        NativeMethods.GDK_KEY_Left => Keys.Left,
+        NativeMethods.GDK_KEY_Up => Keys.Up,
+        NativeMethods.GDK_KEY_Right => Keys.Right,
+        NativeMethods.GDK_KEY_Down => Keys.Down,
+        NativeMethods.GDK_KEY_Insert => Keys.Insert,
+        NativeMethods.GDK_KEY_Delete => Keys.Delete,
+
+        // Letters and digits carry their (uppercased) ASCII code, matching the Win32 virtual-key numbering.
+        >= 'a' and <= 'z' => (Keys)(keyval - 0x20),
+        >= 'A' and <= 'Z' => (Keys)keyval,
+        >= '0' and <= '9' => (Keys)keyval,
+        _ => Keys.None,
+    };
+
+    /// <summary>Recovers the peer bound to a native callback's <c>user_data</c>.</summary>
+    private static GtkCanvasPeer? FromData(nint userData)
+        => userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkCanvasPeer peer ? peer : null;
+
+    // --- Native callbacks (Cdecl, gboolean-returning) -------------------------------------------
+
+    /// <summary>Native "draw" handler: <c>gboolean (GtkWidget*, cairo_t*, gpointer)</c>.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnDraw(nint widget, nint cr, nint userData)
+    {
+        FromData(userData)?.RaisePaint(cr);
+        return 0;
+    }
+
+    /// <summary>Native "button-press-event" handler: <c>gboolean (GtkWidget*, GdkEventButton*, gpointer)</c>.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnButtonPress(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = FromData(userData);
+        if (peer is not null)
+        {
+            unsafe
+            {
+                ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
+                peer.RaiseMouseDown(ToButton(e.Button), (int)e.X, (int)e.Y);
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "button-release-event" handler.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnButtonRelease(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = FromData(userData);
+        if (peer is not null)
+        {
+            unsafe
+            {
+                ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
+                peer.RaiseMouseUp(ToButton(e.Button), (int)e.X, (int)e.Y);
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "motion-notify-event" handler.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnMotion(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = FromData(userData);
+        if (peer is not null)
+        {
+            unsafe
+            {
+                ref var e = ref Unsafe.AsRef<GdkEventMotion>((void*)eventPtr);
+                peer.RaiseMouseMove((int)e.X, (int)e.Y);
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "scroll-event" handler: maps vertical direction to a ±120 wheel delta.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnScroll(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = FromData(userData);
+        if (peer is not null)
+        {
+            unsafe
+            {
+                ref var e = ref Unsafe.AsRef<GdkEventScroll>((void*)eventPtr);
+                var delta = e.Direction switch
+                {
+                    NativeMethods.GDK_SCROLL_UP => 120,
+                    NativeMethods.GDK_SCROLL_DOWN => -120,
+                    _ => 0,
+                };
+                if (delta != 0)
+                    peer.RaiseMouseWheel(delta, (int)e.X, (int)e.Y);
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "leave-notify-event" handler.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnLeave(nint widget, nint eventPtr, nint userData)
+    {
+        FromData(userData)?.RaiseMouseLeave();
+        return 0;
+    }
+
+    /// <summary>Native "key-press-event" handler: raises KeyDown and, for printable keys, KeyPress.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnKeyPress(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = FromData(userData);
+        if (peer is not null)
+        {
+            unsafe
+            {
+                ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+                peer.RaiseKeyDown(ToKey(e.KeyVal), ToModifiers(e.State));
+
+                var unicode = NativeMethods.gdk_keyval_to_unicode(e.KeyVal);
+                if (unicode is >= 0x20 and not 0x7F and <= 0xFFFF)
+                    peer.RaiseKeyPress((char)unicode);
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "key-release-event" handler.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnKeyRelease(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = FromData(userData);
+        if (peer is not null)
+        {
+            unsafe
+            {
+                ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+                peer.RaiseKeyUp(ToKey(e.KeyVal), ToModifiers(e.State));
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "focus-in-event" handler.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnFocusIn(nint widget, nint eventPtr, nint userData)
+    {
+        FromData(userData)?.RaiseGotFocus();
+        return 0;
+    }
+
+    /// <summary>Native "focus-out-event" handler.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnFocusOut(nint widget, nint eventPtr, nint userData)
+    {
+        FromData(userData)?.RaiseLostFocus();
+        return 0;
+    }
+}

@@ -12,9 +12,13 @@ internal static partial class NativeMethods
 {
     private const string Gtk = "libgtk-3.so.0";
     private const string GObject = "libgobject-2.0.so.0";
+    private const string GLib = "libglib-2.0.so.0";
 
     /// <summary>Value of <c>GTK_WINDOW_TOPLEVEL</c> — a normal, WM-decorated top-level window.</summary>
     internal const int GTK_WINDOW_TOPLEVEL = 0;
+
+    /// <summary>Value of <c>GTK_STATE_FLAG_NORMAL</c> — the default, unmodified widget state.</summary>
+    internal const uint GTK_STATE_FLAG_NORMAL = 0;
 
     // --- Library init and main loop -------------------------------------------------------------
 
@@ -103,6 +107,79 @@ internal static partial class NativeMethods
     /// <summary>Sets the text of a label (UTF-8).</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void gtk_label_set_text(nint label, string str);
+
+    // --- Owner-draw canvas (GtkDrawingArea) -----------------------------------------------------
+
+    /// <summary>Creates a bare <c>GtkDrawingArea</c> — the blank surface owner-drawn controls paint on.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_drawing_area_new();
+
+    /// <summary>Sets whether a widget accepts keyboard focus (<c>gboolean</c> is passed as 1/0).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_set_can_focus(nint widget, int canFocus);
+
+    /// <summary>Adds the given <c>GdkEventMask</c> bits to those the widget's window receives.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_add_events(nint widget, int events);
+
+    /// <summary>Schedules a full repaint of the widget.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_queue_draw(nint widget);
+
+    /// <summary>Schedules a repaint of the given rectangle in widget-relative coordinates.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_queue_draw_area(nint widget, int x, int y, int width, int height);
+
+    /// <summary>Moves keyboard focus to the widget (it must be focusable and realized).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_grab_focus(nint widget);
+
+    /// <summary>Returns the widget's current allocated width in pixels.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_widget_get_allocated_width(nint widget);
+
+    /// <summary>Returns the widget's current allocated height in pixels.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_widget_get_allocated_height(nint widget);
+
+    // --- Theming (GtkStyleContext / GtkSettings) ------------------------------------------------
+
+    /// <summary>Returns the (owned-by-widget) <c>GtkStyleContext</c> used to resolve theme colors.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_widget_get_style_context(nint widget);
+
+    /// <summary>Reads the foreground (text) color for the given <c>GtkStateFlags</c> into <paramref name="color"/>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_style_context_get_color(nint context, uint state, out GdkRGBA color);
+
+    /// <summary>
+    /// Looks up a named theme color (for example <c>"theme_bg_color"</c>) in the style context,
+    /// writing it to <paramref name="color"/> and returning <c>TRUE</c> (1) when the name resolves.
+    /// </summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial int gtk_style_context_lookup_color(nint context, string colorName, out GdkRGBA color);
+
+    /// <summary>Returns the default <c>GtkSettings</c> object for the current screen.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_settings_get_default();
+
+    // --- GObject / GLib helpers -----------------------------------------------------------------
+
+    /// <summary>
+    /// Reads a single object property. Declared with a fixed (non-variadic) signature — the trailing
+    /// <c>NULL</c> terminator is passed explicitly — which matches the C ABI for the one string
+    /// property we read (<c>gtk-font-name</c>) and stays <c>LibraryImport</c>-compatible.
+    /// </summary>
+    [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void g_object_get(nint @object, string firstPropertyName, out nint value, nint terminator);
+
+    /// <summary>Drops one reference to a <c>GObject</c>.</summary>
+    [LibraryImport(GObject)]
+    internal static partial void g_object_unref(nint @object);
+
+    /// <summary>Frees memory allocated by GLib (for example the string returned by <see cref="g_object_get"/>).</summary>
+    [LibraryImport(GLib)]
+    internal static partial void g_free(nint mem);
 
     // --- Signals --------------------------------------------------------------------------------
 

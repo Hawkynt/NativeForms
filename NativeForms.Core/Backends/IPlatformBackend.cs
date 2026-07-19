@@ -1,3 +1,5 @@
+using Hawkynt.NativeForms.Drawing;
+
 namespace Hawkynt.NativeForms.Backends;
 
 /// <summary>
@@ -17,6 +19,9 @@ public interface IPlatformBackend
     /// </summary>
     bool IsSupported { get; }
 
+    /// <summary>The native theme (colors, font, metrics) owner-drawn controls paint with.</summary>
+    ITheme Theme { get; }
+
     /// <summary>Creates an unrealized top-level window peer.</summary>
     IWindowPeer CreateWindow();
 
@@ -25,6 +30,12 @@ public interface IPlatformBackend
 
     /// <summary>Creates an unrealized static-text peer.</summary>
     ILabelPeer CreateLabel();
+
+    /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
+    ICanvasPeer CreateCanvas();
+
+    /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
+    IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);
 
     /// <summary>
     /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>

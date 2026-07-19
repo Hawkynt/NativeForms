@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
@@ -21,7 +22,17 @@ public sealed class CocoaBackend : IPlatformBackend
     public bool IsSupported => OperatingSystem.IsMacOS();
 
     /// <inheritdoc/>
+    public ITheme Theme => DefaultTheme.Instance;
+
+    /// <inheritdoc/>
     public IWindowPeer CreateWindow() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public ICanvasPeer CreateCanvas() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
+    public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
+        => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
     public IButtonPeer CreateButton() => throw new PlatformNotSupportedException(_NotImplemented);

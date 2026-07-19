@@ -62,8 +62,18 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       # Proves the headline goal: the toolkit and demo compile ahead-of-time on every platform.
-      - name: Publish demo with NativeAOT
+      # TreatWarningsAsErrors makes any trim/AOT (IL2xxx/IL3xxx) warning fail the build, so
+      # trimmability can never silently regress.
+      - name: Publish demo with NativeAOT (trim/AOT warnings are errors)
+        shell: bash
         run: >
           dotnet publish NativeForms.Demo/NativeForms.Demo.csproj
           --configuration Release --runtime ${{ matrix.rid }} --self-contained
-          -p:PublishAot=true
+          -p:PublishAot=true -p:TreatWarningsAsErrors=true
+          -o aot-out
+      # Footprint is a first-class goal — surface the native binary size on every run.
+      - name: Report native binary size
+        shell: bash
+        run: |
+          echo "### NativeAOT size — ${{ matrix.rid }}" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh aot-out/Hawkynt.NativeForms.Demo* 2>/dev/null | awk '{print $5, $NF}' >> "$GITHUB_STEP_SUMMARY" || true

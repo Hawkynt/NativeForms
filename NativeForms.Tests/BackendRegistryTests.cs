@@ -1,4 +1,6 @@
+using System;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Tests;
 
@@ -47,9 +49,12 @@ internal sealed class BackendRegistryTests
     {
         public abstract string Name { get; }
         public abstract bool IsSupported { get; }
+        public ITheme Theme => DefaultTheme.Instance;
         public IWindowPeer CreateWindow() => throw new NotSupportedException();
         public IButtonPeer CreateButton() => throw new NotSupportedException();
         public ILabelPeer CreateLabel() => throw new NotSupportedException();
+        public ICanvasPeer CreateCanvas() => throw new NotSupportedException();
+        public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => throw new NotSupportedException();
         public void Run(IWindowPeer mainWindow) { }
         public void Quit() { }
     }
