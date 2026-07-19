@@ -221,11 +221,15 @@ strategy (may differ per platform; note exceptions inline).
       tri-state `CheckState`, image + text next to the box pending
 - [~] `RadioButton` (owner) — themed ring + accent dot, grouping by container, click/Space,
       `CheckedChanged` done; image + text next to the ring pending
-- [ ] `Label` (native) *(basic exists; add `AutoSize`, `TextAlign`, mnemonics)*
+- [~] `Label` (native) — polish done, images pending
   - [x] Text
-  - [ ] `AutoSize`, `TextAlign`, `BorderStyle`, mnemonic → focuses next control
+  - [x] `AutoSize` (canvas-free `IPlatformBackend.MeasureText`), `TextAlign`, `BorderStyle`
+        (Win32 style bit; GTK documented no-op), mnemonic rendering (`&x` underline, GTK `_x`
+        translation)
+  - [ ] Mnemonic activation focuses the next control (blocked on the §7.1 focus model)
   - [ ] `Image` + `ImageAlign` (icon beside/behind text)
-- [ ] `LinkLabel` (owner)
+- [~] `LinkLabel` (owner) — whole-text link: accent color + underline, hover + `Visited` states,
+      click/Space → `LinkClicked`; per-character `LinkArea` ranges pending
 - [ ] `TextBox` (native) — single-line first, then:
   - [ ] `Multiline` (scrollbars, word wrap, `AcceptsReturn`/`AcceptsTab`)
   - [ ] `PlaceholderText` hint (cue banner: `EM_SETCUEBANNER` / `gtk_entry_set_placeholder_text`;
