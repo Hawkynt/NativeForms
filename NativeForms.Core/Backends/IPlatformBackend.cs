@@ -34,6 +34,9 @@ public interface IPlatformBackend
     /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
     ICanvasPeer CreateCanvas();
 
+    /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
+    IPopupPeer CreatePopup();
+
     /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
     IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);
 

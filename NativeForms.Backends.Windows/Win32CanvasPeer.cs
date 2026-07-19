@@ -15,11 +15,13 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// the managed control subscribes to. As an <see cref="IContainerPeer"/> it also hosts nested child
 /// HWNDs on top of its painted surface, exactly like <see cref="WindowPeer"/> hosts them in a form's
 /// client area: children added before this canvas has its own HWND are buffered and parented the
-/// moment it is created.
+/// moment it is created. <see cref="Win32PopupPeer"/> derives from it, reusing the same window class,
+/// procedure and event pipeline for the light-dismiss popup surface.
 /// </summary>
-internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
+internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
 {
-    private const string ClassName = "HawkyntNativeFormsCanvas";
+    /// <summary>The shared canvas window class every owner-drawn surface (canvas or popup) is built from.</summary>
+    private protected const string ClassName = "HawkyntNativeFormsCanvas";
 
     /// <summary>Maps a live canvas HWND to its peer so the static <see cref="WndProc"/> can find it.</summary>
     private static readonly ConcurrentDictionary<nint, Win32CanvasPeer> _canvases = new();
@@ -79,18 +81,31 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     {
         EnsureClassRegistered();
         base.CreateChildHandle(parent, controlId);
-        if (this.Handle == 0)
-            return;
+        if (this.Handle != 0)
+            this.OnHandleCreated();
+    }
 
+    /// <summary>
+    /// Registers the fresh HWND for message routing and flushes children that were added while this
+    /// surface had no HWND of its own yet. Called by every creation path — child and popup alike.
+    /// </summary>
+    private protected void OnHandleCreated()
+    {
         _canvases[this.Handle] = this;
 
-        // Flush children that were added while this canvas had no HWND of its own yet.
         if (this._children is null)
             return;
 
         foreach (var (childId, child) in this._children)
             child.CreateChildHandle(this.Handle, childId);
     }
+
+    /// <summary>
+    /// Peer-specific first look at a message, ahead of the shared canvas handling. Return
+    /// <see langword="true"/> to report the message fully handled; the popup peer uses this to
+    /// implement light dismiss without duplicating the window procedure.
+    /// </summary>
+    private protected virtual bool PreProcessMessage(uint msg, nint wParam, nint lParam) => false;
 
     /// <inheritdoc/>
     public void AddChild(IControlPeer child)
@@ -203,10 +218,10 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
         => handler?.Invoke(this, new KeyEventArgs((Keys)(int)wParam, CurrentModifiers()));
 
     /// <summary>Extracts the low word of a message parameter as a signed 16-bit coordinate.</summary>
-    private static int LoWord(nint value) => (short)(value & 0xFFFF);
+    private protected static int LoWord(nint value) => (short)(value & 0xFFFF);
 
     /// <summary>Extracts the high word of a message parameter as a signed 16-bit coordinate.</summary>
-    private static int HiWord(nint value) => (short)((value >> 16) & 0xFFFF);
+    private protected static int HiWord(nint value) => (short)((value >> 16) & 0xFFFF);
 
     /// <summary>Reads the live Shift/Control/Alt state via <c>GetKeyState</c> into modifier flags.</summary>
     private static KeyModifiers CurrentModifiers()
@@ -222,7 +237,7 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     }
 
     /// <summary>Registers the shared, background-less canvas window class exactly once per process.</summary>
-    private static void EnsureClassRegistered()
+    private protected static void EnsureClassRegistered()
     {
         if (Interlocked.CompareExchange(ref _classRegistered, 1, 0) != 0)
             return;
@@ -256,6 +271,9 @@ internal sealed unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     {
         if (_canvases.TryGetValue(hwnd, out var peer))
         {
+            if (peer.PreProcessMessage(msg, wParam, lParam))
+                return 0;
+
             switch (msg)
             {
                 case NativeMethods.WM_ERASEBKGND:

@@ -175,6 +175,9 @@ strategy (may differ per platform; note exceptions inline).
 - [x] Backend abstraction (`IPlatformBackend`, peer interfaces, `BackendRegistry`)
 - [x] `Timer` (WinForms-shaped, `ITimerPeer`: WM_TIMER on Win32, `g_timeout` on GTK, fireable
       headless fake; deferred arm until a backend runs) — drives marquee/caret/tooltip/autorepeat
+- [x] Popup surface (`IPopupPeer : ICanvasPeer`: WS_POPUP + capture light-dismiss on Win32,
+      `GTK_WINDOW_POPUP` + seat/GTK grabs; `ShowAt`/`Hide`/`Dismissed`; `Control.PointToScreen`)
+      — hosts ComboBox drop-downs, menus, tooltips, calendar fly-outs
 - [ ] `Component`/`IContainer` + designer-free component model
 - [ ] `Cursor`, `Cursors`; `Control.Cursor`
 - [ ] Focus model (`Focus()`, `TabIndex`, `TabStop`, `Enter`/`Leave`/`GotFocus`/`LostFocus`)

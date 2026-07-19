@@ -226,6 +226,11 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool MoveWindow(nint hWnd, int X, int Y, int nWidth, int nHeight, [MarshalAs(UnmanagedType.Bool)] bool bRepaint);
 
+    /// <summary>Converts a point from a window's client space to screen coordinates, in place.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ClientToScreen(nint hWnd, ref POINT lpPoint);
+
     /// <summary>Calls the default window procedure for messages this backend does not handle.</summary>
     [LibraryImport("user32.dll")]
     internal static partial nint DefWindowProcW(nint hWnd, uint msg, nint wParam, nint lParam);

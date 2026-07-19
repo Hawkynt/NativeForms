@@ -50,6 +50,17 @@ internal abstract class Win32ControlPeer : IControlPeer
             NativeMethods.EnableWindow(Handle, enabled);
     }
 
+    /// <inheritdoc/>
+    public Point PointToScreen(Point clientPoint)
+    {
+        if (Handle == 0)
+            return clientPoint;
+
+        var point = new NativeMethods.POINT { x = clientPoint.X, y = clientPoint.Y };
+        NativeMethods.ClientToScreen(Handle, ref point);
+        return new(point.x, point.y);
+    }
+
     /// <summary>Pushes all buffered state onto the native handle. Call right after it is created.</summary>
     protected void FlushState()
     {

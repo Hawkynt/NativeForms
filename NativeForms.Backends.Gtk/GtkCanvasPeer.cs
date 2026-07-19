@@ -16,9 +16,10 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// the owner-drawn background always ends up underneath the children. Like the other child peers it
 /// is realized lazily: the widget, its event mask and its signal handlers are created the first time
 /// the owning container drops it into its <c>GtkFixed</c>, and children added before that moment are
-/// buffered and placed as soon as the widget exists.
+/// buffered and placed as soon as the widget exists. <see cref="GtkPopupPeer"/> derives from it,
+/// hosting the same canvas widget inside a popup top-level for the light-dismiss surface.
 /// </summary>
-internal sealed class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
+internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 {
     private const int GdkEventMask =
         NativeMethods.GDK_BUTTON_PRESS_MASK

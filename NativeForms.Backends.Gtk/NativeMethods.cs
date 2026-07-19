@@ -17,6 +17,9 @@ internal static partial class NativeMethods
     /// <summary>Value of <c>GTK_WINDOW_TOPLEVEL</c> — a normal, WM-decorated top-level window.</summary>
     internal const int GTK_WINDOW_TOPLEVEL = 0;
 
+    /// <summary>Value of <c>GTK_WINDOW_POPUP</c> — an undecorated surface the WM ignores (menus, tooltips).</summary>
+    internal const int GTK_WINDOW_POPUP = 1;
+
     /// <summary>Value of <c>GTK_STATE_FLAG_NORMAL</c> — the default, unmodified widget state.</summary>
     internal const uint GTK_STATE_FLAG_NORMAL = 0;
 
@@ -68,6 +71,10 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_fixed_move(nint fixed_, nint widget, int x, int y);
 
+    /// <summary>Moves a top-level window to the given root-window (screen) coordinates.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_move(nint window, int x, int y);
+
     // --- Generic widget operations --------------------------------------------------------------
 
     /// <summary>Recursively shows <paramref name="widget"/> and all of its descendants.</summary>
@@ -86,9 +93,33 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_set_size_request(nint widget, int width, int height);
 
+    /// <summary>Hides a widget without destroying it.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_hide(nint widget);
+
     /// <summary>Destroys a widget and drops the toolkit's reference to it.</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_destroy(nint widget);
+
+    /// <summary>Returns the widget's <c>GdkWindow</c>, or 0 before the widget is realized.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_widget_get_window(nint widget);
+
+    /// <summary>Whether the widget has its own <c>GdkWindow</c> rather than sharing its parent's (<c>gboolean</c>).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_widget_get_has_window(nint widget);
+
+    /// <summary>Reads the widget's current allocation — its position and size within its parent's window.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_get_allocation(nint widget, out GdkRectangle allocation);
+
+    /// <summary>Makes <paramref name="widget"/> the target of all the application's events (a GTK grab).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_grab_add(nint widget);
+
+    /// <summary>Removes the application-wide event grab added by <see cref="gtk_grab_add"/>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_grab_remove(nint widget);
 
     // --- Buttons and labels ---------------------------------------------------------------------
 

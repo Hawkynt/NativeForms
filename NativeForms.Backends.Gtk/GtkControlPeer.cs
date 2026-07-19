@@ -77,6 +77,30 @@ internal abstract class GtkControlPeer : IControlPeer
             NativeMethods.gtk_widget_set_sensitive(_widget, Bool(enabled));
     }
 
+    /// <inheritdoc />
+    public Point PointToScreen(Point clientPoint)
+    {
+        if (_widget == 0)
+            return clientPoint;
+
+        var window = NativeMethods.gtk_widget_get_window(_widget);
+        if (window == 0)
+            return clientPoint;
+
+        NativeMethods.gdk_window_get_origin(window, out var x, out var y);
+
+        // A window-less widget shares its parent's GdkWindow; its own client origin sits at the
+        // allocation offset inside that window.
+        if (NativeMethods.gtk_widget_get_has_window(_widget) == 0)
+        {
+            NativeMethods.gtk_widget_get_allocation(_widget, out var allocation);
+            x += allocation.X;
+            y += allocation.Y;
+        }
+
+        return new(x + clientPoint.X, y + clientPoint.Y);
+    }
+
     /// <summary>Creates the concrete native widget, using the buffered state where relevant.</summary>
     protected abstract nint CreateWidget();
 

@@ -144,6 +144,16 @@ public abstract class Control
     /// <summary>Programmatically triggers the <see cref="Click"/> event.</summary>
     public void PerformClick() => this.OnClick(EventArgs.Empty);
 
+    /// <summary>
+    /// Maps a point from this control's client space to screen coordinates. Only the native widget
+    /// knows where it sits on screen, so the control must be realized first.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The control has not been realized yet.</exception>
+    public Point PointToScreen(Point clientPoint)
+        => _peer is not null
+            ? _peer.PointToScreen(clientPoint)
+            : throw new InvalidOperationException("The control must be realized before client coordinates can be mapped to the screen.");
+
     /// <summary>The realized native peer, or <see langword="null"/> before realization.</summary>
     internal IControlPeer? Peer => _peer;
 

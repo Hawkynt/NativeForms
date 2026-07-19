@@ -28,6 +28,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public IButtonPeer CreateButton() => this.Track(new HeadlessButtonPeer());
     public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
+    public IPopupPeer CreatePopup() => this.Track(new HeadlessPopupPeer());
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
 
     public ITimerPeer CreateTimer()
@@ -61,10 +62,15 @@ internal abstract class HeadlessPeer : IControlPeer
     public bool Enabled { get; private set; }
     public bool Disposed { get; private set; }
 
+    /// <summary>Where the widget's client origin sits on the fake screen; settable so tests can
+    /// assert client-to-screen placement math without a windowing system.</summary>
+    public Point ScreenOrigin { get; set; }
+
     public void SetBounds(Rectangle bounds) => this.Bounds = bounds;
     public void SetText(string text) => this.Text = text;
     public void SetVisible(bool visible) => this.Visible = visible;
     public void SetEnabled(bool enabled) => this.Enabled = enabled;
+    public Point PointToScreen(Point clientPoint) => new(this.ScreenOrigin.X + clientPoint.X, this.ScreenOrigin.Y + clientPoint.Y);
     public void Dispose() => this.Disposed = true;
 }
 
@@ -130,7 +136,7 @@ internal sealed class HeadlessImage(int width, int height) : IImage
 }
 
 /// <summary>A canvas peer whose events tests can raise directly, with a recording graphics surface.</summary>
-internal sealed class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
+internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
 {
     public List<IControlPeer> Children { get; } = [];
     public bool Focusable { get; private set; }
@@ -188,6 +194,39 @@ internal sealed class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
 
     public void RaiseGotFocus() => this.GotFocus?.Invoke(this, EventArgs.Empty);
     public void RaiseLostFocus() => this.LostFocus?.Invoke(this, EventArgs.Empty);
+}
+
+/// <summary>A popup peer that records every ShowAt/Hide and lets tests trigger light dismissal.</summary>
+internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
+{
+    public List<(Point Location, Size Size)> ShowCalls { get; } = [];
+    public int HideCount { get; private set; }
+    public bool IsShown { get; private set; }
+
+    public event EventHandler? Dismissed;
+
+    public void ShowAt(Point screenLocation, Size size)
+    {
+        this.ShowCalls.Add((screenLocation, size));
+        this.IsShown = true;
+    }
+
+    public void Hide()
+    {
+        ++this.HideCount;
+        this.IsShown = false;
+    }
+
+    /// <summary>Dismisses the popup as the platform would: hides the surface first, then raises
+    /// <see cref="Dismissed"/>. A no-op while the popup is not shown, matching every real backend.</summary>
+    public void FireDismiss()
+    {
+        if (!this.IsShown)
+            return;
+
+        this.Hide();
+        this.Dismissed?.Invoke(this, EventArgs.Empty);
+    }
 }
 
 /// <summary>An <see cref="IGraphics"/> that records draw calls for assertions and measures text deterministically.</summary>

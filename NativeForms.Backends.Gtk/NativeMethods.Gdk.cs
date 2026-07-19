@@ -52,9 +52,64 @@ internal static partial class NativeMethods
     internal const uint GDK_KEY_Insert = 0xff63;
     internal const uint GDK_KEY_Delete = 0xffff;
 
+    // --- GdkSeatCapabilities --------------------------------------------------------------------
+
+    /// <summary>All pointing devices — pointer, touch and tablet stylus (the popup's grab scope).</summary>
+    internal const int GDK_SEAT_CAPABILITY_ALL_POINTING = 0x7;
+
     /// <summary>Maps a GDK key symbol to its Unicode code point, or 0 when it has none.</summary>
     [LibraryImport(Gdk)]
     internal static partial uint gdk_keyval_to_unicode(uint keyval);
+
+    /// <summary>Returns the default <c>GdkDisplay</c>.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_display_get_default();
+
+    /// <summary>Returns the default <c>GdkSeat</c> (the user's pointer/keyboard pair) of a display.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_display_get_default_seat(nint display);
+
+    /// <summary>
+    /// Grabs the seat's devices for <paramref name="window"/>. With <paramref name="ownerEvents"/> on,
+    /// events over the application's own windows are delivered normally while everything else is
+    /// routed to the grab window — the mechanism behind the popup's light dismiss. Returns
+    /// <c>GDK_GRAB_SUCCESS</c> (0) when the grab is taken.
+    /// </summary>
+    [LibraryImport(Gdk)]
+    internal static partial int gdk_seat_grab(
+        nint seat,
+        nint window,
+        int capabilities,
+        int ownerEvents,
+        nint cursor,
+        nint @event,
+        nint prepareFunc,
+        nint prepareFuncData);
+
+    /// <summary>Releases the grab taken by <see cref="gdk_seat_grab"/>.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial void gdk_seat_ungrab(nint seat);
+
+    /// <summary>Retrieves a window's origin (its top-left corner) in root-window (screen) coordinates.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial void gdk_window_get_origin(nint window, out int x, out int y);
+}
+
+/// <summary>A GDK rectangle — also a widget's <c>GtkAllocation</c>: integer position and size.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct GdkRectangle
+{
+    /// <summary>The x-coordinate of the left edge.</summary>
+    public int X;
+
+    /// <summary>The y-coordinate of the top edge.</summary>
+    public int Y;
+
+    /// <summary>The width.</summary>
+    public int Width;
+
+    /// <summary>The height.</summary>
+    public int Height;
 }
 
 /// <summary>The four RGBA components a GDK color carries, each a double in the 0..1 range.</summary>

@@ -34,6 +34,9 @@ public sealed class Win32Backend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();
 
     /// <inheritdoc/>
+    public IPopupPeer CreatePopup() => new Win32PopupPeer();
+
+    /// <inheritdoc/>
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
         => new Win32Image(width, height, argb);
 

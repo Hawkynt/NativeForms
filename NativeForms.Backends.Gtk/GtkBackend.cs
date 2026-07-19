@@ -53,6 +53,13 @@ public sealed class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public IPopupPeer CreatePopup()
+    {
+        EnsureInitialized();
+        return new GtkPopupPeer();
+    }
+
+    /// <inheritdoc />
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
     {
         EnsureInitialized();

@@ -21,6 +21,9 @@ public interface IControlPeer : IDisposable
 
     /// <summary>Enables or greys out the widget for user interaction.</summary>
     void SetEnabled(bool enabled);
+
+    /// <summary>Maps a point in this widget's client space to screen coordinates.</summary>
+    Point PointToScreen(Point clientPoint);
 }
 
 /// <summary>
