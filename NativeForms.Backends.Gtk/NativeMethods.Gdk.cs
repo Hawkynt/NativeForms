@@ -51,6 +51,12 @@ internal static partial class NativeMethods
     internal const uint GDK_KEY_Down = 0xff54;
     internal const uint GDK_KEY_Insert = 0xff63;
     internal const uint GDK_KEY_Delete = 0xffff;
+    internal const uint GDK_KEY_asterisk = 0x02a;
+    internal const uint GDK_KEY_plus = 0x02b;
+    internal const uint GDK_KEY_minus = 0x02d;
+    internal const uint GDK_KEY_KP_Multiply = 0xffaa;
+    internal const uint GDK_KEY_KP_Add = 0xffab;
+    internal const uint GDK_KEY_KP_Subtract = 0xffad;
 
     // --- GdkSeatCapabilities --------------------------------------------------------------------
 

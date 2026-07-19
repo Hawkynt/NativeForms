@@ -87,4 +87,13 @@ public enum Keys
 
     /// <summary>Delete.</summary>
     Delete = 0x2E,
+
+    /// <summary>Numeric-keypad multiply (*).</summary>
+    Multiply = 0x6A,
+
+    /// <summary>Numeric-keypad add (+).</summary>
+    Add = 0x6B,
+
+    /// <summary>Numeric-keypad subtract (−).</summary>
+    Subtract = 0x6D,
 }

@@ -158,7 +158,7 @@ public abstract class Control
     internal IControlPeer? Peer => _peer;
 
     /// <summary>The backend this control is realized on, or <see langword="null"/> before realization.</summary>
-    private protected IPlatformBackend? Backend => _backend;
+    internal IPlatformBackend? Backend => _backend;
 
     /// <summary>Creates the backend peer specific to this control kind (button, label, window …).</summary>
     private protected abstract IControlPeer CreatePeer(IPlatformBackend backend);

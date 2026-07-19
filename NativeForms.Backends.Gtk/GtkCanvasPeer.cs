@@ -233,6 +233,9 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         NativeMethods.GDK_KEY_Down => Keys.Down,
         NativeMethods.GDK_KEY_Insert => Keys.Insert,
         NativeMethods.GDK_KEY_Delete => Keys.Delete,
+        NativeMethods.GDK_KEY_asterisk or NativeMethods.GDK_KEY_KP_Multiply => Keys.Multiply,
+        NativeMethods.GDK_KEY_plus or NativeMethods.GDK_KEY_KP_Add => Keys.Add,
+        NativeMethods.GDK_KEY_minus or NativeMethods.GDK_KEY_KP_Subtract => Keys.Subtract,
 
         // Letters and digits carry their (uppercased) ASCII code, matching the Win32 virtual-key numbering.
         >= 'a' and <= 'z' => (Keys)(keyval - 0x20),
