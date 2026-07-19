@@ -97,6 +97,13 @@ public interface IPlatformBackend
     Font? ShowFontDialog(Font font);
 
     /// <summary>
+    /// Places plain text on the system clipboard, replacing its current content. The seam behind copy
+    /// gestures (a grid's Ctrl+C); reading the clipboard and non-text formats are not part of the
+    /// contract.
+    /// </summary>
+    void SetClipboardText(string text);
+
+    /// <summary>
     /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>
     /// is called. Must be invoked on the thread that created the widgets.
     /// </summary>

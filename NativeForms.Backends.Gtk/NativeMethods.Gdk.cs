@@ -140,6 +140,20 @@ internal static partial class NativeMethods
     /// <summary>Returns the byte distance between the starts of consecutive pixbuf rows.</summary>
     [LibraryImport(GdkPixbuf)]
     internal static partial int gdk_pixbuf_get_rowstride(nint pixbuf);
+
+    // --- Clipboard ------------------------------------------------------------------------------
+
+    /// <summary>Interns an atom by name; <c>"CLIPBOARD"</c> names the desktop clipboard selection.</summary>
+    [LibraryImport(Gdk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint gdk_atom_intern(string atomName, int onlyIfExists);
+
+    /// <summary>Returns the (display-owned) clipboard object for the given selection atom.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_clipboard_get(nint selection);
+
+    /// <summary>Places UTF-8 text on the clipboard; -1 length means zero-terminated.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_clipboard_set_text(nint clipboard, string text, int len);
 }
 
 /// <summary>A GDK rectangle — also a widget's <c>GtkAllocation</c>: integer position and size.</summary>

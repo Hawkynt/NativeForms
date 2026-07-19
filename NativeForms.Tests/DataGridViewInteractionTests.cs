@@ -272,4 +272,216 @@ internal sealed class DataGridViewInteractionTests
         canvas.RaiseMouseWheel(120, modifiers: KeyModifiers.Shift);
         Assert.That(grid.HorizontalOffset, Is.Zero, "clamped at the left edge");
     }
+
+    /// <summary>A grid whose first column is frozen and whose columns overflow the 200px viewport:
+    /// Name (100, frozen), Age (60) and City (100) — 160px of scrolling columns behind a 100px pin.</summary>
+    private static DataGridView MakeFrozenGrid()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].Frozen = true;
+        grid.Columns.Add(new DataGridViewColumn("City", static _ => "Rome"));
+        return grid;
+    }
+
+    [Test]
+    public void Frozen_column_stays_pinned_while_the_rest_scroll()
+    {
+        var grid = MakeFrozenGrid();
+        var canvas = Realize(grid);
+        grid.HorizontalOffset = 50;
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Name\"") && o.Contains("@4,0")), Is.True, "frozen header pinned at x=0");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@4,22")), Is.True, "frozen cell pinned");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Age\"") && o.Contains("@54,0")), Is.True, "scrolling header shifted by the offset (100 - 50 + 4)");
+            Assert.That(g.Operations, Does.Contain("clip 100,0,100,22"), "scrolling headers clip to the right of the frozen run");
+            Assert.That(g.Operations, Does.Contain("line #FFC8C8C8 99,0-99,110"), "frozen seam");
+        });
+    }
+
+    [Test]
+    public void Frozen_columns_hit_test_at_their_pinned_position()
+    {
+        var grid = MakeFrozenGrid();
+        DataGridViewCellEventArgs? click = null;
+        grid.CellClick += (_, e) => click = e;
+        var canvas = Realize(grid);
+        grid.HorizontalOffset = 50;
+
+        canvas.RaiseMouseDown(50, 30); // inside the pinned Name column
+        Assert.That(click!.ColumnIndex, Is.Zero, "the frozen column wins over the columns scrolled beneath it");
+
+        canvas.RaiseMouseDown(105, 30); // Age spans 50..110 but only shows right of the 100px pin
+        Assert.That(click.ColumnIndex, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void HorizontalOffset_clamps_against_the_scrolling_columns_only()
+    {
+        var grid = MakeFrozenGrid(); // 100 frozen + 160 scrolling in a 200px control => max 160 - 100 = 60
+        Realize(grid);
+
+        grid.HorizontalOffset = 10_000;
+
+        Assert.That(grid.HorizontalOffset, Is.EqualTo(60));
+    }
+
+    [Test]
+    public void Dragging_a_header_reorders_the_display_and_updates_DisplayIndex()
+    {
+        var grid = MakeGrid();
+        grid.AllowUserToOrderColumns = true;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(50, 5);  // grab the Name header
+        canvas.RaiseMouseMove(130, 5); // drag past the Age column
+        canvas.RaiseMouseUp(130, 5);
+
+        var g = canvas.RaisePaint();
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Columns[0].DisplayIndex, Is.EqualTo(1), "Name now displays second");
+            Assert.That(grid.Columns[1].DisplayIndex, Is.Zero, "Age now displays first");
+            Assert.That(grid.Columns[0].HeaderText, Is.EqualTo("Name"), "the model Columns list is untouched");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Age\"") && o.Contains("@4,0")), Is.True, "Age painted first");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Name\"") && o.Contains("@64,0")), Is.True, "Name painted after Age's 60px");
+        });
+    }
+
+    [Test]
+    public void Header_drags_do_not_reorder_while_disallowed()
+    {
+        var grid = MakeGrid(); // AllowUserToOrderColumns defaults to false
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(50, 5);
+        canvas.RaiseMouseMove(130, 5);
+        canvas.RaiseMouseUp(130, 5);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Columns[0].DisplayIndex, Is.EqualTo(-1));
+            Assert.That(grid.Columns[1].DisplayIndex, Is.EqualTo(-1));
+        });
+    }
+
+    [Test]
+    public void GetClipboardContent_returns_tab_separated_display_text()
+    {
+        var grid = MakeGrid();
+        Realize(grid);
+
+        Assert.That(grid.GetClipboardContent(), Is.Empty, "no selection, no content");
+
+        grid.SelectedRowIndex = 1;
+        Assert.That(grid.GetClipboardContent(), Is.EqualTo("Bob\t25"));
+    }
+
+    [Test]
+    public void Clipboard_rows_follow_the_display_order_while_sorted()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        grid.Columns[1].SortMode = DataGridViewColumnSortMode.Automatic;
+        var canvas = Realize(grid);
+        canvas.RaiseMouseDown(130, 5); // sort ascending by age: Bob(25), Alice(30), Carol(40)
+
+        canvas.RaiseMouseDown(10, 30);                                  // Bob (display row 0)
+        canvas.RaiseMouseDown(10, 50, modifiers: KeyModifiers.Control); // + Alice (display row 1)
+
+        Assert.That(grid.GetClipboardContent(), Is.EqualTo("Bob\t25\r\nAlice\t30"));
+    }
+
+    [Test]
+    public void Ctrl_C_stores_the_selection_through_the_backend_seam()
+    {
+        var backend = new HeadlessBackend();
+        var grid = MakeGrid();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        grid.SelectedRowIndex = 0;
+
+        canvas.RaiseKeyDown(Keys.C, KeyModifiers.Control);
+
+        Assert.That(backend.ClipboardTexts, Is.EqualTo(new[] { "Alice\t30" }));
+
+        grid.SelectedRowIndex = -1;
+        canvas.RaiseKeyDown(Keys.C, KeyModifiers.Control);
+        Assert.That(backend.ClipboardTexts, Has.Count.EqualTo(1), "an empty selection stores nothing");
+    }
+
+    [Test]
+    public void Ctrl_click_toggles_rows_into_the_multi_selection()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var selections = 0;
+        grid.SelectionChanged += (_, _) => ++selections;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(10, 30);                                  // Alice
+        canvas.RaiseMouseDown(10, 74, modifiers: KeyModifiers.Control); // + Carol
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Alice", "Carol" }));
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(2), "the toggled row becomes current");
+            Assert.That(selections, Is.EqualTo(2));
+        });
+
+        canvas.RaiseMouseDown(10, 30, modifiers: KeyModifiers.Control); // - Alice
+        Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Carol" }));
+    }
+
+    [Test]
+    public void Shift_click_selects_a_display_range()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(10, 30);                                // anchor on Alice
+        canvas.RaiseMouseDown(10, 74, modifiers: KeyModifiers.Shift); // range to Carol
+
+        Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Alice", "Bob", "Carol" }));
+    }
+
+    [Test]
+    public void Plain_click_collapses_the_multi_selection()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+        canvas.RaiseMouseDown(10, 30);
+        canvas.RaiseMouseDown(10, 74, modifiers: KeyModifiers.Control);
+
+        canvas.RaiseMouseDown(10, 50); // plain click on Bob
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Bob" }));
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Shift_arrow_extends_the_selection_from_the_anchor()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+        canvas.RaiseMouseDown(10, 30); // anchor on Alice
+
+        canvas.RaiseKeyDown(Keys.Down, KeyModifiers.Shift);
+
+        Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Alice", "Bob" }));
+
+        canvas.RaiseKeyDown(Keys.Down); // a plain arrow collapses to the new row
+        Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Carol" }));
+    }
 }

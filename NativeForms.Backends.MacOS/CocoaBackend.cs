@@ -76,6 +76,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public IRichTextBoxPeer CreateRichTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public void SetClipboardText(string text) => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

@@ -182,6 +182,60 @@ internal sealed class DataGridViewPresentationTests
     }
 
     [Test]
+    public void FullRowTextSelector_merges_the_row_into_one_full_width_cell()
+    {
+        var grid = MakeGrid();
+        grid.FullRowTextSelector = static o => ((Person)o!).Name == "Bob" ? "— Section —" : null;
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"— Section —\"") && o.Contains("@4,44")), Is.True, "one full-width cell");
+            Assert.That(g.DrewText("Bob"), Is.False, "no per-column cells on the merged row");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"25\"")), Is.False);
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(",22")), Is.True, "normal rows keep their cells");
+        });
+    }
+
+    [Test]
+    public void Merged_rows_are_skipped_by_selection_and_navigation()
+    {
+        var grid = MakeGrid();
+        grid.FullRowTextSelector = static o => ((Person)o!).Name == "Bob" ? "— Section —" : null;
+        var cellClicks = 0;
+        grid.CellClick += (_, _) => ++cellClicks;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(10, 50); // the merged row
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(-1), "merged rows take no selection");
+            Assert.That(cellClicks, Is.Zero, "and have no cells to click");
+        });
+
+        grid.SelectedRowIndex = 0;
+        canvas.RaiseKeyDown(Keys.Down);
+        Assert.That(grid.SelectedRowIndex, Is.EqualTo(2), "keyboard navigation skips the merged row");
+    }
+
+    [Test]
+    public void Merged_rows_refuse_editing()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].TextSetter = static (_, _) => { };
+        grid.FullRowTextSelector = static o => ((Person)o!).Name == "Bob" ? "— Section —" : null;
+        Realize(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.BeginEdit(1, 0), Is.False, "the merged row has no editable cells");
+            Assert.That(grid.BeginEdit(0, 0), Is.True, "normal rows edit");
+        });
+    }
+
+    [Test]
     public void Virtualization_stays_bounded_with_presentation_selectors()
     {
         var grid = new DataGridView { Bounds = new(0, 0, 200, 110) };

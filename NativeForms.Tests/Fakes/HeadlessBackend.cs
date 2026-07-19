@@ -50,6 +50,9 @@ internal sealed class HeadlessBackend : IPlatformBackend
     /// <summary>The scripted font <see cref="ShowFontDialog"/> returns (null = user cancelled).</summary>
     public Font? FontDialogResult { get; set; }
 
+    /// <summary>Every <see cref="SetClipboardText"/> call, in the order it arrived.</summary>
+    public List<string> ClipboardTexts { get; } = [];
+
     public string Name => "Headless";
     public bool IsSupported => true;
     public ITheme Theme => DefaultTheme.Instance;
@@ -113,6 +116,8 @@ internal sealed class HeadlessBackend : IPlatformBackend
         this.DidRun = true;
         this.RunAction?.Invoke();
     }
+
+    public void SetClipboardText(string text) => this.ClipboardTexts.Add(text);
 
     public void Quit() => this.DidQuit = true;
 

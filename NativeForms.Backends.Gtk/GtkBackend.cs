@@ -173,6 +173,15 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public void SetClipboardText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        EnsureInitialized();
+        var clipboard = NativeMethods.gtk_clipboard_get(NativeMethods.gdk_atom_intern("CLIPBOARD", 0));
+        NativeMethods.gtk_clipboard_set_text(clipboard, text, -1);
+    }
+
+    /// <inheritdoc />
     public void Run(IWindowPeer mainWindow)
     {
         EnsureInitialized();

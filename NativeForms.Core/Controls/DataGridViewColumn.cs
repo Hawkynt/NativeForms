@@ -93,4 +93,63 @@ public sealed class DataGridViewColumn
     /// <summary>How the column width is computed. Defaults to
     /// <see cref="DataGridViewAutoSizeColumnMode.None"/>.</summary>
     public DataGridViewAutoSizeColumnMode AutoSizeMode { get; set; }
+
+    /// <summary>Whether the column is pinned at the left edge: frozen columns form the leading run of
+    /// the display order and stay put while <see cref="DataGridView.HorizontalOffset"/> scrolls the
+    /// rest underneath them.</summary>
+    public bool Frozen { get; set; }
+
+    /// <summary>The column's position in the display order, or a negative value (the default) for its
+    /// position in <see cref="DataGridView.Columns"/>. A drag-reorder gesture rewrites it on every
+    /// column; assigning it directly reorders the presentation on the next repaint —
+    /// <see cref="DataGridView.Columns"/> itself is never reordered.</summary>
+    public int DisplayIndex { get; set; } = -1;
+
+    /// <summary>Writes a committed <see cref="DataGridViewColumnKind.Text"/> edit back to the row
+    /// item; <see langword="null"/> (the default) makes the cell display-only, like an unset
+    /// <see cref="CheckedSetter"/>.</summary>
+    public Action<object?, string>? TextSetter { get; set; }
+
+    /// <summary>Maps a row item to the choices a <see cref="DataGridViewColumnKind.ComboBox"/> cell
+    /// offers while editing. Return a cached list — required (with <see cref="ValueSetter"/>) for the
+    /// cell to enter edit mode.</summary>
+    public Func<object?, IReadOnlyList<object?>>? ItemsSelector { get; set; }
+
+    /// <summary>Maps a <see cref="ItemsSelector"/> choice to its display text in the popup list;
+    /// <see langword="null"/> falls back to <c>ToString()</c>.</summary>
+    public Func<object?, string>? ItemDisplaySelector { get; set; }
+
+    /// <summary>Writes the choice picked in a <see cref="DataGridViewColumnKind.ComboBox"/> editor
+    /// back to the row item (row item, chosen value).</summary>
+    public Action<object?, object?>? ValueSetter { get; set; }
+
+    /// <summary>Maps a row item to the number a <see cref="DataGridViewColumnKind.NumericUpDown"/>
+    /// editor starts from.</summary>
+    public Func<object?, decimal>? NumberSelector { get; set; }
+
+    /// <summary>Writes a committed <see cref="DataGridViewColumnKind.NumericUpDown"/> edit back to
+    /// the row item, already clamped into [<see cref="Minimum"/>, <see cref="Maximum"/>].</summary>
+    public Action<object?, decimal>? NumberSetter { get; set; }
+
+    /// <summary>The lowest value the <see cref="DataGridViewColumnKind.NumericUpDown"/> editor accepts.</summary>
+    public decimal Minimum { get; set; }
+
+    /// <summary>The highest value the <see cref="DataGridViewColumnKind.NumericUpDown"/> editor accepts.</summary>
+    public decimal Maximum { get; set; } = 100m;
+
+    /// <summary>The step of the <see cref="DataGridViewColumnKind.NumericUpDown"/> editor's spinner
+    /// buttons and Up/Down keys.</summary>
+    public decimal Increment { get; set; } = 1m;
+
+    /// <summary>The number of decimal digits the <see cref="DataGridViewColumnKind.NumericUpDown"/>
+    /// editor displays (0–28).</summary>
+    public int DecimalPlaces { get; set; }
+
+    /// <summary>Maps a row item to the date a <see cref="DataGridViewColumnKind.DateTime"/> editor's
+    /// popup calendar starts on.</summary>
+    public Func<object?, DateTime>? DateSelector { get; set; }
+
+    /// <summary>Writes the day picked in a <see cref="DataGridViewColumnKind.DateTime"/> editor back
+    /// to the row item; the time of day of the <see cref="DateSelector"/> value is preserved.</summary>
+    public Action<object?, DateTime>? DateSetter { get; set; }
 }

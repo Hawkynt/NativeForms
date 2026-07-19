@@ -32,4 +32,21 @@ public enum DataGridViewColumnKind
     /// <summary>A themed progress fill (0..100) driven by
     /// <see cref="DataGridViewColumn.ProgressSelector"/>.</summary>
     Progress,
+
+    /// <summary>Text with a drop arrow; editing opens a popup list of the choices from
+    /// <see cref="DataGridViewColumn.ItemsSelector"/> and commits the picked one through
+    /// <see cref="DataGridViewColumn.ValueSetter"/>.</summary>
+    ComboBox,
+
+    /// <summary>Plain text whose editor is a hosted <see cref="Hawkynt.NativeForms.NumericUpDown"/>
+    /// bound through <see cref="DataGridViewColumn.NumberSelector"/>/<see cref="DataGridViewColumn.NumberSetter"/>,
+    /// clamped and stepped by the column's <see cref="DataGridViewColumn.Minimum"/>,
+    /// <see cref="DataGridViewColumn.Maximum"/>, <see cref="DataGridViewColumn.Increment"/> and
+    /// <see cref="DataGridViewColumn.DecimalPlaces"/>.</summary>
+    NumericUpDown,
+
+    /// <summary>The formatted date as plain text; editing opens the popup month calendar (the same
+    /// engine as <see cref="Hawkynt.NativeForms.DateTimePicker"/>) and commits the picked day through
+    /// <see cref="DataGridViewColumn.DateSetter"/>, keeping the time of day.</summary>
+    DateTime,
 }

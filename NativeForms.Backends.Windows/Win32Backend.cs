@@ -78,6 +78,47 @@ public sealed partial class Win32Backend : IPlatformBackend
     }
 
     /// <inheritdoc/>
+    public void SetClipboardText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (NativeMethods.OpenClipboard(0) == 0)
+            return;
+
+        try
+        {
+            NativeMethods.EmptyClipboard();
+
+            // CF_UNICODETEXT is a zero-terminated UTF-16 string in a movable global block; on a
+            // successful SetClipboardData the system takes ownership of the handle.
+            var handle = NativeMethods.GlobalAlloc(NativeMethods.GMEM_MOVEABLE, (nuint)((text.Length + 1) * sizeof(char)));
+            if (handle == 0)
+                return;
+
+            var target = NativeMethods.GlobalLock(handle);
+            if (target == 0)
+            {
+                NativeMethods.GlobalFree(handle);
+                return;
+            }
+
+            unsafe
+            {
+                var destination = new Span<char>((void*)target, text.Length + 1);
+                text.AsSpan().CopyTo(destination);
+                destination[text.Length] = '\0';
+            }
+
+            NativeMethods.GlobalUnlock(handle);
+            if (NativeMethods.SetClipboardData(NativeMethods.CF_UNICODETEXT, handle) == 0)
+                NativeMethods.GlobalFree(handle);
+        }
+        finally
+        {
+            NativeMethods.CloseClipboard();
+        }
+    }
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow)
     {
         ArgumentNullException.ThrowIfNull(mainWindow);
