@@ -1,6 +1,6 @@
 namespace Hawkynt.NativeForms;
 
-/// <summary>Carries the affected node to a <see cref="TreeView"/> After* event handler.</summary>
+/// <summary>Carries the affected node to a <see cref="TreeView"/>/<see cref="TreeListView"/> After* event handler.</summary>
 public sealed class TreeViewEventArgs(TreeNode node) : EventArgs
 {
     /// <summary>The node the event is about.</summary>
@@ -8,8 +8,8 @@ public sealed class TreeViewEventArgs(TreeNode node) : EventArgs
 }
 
 /// <summary>
-/// Carries the affected node to a cancelable <see cref="TreeView"/> Before* event handler; setting
-/// <see cref="Cancel"/> vetoes the pending state change.
+/// Carries the affected node to a cancelable <see cref="TreeView"/>/<see cref="TreeListView"/>
+/// Before* event handler; setting <see cref="Cancel"/> vetoes the pending state change.
 /// </summary>
 public sealed class TreeViewCancelEventArgs(TreeNode node) : EventArgs
 {

@@ -1,15 +1,15 @@
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// A single node in a <see cref="TreeView"/>: a label, optional icons and check state, and a
-/// <see cref="Nodes"/> collection of children. Nodes are plain data until their tree is realized —
-/// they can be built, nested and expanded long before (or without) a backend existing, exactly like
-/// their Windows Forms namesake.
+/// A single node in a <see cref="TreeView"/> or <see cref="TreeListView"/>: a label, optional icons
+/// and check state, and a <see cref="Nodes"/> collection of children. Nodes are plain data until
+/// their control is realized — they can be built, nested and expanded long before (or without) a
+/// backend existing, exactly like their Windows Forms namesake.
 /// </summary>
 public sealed class TreeNode
 {
     private TreeNodeCollection? _nodes;
-    private TreeView? _tree;
+    private ITreeNodeHost? _host;
 
     /// <summary>Creates a node with an empty label.</summary>
     public TreeNode() { }
@@ -28,14 +28,14 @@ public sealed class TreeNode
                 return;
 
             field = value;
-            _tree?.Invalidate();
+            _host?.Invalidate();
         }
     } = string.Empty;
 
     /// <summary>Arbitrary caller data associated with the node.</summary>
     public object? Tag { get; set; }
 
-    /// <summary>The <see cref="TreeView.ImageList"/> index of the node's icon, or -1 for none.</summary>
+    /// <summary>The image-list index of the node's icon, or -1 for none.</summary>
     public int ImageIndex
     {
         get => field;
@@ -45,7 +45,7 @@ public sealed class TreeNode
                 return;
 
             field = value;
-            _tree?.Invalidate();
+            _host?.Invalidate();
         }
     } = -1;
 
@@ -59,13 +59,13 @@ public sealed class TreeNode
                 return;
 
             field = value;
-            _tree?.Invalidate();
+            _host?.Invalidate();
         }
     } = -1;
 
     /// <summary>
     /// Whether the node's check box is ticked. Changing it raises <see cref="TreeView.AfterCheck"/>
-    /// on an attached tree.
+    /// on an attached control.
     /// </summary>
     public bool Checked
     {
@@ -76,7 +76,7 @@ public sealed class TreeNode
                 return;
 
             field = value;
-            _tree?.OnNodeChecked(this);
+            _host?.OnNodeChecked(this);
         }
     }
 
@@ -90,7 +90,7 @@ public sealed class TreeNode
     public TreeNode? Parent { get; internal set; }
 
     /// <summary>The tree this node is attached to, or <see langword="null"/> while detached.</summary>
-    public TreeView? TreeView => _tree;
+    public TreeView? TreeView => _host as TreeView;
 
     /// <summary>The zero-based depth of the node: 0 for roots, parent level + 1 below.</summary>
     public int Level
@@ -104,6 +104,9 @@ public sealed class TreeNode
             return level;
         }
     }
+
+    /// <summary>The control this node is attached to, or <see langword="null"/> while detached.</summary>
+    internal ITreeNodeHost? Host => _host;
 
     /// <summary>The collection this node currently lives in, or <see langword="null"/> while detached.</summary>
     internal TreeNodeCollection? OwnerCollection { get; set; }
@@ -121,15 +124,29 @@ public sealed class TreeNode
     internal bool HasNextSibling => this.OwnerCollection is not null && this.SiblingIndex < this.OwnerCollection.Count - 1;
 
     /// <summary>
-    /// Shows the node's children. On an attached tree this raises <see cref="TreeView.BeforeExpand"/>
+    /// Shows the node's children. On an attached control this raises <see cref="TreeView.BeforeExpand"/>
     /// (cancelable) and <see cref="TreeView.AfterExpand"/>; detached nodes just flip the state.
     /// </summary>
     public void Expand()
     {
-        if (_tree is null)
+        if (this.IsExpanded)
+            return;
+
+        var host = _host;
+        if (host is null)
+        {
             this.IsExpanded = true;
-        else
-            _tree.RequestExpand(this);
+            return;
+        }
+
+        var e = new TreeViewCancelEventArgs(this);
+        host.OnBeforeExpand(e);
+        if (e.Cancel)
+            return;
+
+        this.IsExpanded = true;
+        host.OnStructureChanged();
+        host.OnAfterExpand(new TreeViewEventArgs(this));
     }
 
     /// <summary>Shows the node and its entire subtree, expanding every descendant.</summary>
@@ -144,15 +161,33 @@ public sealed class TreeNode
     }
 
     /// <summary>
-    /// Hides the node's children. On an attached tree this raises <see cref="TreeView.BeforeCollapse"/>
-    /// (cancelable) and <see cref="TreeView.AfterCollapse"/>; detached nodes just flip the state.
+    /// Hides the node's children. On an attached control this raises <see cref="TreeView.BeforeCollapse"/>
+    /// (cancelable) and <see cref="TreeView.AfterCollapse"/>; detached nodes just flip the state. When
+    /// the selected node vanishes under the collapsing one, the selection moves up to this node.
     /// </summary>
     public void Collapse()
     {
-        if (_tree is null)
+        if (!this.IsExpanded)
+            return;
+
+        var host = _host;
+        if (host is null)
+        {
             this.IsExpanded = false;
-        else
-            _tree.RequestCollapse(this);
+            return;
+        }
+
+        var e = new TreeViewCancelEventArgs(this);
+        host.OnBeforeCollapse(e);
+        if (e.Cancel)
+            return;
+
+        this.IsExpanded = false;
+        host.OnStructureChanged();
+        if (this.IsAncestorOf(host.SelectedNode))
+            host.SelectedNode = this;
+
+        host.OnAfterCollapse(new TreeViewEventArgs(this));
     }
 
     /// <summary>Expands a collapsed node and collapses an expanded one.</summary>
@@ -164,26 +199,33 @@ public sealed class TreeNode
             this.Expand();
     }
 
-    /// <summary>Expands every ancestor and scrolls the attached tree until this node is on screen.</summary>
+    /// <summary>Expands every ancestor and scrolls the attached control until this node is on screen.</summary>
     public void EnsureVisible()
     {
         for (var node = this.Parent; node is not null; node = node.Parent)
             node.Expand();
 
-        _tree?.ScrollNodeIntoView(this);
+        _host?.ScrollNodeIntoView(this);
     }
 
-    /// <summary>Sets the expansion state directly, bypassing the tree's Before/After event pipeline.</summary>
-    internal void SetExpandedCore(bool expanded) => this.IsExpanded = expanded;
-
-    /// <summary>Attaches or detaches this node and its whole subtree to a tree.</summary>
-    internal void SetTree(TreeView? tree)
+    /// <summary>Whether <paramref name="other"/> is a (transitive) descendant of this node.</summary>
+    private bool IsAncestorOf(TreeNode? other)
     {
-        _tree = tree;
+        for (var ancestor = other?.Parent; ancestor is not null; ancestor = ancestor.Parent)
+            if (ReferenceEquals(ancestor, this))
+                return true;
+
+        return false;
+    }
+
+    /// <summary>Attaches or detaches this node and its whole subtree to a hosting control.</summary>
+    internal void SetHost(ITreeNodeHost? host)
+    {
+        _host = host;
         if (_nodes is null)
             return;
 
         for (var i = 0; i < _nodes.Count; ++i)
-            _nodes[i].SetTree(tree);
+            _nodes[i].SetHost(host);
     }
 }

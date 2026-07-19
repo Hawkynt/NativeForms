@@ -1,45 +1,58 @@
 using System.Drawing;
+using Hawkynt.NativeForms.ComponentModel;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// An owner-drawn tree view painted in the native theme: hierarchical <see cref="TreeNode"/>s with
-/// expand/collapse glyphs, optional connector lines, per-node icons from an <see cref="ImageList"/>,
-/// optional check boxes, single selection and wheel/keyboard scrolling. The expanded part of the tree
-/// is flattened into a list of visible rows and painting is virtualized to the rows intersecting the
-/// client area, so it stays cheap for very large trees.
+/// An owner-drawn TreeView × ListView hybrid painted in the native theme: the first column renders an
+/// expandable <see cref="TreeNode"/> hierarchy (indent, expand/collapse glyphs, optional check boxes
+/// and per-node icons from an <see cref="ImageList"/>), the remaining columns render per-node text
+/// produced by reflection-free <see cref="TreeListViewColumn.TextSelector"/>s under a ListView-style
+/// header row. Selection is full-row; expand/collapse, checking and keyboard navigation behave
+/// exactly like <see cref="TreeView"/>. The expanded part of the tree is flattened into a list of
+/// visible rows and painting is virtualized to the rows intersecting the client area, so it stays
+/// cheap for very large trees.
 /// </summary>
 /// <remarks>
-/// Connector lines are drawn solid in the theme's disabled-text color because <see cref="IGraphics"/>
-/// has no dashed strokes. TODO: label editing (<c>BeginEdit</c>, waits on the text-box overlay),
-/// multi-selection, drag and drop, and a virtual-mode node API.
+/// TODO: column sorting, interactive column resize and label editing.
 /// </remarks>
-public class TreeView : OwnerDrawnControl, ITreeNodeHost
+public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 {
     private const int _CheckCellWidth = GlyphRenderer.CheckBoxSize + 4;
     private const int _IconGap = 4;
     private const int _TextPad = 2;
+    private const int _CellPad = 2;
     private const int _DoubleClickMs = 500;
 
     private readonly TreeRowList _rows;
+    private readonly List<TreeListViewColumn> _watchedColumns = [];
     private TreeNode? _selectedNode;
     private int? _itemHeight;
     private TreeNode? _lastClickNode;
     private long _lastClickTicks;
 
-    /// <summary>Creates a tree view.</summary>
-    public TreeView()
+    /// <summary>Creates a tree-list view.</summary>
+    public TreeListView()
     {
         this.Nodes = new(this);
         _rows = new(this.Nodes, () => this.VisibleRowCount);
+        this.Columns = new();
+        this.Columns.ListChanged += this.OnColumnsChanged;
     }
 
     /// <summary>The root nodes. Mutating any level of the hierarchy re-flattens and repaints.</summary>
     public TreeNodeCollection Nodes { get; }
 
+    /// <summary>
+    /// The columns. Index 0 is the tree column; the rest render their
+    /// <see cref="TreeListViewColumn.TextSelector"/> text. Mutating the collection — or any column's
+    /// caption, width or alignment — repaints the control.
+    /// </summary>
+    public ObservableList<TreeListViewColumn> Columns { get; }
+
     /// <summary>The selected node, or <see langword="null"/>. Setting it scrolls the node into view.</summary>
-    /// <exception cref="ArgumentException">The node belongs to a different tree.</exception>
+    /// <exception cref="ArgumentException">The node belongs to a different control.</exception>
     public TreeNode? SelectedNode
     {
         get => _selectedNode;
@@ -49,7 +62,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
                 return;
 
             if (value is not null && !ReferenceEquals(value.Host, this))
-                throw new ArgumentException("The node is not attached to this tree.", nameof(value));
+                throw new ArgumentException("The node is not attached to this control.", nameof(value));
 
             _selectedNode = value;
             if (value is not null)
@@ -61,7 +74,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         }
     }
 
-    /// <summary>Whether every node shows a themed check box. Defaults to <see langword="false"/>.</summary>
+    /// <summary>Whether every node shows a themed check box in the tree column. Defaults to <see langword="false"/>.</summary>
     public bool CheckBoxes
     {
         get => field;
@@ -89,7 +102,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         }
     }
 
-    /// <summary>The pixel height of a row (also the indent per level). Defaults to the theme row height.</summary>
+    /// <summary>The pixel height of a row, the header and the indent per level. Defaults to the theme row height.</summary>
     public int ItemHeight
     {
         get => _itemHeight ?? this.Theme.RowHeight;
@@ -100,39 +113,8 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         }
     }
 
-    /// <summary>Whether connector lines are drawn between nodes. Defaults to <see langword="true"/>.</summary>
-    public bool ShowLines
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.Invalidate();
-        }
-    } = true;
-
-    /// <summary>Whether expand/collapse glyphs are drawn for parent nodes. Defaults to <see langword="true"/>.</summary>
-    public bool ShowPlusMinus
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.Invalidate();
-        }
-    } = true;
-
-    /// <summary>
-    /// Whether root nodes get their own glyph/line cell. When <see langword="false"/>, everything
-    /// shifts one indent level left and roots lose their glyphs. Defaults to <see langword="true"/>.
-    /// </summary>
-    public bool ShowRootLines
+    /// <summary>Whether the column header row is shown. Defaults to <see langword="true"/>.</summary>
+    public bool ShowColumnHeaders
     {
         get => field;
         set
@@ -172,8 +154,11 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
-    /// <summary>The number of fully visible rows in the client area.</summary>
-    protected int VisibleRowCount => Math.Max(1, this.Height / this.ItemHeight);
+    /// <summary>The pixel height reserved for the header row (0 while headers are hidden).</summary>
+    protected int HeaderHeight => this.ShowColumnHeaders ? this.ItemHeight : 0;
+
+    /// <summary>The number of fully visible rows in the item area.</summary>
+    protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.ItemHeight);
 
     /// <summary>Raises <see cref="AfterSelect"/>.</summary>
     protected virtual void OnAfterSelect(TreeViewEventArgs e) => this.AfterSelect?.Invoke(this, e);
@@ -201,6 +186,46 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     void ITreeNodeHost.OnNodeChecked(TreeNode node) => this.OnNodeChecked(node);
     void ITreeNodeHost.ScrollNodeIntoView(TreeNode node) => this.ScrollNodeIntoView(node);
 
+    /// <summary>
+    /// Replaces the tree from a data source: one node per item, labeled via <paramref name="text"/>,
+    /// nested via <paramref name="children"/> and carrying the item in <see cref="TreeNode.Tag"/>.
+    /// The hierarchy is built eagerly, cut off after <paramref name="maxDepth"/> levels so cyclic
+    /// object graphs terminate.
+    /// </summary>
+    /// <typeparam name="T">The item type.</typeparam>
+    /// <param name="roots">The root items.</param>
+    /// <param name="text">Maps an item to its node label.</param>
+    /// <param name="children">Maps an item to its child items; <see langword="null"/> for a leaf.</param>
+    /// <param name="maxDepth">The maximum number of levels built. Defaults to 32.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxDepth"/> is zero or negative.</exception>
+    public void SetDataSource<T>(IEnumerable<T> roots, Func<T, string> text, Func<T, IEnumerable<T>?> children, int maxDepth = 32)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(children);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxDepth, 0);
+
+        this.Nodes.Clear();
+        foreach (var item in roots)
+            this.Nodes.Add(BuildNode(item, text, children, maxDepth - 1));
+    }
+
+    private static TreeNode BuildNode<T>(T item, Func<T, string> text, Func<T, IEnumerable<T>?> children, int remainingDepth)
+    {
+        var node = new TreeNode(text(item)) { Tag = item };
+        if (remainingDepth <= 0)
+            return node;
+
+        var kids = children(item);
+        if (kids is null)
+            return node;
+
+        foreach (var kid in kids)
+            node.Nodes.Add(BuildNode(kid, text, children, remainingDepth - 1));
+
+        return node;
+    }
+
     /// <summary>Called by nodes/collections after any structural change: re-flatten lazily and repaint.</summary>
     internal void OnStructureChanged()
     {
@@ -225,9 +250,24 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
             this.Invalidate();
     }
 
-    /// <summary>The left edge of a node's glyph/line cell; negative when that cell is suppressed.</summary>
-    private int GlyphCellLeft(TreeNode node)
-        => (this.ShowRootLines ? node.Level : node.Level - 1) * this.ItemHeight;
+    /// <summary>Follows every column's <see cref="ColumnHeader.Changed"/> so width edits repaint.</summary>
+    private void OnColumnsChanged(object? sender, ListChangedEventArgs e)
+    {
+        for (var i = 0; i < _watchedColumns.Count; ++i)
+            _watchedColumns[i].Changed -= this.OnColumnChanged;
+
+        _watchedColumns.Clear();
+        for (var i = 0; i < this.Columns.Count; ++i)
+        {
+            var column = this.Columns[i];
+            column.Changed += this.OnColumnChanged;
+            _watchedColumns.Add(column);
+        }
+
+        this.Invalidate();
+    }
+
+    private void OnColumnChanged(object? sender, EventArgs e) => this.Invalidate();
 
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
@@ -236,8 +276,15 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         if (e.Button != MouseButtons.Left)
             return;
 
+        var contentY = e.Y - this.HeaderHeight;
+        if (contentY < 0)
+        {
+            _lastClickNode = null;
+            return;
+        }
+
         var count = _rows.Count;
-        var row = _rows.TopIndex + (e.Y / this.ItemHeight);
+        var row = _rows.TopIndex + (contentY / this.ItemHeight);
         if (row < 0 || row >= count)
         {
             _lastClickNode = null;
@@ -246,17 +293,22 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
 
         var node = _rows[row];
         var indent = this.ItemHeight;
-        var glyphCellLeft = this.GlyphCellLeft(node);
+        var glyphCellLeft = node.Level * indent;
         var contentLeft = glyphCellLeft + indent;
 
-        if (this.ShowPlusMinus && node.HasChildren && glyphCellLeft >= 0 && e.X >= glyphCellLeft && e.X < contentLeft)
+        // The glyph/check cells only react inside the tree column — painting clips them there, so a
+        // click on a neighboring column always selects even when a deep node's cells would overlap.
+        var treeCellRight = this.Columns.Count == 0 ? this.Width : this.Columns[0].Width;
+        var inTreeCell = e.X < treeCellRight;
+
+        if (inTreeCell && node.HasChildren && e.X >= glyphCellLeft && e.X < contentLeft)
         {
             _lastClickNode = null;
             node.Toggle();
             return;
         }
 
-        if (this.CheckBoxes && e.X >= contentLeft && e.X < contentLeft + _CheckCellWidth)
+        if (inTreeCell && this.CheckBoxes && e.X >= contentLeft && e.X < contentLeft + _CheckCellWidth)
         {
             _lastClickNode = null;
             node.Checked = !node.Checked;
@@ -296,10 +348,14 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, this.Width, this.Height));
 
         var rowHeight = this.ItemHeight;
+        var headerHeight = this.HeaderHeight;
+        if (headerHeight > 0)
+            HeaderRowPainter.Draw(g, theme, this.Columns, this.Width, headerHeight);
+
         var top = _rows.TopIndex;
         var last = Math.Min(_rows.Count, top + this.VisibleRowCount + 1);
         for (var i = top; i < last; ++i)
-            this.PaintRow(g, theme, _rows[i], (i - top) * rowHeight, rowHeight);
+            this.PaintRow(g, theme, _rows[i], headerHeight + ((i - top) * rowHeight), rowHeight);
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
     }
@@ -310,14 +366,39 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         if (selected)
             g.FillRectangle(theme.SelectionBackground, new Rectangle(0, y, this.Width, rowHeight));
 
+        var textColor = selected ? theme.SelectionText : theme.ControlText;
+        if (this.Columns.Count == 0)
+        {
+            this.PaintTreeCell(g, theme, node, selected, textColor, this.Width, y, rowHeight);
+            return;
+        }
+
+        var x = 0;
+        for (var c = 0; c < this.Columns.Count; ++c)
+        {
+            var col = this.Columns[c];
+            g.PushClip(new Rectangle(x, y, col.Width, rowHeight));
+            if (c == 0)
+                this.PaintTreeCell(g, theme, node, selected, textColor, col.Width, y, rowHeight);
+            else
+            {
+                var text = col.TextSelector?.Invoke(node) ?? string.Empty;
+                var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
+                g.DrawText(text, theme.DefaultFont, textColor, textRect, col.TextAlign);
+            }
+
+            g.PopClip();
+            x += col.Width;
+        }
+    }
+
+    private void PaintTreeCell(IGraphics g, ITheme theme, TreeNode node, bool selected, Color textColor, int width, int y, int rowHeight)
+    {
         var indent = rowHeight;
-        var glyphCellLeft = this.GlyphCellLeft(node);
+        var glyphCellLeft = node.Level * indent;
         var contentLeft = glyphCellLeft + indent;
 
-        if (this.ShowLines)
-            this.PaintLines(g, theme, node, y, rowHeight, glyphCellLeft, contentLeft);
-
-        if (this.ShowPlusMinus && node.HasChildren && glyphCellLeft >= 0)
+        if (node.HasChildren)
             ExpandGlyph.Draw(g, theme, glyphCellLeft, y, indent, rowHeight, node.IsExpanded);
 
         var x = contentLeft;
@@ -330,37 +411,8 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
 
         x = this.PaintImage(g, node, selected, x, y, rowHeight);
 
-        var textColor = selected ? theme.SelectionText : theme.ControlText;
-        var textRect = new Rectangle(x + _TextPad, y, this.Width - x - (2 * _TextPad), rowHeight);
+        var textRect = new Rectangle(x + _TextPad, y, width - x - (2 * _TextPad), rowHeight);
         g.DrawText(node.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
-    }
-
-    private void PaintLines(IGraphics g, ITheme theme, TreeNode node, int y, int rowHeight, int glyphCellLeft, int contentLeft)
-    {
-        // Solid faint connectors — IGraphics has no dashed strokes, so the classic dotted look is
-        // approximated with the disabled-text color.
-        var color = theme.DisabledText;
-        var midY = y + (rowHeight / 2);
-        if (glyphCellLeft >= 0)
-        {
-            var midX = glyphCellLeft + (rowHeight / 2);
-            g.DrawLine(color, midX, midY, contentLeft, midY);
-            if (node.HasPreviousSibling || node.Parent is not null)
-                g.DrawLine(color, midX, y, midX, midY);
-
-            if (node.HasNextSibling)
-                g.DrawLine(color, midX, midY, midX, y + rowHeight);
-        }
-
-        for (var ancestor = node.Parent; ancestor is not null; ancestor = ancestor.Parent)
-        {
-            var cellLeft = this.GlyphCellLeft(ancestor);
-            if (cellLeft >= 0 && ancestor.HasNextSibling)
-            {
-                var midX = cellLeft + (rowHeight / 2);
-                g.DrawLine(color, midX, y, midX, y + rowHeight);
-            }
-        }
     }
 
     private int PaintImage(IGraphics g, TreeNode node, bool selected, int x, int y, int rowHeight)

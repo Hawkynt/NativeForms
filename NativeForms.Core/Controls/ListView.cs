@@ -235,7 +235,7 @@ public class ListView : OwnerDrawnControl
         var rowHeight = this.ItemHeight;
         var headerHeight = this.HeaderHeight;
         if (headerHeight > 0)
-            this.PaintHeader(g, theme, headerHeight);
+            HeaderRowPainter.Draw(g, theme, this.Columns, this.Width, headerHeight);
 
         var last = Math.Min(this.Items.Count, _topIndex + this.VisibleRowCount + 1);
         for (var i = _topIndex; i < last; ++i)
@@ -298,26 +298,6 @@ public class ListView : OwnerDrawnControl
 
         var textRect = new Rectangle(textLeft, y, x + width - textLeft - _CellPad, rowHeight);
         g.DrawText(item.Text, theme.DefaultFont, textColor, textRect, alignment);
-    }
-
-    private void PaintHeader(IGraphics g, ITheme theme, int headerHeight)
-    {
-        g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, this.Width, headerHeight));
-
-        var x = 0;
-        for (var c = 0; c < this.Columns.Count; ++c)
-        {
-            var col = this.Columns[c];
-            g.PushClip(new Rectangle(x, 0, col.Width, headerHeight));
-            var textRect = new Rectangle(x + _CellPad, 0, col.Width - (2 * _CellPad), headerHeight);
-            g.DrawText(col.Text, theme.DefaultFont, theme.HeaderText, textRect, col.TextAlign);
-            g.PopClip();
-
-            x += col.Width;
-            g.DrawLine(theme.Border, x, 0, x, headerHeight);
-        }
-
-        g.DrawLine(theme.Border, 0, headerHeight - 1, this.Width, headerHeight - 1);
     }
 
     private void PaintList(IGraphics g, ITheme theme)
