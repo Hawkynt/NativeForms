@@ -70,14 +70,37 @@ Use it like any other control: `form.Controls.Add(new Swatch { Text = "On air", 
 
 You never touch the peer. State changes call `Invalidate()` (or `Invalidate(Rectangle)` for a sub-region); the platform schedules a repaint and calls back into `OnPaint` with an `IGraphics` surface and a clip rectangle. `OnTextChanged` already invalidates for you.
 
+The canvas is also a **container** (`IContainerPeer`): an owner-drawn control can host real native children on top of its painted surface. That is how `Panel`, `GroupBox` and `TabPage` parent buttons and text boxes — you just add to `Controls`, the realization walk does the rest (see [architecture.md](architecture.md)).
+
+## ContextMenuStrip and ToolTip come for free
+
+Two component integrations are wired into the owner-drawn mouse pipeline, so a custom control gets them without writing a line:
+
+- **Context menu.** Assign a [`ContextMenuStrip`](controls/control.md) to `Control.ContextMenuStrip` and a right-click on the control opens it at the cursor — the base class routes `MouseDown` with the right button into `menu.Show(this, e.Location)` after your own `OnMouseDown` ran.
+- **Tool tips.** `ToolTip.SetToolTip(control, "…")` observes the control's canvas mouse traffic through internal mirror events (raised *after* your `OnMouseMove`/`OnMouseLeave`/`OnMouseDown`), shows a themed popup near the cursor after `InitialDelay`, and hides it on leave, press or `AutoPopDelay`.
+
+Both integrations are owner-drawn-only today: native-widget controls (Button, TextBox …) need right-click/hover events on their peers first — tracked in [PRD.md](PRD.md).
+
+## Shared paint primitives
+
+Several themed visuals recur across controls, so they live in reusable helpers instead of being re-derived per control. All of them are `internal` — toolkit controls use them freely, external subclasses cannot yet (the public native-style primitive surface is an open box in [PRD.md](PRD.md) §5):
+
+- `Drawing.GlyphRenderer` — the check glyph (`CheckBox` and grid check cells), the progress fill (`ProgressBar` and progress cells), a push-button face, sort arrows and the current-row marker. Stroke/fill only, no allocation, safe on the paint path.
+- `Drawing.ContentLayout` — the shared icon+text geometry: image and text sizes are stacked per `TextImageRelation`, anchored per `ContentAlignment`, clipped to the bounds. Pure geometry (the caller measures and draws), so image placement behaves identically in `CheckBox`, `RadioButton`, `GroupBox` captions, `PictureBox` and the native button/label peers.
+- **Two scrollbar renderers** — an honest wart. `Drawing.ScrollBarRenderer` speaks extent/viewport/position and paints the minimal track+thumb bars `Panel.AutoScroll` uses; `Hawkynt.NativeForms.ScrollBarRenderer` (next to the `ScrollBar` control) speaks minimum/maximum/value/largeChange and adds arrow buttons, channel paging and hit-testing. Unifying them into one implementation is an explicit debt box in [PRD.md](PRD.md) §7.5.
+
+## Painting `ImageList` images
+
+`ImageList` stores raw ARGB pixels backend-free; the native `IImage` for an entry is materialized lazily against a concrete backend. A realized control reaches its backend through the internal `Control.Backend` property and calls `imageList.GetImage(index, backend)` inside `OnPaint` — first use creates and caches the native bitmap, later frames are lookups. `ComboBox`, `TreeView`, `TabControl` and the tool-strip items all paint through this seam; before realization (no backend yet) controls simply skip the image.
+
 ## Worked example: CheckBox
 
-`NativeForms.Core/Controls/CheckBox.cs` is the pattern in ~90 lines. The essentials:
+`NativeForms.Core/Controls/CheckBox.cs` is the pattern in ~110 lines. The essentials:
 
 - **State + invalidate + event.** `Checked` compares, stores, calls `this.Invalidate()`, then raises `CheckedChanged`. Never paint directly from a setter — invalidate and let the platform drive `OnPaint`.
-- **Focus.** `protected override bool Focusable => true;` — interactive controls opt in; purely visual ones (`ProgressBar`, `GroupBox`) keep the `false` default.
+- **Focus.** `protected override bool Focusable => true;` — interactive controls opt in; purely visual ones (`ProgressBar`) keep the `false` default.
 - **Input.** `OnMouseUp` toggles when the left button releases inside `new Rectangle(0, 0, this.Width, this.Height)`; `OnKeyDown` toggles on `Keys.Space` and sets `e.Handled = true`.
-- **Paint, entirely through the theme:**
+- **Paint, entirely through the theme and the shared primitives:**
 
 ```csharp
 protected override void OnPaint(PaintEventArgs e)
@@ -86,14 +109,14 @@ protected override void OnPaint(PaintEventArgs e)
     var theme = this.Theme;
     g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
 
-    var boxTop = Math.Max(0, (this.Height - _BoxSize) / 2);
-    var box = new Rectangle(0, boxTop, _BoxSize, _BoxSize);
-    g.FillRectangle(theme.FieldBackground, box);
-    g.DrawRectangle(_checked ? theme.Accent : theme.Border, box);
-    // … accent checkmark strokes …
+    var boxTop = Math.Max(0, (this.Height - GlyphRenderer.CheckBoxSize) / 2);
+    var box = new Rectangle(0, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize);
+    GlyphRenderer.DrawCheckBox(g, theme, box, this.Checked);
 
-    var textRect = new Rectangle(_BoxSize + _TextGap, 0, this.Width - _BoxSize - _TextGap, this.Height);
-    g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, ContentAlignment.MiddleLeft);
+    var content = new Rectangle(GlyphRenderer.CheckBoxSize + _TextGap, 0, this.Width - GlyphRenderer.CheckBoxSize - _TextGap, this.Height);
+    var textColor = this.Enabled ? theme.ControlText : theme.DisabledText;
+    // … optional Image via ContentLayout.Arrange, then …
+    g.DrawText(this.Text, theme.DefaultFont, textColor, content, ContentAlignment.MiddleLeft);
 }
 ```
 
@@ -136,7 +159,7 @@ public void CheckBox_paints_label_text()
 }
 ```
 
-Input goes in through `RaiseMouseDown/Up/Move/Wheel`, `RaiseKeyDown/Up`, `RaiseKeyPress`, `RaiseGotFocus/LostFocus`; output comes back as `RecordingGraphics.Operations` strings (`"fill …"`, `"rect …"`, `"text …"`).
+Input goes in through `RaiseMouseDown/Up/Move/Wheel` (with optional button and modifier arguments), `RaiseKeyDown/Up`, `RaiseKeyPress`, `RaiseMouseLeave`, `RaiseGotFocus/LostFocus`; output comes back as `RecordingGraphics.Operations` strings (`"fill …"`, `"rect …"`, `"text …"`).
 
 ## API
 
@@ -146,10 +169,10 @@ Input goes in through `RaiseMouseDown/Up/Move/Wheel`, `RaiseKeyDown/Up`, `RaiseK
 |---|---|---|
 | `Theme` | `protected ITheme` | The theme to paint with; `DefaultTheme.Instance` until realized, then the backend's native theme |
 | `Focusable` | `protected virtual bool` (default `false`) | Override to `true` so the surface takes keyboard focus |
-| `Invalidate()` / `Invalidate(Rectangle)` | method | Request a repaint of the whole surface or a sub-region |
+| `Invalidate()` / `Invalidate(Rectangle)` | method | Request a repaint of the whole surface or a sub-region; safe no-ops before realization |
 | `Focus()` | method | Move keyboard focus to this control |
 | `OnPaint(PaintEventArgs)` | `protected virtual` | Draw through `e.Graphics`, clipped to `e.ClipRectangle` |
-| `OnMouseDown/Up/Move/Wheel(MouseEventArgs)`, `OnMouseLeave(EventArgs)` | `protected virtual` | Pointer input in client coordinates |
+| `OnMouseDown/Up/Move/Wheel(MouseEventArgs)`, `OnMouseLeave(EventArgs)` | `protected virtual` | Pointer input in client coordinates; `MouseEventArgs` carries the modifier keys |
 | `OnKeyDown/Up(KeyEventArgs)`, `OnKeyPress(KeyPressEventArgs)` | `protected virtual` | Keyboard input while focused; set `Handled` to consume |
 | `OnGotFocus/OnLostFocus(EventArgs)` | `protected virtual` | Focus transitions |
 
@@ -161,7 +184,7 @@ Input goes in through `RaiseMouseDown/Up/Move/Wheel`, `RaiseKeyDown/Up`, `RaiseK
 | `FillEllipse(Color, Rectangle)` / `DrawEllipse(Color, Rectangle, int)` | Ellipse inscribed in bounds |
 | `DrawLine(Color, int, int, int, int, int)` | Straight line with thickness |
 | `DrawText(string, Font, Color, Rectangle, ContentAlignment)` | Aligned text in the native font |
-| `MeasureText(string, Font)` | Pixel size of a string |
+| `MeasureText(string, Font)` | Pixel size of a string (also on `IPlatformBackend` for measuring between paints) |
 | `DrawImage(IImage, Rectangle)` | Image scaled into bounds |
 | `PushClip(Rectangle)` / `PopClip()` | Clip-region stack |
 
@@ -173,8 +196,8 @@ Input goes in through `RaiseMouseDown/Up/Move/Wheel`, `RaiseKeyDown/Up`, `RaiseK
 
 **Allocation rules.** No per-frame allocation on the paint path: `OnPaint` runs on every repaint, so no string building, no LINQ, no captured closures, no `new` of reference types there — `Rectangle`/`Point`/`Size`/`Font` are value types and cost nothing. Construction is budgeted too: `AllocationBudgetTests` asserts an owner-drawn control allocates under 768 bytes.
 
-**Realization.** Like every control, state set before `Application.Run` is buffered and flushed at realization; `Invalidate()`/`Focus()` before realization are safe no-ops. See [controls/control.md](controls/control.md).
+**Realization.** Like every control, state set before `Application.Run` is buffered and flushed at realization; `Invalidate()`/`Focus()` before realization are safe no-ops. Owner-drawn containers realize their children too — see [controls/control.md](controls/control.md).
 
 **Theming.** A control that only touches `Theme` members inherits native looks — and will inherit dark mode when theme-change notifications land.
 
-**Not yet implemented.** Double buffering, per-monitor DPI, light/dark change notifications, rounded rects, native-style primitive helpers (button/radio/arrow/header/scrollbar), and the shared icon+text layout helper are open boxes in [PRD.md](PRD.md) §5.
+**Not yet implemented.** Double buffering, per-monitor DPI, light/dark change notifications, rounded rects, and a *public* native-style primitive surface (button/radio/arrow/header/scrollbar helpers) are open boxes in [PRD.md](PRD.md) §5; unifying the two internal scrollbar renderers is a debt box in §7.5; mnemonic-aware layout and item-cell adoption of `ContentLayout` are pending in §5.

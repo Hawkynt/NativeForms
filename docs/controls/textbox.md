@@ -1,0 +1,54 @@
+# TextBox
+
+> A text input box backed by the platform's native editor — a Win32 `EDIT`, a `GtkEntry`/`GtkTextView` — so caret, selection, clipboard and IME behave exactly like every other text field on the user's desktop.
+
+`Hawkynt.NativeForms.TextBox` · strategy: **native** · peer: `ITextBoxPeer`
+
+## Usage
+
+```csharp
+var box = new TextBox
+{
+    PlaceholderText = "Name",
+    MaxLength = 40,
+    Bounds = new(20, 20, 200, 24),
+};
+box.TextChanged += (_, _) => Console.WriteLine(box.Text);
+form.Controls.Add(box);
+
+box.SelectionStart = 0;
+box.SelectionLength = 4;      // select the first four characters
+box.SelectedText = "Jane";    // replace them, caret lands after the insertion
+```
+
+## API
+
+### Properties
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `Multiline` | `bool` | `false` | Multiline editor with vertical scrolling instead of a single-line entry. May recreate the native widget (see Notes). |
+| `PlaceholderText` | `string` | `""` | Greyed hint shown while the box is empty. Single-line only on most platforms. |
+| `PasswordChar` | `char` | `'\0'` | Masks the displayed text with this character; `'\0'` turns masking off. |
+| `UseSystemPasswordChar` | `bool` | `false` | Masks with the platform's standard glyph (`●`), overriding `PasswordChar`. |
+| `ReadOnly` | `bool` | `false` | Text can be selected and copied but not edited. |
+| `MaxLength` | `int` | `0` | Maximum characters the user can type; 0 means unlimited. Negative values coerce to 0. |
+| `CharacterCasing` | `CharacterCasing` | `Normal` | Forces `Upper`/`Lower` casing. Changing it re-cases the current `Text`; while active, programmatic writes and user input are normalized alike. |
+| `AcceptsReturn` | `bool` | `false` | Whether Enter inserts a newline in a multiline box instead of activating the default button. Stored only — the key behavior is not wired yet. |
+| `AcceptsTab` | `bool` | `false` | Whether Tab inserts a tab character in a multiline box instead of moving focus. Stored only. |
+| `SelectionStart` | `int` | `0` | Index of the first selected character (the caret position when nothing is selected). Buffered before realization, read live from the widget afterwards. |
+| `SelectionLength` | `int` | `0` | Number of selected characters. Buffered/live like `SelectionStart`. |
+| `SelectedText` | `string` | `""` | The selected run of `Text`; assigning replaces the selection and places the caret after the inserted text. |
+
+The inherited `Text` property is overridden: assigned text is normalized by `CharacterCasing` and pushed to the widget; user edits flow back from the peer and raise `TextChanged` exactly once — the peer's echo of a programmatic write never raises a second event.
+
+Inherits the common members of [`Control`](control.md).
+
+## Notes
+
+- Every setting is buffered until realization and flushed into the peer when the native widget is created; writes afterwards forward immediately. `TextBoxTests` pin the whole surface headlessly against the test backend's text-box peer.
+- **Multiline recreates the widget.** Win32 `ES_MULTILINE` is a creation-time style, so flipping `Multiline` on a live control destroys and recreates the HWND (same control id, so `WM_COMMAND` routing survives); GTK swaps between a `GtkEntry` and a `GtkTextView` in a `GtkScrolledWindow`. Peers buffer their state and re-flush it into the fresh widget, so the swap is invisible — text and selection survive.
+- **Platform limits, documented honestly.** The placeholder is a single-line feature: Win32's cue banner (`EM_SETCUEBANNER`) only exists on single-line `EDIT` controls, and `GtkTextView` has no placeholder. `MaxLength` and password masking are also entry-only on GTK (`GtkTextView` has no native limit or masking).
+- `CharacterCasing` is normalized in the core — on assignment and on user input alike (a corrective push rewrites the widget when it disagrees) — so it behaves identically on every backend; no `ES_UPPERCASE`/`ES_LOWERCASE` style bits.
+- [`MaskedTextBox`](maskedtextbox.md) and [`RichTextBox`](richtextbox.md) build on this control; [`SearchBox`](searchbox.md), [`ComboBox`](combobox.md) (editable style) and the spinners host one as their editor.
+- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): an owner-drawn placeholder for multiline boxes, the `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, and an undo API.

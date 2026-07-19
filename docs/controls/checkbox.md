@@ -19,6 +19,7 @@ form.Controls.Add(check);
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `Checked` | `bool` | `false` | Whether the box is checked. Setting it invalidates the control and raises `CheckedChanged`. |
+| `Image` | `IImage?` | `null` | An optional icon rendered between the check square and the caption through the shared `ContentLayout`; the text shifts right to make room. |
 
 ### Events
 
@@ -30,7 +31,8 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 ## Notes
 
-- Painted with the platform `ITheme` (`FieldBackground` box, `Accent` checkmark and checked border, `ControlText`/`DisabledText` label), so it matches the host desktop; testable headlessly through the test backend's recording canvas.
+- Painted with the platform `ITheme` (`FieldBackground` box, `Accent` checkmark and checked border, `ControlText`/`DisabledText` label), so it matches the host desktop; testable headlessly through the test backend's recording canvas. The 14 px check square itself is drawn by the shared `GlyphRenderer` (`DrawCheckBox`), the same glyph `DateTimePicker`'s check box uses.
 - A left mouse-button release inside the bounds toggles `Checked`; so does the Space key when focused (the control is focusable). Each user toggle raises `CheckedChanged` and the inherited `Click`.
-- `OwnerDrawnControlTests` pin the behavior: two clicks toggle on then off with two `CheckedChanged` events, Space toggles, and the label text is painted.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): tri-state `CheckState` and an image next to the box.
+- With an `Image`, the icon and text lay out via the shared `ContentLayout` (`ImageBeforeText`, middle-left) in the area right of the glyph; without one, the classic text placement stays untouched.
+- `OwnerDrawnControlTests` pin the behavior: two clicks toggle on then off with two `CheckedChanged` events, Space toggles, and the label text is painted. `CheckBoxImageTests` pin the icon placement, the text shift and the invalidation on image change.
+- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): tri-state `CheckState`.

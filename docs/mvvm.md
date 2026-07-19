@@ -75,8 +75,10 @@ button. `RelayCommand` ignores the command parameter; `RelayCommand<T>` casts it
 it to both delegates. `CanExecute` returns `true` when no guard was supplied. When the guard's
 answer may have changed, call `RaiseCanExecuteChanged()` so bound controls re-query it.
 
-There is no automatic `Button.Command` wiring yet (see [Notes](#notes)); today you wire the click
-event yourself, exactly as the demo does:
+Menu and tool-strip items take a command directly — `ToolStripItem.Command` executes on activation
+and its `CanExecute` gates the item's effective `Enabled`, re-evaluated on `CanExecuteChanged`.
+`Button` has no `Command` property yet (see [Notes](#notes)); there you wire the click event
+yourself, exactly as the demo does:
 
 ```csharp
 button.Click += (_, _) => viewModel.Increment.Execute(null);
@@ -344,8 +346,9 @@ Planned, not yet implemented — tracked box-by-box in `docs/PRD.md` §3 and §6
   `label.Bind(vm, nameof(vm.Count), v => v.Display, (c, text) => c.Text = text)` plus two-way
   overloads. The WinForms string API (`DataBindings.Add("Text", vm, "Name")`) is a non-goal — it
   needs reflection.
-- **`ICommand` wiring on `Button`/`ToolStripButton`/menu items** with automatic enable/disable via
-  `CanExecute`; until then, wire `Click` manually as shown above.
+- **`ICommand` wiring on `Button`** with automatic enable/disable via `CanExecute`; until then, wire
+  `Click` manually as shown above. Menu and tool-strip items already have it
+  (`ToolStripItem.Command`).
 - **Lambdas everywhere:** every binding/configuration surface (bindings, column value/image/style
   selectors, read-only predicates, display-text/tooltip providers) accepts plain `Func<>`/`Action<>`
   lambdas — never string member names, never `Expression<>` trees.
@@ -356,6 +359,7 @@ Planned, not yet implemented — tracked box-by-box in `docs/PRD.md` §3 and §6
 - **Format/parse converters** (`IValueConverter`-style) for two-way text↔value.
 - **Validation hooks** (`INotifyDataErrorInfo`-style) with error surfacing on controls.
 - **Nested-path binding** (`a.b.c`) via chained typed selectors.
-- **Remaining list/selection binding:** `ComboBox`/`ListView` with `ValueMember`/`SelectedValue`;
+- **Remaining list/selection binding:** `ListView` value binding; `ComboBox` already closes the
+  `ValueMember`/`SelectedValue` loop reflection-free via its `ValueSelector` delegate, and
   `ListBox`/`DataGridView` `DataSource` + selectors are done (one-way).
 - **An MVP passive-view sample** (`IView` interfaces + presenter).
