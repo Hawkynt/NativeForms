@@ -32,6 +32,9 @@ public sealed class Win32Backend : IPlatformBackend
     public ILabelPeer CreateLabel() => new LabelPeer();
 
     /// <inheritdoc/>
+    public ITextBoxPeer CreateTextBox() => new TextBoxPeer();
+
+    /// <inheritdoc/>
     public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();
 
     /// <inheritdoc/>

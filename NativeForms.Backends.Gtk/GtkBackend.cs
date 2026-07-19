@@ -127,6 +127,13 @@ public sealed class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public ITextBoxPeer CreateTextBox()
+    {
+        EnsureInitialized();
+        return new GtkTextBoxPeer();
+    }
+
+    /// <inheritdoc />
     public void Run(IWindowPeer mainWindow)
     {
         EnsureInitialized();

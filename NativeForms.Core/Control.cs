@@ -24,7 +24,7 @@ public abstract class Control
     protected Control() => this.Controls = new(this);
 
     /// <summary>The caption text: a button label, a form's title bar, a label's text.</summary>
-    public string Text
+    public virtual string Text
     {
         get => field;
         set

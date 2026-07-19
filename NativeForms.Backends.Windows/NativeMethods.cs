@@ -57,6 +57,40 @@ internal static partial class NativeMethods
     /// <summary>Vertically center the content (single-line text only).</summary>
     internal const uint SS_CENTERIMAGE = 0x00000200;
 
+    // --- Edit styles (EDIT class) ---
+
+    /// <summary>Scrolls text horizontally as the caret passes the right edge (single-line editing).</summary>
+    internal const uint ES_AUTOHSCROLL = 0x0080;
+
+    /// <summary>A multiline edit control.</summary>
+    internal const uint ES_MULTILINE = 0x0004;
+
+    /// <summary>Scrolls text vertically as the caret passes the bottom edge (multiline editing).</summary>
+    internal const uint ES_AUTOVSCROLL = 0x0040;
+
+    /// <summary>The window has a vertical scroll bar.</summary>
+    internal const uint WS_VSCROLL = 0x00200000;
+
+    // --- Edit messages ---
+
+    /// <summary>Retrieves the selection as start/end character positions written through the pointers passed in wParam/lParam.</summary>
+    internal const uint EM_GETSEL = 0x00B0;
+
+    /// <summary>Selects the character range wParam (start) … lParam (end).</summary>
+    internal const uint EM_SETSEL = 0x00B1;
+
+    /// <summary>Caps the amount of text the user can type; wParam 0 raises the limit to the class maximum.</summary>
+    internal const uint EM_SETLIMITTEXT = 0x00C5;
+
+    /// <summary>Sets the character shown instead of typed text; wParam 0 turns masking off.</summary>
+    internal const uint EM_SETPASSWORDCHAR = 0x00CC;
+
+    /// <summary>Toggles the read-only state; wParam is a BOOL.</summary>
+    internal const uint EM_SETREADONLY = 0x00CF;
+
+    /// <summary>Sets the grey cue-banner hint (lParam LPCWSTR); single-line EDIT controls only.</summary>
+    internal const uint EM_SETCUEBANNER = 0x1501;
+
     // --- ShowWindow commands ---
 
     /// <summary>Hides the window.</summary>
@@ -80,6 +114,9 @@ internal static partial class NativeMethods
 
     /// <summary>The button was clicked.</summary>
     internal const int BN_CLICKED = 0;
+
+    /// <summary>The edit control's text changed (sent after the screen was updated).</summary>
+    internal const int EN_CHANGE = 0x0300;
 
     // --- Miscellaneous ---
 
@@ -269,6 +306,22 @@ internal static partial class NativeMethods
     /// <summary>Posts a <c>WM_QUIT</c> message, asking the message loop to terminate.</summary>
     [LibraryImport("user32.dll")]
     internal static partial void PostQuitMessage(int nExitCode);
+
+    /// <summary>Sends a message to a window and waits for it to be processed.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial nint SendMessageW(nint hWnd, uint msg, nint wParam, nint lParam);
+
+    /// <summary>Sends a message whose lParam is a string (for example <see cref="EM_SETCUEBANNER"/>).</summary>
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial nint SendMessageStringW(nint hWnd, uint msg, nint wParam, string lParam);
+
+    /// <summary>Returns the length, in characters, of the window's text.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial int GetWindowTextLengthW(nint hWnd);
+
+    /// <summary>Copies the window's text into the caller-provided buffer; returns the copied length.</summary>
+    [LibraryImport("user32.dll")]
+    internal static unsafe partial int GetWindowTextW(nint hWnd, char* lpString, int nMaxCount);
 
     /// <summary>
     /// Creates an interval timer. Called with a null HWND and a zero event id, USER32 allocates a

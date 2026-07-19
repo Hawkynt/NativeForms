@@ -10,7 +10,9 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// </summary>
 internal abstract class Win32ControlPeer : IControlPeer
 {
-    private string _text = string.Empty;
+    /// <summary>Buffered caption/content text, applied whenever a native handle exists.</summary>
+    protected string _text = string.Empty;
+
     private Rectangle _bounds;
     private bool _visible = true;
     private bool _enabled = true;

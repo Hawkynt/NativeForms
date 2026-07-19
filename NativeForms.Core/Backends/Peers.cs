@@ -79,6 +79,47 @@ public interface ILabelPeer : IControlPeer
 }
 
 /// <summary>
+/// A text-input peer — the native side of a <see cref="TextBox"/>. Beyond the base state it carries
+/// the edit-specific settings (multiline, placeholder, password masking, read-only, max length,
+/// selection) and reports the live text and selection back from the widget.
+/// </summary>
+/// <remarks>
+/// <see cref="SetMultiline"/> may recreate the native widget — some toolkits use different widgets
+/// (or creation-time style bits) for single-line and multiline editing. Peers buffer their state, so
+/// tearing the widget down and re-flushing the buffer into a fresh one is legal and invisible to the
+/// core.
+/// </remarks>
+public interface ITextBoxPeer : IControlPeer
+{
+    /// <summary>Switches between a single-line entry and a multiline editor (may recreate the widget).</summary>
+    void SetMultiline(bool multiline);
+
+    /// <summary>Sets the greyed hint shown while the box is empty (single-line only on most platforms).</summary>
+    void SetPlaceholder(string placeholder);
+
+    /// <summary>Masks the displayed text with the given character; <c>'\0'</c> turns masking off.</summary>
+    void SetPasswordChar(char passwordChar);
+
+    /// <summary>Makes the text selectable and copyable but not editable.</summary>
+    void SetReadOnly(bool readOnly);
+
+    /// <summary>Caps the number of characters the user can type; 0 means unlimited.</summary>
+    void SetMaxLength(int maxLength);
+
+    /// <summary>Selects <paramref name="length"/> characters starting at <paramref name="start"/> (length 0 places the caret).</summary>
+    void SetSelection(int start, int length);
+
+    /// <summary>Returns the current selection as a start/length pair (length 0 = a bare caret).</summary>
+    (int Start, int Length) GetSelection();
+
+    /// <summary>Returns the live text held by the widget, including edits the user has made.</summary>
+    string GetText();
+
+    /// <summary>Raised whenever the widget's text changes, including edits typed by the user.</summary>
+    event EventHandler? TextChangedByUser;
+}
+
+/// <summary>
 /// A recurring UI-thread timer source — the native side of a <see cref="Timer"/>. Ticks are delivered
 /// by the platform message loop, so they always arrive on the thread that pumps it. Starting a peer
 /// that is already running restarts it with the new interval.

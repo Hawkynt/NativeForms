@@ -53,6 +53,7 @@ internal sealed class BackendRegistryTests
         public IWindowPeer CreateWindow() => throw new NotSupportedException();
         public IButtonPeer CreateButton() => throw new NotSupportedException();
         public ILabelPeer CreateLabel() => throw new NotSupportedException();
+        public ITextBoxPeer CreateTextBox() => throw new NotSupportedException();
         public ICanvasPeer CreateCanvas() => throw new NotSupportedException();
         public IPopupPeer CreatePopup() => throw new NotSupportedException();
         public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => throw new NotSupportedException();

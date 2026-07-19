@@ -27,6 +27,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer());
     public IButtonPeer CreateButton() => this.Track(new HeadlessButtonPeer());
     public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
+    public ITextBoxPeer CreateTextBox() => this.Track(new HeadlessTextBoxPeer());
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
     public IPopupPeer CreatePopup() => this.Track(new HeadlessPopupPeer());
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
@@ -104,6 +105,73 @@ internal sealed class HeadlessLabelPeer : HeadlessPeer, ILabelPeer
     public void SetTextAlign(ContentAlignment alignment) => this.TextAlign = alignment;
     public void SetBorderStyle(BorderStyle borderStyle) => this.BorderStyle = borderStyle;
     public void SetUseMnemonic(bool useMnemonic) => this.UseMnemonic = useMnemonic;
+}
+
+/// <summary>A text-box peer that records every edit-specific setting and lets tests simulate user edits.</summary>
+internal sealed class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
+{
+    public bool Multiline { get; private set; }
+    public string Placeholder { get; private set; } = string.Empty;
+    public char PasswordChar { get; private set; }
+    public bool ReadOnly { get; private set; }
+    public int MaxLength { get; private set; }
+    public int SelectionStart { get; private set; }
+    public int SelectionLength { get; private set; }
+
+    /// <summary>Every textbox-specific Set* call, in the order it arrived.</summary>
+    public List<string> Calls { get; } = [];
+
+    public event EventHandler? TextChangedByUser;
+
+    public void SetMultiline(bool multiline)
+    {
+        this.Multiline = multiline;
+        this.Calls.Add($"multiline={multiline}");
+    }
+
+    public void SetPlaceholder(string placeholder)
+    {
+        this.Placeholder = placeholder;
+        this.Calls.Add($"placeholder={placeholder}");
+    }
+
+    public void SetPasswordChar(char passwordChar)
+    {
+        this.PasswordChar = passwordChar;
+        this.Calls.Add($"passwordChar={passwordChar}");
+    }
+
+    public void SetReadOnly(bool readOnly)
+    {
+        this.ReadOnly = readOnly;
+        this.Calls.Add($"readOnly={readOnly}");
+    }
+
+    public void SetMaxLength(int maxLength)
+    {
+        this.MaxLength = maxLength;
+        this.Calls.Add($"maxLength={maxLength}");
+    }
+
+    public void SetSelection(int start, int length)
+    {
+        this.SelectionStart = start;
+        this.SelectionLength = length;
+        this.Calls.Add($"selection={start},{length}");
+    }
+
+    public (int Start, int Length) GetSelection() => (this.SelectionStart, this.SelectionLength);
+
+    public string GetText() => this.Text;
+
+    /// <summary>Simulates the user replacing the widget's content, leaving the caret at the end.</summary>
+    public void SimulateUserInput(string text)
+    {
+        this.SetText(text);
+        this.SelectionStart = text.Length;
+        this.SelectionLength = 0;
+        this.TextChangedByUser?.Invoke(this, EventArgs.Empty);
+    }
 }
 
 /// <summary>A timer peer that records every Start/Stop and lets tests raise ticks by hand.</summary>

@@ -51,6 +51,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public ILabelPeer CreateLabel() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public ITextBoxPeer CreateTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

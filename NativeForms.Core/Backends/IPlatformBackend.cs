@@ -32,6 +32,9 @@ public interface IPlatformBackend
     /// <summary>Creates an unrealized static-text peer.</summary>
     ILabelPeer CreateLabel();
 
+    /// <summary>Creates an unrealized text-input peer.</summary>
+    ITextBoxPeer CreateTextBox();
+
     /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
     ICanvasPeer CreateCanvas();
 

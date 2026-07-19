@@ -151,6 +151,112 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_label_set_yalign(nint label, float yalign);
 
+    // --- Text entry (single-line) ---------------------------------------------------------------
+
+    /// <summary>Creates an empty single-line text entry.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_entry_new();
+
+    /// <summary>Replaces the entry's content (UTF-8).</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_entry_set_text(nint entry, string text);
+
+    /// <summary>Returns the entry's current text as a UTF-8 pointer owned by the widget — do not free.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_entry_get_text(nint entry);
+
+    /// <summary>Sets the greyed hint shown while the entry is empty and unfocused (UTF-8).</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_entry_set_placeholder_text(nint entry, string text);
+
+    /// <summary>Shows the real text (1) or the invisible char (0) — the password-mode switch.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_entry_set_visibility(nint entry, int visible);
+
+    /// <summary>Sets the Unicode code point drawn instead of each character while visibility is off.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_entry_set_invisible_char(nint entry, uint ch);
+
+    /// <summary>Caps the number of characters the entry accepts; 0 means unlimited.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_entry_set_max_length(nint entry, int max);
+
+    /// <summary>Toggles whether the user can edit the widget's text (<c>GtkEditable</c>).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_editable_set_editable(nint editable, int isEditable);
+
+    /// <summary>Selects the characters between the two offsets; -1 means the end of the text.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_editable_select_region(nint editable, int startPos, int endPos);
+
+    /// <summary>Reads the selection bounds in characters (both equal the caret when nothing is selected);
+    /// returns <c>TRUE</c> (1) when a non-empty selection exists.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_editable_get_selection_bounds(nint editable, out int startPos, out int endPos);
+
+    // --- Text view (multiline) ------------------------------------------------------------------
+
+    /// <summary>Creates a scrolled window; 0/0 lets it create its own adjustments.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_scrolled_window_new(nint hadjustment, nint vadjustment);
+
+    /// <summary>Creates an empty multiline text view (with its own buffer).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_text_view_new();
+
+    /// <summary>Returns the <c>GtkTextBuffer</c> the view displays (owned by the view).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_text_view_get_buffer(nint textView);
+
+    /// <summary>Toggles whether the user can edit the view's buffer.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_text_view_set_editable(nint textView, int setting);
+
+    /// <summary>Replaces the buffer's content (UTF-8); a length of -1 means NUL-terminated.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_text_buffer_set_text(nint buffer, string text, int len);
+
+    /// <summary>Writes iterators for the very start and very end of the buffer.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_text_buffer_get_bounds(nint buffer, out GtkTextIter start, out GtkTextIter end);
+
+    /// <summary>Returns the text between two iterators as a newly allocated UTF-8 string — free with <see cref="g_free"/>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_text_buffer_get_text(nint buffer, in GtkTextIter start, in GtkTextIter end, int includeHiddenChars);
+
+    /// <summary>Writes an iterator at the given character offset into the buffer.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_text_buffer_get_iter_at_offset(nint buffer, out GtkTextIter iter, int charOffset);
+
+    /// <summary>Moves the caret (<paramref name="ins"/>) and the selection bound in one operation.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_text_buffer_select_range(nint buffer, in GtkTextIter ins, in GtkTextIter bound);
+
+    /// <summary>Reads the selection bounds (both at the caret when nothing is selected); returns <c>TRUE</c> (1)
+    /// when a non-empty selection exists.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_text_buffer_get_selection_bounds(nint buffer, out GtkTextIter start, out GtkTextIter end);
+
+    /// <summary>Returns the character offset of an iterator within its buffer.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_text_iter_get_offset(in GtkTextIter iter);
+
+    /// <summary>
+    /// An opaque, stack-allocatable position inside a <c>GtkTextBuffer</c>. The fields are private
+    /// implementation details of GTK; only the overall size — as declared in <c>gtktextiter.h</c>
+    /// (14 dummy fields: pointers and ints) — matters, so the struct can live on the managed stack
+    /// and be passed by reference.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct GtkTextIter
+    {
+        private nint _dummy1, _dummy2;
+        private int _dummy3, _dummy4, _dummy5, _dummy6, _dummy7, _dummy8;
+        private nint _dummy9, _dummy10;
+        private int _dummy11, _dummy12, _dummy13;
+        private nint _dummy14;
+    }
+
     // --- Owner-draw canvas ----------------------------------------------------------------------
 
     /// <summary>
