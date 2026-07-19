@@ -198,7 +198,8 @@ strategy (may differ per platform; note exceptions inline).
   - [x] Realize + show + close event
   - [ ] `StartPosition`, `FormBorderStyle`, `WindowState` (min/max/normal), `MinimizeBox`/`MaximizeBox`
   - [ ] `MinimumSize`/`MaximumSize`, resize events, `AcceptButton`/`CancelButton`
-  - [ ] `ShowDialog()` modal + `DialogResult`
+  - [~] `ShowDialog()` modal + `DialogResult` (nested native loops, owner disable/transient,
+        `AcceptButton`/`CancelButton` properties; Enter/Escape routing blocked on §7.1 focus model)
   - [ ] `MdiParent`/MDI (or documented non-goal)
   - [ ] Icon, `TopMost`, `Opacity`
 - [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
@@ -219,7 +220,8 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.3 Buttons & simple inputs
 - [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
-  - [ ] `DialogResult`, default/accept styling, `FlatStyle`
+  - [~] [x] `DialogResult` (click walks to the owning Form, closes modal); [ ] default/accept
+        styling, [ ] `FlatStyle` pending
   - [~] Image (`Image`/`ImageAlign`/`TextImageRelation` peer surface): GTK full image+text
         (`gtk_button_set_image` + position); Win32 `BM_SETIMAGE`/`BS_BITMAP` image-only (classic
         BUTTON cannot render both — documented); owner-drawn image+text fallback pending
@@ -363,10 +365,13 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `PropertyGrid` (owner) — later
 
 ### 7.8 Dialogs (native common dialogs)
-- [ ] `MessageBox.Show`
-- [ ] `OpenFileDialog` / `SaveFileDialog`
-- [ ] `FolderBrowserDialog`
-- [ ] `ColorDialog`, `FontDialog`
+- [x] `MessageBox.Show` (buttons/icons mapped; `MessageBoxW` / `GtkMessageDialog`)
+- [~] `OpenFileDialog` / `SaveFileDialog` — WinForms filter syntax, `FilterIndex`, `Multiselect`
+      (`GetOpenFileNameW` family / `GtkFileChooserDialog`); `FilterIndex` write-back pending
+- [~] `FolderBrowserDialog` (`SHBrowseForFolderW` / GTK select-folder); Win32 initial-directory
+      hook pending
+- [x] `ColorDialog`, `FontDialog` (`ChooseColorW`/`ChooseFontW` / GTK choosers with Pango
+      round-trip)
 - [ ] `PrintDialog`/printing (later / optional)
 
 ### 7.9 Modern extras (controls users expect today; owner-drawn, native-themed)
