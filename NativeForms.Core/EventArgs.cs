@@ -68,6 +68,13 @@ public sealed class KeyEventArgs(Keys keyCode, KeyModifiers modifiers) : EventAr
     public bool Handled { get; set; }
 }
 
+/// <summary>Carries the text of an activated inline link — an auto-detected URL in a <see cref="RichTextBox"/>.</summary>
+public sealed class LinkClickedEventArgs(string linkText) : EventArgs
+{
+    /// <summary>The link's text as it appears in the document (for URLs, the URL itself).</summary>
+    public string LinkText { get; } = linkText;
+}
+
 /// <summary>Describes a character typed, matching <c>System.Windows.Forms.KeyPressEventArgs</c>.</summary>
 public sealed class KeyPressEventArgs(char keyChar) : EventArgs
 {

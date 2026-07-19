@@ -43,4 +43,11 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
     /// nothing; interactive controls (buttons) override it.
     /// </summary>
     internal virtual void OnCommand(int notifyCode) { }
+
+    /// <summary>
+    /// Handles a <c>WM_NOTIFY</c> notification addressed to this control; <paramref name="lParam"/>
+    /// points at the notification-specific structure (which starts with an <c>NMHDR</c>). The base
+    /// implementation does nothing; controls with structured notifications (rich edits) override it.
+    /// </summary>
+    internal virtual void OnNotify(int code, nint lParam) { }
 }

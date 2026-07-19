@@ -67,6 +67,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public Font? ShowFontDialog(Font font) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public IRichTextBoxPeer CreateRichTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

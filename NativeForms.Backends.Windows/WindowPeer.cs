@@ -140,6 +140,13 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
             child.OnCommand(notifyCode);
     }
 
+    /// <summary>Routes a <c>WM_NOTIFY</c> notification to the child identified by its control id.</summary>
+    private void OnNotify(int controlId, int code, nint lParam)
+    {
+        if (_children.TryGetValue(controlId, out var child))
+            child.OnNotify(code, lParam);
+    }
+
     /// <summary>Raises <see cref="Closed"/>.</summary>
     private void RaiseClosed() => Closed?.Invoke(this, EventArgs.Empty);
 
@@ -184,6 +191,17 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                     var controlId = (int)(wParam & 0xFFFF);
                     var notifyCode = (int)((wParam >> 16) & 0xFFFF);
                     commandWindow.OnCommand(controlId, notifyCode);
+                }
+
+                return 0;
+
+            case NativeMethods.WM_NOTIFY:
+                // Structured notifications (rich edits, common controls): lParam points at an NMHDR
+                // carrying the sender's control id and the notification code.
+                if (lParam != 0 && _windows.TryGetValue(hwnd, out var notifyWindow))
+                {
+                    var header = (NativeMethods.NMHDR*)lParam;
+                    notifyWindow.OnNotify((int)header->idFrom, (int)header->code, lParam);
                 }
 
                 return 0;

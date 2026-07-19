@@ -152,6 +152,55 @@ public interface ITextBoxPeer : IControlPeer
 }
 
 /// <summary>
+/// A rich-text-editor peer — the native side of a <see cref="RichTextBox"/> (a Win32
+/// <c>RICHEDIT50W</c>, a <c>GtkTextView</c> with text tags). On top of the plain text-box surface it
+/// applies character and paragraph formatting to the widget's <em>current selection</em> and moves
+/// whole documents in and out as RTF.
+/// </summary>
+/// <remarks>
+/// The selection-formatting calls are commands, not state: they act on whatever the widget has
+/// selected at the moment of the call and are not buffered — the owning control only issues them
+/// once realized. RTF travels through the core's <see cref="Text.RtfSerializer"/> subset where the
+/// platform has no native RTF engine.
+/// </remarks>
+public interface IRichTextBoxPeer : ITextBoxPeer
+{
+    /// <summary>Turns the given style flags (bold/italic/underline/strikeout) on or off over the current selection.</summary>
+    void SetSelectionStyle(FontStyle style, bool enabled);
+
+    /// <summary>Sets the text color of the current selection; <see cref="Color.Empty"/> restores the default.</summary>
+    void SetSelectionColor(Color color);
+
+    /// <summary>Sets the font size, in points, of the current selection.</summary>
+    void SetSelectionFontSize(float sizeInPoints);
+
+    /// <summary>
+    /// Aligns the paragraphs the current selection touches. Only the horizontal component
+    /// (left/center/right) is meaningful; the vertical component is ignored.
+    /// </summary>
+    void SetSelectionAlignment(ContentAlignment alignment);
+
+    /// <summary>Turns bullet-list rendering on or off for the paragraphs the current selection touches.</summary>
+    void SetSelectionBullet(bool bullet);
+
+    /// <summary>Whether URLs in the text are detected, rendered as links and reported via <see cref="LinkClicked"/>.</summary>
+    void SetDetectUrls(bool detectUrls);
+
+    /// <summary>Scales the rendered text by the given factor (1.0 = normal size) without touching the document.</summary>
+    void SetZoom(float factor);
+
+    /// <summary>Returns the whole document as RTF (the core subset, or the platform's native writer where one exists).</summary>
+    string GetRtf();
+
+    /// <summary>Replaces the whole document from RTF; the resulting plain text is reported through
+    /// <see cref="ITextBoxPeer.TextChangedByUser"/> like any other widget-side change.</summary>
+    void SetRtf(string rtf);
+
+    /// <summary>Raised when the user activates a detected link; the argument is the link's text (the URL).</summary>
+    event EventHandler<string>? LinkClicked;
+}
+
+/// <summary>
 /// A recurring UI-thread timer source — the native side of a <see cref="Timer"/>. Ticks are delivered
 /// by the platform message loop, so they always arrive on the thread that pumps it. Starting a peer
 /// that is already running restarts it with the new interval.

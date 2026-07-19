@@ -35,7 +35,7 @@ public class TextBox : Control
         get => _text;
         set
         {
-            value = ApplyCasing(this.CharacterCasing, value ?? string.Empty);
+            value = this.NormalizeText(value ?? string.Empty);
             if (_text == value)
                 return;
 
@@ -245,7 +245,7 @@ public class TextBox : Control
             return;
 
         var raw = peer.GetText();
-        var value = ApplyCasing(this.CharacterCasing, raw);
+        var value = this.NormalizeText(raw);
         var changed = _text != value;
         _text = value;
         if (value != raw)
@@ -254,6 +254,16 @@ public class TextBox : Control
         if (changed)
             this.OnTextChanged(EventArgs.Empty);
     }
+
+    /// <summary>
+    /// Normalizes a candidate text value before it is stored, pushed to the widget or compared. The
+    /// base implementation applies <see cref="CharacterCasing"/>; subclasses refine it — the masked
+    /// box routes every candidate through its mask here, which is what makes the corrective push in
+    /// <see cref="OnPeerTextChanged"/> (write the normalized value back when the widget disagrees)
+    /// work for casing and masking alike. Must be idempotent: normalizing an already-normalized
+    /// value has to return it unchanged, or the correction would echo forever.
+    /// </summary>
+    private protected virtual string NormalizeText(string value) => ApplyCasing(this.CharacterCasing, value);
 
     /// <summary>Applies <paramref name="casing"/> to <paramref name="value"/>.</summary>
     private static string ApplyCasing(CharacterCasing casing, string value) => casing switch

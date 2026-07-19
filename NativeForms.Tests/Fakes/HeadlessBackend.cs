@@ -1,6 +1,7 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
+using Hawkynt.NativeForms.Text;
 
 namespace Hawkynt.NativeForms.Tests.Fakes;
 
@@ -80,6 +81,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public IButtonPeer CreateButton() => this.Track(new HeadlessButtonPeer());
     public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
     public ITextBoxPeer CreateTextBox() => this.Track(new HeadlessTextBoxPeer());
+    public IRichTextBoxPeer CreateRichTextBox() => this.Track(new HeadlessRichTextBoxPeer());
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
     public IPopupPeer CreatePopup() => this.Track(new HeadlessPopupPeer());
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
@@ -207,7 +209,7 @@ internal sealed class HeadlessLabelPeer : HeadlessPeer, ILabelPeer
 }
 
 /// <summary>A text-box peer that records every edit-specific setting and lets tests simulate user edits.</summary>
-internal sealed class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
+internal class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
 {
     public bool Multiline { get; private set; }
     public string Placeholder { get; private set; } = string.Empty;
@@ -271,6 +273,62 @@ internal sealed class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
         this.SelectionLength = 0;
         this.TextChangedByUser?.Invoke(this, EventArgs.Empty);
     }
+}
+
+/// <summary>
+/// A rich-text peer that records every formatting call together with the selection it applied to,
+/// keeps the last document set through RTF, and round-trips <see cref="GetRtf"/> through the core
+/// <see cref="RtfSerializer"/> — the reference implementation of the RTF-less platform contract.
+/// </summary>
+internal sealed class HeadlessRichTextBoxPeer : HeadlessTextBoxPeer, IRichTextBoxPeer
+{
+    private RichDocument? _document;
+
+    /// <summary>Every rich-specific call, in order, formatted as <c>name=value@selectionStart,selectionLength</c>.</summary>
+    public List<string> RichCalls { get; } = [];
+
+    public bool DetectUrls { get; private set; }
+    public float Zoom { get; private set; } = 1f;
+
+    public event EventHandler<string>? LinkClicked;
+
+    public void SetSelectionStyle(FontStyle style, bool enabled)
+        => this.RichCalls.Add($"style={style},{enabled}@{this.SelectionStart},{this.SelectionLength}");
+
+    public void SetSelectionColor(Color color)
+        => this.RichCalls.Add($"color=#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}@{this.SelectionStart},{this.SelectionLength}");
+
+    public void SetSelectionFontSize(float sizeInPoints)
+        => this.RichCalls.Add($"fontSize={sizeInPoints}@{this.SelectionStart},{this.SelectionLength}");
+
+    public void SetSelectionAlignment(ContentAlignment alignment)
+        => this.RichCalls.Add($"alignment={alignment}@{this.SelectionStart},{this.SelectionLength}");
+
+    public void SetSelectionBullet(bool bullet)
+        => this.RichCalls.Add($"bullet={bullet}@{this.SelectionStart},{this.SelectionLength}");
+
+    public void SetDetectUrls(bool detectUrls)
+    {
+        this.DetectUrls = detectUrls;
+        this.RichCalls.Add($"detectUrls={detectUrls}");
+    }
+
+    public void SetZoom(float factor)
+    {
+        this.Zoom = factor;
+        this.RichCalls.Add($"zoom={factor}");
+    }
+
+    public string GetRtf() => RtfSerializer.Write(_document ?? RichDocument.FromPlainText(this.GetText()));
+
+    public void SetRtf(string rtf)
+    {
+        _document = RtfSerializer.Parse(rtf);
+        this.SimulateUserInput(_document.ToPlainText());
+    }
+
+    /// <summary>Raises <see cref="LinkClicked"/> as the platform would when the user activates a link.</summary>
+    public void FireLinkClicked(string linkText) => this.LinkClicked?.Invoke(this, linkText);
 }
 
 /// <summary>A timer peer that records every Start/Stop and lets tests raise ticks by hand.</summary>

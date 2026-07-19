@@ -35,6 +35,9 @@ public sealed partial class Win32Backend : IPlatformBackend
     public ITextBoxPeer CreateTextBox() => new TextBoxPeer();
 
     /// <inheritdoc/>
+    public IRichTextBoxPeer CreateRichTextBox() => new RichTextBoxPeer();
+
+    /// <inheritdoc/>
     public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();
 
     /// <inheritdoc/>

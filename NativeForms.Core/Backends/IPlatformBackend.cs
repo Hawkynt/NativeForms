@@ -35,6 +35,9 @@ public interface IPlatformBackend
     /// <summary>Creates an unrealized text-input peer.</summary>
     ITextBoxPeer CreateTextBox();
 
+    /// <summary>Creates an unrealized rich-text-editor peer.</summary>
+    IRichTextBoxPeer CreateRichTextBox();
+
     /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
     ICanvasPeer CreateCanvas();
 

@@ -134,6 +134,13 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public IRichTextBoxPeer CreateRichTextBox()
+    {
+        EnsureInitialized();
+        return new GtkRichTextBoxPeer();
+    }
+
+    /// <inheritdoc />
     public void Run(IWindowPeer mainWindow)
     {
         EnsureInitialized();

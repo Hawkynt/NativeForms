@@ -15,7 +15,7 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// boxes show no placeholder until an owner-drawn hint is added. Character casing is normalized by
 /// the core, so no <c>ES_UPPERCASE</c>/<c>ES_LOWERCASE</c> style bits are needed here.
 /// </remarks>
-internal sealed unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
+internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
 {
     private bool _multiline;
     private string _placeholder = string.Empty;

@@ -172,6 +172,14 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
             child.OnCommand((int)((wParam >> 16) & 0xFFFF));
     }
 
+    /// <summary>Routes a <c>WM_NOTIFY</c> notification from a hosted native child to its peer.</summary>
+    private void OnNotifyMessage(nint lParam)
+    {
+        var header = (NativeMethods.NMHDR*)lParam;
+        if (this._children is not null && this._children.TryGetValue((int)header->idFrom, out var child))
+            child.OnNotify((int)header->code, lParam);
+    }
+
     /// <summary>Paints the update region by driving the managed <see cref="Paint"/> handler over a GDI surface.</summary>
     private void OnPaintMessage(nint hwnd)
     {
@@ -293,6 +301,11 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                     // A non-zero lParam means a hosted native child (its HWND) is notifying us.
                     if (lParam != 0)
                         peer.OnCommandMessage(wParam);
+                    return 0;
+
+                case NativeMethods.WM_NOTIFY:
+                    if (lParam != 0)
+                        peer.OnNotifyMessage(lParam);
                     return 0;
 
                 case NativeMethods.WM_PAINT:

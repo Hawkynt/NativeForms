@@ -15,6 +15,9 @@ public enum FontStyle
 
     /// <summary>Underlined.</summary>
     Underline = 4,
+
+    /// <summary>Struck through.</summary>
+    Strikeout = 8,
 }
 
 /// <summary>
