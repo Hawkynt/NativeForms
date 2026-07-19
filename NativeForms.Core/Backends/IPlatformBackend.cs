@@ -51,6 +51,13 @@ public interface IPlatformBackend
     ITimerPeer CreateTimer();
 
     /// <summary>
+    /// Creates a hidden tray/status-area icon peer. Backends whose platform has no supported tray
+    /// surface throw <see cref="NotSupportedException"/> — honestly, at creation time — rather than
+    /// silently dropping the icon.
+    /// </summary>
+    INotifyIconPeer CreateNotifyIcon();
+
+    /// <summary>
     /// Measures the pixel size <paramref name="text"/> would occupy in <paramref name="font"/>, without
     /// needing a paint surface — the seam auto-sizing controls use before and between paints. Uses the
     /// same native text engine as <see cref="IGraphics.MeasureText"/>, so both agree.

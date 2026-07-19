@@ -64,6 +64,8 @@ internal sealed class BackendRegistryTests
         public string[]? ShowFileDialog(in FileDialogOptions options) => throw new NotSupportedException();
         public System.Drawing.Color? ShowColorDialog(System.Drawing.Color color) => throw new NotSupportedException();
         public Font? ShowFontDialog(Font font) => throw new NotSupportedException();
+
+        public INotifyIconPeer CreateNotifyIcon() => throw new NotSupportedException();
         public void Run(IWindowPeer mainWindow) { }
         public void Quit() { }
     }

@@ -41,6 +41,16 @@ public abstract class OwnerDrawnControl : Control
     /// <inheritdoc/>
     private protected override void OnUnrealized() => _canvas = null;
 
+    /// <summary>Mirrors the canvas's pointer moves for components (tool tips) that observe a control
+    /// without subclassing it. Raised after the control's own <see cref="OnMouseMove"/>.</summary>
+    internal event EventHandler<MouseEventArgs>? CanvasMouseMove;
+
+    /// <summary>Mirrors the canvas's mouse-leave for observing components.</summary>
+    internal event EventHandler? CanvasMouseLeave;
+
+    /// <summary>Mirrors the canvas's button presses for observing components.</summary>
+    internal event EventHandler<MouseEventArgs>? CanvasMouseDown;
+
     private protected override void OnRealized(IControlPeer peer)
     {
         if (peer is not ICanvasPeer canvas)
@@ -48,11 +58,25 @@ public abstract class OwnerDrawnControl : Control
 
         canvas.SetFocusable(this.Focusable);
         canvas.Paint += (_, e) => this.OnPaint(e);
-        canvas.MouseDown += (_, e) => this.OnMouseDown(e);
+        canvas.MouseDown += (_, e) =>
+        {
+            this.OnMouseDown(e);
+            this.CanvasMouseDown?.Invoke(this, e);
+            if (e.Button == MouseButtons.Right && this.ContextMenuStrip is { } menu)
+                menu.Show(this, e.Location);
+        };
         canvas.MouseUp += (_, e) => this.OnMouseUp(e);
-        canvas.MouseMove += (_, e) => this.OnMouseMove(e);
+        canvas.MouseMove += (_, e) =>
+        {
+            this.OnMouseMove(e);
+            this.CanvasMouseMove?.Invoke(this, e);
+        };
         canvas.MouseWheel += (_, e) => this.OnMouseWheel(e);
-        canvas.MouseLeave += (_, _) => this.OnMouseLeave(EventArgs.Empty);
+        canvas.MouseLeave += (_, _) =>
+        {
+            this.OnMouseLeave(EventArgs.Empty);
+            this.CanvasMouseLeave?.Invoke(this, EventArgs.Empty);
+        };
         canvas.KeyDown += (_, e) => this.OnKeyDown(e);
         canvas.KeyUp += (_, e) => this.OnKeyUp(e);
         canvas.KeyPress += (_, e) => this.OnKeyPress(e);

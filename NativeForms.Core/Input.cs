@@ -36,8 +36,12 @@ public enum KeyModifiers
 
 /// <summary>
 /// Virtual key codes for the keys the toolkit reacts to. Values follow the Win32 virtual-key numbers
-/// so backends can forward them directly; letters and digits use their ASCII code.
+/// so backends can forward them directly; letters and digits use their ASCII code. Like its Windows
+/// Forms namesake the enum doubles as key <em>data</em>: the <see cref="Shift"/>/<see cref="Control"/>/
+/// <see cref="Alt"/> modifier bits combine with a key code to describe a chord such as
+/// <c>Keys.Control | Keys.S</c> for menu shortcuts.
 /// </summary>
+[Flags]
 public enum Keys
 {
     /// <summary>No key.</summary>
@@ -99,4 +103,160 @@ public enum Keys
 
     /// <summary>Numeric-keypad subtract (−).</summary>
     Subtract = 0x6D,
+
+    /// <summary>The digit 0.</summary>
+    D0 = 0x30,
+
+    /// <summary>The digit 1.</summary>
+    D1 = 0x31,
+
+    /// <summary>The digit 2.</summary>
+    D2 = 0x32,
+
+    /// <summary>The digit 3.</summary>
+    D3 = 0x33,
+
+    /// <summary>The digit 4.</summary>
+    D4 = 0x34,
+
+    /// <summary>The digit 5.</summary>
+    D5 = 0x35,
+
+    /// <summary>The digit 6.</summary>
+    D6 = 0x36,
+
+    /// <summary>The digit 7.</summary>
+    D7 = 0x37,
+
+    /// <summary>The digit 8.</summary>
+    D8 = 0x38,
+
+    /// <summary>The digit 9.</summary>
+    D9 = 0x39,
+
+    /// <summary>The letter A.</summary>
+    A = 0x41,
+
+    /// <summary>The letter B.</summary>
+    B = 0x42,
+
+    /// <summary>The letter C.</summary>
+    C = 0x43,
+
+    /// <summary>The letter D.</summary>
+    D = 0x44,
+
+    /// <summary>The letter E.</summary>
+    E = 0x45,
+
+    /// <summary>The letter F.</summary>
+    F = 0x46,
+
+    /// <summary>The letter G.</summary>
+    G = 0x47,
+
+    /// <summary>The letter H.</summary>
+    H = 0x48,
+
+    /// <summary>The letter I.</summary>
+    I = 0x49,
+
+    /// <summary>The letter J.</summary>
+    J = 0x4A,
+
+    /// <summary>The letter K.</summary>
+    K = 0x4B,
+
+    /// <summary>The letter L.</summary>
+    L = 0x4C,
+
+    /// <summary>The letter M.</summary>
+    M = 0x4D,
+
+    /// <summary>The letter N.</summary>
+    N = 0x4E,
+
+    /// <summary>The letter O.</summary>
+    O = 0x4F,
+
+    /// <summary>The letter P.</summary>
+    P = 0x50,
+
+    /// <summary>The letter Q.</summary>
+    Q = 0x51,
+
+    /// <summary>The letter R.</summary>
+    R = 0x52,
+
+    /// <summary>The letter S.</summary>
+    S = 0x53,
+
+    /// <summary>The letter T.</summary>
+    T = 0x54,
+
+    /// <summary>The letter U.</summary>
+    U = 0x55,
+
+    /// <summary>The letter V.</summary>
+    V = 0x56,
+
+    /// <summary>The letter W.</summary>
+    W = 0x57,
+
+    /// <summary>The letter X.</summary>
+    X = 0x58,
+
+    /// <summary>The letter Y.</summary>
+    Y = 0x59,
+
+    /// <summary>The letter Z.</summary>
+    Z = 0x5A,
+
+    /// <summary>F1.</summary>
+    F1 = 0x70,
+
+    /// <summary>F2.</summary>
+    F2 = 0x71,
+
+    /// <summary>F3.</summary>
+    F3 = 0x72,
+
+    /// <summary>F5.</summary>
+    F5 = 0x74,
+
+    /// <summary>F6.</summary>
+    F6 = 0x75,
+
+    /// <summary>F7.</summary>
+    F7 = 0x76,
+
+    /// <summary>F8.</summary>
+    F8 = 0x77,
+
+    /// <summary>F9.</summary>
+    F9 = 0x78,
+
+    /// <summary>F10.</summary>
+    F10 = 0x79,
+
+    /// <summary>F11.</summary>
+    F11 = 0x7A,
+
+    /// <summary>F12.</summary>
+    F12 = 0x7B,
+
+    /// <summary>The bit mask extracting the key code from key data.</summary>
+    KeyCode = 0xFFFF,
+
+    /// <summary>The bit mask extracting the modifier bits from key data.</summary>
+    Modifiers = ~0xFFFF,
+
+    /// <summary>The Shift modifier bit.</summary>
+    Shift = 0x10000,
+
+    /// <summary>The Control modifier bit.</summary>
+    Control = 0x20000,
+
+    /// <summary>The Alt modifier bit.</summary>
+    Alt = 0x40000,
 }

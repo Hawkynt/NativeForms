@@ -32,7 +32,7 @@ internal sealed class GroupBoxImageTests
         Assert.Multiple(() =>
         {
             Assert.That(g.Operations.Exists(o => o.StartsWith("fill ") && o.EndsWith(" 8,0,49,16")), Is.True, "the border gap widens for icon + gap + caption");
-            Assert.That(g.Operations, Does.Contain("image 16x16 @12,0,16,16"));
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16 @12,0,16,16")), Is.True);
             Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Cap\"") && o.EndsWith("@32,0")), Is.True, "caption shifts right past the image");
         });
     }
@@ -48,7 +48,7 @@ internal sealed class GroupBoxImageTests
         Assert.Multiple(() =>
         {
             Assert.That(g.Operations.Exists(o => o.StartsWith("fill ") && o.EndsWith(" 8,0,24,16")), Is.True);
-            Assert.That(g.Operations, Does.Contain("image 16x16 @12,0,16,16"));
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16 @12,0,16,16")), Is.True);
             Assert.That(g.Operations.Exists(o => o.StartsWith("text ")), Is.False);
         });
     }

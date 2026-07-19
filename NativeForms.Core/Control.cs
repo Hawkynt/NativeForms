@@ -127,6 +127,13 @@ public abstract class Control
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
 
+    /// <summary>
+    /// The context menu a right-click on this control opens at the cursor, or <see langword="null"/>
+    /// for none. Owner-drawn controls open it from their mouse pipeline; native-widget controls need
+    /// right-click peer events first (tracked in <c>docs/PRD.md</c>).
+    /// </summary>
+    public ContextMenuStrip? ContextMenuStrip { get; set; }
+
     /// <summary>The child controls hosted by this control.</summary>
     public ControlCollection Controls { get; }
 

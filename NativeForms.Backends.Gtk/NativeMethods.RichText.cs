@@ -55,17 +55,6 @@ internal static partial class NativeMethods
         public long data1;
     }
 
-    /// <summary>A singly-linked GLib list cell (<c>GSList</c>), read in place from native memory.</summary>
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct GSList
-    {
-        /// <summary>The element carried by this cell.</summary>
-        public nint data;
-
-        /// <summary>The next cell, or 0 at the end.</summary>
-        public nint next;
-    }
-
     // --- GValue accessors (all non-variadic — the AOT-safe property path) ---
 
     /// <summary>Initializes a zeroed <c>GValue</c> to hold the given type; returns the value itself.</summary>
@@ -95,10 +84,6 @@ internal static partial class NativeMethods
     /// <summary>Sets one object property from a <c>GValue</c> — the fixed-signature alternative to <c>g_object_set</c>.</summary>
     [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void g_object_set_property(nint @object, string propertyName, in GValue value);
-
-    /// <summary>Frees the cells of a <c>GSList</c> (not the elements they point to).</summary>
-    [LibraryImport(GLib)]
-    internal static partial void g_slist_free(nint list);
 
     // --- Text tags -------------------------------------------------------------------------------
 

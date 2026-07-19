@@ -14,6 +14,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
 {
     public List<HeadlessPeer> Created { get; } = [];
     public List<HeadlessTimerPeer> Timers { get; } = [];
+    public List<HeadlessNotifyIconPeer> NotifyIcons { get; } = [];
     public bool DidRun { get; private set; }
     public bool DidQuit { get; private set; }
 
@@ -91,6 +92,13 @@ internal sealed class HeadlessBackend : IPlatformBackend
     {
         var peer = new HeadlessTimerPeer();
         this.Timers.Add(peer);
+        return peer;
+    }
+
+    public INotifyIconPeer CreateNotifyIcon()
+    {
+        var peer = new HeadlessNotifyIconPeer();
+        this.NotifyIcons.Add(peer);
         return peer;
     }
 
@@ -361,6 +369,43 @@ internal sealed class HeadlessTimerPeer : ITimerPeer
 
     /// <summary>Raises <see cref="Tick"/> as the platform message loop would.</summary>
     public void FireTick() => this.Tick?.Invoke(this, EventArgs.Empty);
+}
+
+/// <summary>A tray-icon peer that records every state push and lets tests raise clicks by hand.</summary>
+internal sealed class HeadlessNotifyIconPeer : INotifyIconPeer
+{
+    public int IconWidth { get; private set; }
+    public int IconHeight { get; private set; }
+    public int[]? IconPixels { get; private set; }
+    public string ToolTip { get; private set; } = string.Empty;
+    public bool Visible { get; private set; }
+    public bool Disposed { get; private set; }
+
+    public event EventHandler? Click;
+    public event EventHandler? DoubleClick;
+
+    public void SetIcon(int width, int height, ReadOnlySpan<int> argb)
+    {
+        this.IconWidth = width;
+        this.IconHeight = height;
+        this.IconPixels = argb.ToArray();
+    }
+
+    public void SetToolTip(string text) => this.ToolTip = text;
+
+    public void SetVisible(bool visible) => this.Visible = visible;
+
+    public void Dispose()
+    {
+        this.Visible = false;
+        this.Disposed = true;
+    }
+
+    /// <summary>Raises <see cref="Click"/> as a shell primary-button click would.</summary>
+    public void FireClick() => this.Click?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raises <see cref="DoubleClick"/> as a shell double-click would.</summary>
+    public void FireDoubleClick() => this.DoubleClick?.Invoke(this, EventArgs.Empty);
 }
 
 internal sealed class HeadlessImage(int width, int height) : IImage

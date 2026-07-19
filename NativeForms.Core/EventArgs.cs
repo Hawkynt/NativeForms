@@ -64,6 +64,14 @@ public sealed class KeyEventArgs(Keys keyCode, KeyModifiers modifiers) : EventAr
     /// <summary>Whether Alt was held.</summary>
     public bool Alt => (this.Modifiers & KeyModifiers.Alt) != 0;
 
+    /// <summary>The key code combined with the active modifier bits — the shape shortcut chords
+    /// (<c>Keys.Control | Keys.S</c>) are declared and compared in.</summary>
+    public Keys KeyData
+        => this.KeyCode
+           | (this.Shift ? Keys.Shift : Keys.None)
+           | (this.Control ? Keys.Control : Keys.None)
+           | (this.Alt ? Keys.Alt : Keys.None);
+
     /// <summary>Set by a handler to indicate the key was consumed.</summary>
     public bool Handled { get; set; }
 }

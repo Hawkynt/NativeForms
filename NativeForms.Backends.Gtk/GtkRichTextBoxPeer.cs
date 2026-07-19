@@ -631,7 +631,7 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
             while (cell != 0)
             {
                 var entry = *(NativeMethods.GSList*)cell;
-                NativeMethods.g_object_get(entry.data, "name", out var namePtr, 0);
+                NativeMethods.g_object_get(entry.Data, "name", out var namePtr, 0);
                 var name = Marshal.PtrToStringUTF8(namePtr);
                 if (namePtr != 0)
                     NativeMethods.g_free(namePtr);
@@ -639,7 +639,7 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
                 if (name is not null && name is not "zoom" and not "link")
                     names.Add(name);
 
-                cell = entry.next;
+                cell = entry.Next;
             }
         }
 

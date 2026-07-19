@@ -51,6 +51,9 @@ public sealed partial class Win32Backend : IPlatformBackend
     public ITimerPeer CreateTimer() => new Win32TimerPeer();
 
     /// <inheritdoc/>
+    public INotifyIconPeer CreateNotifyIcon() => new Win32NotifyIconPeer();
+
+    /// <inheritdoc/>
     public Size MeasureText(string text, Font font)
     {
         var hdc = NativeMethods.GetDC(0);

@@ -201,6 +201,30 @@ public interface IRichTextBoxPeer : ITextBoxPeer
 }
 
 /// <summary>
+/// A system tray/status-area icon — the native side of a <see cref="NotifyIcon"/>. The icon pixels
+/// arrive as raw 32-bit ARGB so the peer can build whatever handle its shell wants (an
+/// <c>HICON</c> on Windows); state setters are buffer-friendly and may arrive before the icon is
+/// shown for the first time.
+/// </summary>
+public interface INotifyIconPeer : IDisposable
+{
+    /// <summary>Replaces the icon from 32-bit ARGB pixels (row-major, length = width * height).</summary>
+    void SetIcon(int width, int height, ReadOnlySpan<int> argb);
+
+    /// <summary>Sets the hover text the shell shows next to the icon.</summary>
+    void SetToolTip(string text);
+
+    /// <summary>Adds the icon to or removes it from the tray.</summary>
+    void SetVisible(bool visible);
+
+    /// <summary>Raised when the user clicks the icon with the primary button.</summary>
+    event EventHandler? Click;
+
+    /// <summary>Raised when the user double-clicks the icon with the primary button.</summary>
+    event EventHandler? DoubleClick;
+}
+
+/// <summary>
 /// A recurring UI-thread timer source — the native side of a <see cref="Timer"/>. Ticks are delivered
 /// by the platform message loop, so they always arrive on the thread that pumps it. Starting a peer
 /// that is already running restarts it with the new interval.

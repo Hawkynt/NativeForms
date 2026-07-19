@@ -75,6 +75,18 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Not implemented: <c>GtkStatusIcon</c> has been deprecated since GTK 3.14 and is absent from
+    /// many desktops, and the replacement (the StatusNotifier D-Bus protocol) is a separate
+    /// integration tracked in <c>docs/PRD.md</c> §7.7. Failing here is more honest than adding an
+    /// icon no shell will show.
+    /// </remarks>
+    public INotifyIconPeer CreateNotifyIcon()
+        => throw new NotSupportedException(
+            "Tray icons are not supported by the GTK backend yet: GtkStatusIcon is deprecated and the "
+            + "StatusNotifier (D-Bus) integration is tracked in docs/PRD.md §7.7.");
+
+    /// <inheritdoc />
     public Size MeasureText(string text, Font font)
     {
         if (string.IsNullOrEmpty(text))

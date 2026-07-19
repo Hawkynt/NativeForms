@@ -31,7 +31,7 @@ internal sealed class CheckBoxImageTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations, Does.Contain("image 16x16 @20,7,16,16"), "icon sits past the 14px glyph + 6px gap, vertically centered");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16 @20,7,16,16")), Is.True, "icon sits past the 14px glyph + 6px gap, vertically centered");
             Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Go\"") && o.EndsWith("@40,7")), Is.True, "text shifts right past the image");
         });
     }
