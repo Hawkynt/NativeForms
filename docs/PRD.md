@@ -137,10 +137,11 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] `DrawEllipse`/`FillEllipse` (GDI `Ellipse`, Cairo unit-circle) — [ ] rounded rects/pills still pending.
 - [ ] Native-style primitives drawn via theme: push button, radio, combo arrow, header cell,
       grid line, scrollbar (or reuse native scrollbars where possible), selection highlight.
-- [ ] Shared icon+text content layout helper (`ContentAlignment` + `TextImageRelation` semantics,
-      mnemonic-aware) used by **every** control that renders image + text — Button, Label, CheckBox,
-      RadioButton, GroupBox caption, tab headers, list/tree/grid cells — so image placement is
-      implemented once and behaves identically everywhere.
+- [~] Shared icon+text content layout helper (`ContentLayout` + `TextImageRelation`): pure
+      geometry, matrix-tested; adopted by CheckBox/RadioButton/GroupBox caption/PictureBox and
+      the native Button/Label peers (platform limits documented: Win32 button/label and GTK label
+      render image-only or text-only, not both); mnemonic-aware layout and item-cell adoption
+      pending.
 
 ---
 
@@ -201,8 +202,8 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] `MdiParent`/MDI (or documented non-goal)
   - [ ] Icon, `TopMost`, `Opacity`
 - [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
-- [~] `GroupBox` (owner) — themed frame + caption done; child inset/layout, caption image
-      (icon before the caption text, fieldset-style) pending
+- [~] `GroupBox` (owner) — themed frame + caption, caption image (icon before the text in the
+      frame gap), real nested children done; child inset/layout convenience pending
 - [~] `TabControl` / `TabPage` (owner, themed header strip; pages host real nested children)
   - [x] Tab headers with **icon + text** (`ImageList` + per-page `ImageIndex`), accent underline
         on the active tab, hover feedback
@@ -219,19 +220,21 @@ strategy (may differ per platform; note exceptions inline).
 ### 7.3 Buttons & simple inputs
 - [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
   - [ ] `DialogResult`, default/accept styling, `FlatStyle`
-  - [ ] Image + text (`Image`, `ImageAlign`, `TextImageRelation`; native where the toolkit
-        supports it — `BM_SETIMAGE`/GTK button image — else owner-drawn)
+  - [~] Image (`Image`/`ImageAlign`/`TextImageRelation` peer surface): GTK full image+text
+        (`gtk_button_set_image` + position); Win32 `BM_SETIMAGE`/`BS_BITMAP` image-only (classic
+        BUTTON cannot render both — documented); owner-drawn image+text fallback pending
 - [~] `CheckBox` (owner) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
-      tri-state `CheckState`, image + text next to the box pending
+      image + text via `ContentLayout` done; tri-state `CheckState` pending
 - [~] `RadioButton` (owner) — themed ring + accent dot, grouping by container, click/Space,
-      `CheckedChanged` done; image + text next to the ring pending
+      `CheckedChanged`, image + text via `ContentLayout` done
 - [~] `Label` (native) — polish done, images pending
   - [x] Text
   - [x] `AutoSize` (canvas-free `IPlatformBackend.MeasureText`), `TextAlign`, `BorderStyle`
         (Win32 style bit; GTK documented no-op), mnemonic rendering (`&x` underline, GTK `_x`
         translation)
   - [ ] Mnemonic activation focuses the next control (blocked on the §7.1 focus model)
-  - [ ] `Image` + `ImageAlign` (icon beside/behind text)
+  - [~] `Image` + `ImageAlign`: peer surface done — Win32 `SS_BITMAP` and GTK widget-swap render
+        image-only when the caption is empty (image+text is platform-limited, documented)
 - [~] `LinkLabel` (owner) — whole-text link: accent color + underline, hover + `Visited` states,
       click/Space → `LinkClicked`; per-character `LinkArea` ranges pending
 - [~] `TextBox` (native: Win32 EDIT / GTK GtkEntry + GtkTextView-in-ScrolledWindow)
@@ -314,11 +317,17 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.5 Range & date
 - [ ] `TrackBar` (native/owner)
+- [x] `MonthCalendar` (owner) — `CalendarCore` engine (title + nav arrows, `FirstDayOfWeek`
+      header, 6×7 grid with leading/trailing greying, today accent, single + Shift/drag range
+      selection capped by `MaxSelectionCount`, `Min`/`MaxDate` clamps, full keyboard set incl.
+      Ctrl+Page year paging, wheel month paging)
+- [~] `DateTimePicker` (owner field + popup calendar sharing `CalendarCore`) — Long/Short/Time/
+      Custom invariant formats, `ShowCheckBox`/`Checked` greying, closed Up/Down day stepping,
+      Alt+Down/F4, commit/cancel semantics done; `BoldedDates`, per-part focus, time spinner
+      editing pending
 - [~] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill) done; `Style.Marquee`
       (animated, allocation-free), `Step`/`PerformStep`, vertical orientation pending
 - [ ] `ScrollBar` (`HScrollBar`/`VScrollBar`) (native)
-- [ ] `DateTimePicker` (native/owner)
-- [ ] `MonthCalendar` (owner)
 
 ### 7.6 Menus, toolbars, status
 - [ ] `MenuStrip` / `ToolStripMenuItem` (native menu bar where available — Win32 `HMENU`,
@@ -338,7 +347,7 @@ strategy (may differ per platform; note exceptions inline).
       works on owner-drawn controls (incl. per-item tips in lists/trees/grids)
 
 ### 7.7 Media & misc
-- [ ] `PictureBox` (owner) — `SizeMode`, image formats
+- [x] `PictureBox` (owner) — `Image`, `SizeMode` (Normal/Stretch/Center/Zoom letterbox), `BorderStyle`
 - [~] `ImageList` (icon storage shared by list/tree/combo/toolbar) — pre-realization storage done:
       holds ARGB pixel data with no backend present, materializes `IImage`s lazily per backend and
       caches per index (`ImageList.GetImage`), fixed `ImageSize`, dispose drops native bitmaps but
