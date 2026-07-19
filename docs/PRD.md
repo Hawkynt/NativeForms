@@ -90,10 +90,12 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
       overloads. The WinForms string API (`DataBindings.Add("Text", vm, "Name")`) is a **non-goal**:
       it needs reflection. Plain `Func<,>`/`Action<,>` delegates only — no `Expression<>` trees
       (interpreted under NativeAOT)
-- [ ] `ICommand` wiring on `Button`/`ToolStripButton`/menu items (auto enable/disable via `CanExecute`)
+- [~] `ICommand` wiring: `ToolStripItem.Command` (menu items, toolbar buttons — `Enabled` follows
+      `CanExecute`) and `SplitButton.Command` done; plain `Button.Command` pending
 - [~] List/selection binding: `ListBox.DataSource` + reflection-free `DisplaySelector`/`ImageSelector`
       done; `DataGridView.DataSource`/`Columns` + reflection-free `ValueSelector`/`ImageSelector`
-      (one-way, cell-level) done; `ComboBox`/`ListView` + `ValueMember`/`SelectedValue` pending
+      (cell-level, now with setter-based editing) done; `ComboBox.ValueSelector`/`SelectedValue`
+      done; `ListView` value binding pending
 
 ---
 
@@ -184,7 +186,8 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] Focus model (`Focus()`, `TabIndex`, `TabStop`, `Enter`/`Leave`/`GotFocus`/`LostFocus`)
 - [ ] Keyboard (`KeyDown`/`KeyUp`/`KeyPress`, mnemonics/accelerators)
 - [ ] Mouse (`MouseDown`/`Up`/`Move`/`Enter`/`Leave`/`Wheel`, `DoubleClick`)
-- [ ] `Font`, `ForeColor`, `BackColor`, `Padding`, `Margin`, `Anchor`, `Dock`
+- [~] `Font`, `ForeColor`, `BackColor`, `Padding`, `Anchor`, `Dock` pending; `Margin`
+      (`Padding` struct, consumed by the layout panels) done
 - [ ] Layout engine: anchoring, docking, `AutoSize`, `TableLayoutPanel`/`FlowLayoutPanel` semantics
 
 ### 7.2 Top-level & containers
@@ -206,7 +209,8 @@ strategy (may differ per platform; note exceptions inline).
         `AcceptButton`/`CancelButton` properties; Enter/Escape routing blocked on §7.1 focus model)
   - [x] `MdiParent`/MDI — documented non-goal in the `Form` remarks
   - [x] Icon (raw-ARGB `SetIcon`, decoder-free), `TopMost`, `Opacity` (compositor-dependent on Linux)
-- [~] `Panel` (owner) — background + `BorderStyle` (None/FixedSingle/Fixed3D) done; `AutoScroll` pending
+- [x] `Panel` (owner) — background, `BorderStyle` (None/FixedSingle/Fixed3D), real nested
+      children, `AutoScroll` (see the dedicated box below)
 - [~] `GroupBox` (owner) — themed frame + caption, caption image (icon before the text in the
       frame gap), real nested children done; child inset/layout convenience pending
 - [~] `TabControl` / `TabPage` (owner, themed header strip; pages host real nested children)
@@ -285,7 +289,8 @@ strategy (may differ per platform; note exceptions inline).
       header rows), checkboxes (`ItemCheck` veto + corner overlay in icon views), MultiExtended
       selection (ListBox engine parity), in-place sorting (`ColumnClick`, `Sorting`,
       `ItemSorter`, stable `ObservableList.Sort`), label editing (hosted TextBox, F2), header
-      sort arrows, virtualized paint in every view done; virtual-mode item API pending
+      sort arrows, virtualized paint in every view done; virtual-mode item API and
+      `ColumnHeader` change-repaint wiring (`Changed` is only observed by TreeListView) pending
 - [~] `TreeView` (owner) — nodes with expand/collapse (themed +/− glyphs, cancelable
       Before/After pipeline), per-node icons (`ImageIndex`/`SelectedImageIndex` via `ImageList`,
       lazily materialized), checkboxes (`AfterCheck`, shared `CheckGlyph`), full keyboard nav
@@ -325,7 +330,8 @@ strategy (may differ per platform; note exceptions inline).
   - [~] [x] full-row selection, [x] keyboard nav (Up/Down/PageUp/PageDown/Home/End), [x] header rendering
         in native theme, [x] sorting, [x] `MultiSelect` (Ctrl/Shift, display-order ranges),
         [x] clipboard copy (TSV via `IPlatformBackend.SetClipboardText`) done; [ ] paste pending
-  - [~] [x] alternating row styles done; [ ] per-cell styles, [ ] DPI + dark mode pending
+  - [~] [x] alternating row styles, [x] per-cell styles (`CellStyleSelector`, see the lambda
+        presentation box) done; [ ] DPI + dark mode verification pending
   - [~] [x] Row headers (`ShowRowHeaders`/`RowHeaderWidth`, current-row marker), [x] column
         auto-size modes, [x] column drag-reorder (`DisplayIndex` indirection, model `Columns`
         untouched)
@@ -375,10 +381,11 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.7 Media & misc
 - [x] `PictureBox` (owner) — `Image`, `SizeMode` (Normal/Stretch/Center/Zoom letterbox), `BorderStyle`
-- [~] `ImageList` (icon storage shared by list/tree/combo/toolbar) — pre-realization storage done:
-      holds ARGB pixel data with no backend present, materializes `IImage`s lazily per backend and
-      caches per index (`ImageList.GetImage`), fixed `ImageSize`, dispose drops native bitmaps but
-      keeps pixels; pending: wiring into controls (`ImageIndex`/`ImageKey`), badge overlays (§7.9)
+- [x] `ImageList` (icon storage shared by list/tree/combo/tab/toolbar) — pre-realization ARGB
+      storage, lazy per-backend materialization with per-index caching (`ImageList.GetImage`),
+      fixed `ImageSize`, dispose drops native bitmaps but keeps pixels, badge overlays
+      (`AddBadged`, §7.9); wired into ListBox/ListView/TreeView/TreeListView/ComboBox/TabControl
+      via `ImageIndex`-style members (`ImageKey` string lookup not offered — indices only)
 - [~] `NotifyIcon` (tray) — Win32 `Shell_NotifyIconW` with message-only callback window done;
       GTK throws (GtkStatusIcon deprecated; StatusNotifier/D-Bus is the tracked follow-up)
 - [ ] `WebBrowser/WebView` (native host) — likely later / optional
@@ -477,30 +484,59 @@ before commit, semantic single-concern commits with the `+ - * # !` prefix, no A
 ## 11. Coverage matrix — tested · demo-ed · documented
 
 A §7 box may be `[x]` (implemented + unit-tested) while the feature is still invisible to users.
-This matrix tracks the rest of "done": a section in the `NativeForms.Demo` gallery and a reference
-page under `docs/`. Every change that ships a control/feature extends this table in the same commit.
-`—` = not applicable.
+This matrix tracks the rest of "done": a section in the `NativeForms.Demo` tabbed gallery and a
+reference page under `docs/`. Every change that ships a control/feature extends this table in the
+same commit. `—` = not applicable.
 
 | Feature | Tests | Demo | Docs |
 |---|---|---|---|
-| Architecture (core/peer/realization) | ✔ | — | [architecture.md](architecture.md) |
+| Architecture (core/peer/realization/containers/popups/modal) | ✔ | — | [architecture.md](architecture.md) |
 | `Application` + `BackendRegistry` | ✔ | ✔ | [controls/application.md](controls/application.md) |
-| `Control` base | ✔ | ✔ | [controls/control.md](controls/control.md) |
-| `Form` | ✔ | ✔ | [controls/form.md](controls/form.md) |
-| `Button` | ✔ | ✔ | [controls/button.md](controls/button.md) |
-| `Label` | ✔ | ✔ | [controls/label.md](controls/label.md) |
-| `Panel` | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
-| `GroupBox` | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |
-| `CheckBox` | ✔ | ✔ | [controls/checkbox.md](controls/checkbox.md) |
-| `RadioButton` | ✔ | ✔ | [controls/radiobutton.md](controls/radiobutton.md) |
-| `ProgressBar` | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
-| `ListBox` | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |
-| `ListView` | ✔ | ✔ | [controls/listview.md](controls/listview.md) |
-| `DataGridView` | ✔ | ✔ | [controls/datagridview.md](controls/datagridview.md) |
-| MVVM primitives + binding | ✔ | ✔ | [mvvm.md](mvvm.md) |
-| Owner-draw engine (`IGraphics`/`ITheme`/canvas) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
+| `Control` base (incl. `Margin`, `PointToScreen`, `ContextMenuStrip`) | ✔ | ✔ | [controls/control.md](controls/control.md) |
+| `Form` (modal, window management, icon) | ✔ | ✔ | [controls/form.md](controls/form.md) |
+| `Timer` | ✔ | ✔ | [controls/timer.md](controls/timer.md) |
+| `ImageList` (+ badges) | ✔ | ✔ | [controls/imagelist.md](controls/imagelist.md) |
+| `Button` (image, `DialogResult`) | ✔ | ✔ | [controls/button.md](controls/button.md) |
+| `Label` (AutoSize/TextAlign/mnemonics/image) | ✔ | ✔ | [controls/label.md](controls/label.md) |
+| `LinkLabel` | ✔ | ✔ | [controls/linklabel.md](controls/linklabel.md) |
+| `TextBox` | ✔ | ✔ | [controls/textbox.md](controls/textbox.md) |
+| `MaskedTextBox` | ✔ | ✔ | [controls/maskedtextbox.md](controls/maskedtextbox.md) |
+| `RichTextBox` (+ RTF subset) | ✔ | ✔ | [controls/richtextbox.md](controls/richtextbox.md) |
+| `SearchBox` | ✔ | ✔ | [controls/searchbox.md](controls/searchbox.md) |
+| `CheckBox` / `RadioButton` (images) | ✔ | ✔ | [controls/checkbox.md](controls/checkbox.md) · [radiobutton.md](controls/radiobutton.md) |
+| `ToggleSwitch` | ✔ | ✔ | [controls/toggleswitch.md](controls/toggleswitch.md) |
+| `SplitButton` / `DropDownButton` | ✔ | ✔ | [controls/splitbutton.md](controls/splitbutton.md) |
+| `NumericUpDown` / `DomainUpDown` | ✔ | ✔ | [controls/numericupdown.md](controls/numericupdown.md) · [domainupdown.md](controls/domainupdown.md) |
+| `TrackBar` | ✔ | ✔ | [controls/trackbar.md](controls/trackbar.md) |
+| `HScrollBar` / `VScrollBar` | ✔ | ✔ | [controls/scrollbar.md](controls/scrollbar.md) |
+| `ProgressBar` (incl. marquee) | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
+| `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
+| `MonthCalendar` | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
+| `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
+| `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
+| `GroupBox` (caption image, nesting) | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |
+| `TabControl` / `TabPage` | ✔ | ✔ | [controls/tabcontrol.md](controls/tabcontrol.md) |
+| `SplitContainer` | ✔ | ✔ | [controls/splitcontainer.md](controls/splitcontainer.md) |
+| `Expander` | ✔ | ✔ | [controls/expander.md](controls/expander.md) |
+| `FlowLayoutPanel` | ✔ | ✔ | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md) |
+| `TableLayoutPanel` | ✔ | ✔ | [controls/tablelayoutpanel.md](controls/tablelayoutpanel.md) |
+| `ListBox` (selection modes, icons) | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |
+| `CheckedListBox` | ✔ | ✔ | [controls/checkedlistbox.md](controls/checkedlistbox.md) |
+| `ComboBox` | ✔ | ✔ | [controls/combobox.md](controls/combobox.md) |
+| `ListView` (5 views, groups, checks, sort, label edit) | ✔ | ✔ | [controls/listview.md](controls/listview.md) |
+| `TreeView` | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
+| `TreeListView` | ✔ | ✔ | [controls/treelistview.md](controls/treelistview.md) |
+| `DataGridView` (kinds, editing, frozen, reorder, clipboard) | ✔ | ✔ | [controls/datagridview.md](controls/datagridview.md) |
+| `MenuStrip` + item model | ✔ | ✔ | [controls/menustrip.md](controls/menustrip.md) |
+| `ContextMenuStrip` | ✔ | ✔ | [controls/contextmenustrip.md](controls/contextmenustrip.md) |
+| `ToolStrip` | ✔ | ✔ | [controls/toolstrip.md](controls/toolstrip.md) |
+| `StatusStrip` | ✔ | ✔ | [controls/statusstrip.md](controls/statusstrip.md) |
+| `ToolTip` | ✔ | ✔ | [controls/tooltip.md](controls/tooltip.md) |
+| `NotifyIcon` | ✔ | — | [controls/notifyicon.md](controls/notifyicon.md) |
+| Modal forms + `MessageBox` + common dialogs | ✔ | ✔ | [controls/dialogs.md](controls/dialogs.md) |
+| MVVM primitives + binding + `ICommand` wiring | ✔ | ✔ | [mvvm.md](mvvm.md) |
+| Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
 
-Known gallery gaps (limited by pending §7 boxes, not by the gallery): no icons anywhere
-(`IImage` requires a resolved backend — see the `ImageList` box in §7.7), containers shown as
-empty frames (nested child realization, §7.2), single radio group (grouping is per-container and
-the gallery is flat).
+`NotifyIcon` has no gallery section (a tray icon in a demo is intrusive; Win32-only today).
+File/folder/color/font dialogs are demoed indirectly through the modal `MessageBox` round-trip —
+opening blocking native dialogs from a gallery is deliberate friction we skip.
