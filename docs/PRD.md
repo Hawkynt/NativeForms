@@ -256,9 +256,13 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `CheckedListBox` (owner) — per-item check state over the ListBox engine (`ItemCheck`
       veto-able before the flip, `CheckOnClick`, Space toggles selection, shared `CheckGlyph`
       with CheckBox, check states survive item mutation)
-- [ ] `ComboBox` (native) — `DropDown`/`DropDownList`/`Simple`, **items with icons** (owner-drawn
-      drop-down in native style), `PlaceholderText` hint on the edit part,
-      `DataSource`/`DisplayMember`/`ValueMember`/`SelectedValue`, autocomplete
+- [~] `ComboBox` (owner field + popup drop-down in native theme) — `DropDownList` and `DropDown`
+      (hosted native TextBox editor), **items with icons** (shared ListBox row painter, pixel-
+      identical rows), `PlaceholderText`, full keyboard model (Alt+Down/F4, closed-arrow
+      selection, prefix cycling open and closed), light-dismiss popup sized by
+      `MaxDropDownItems`, `DataSource` + `DisplaySelector`/`ValueSelector`/`SelectedValue`
+      (lambda-shaped DisplayMember/ValueMember) done; `Simple` style and autocomplete pending
+      (autocomplete needs key events on `ITextBoxPeer`)
 - [~] `ListView` (owner, native metrics) — Details + List views, columns (`Width`/`TextAlign`),
       per-item icons, sub-items, single selection, header row, wheel/keyboard scroll, virtualized
       paint done; LargeIcon/SmallIcon/Tile views, groups, checkboxes, virtual-mode item API, label
