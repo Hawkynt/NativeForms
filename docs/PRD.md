@@ -250,7 +250,10 @@ strategy (may differ per platform; note exceptions inline).
   - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live
   - [ ] Owner-drawn grey placeholder for multiline (no native support in EDIT or GtkTextView)
   - [ ] `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, undo API
-- [ ] `MaskedTextBox` (owner over native TextBox)
+- [x] `MaskedTextBox` (core mask engine over the native TextBox: 0/9/L/?/A/a/&/C + literals +
+      escapes, `PromptChar`, transactional whole-text validation with revert, `MaskCompleted`,
+      `MaskedTextChanged`, raw-text extraction; whole-text transitions documented — no per-key
+      caret steering yet)
 - [ ] `RichTextBox` (native where available / owner) — character styles (bold/italic/underline/
       strikeout, `SelectionColor`/`SelectionFont`), paragraph alignment + indent, bullet lists,
       auto-detected links + `LinkClicked`, `PlaceholderText`, RTF subset load/save (`Rtf`,
