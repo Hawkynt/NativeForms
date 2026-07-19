@@ -381,12 +381,12 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `PrintDialog`/printing (later / optional)
 
 ### 7.9 Modern extras (controls users expect today; owner-drawn, native-themed)
-- [ ] `ToggleSwitch` (owner) — on/off slider as the modern CheckBox alternative
-- [ ] `SplitButton` / `DropDownButton` (owner) — button with attached drop-down menu
+- [x] `ToggleSwitch` (owner) — themed pill + thumb, accent when on, optional caption, click/Space (snap, no animation yet)
+- [x] `SplitButton` / `DropDownButton` (owner) — shared `DropDownButtonBase` over the MenuDropDown engine; SplitButton gates its main action through `ICommand`
 - [x] `Expander` (owner) — collapsible header (themed triangle + caption, click/Space) +
       content whose child peers hide while collapsed; height restores on expand
-- [ ] `SearchBox` — `TextBox` preset: placeholder hint + search icon + clear (×) button
-- [ ] Badge/overlay support on `ImageList` images (small composed status icons)
+- [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
+- [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 
 ---
 
