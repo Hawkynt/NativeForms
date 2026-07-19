@@ -6,7 +6,7 @@ working in this repository. These rules are not optional. The full house spec li
 
 ## What this is
 
-A cross-platform **C# (.NET 8) UI toolkit** with a Windows Forms-shaped API that renders through
+A cross-platform **C# (.NET 10) UI toolkit** with a Windows Forms-shaped API that renders through
 platform-native widgets (Win32, GTK, Cocoa) via `[LibraryImport]` P/Invoke, and owner-draws the
 controls no platform offers natively — in that platform's own theme. It must stay **fast**, **tiny**
 (bytes, not megabytes) and **trim/NativeAOT compatible**.

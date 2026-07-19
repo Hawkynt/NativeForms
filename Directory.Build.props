@@ -4,7 +4,7 @@
        several assemblies (Core + one backend per platform + demo + tests) that would otherwise
        repeat the same TFM, nullable and packaging metadata. -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

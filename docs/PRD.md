@@ -31,7 +31,7 @@ widget · `owner` = we draw it ourselves in the native theme.
 4. **Bytes, not megabytes.** Aggressive memory discipline (see §4). A small form should cost
    kilobytes of managed state, not megabytes.
 5. **Pattern-agnostic.** First-class support for **MVVM, MVC and MVP** and every data-binding flavor
-   (one-way, two-way, to-source, one-time; scalar and list binding).
+   (one-way, two-way, to-source, one-time; scalar and list binding; converters, default values, null-replace values).
 6. **One binary, every platform** — or trim to a single platform for the smallest footprint. The
    app chooses which backends it registers.
 

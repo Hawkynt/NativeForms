@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0                           # version.pl counts commits
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
       - name: Stamp per-package versions
         shell: bash
         run: perl .github/workflows/scripts/version.pl --stamp
