@@ -24,6 +24,10 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial nint SetClipboardData(uint uFormat, nint hMem);
 
+    /// <summary>Retrieves data from the open clipboard; the clipboard keeps owning the handle.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetClipboardData(uint uFormat);
+
     /// <summary>Closes the clipboard, making the placed data visible to other applications.</summary>
     [LibraryImport("user32.dll")]
     internal static partial int CloseClipboard();

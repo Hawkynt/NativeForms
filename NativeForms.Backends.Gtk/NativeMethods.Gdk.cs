@@ -175,6 +175,11 @@ internal static partial class NativeMethods
     /// <summary>Places UTF-8 text on the clipboard; -1 length means zero-terminated.</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void gtk_clipboard_set_text(nint clipboard, string text, int len);
+
+    /// <summary>Reads the clipboard's text, waiting for the owner's reply: a heap UTF-8 string to
+    /// free with <see cref="g_free"/>, or 0 when the clipboard holds no text.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_clipboard_wait_for_text(nint clipboard);
 }
 
 /// <summary>A GDK rectangle — also a widget's <c>GtkAllocation</c>: integer position and size.</summary>

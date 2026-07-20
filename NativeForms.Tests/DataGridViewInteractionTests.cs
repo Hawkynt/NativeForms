@@ -484,4 +484,97 @@ internal sealed class DataGridViewInteractionTests
         canvas.RaiseKeyDown(Keys.Down); // a plain arrow collapses to the new row
         Assert.That(grid.SelectedItems.Cast<Person>().Select(static p => p.Name), Is.EqualTo(new[] { "Carol" }));
     }
+
+    [Test]
+    public void Fill_columns_share_the_leftover_width_by_weight()
+    {
+        var grid = MakeGrid(); // 3 rows fit — the whole 200px viewport is available
+        grid.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        grid.Columns[0].FillWeight = 100f;
+        grid.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        grid.Columns[1].FillWeight = 300f;
+        var canvas = Realize(grid);
+
+        canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Columns[0].Width, Is.EqualTo(50), "100 of 400 weight over 200px");
+            Assert.That(grid.Columns[1].Width, Is.EqualTo(150), "300 of 400 weight over 200px");
+        });
+    }
+
+    [Test]
+    public void Fill_columns_respect_their_minimum_width()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        grid.Columns[0].FillWeight = 100f;
+        grid.Columns[0].MinimumWidth = 80;
+        grid.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        grid.Columns[1].FillWeight = 300f;
+        var canvas = Realize(grid);
+
+        canvas.RaisePaint();
+
+        Assert.That(grid.Columns[0].Width, Is.EqualTo(80), "the 50px share is floored at MinimumWidth");
+    }
+
+    [Test]
+    public void Fill_recomputes_when_the_grid_resizes()
+    {
+        var grid = MakeGrid(); // fixed 60px Age column, Name fills the rest
+        grid.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        var canvas = Realize(grid);
+        canvas.RaisePaint();
+        Assert.That(grid.Columns[0].Width, Is.EqualTo(140));
+
+        grid.Bounds = new(0, 0, 300, 110);
+        canvas.RaisePaint();
+
+        Assert.That(grid.Columns[0].Width, Is.EqualTo(240), "the fill follows the wider viewport");
+    }
+
+    [Test]
+    public void Resizable_False_blocks_the_divider_drag_even_when_the_grid_allows()
+    {
+        var grid = MakeGrid(); // AllowUserToResizeColumns defaults to true
+        grid.Columns[0].Resizable = DataGridViewTriState.False;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(100, 5); // the Name/Age divider
+        canvas.RaiseMouseMove(130, 5);
+        canvas.RaiseMouseUp(130, 5);
+
+        Assert.That(grid.Columns[0].Width, Is.EqualTo(100));
+    }
+
+    [Test]
+    public void Resizable_True_overrides_a_grid_that_disallows()
+    {
+        var grid = MakeGrid();
+        grid.AllowUserToResizeColumns = false;
+        grid.Columns[0].Resizable = DataGridViewTriState.True;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(100, 5);
+        canvas.RaiseMouseMove(130, 5);
+        canvas.RaiseMouseUp(130, 5);
+
+        Assert.That(grid.Columns[0].Width, Is.EqualTo(130));
+    }
+
+    [Test]
+    public void MinimumWidth_clamps_the_user_resize()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].MinimumWidth = 50;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(100, 5);
+        canvas.RaiseMouseMove(10, 5); // would shrink to 10px
+        canvas.RaiseMouseUp(10, 5);
+
+        Assert.That(grid.Columns[0].Width, Is.EqualTo(50));
+    }
 }

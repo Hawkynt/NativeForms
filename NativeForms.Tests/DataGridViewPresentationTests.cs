@@ -255,4 +255,105 @@ internal sealed class DataGridViewPresentationTests
         // linearly over the visible window only, so the op count stays tiny for 100000 rows.
         Assert.That(textOps, Is.LessThan(32), $"rendered {textOps} text ops for 100000 rows");
     }
+
+    private static HeadlessBackend RealizeWithBackend(OwnerDrawnControl control)
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(control);
+        Application.Run(form, backend);
+        return backend;
+    }
+
+    [Test]
+    public void FormatSelector_shapes_the_display_after_the_value_selector()
+    {
+        var grid = MakeGrid();
+        grid.Columns[1].FormatSelector = static value => $"{value} y";
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.DrewText("30 y"), Is.True, "the value runs through the formatter");
+            Assert.That(g.DrewText("Age"), Is.True, "headers stay unformatted");
+        });
+    }
+
+    [Test]
+    public void Editors_seed_from_the_raw_value_not_the_format()
+    {
+        var grid = MakeGrid();
+        grid.Columns[1].FormatSelector = static value => $"{value} y";
+        grid.Columns[1].TextSetter = static (_, _) => { };
+        Realize(grid);
+
+        grid.BeginEdit(0, 1);
+
+        Assert.That(grid.EditingControl!.Text, Is.EqualTo("30"), "formatting is display-only");
+    }
+
+    [Test]
+    public void Cell_tooltip_pops_up_after_the_hover_delay_and_auto_hides()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].TooltipSelector = static o => ((Person)o!).Name == "Alice" ? "tip-A" : null;
+        var backend = RealizeWithBackend(grid);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseMove(10, 30); // row 0, Name
+        var timer = backend.Timers.Single();
+        Assert.That(timer.StartedIntervals, Is.EqualTo(new[] { 500 }), "armed with the tooltip initial delay");
+
+        timer.FireTick();
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(popup.IsShown, Is.True);
+            // Cursor (10, 30) plus the shared 18px offset; "tip-A" (35x16) in 4px padding.
+            Assert.That(popup.ShowCalls.Single(), Is.EqualTo((new Point(10, 48), new Size(43, 24))));
+            Assert.That(popup.RaisePaint().DrewText("tip-A"), Is.True);
+        });
+
+        timer.FireTick(); // the auto-pop phase elapses
+        Assert.That(popup.IsShown, Is.False);
+    }
+
+    [Test]
+    public void Cell_tooltip_hides_when_the_pointer_leaves_or_presses()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].TooltipSelector = static _ => "tip";
+        var backend = RealizeWithBackend(grid);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseMove(10, 30);
+        backend.Timers.Single().FireTick();
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        Assert.That(popup.IsShown, Is.True);
+
+        canvas.RaiseMouseLeave();
+        Assert.That(popup.IsShown, Is.False, "leaving the grid hides the tip");
+
+        canvas.RaiseMouseMove(10, 30);
+        backend.Timers.Single().FireTick();
+        Assert.That(popup.IsShown, Is.True);
+
+        canvas.RaiseMouseDown(10, 30);
+        Assert.That(popup.IsShown, Is.False, "a press hides the tip");
+    }
+
+    [Test]
+    public void Cells_without_tooltip_text_never_arm_the_delay()
+    {
+        var grid = MakeGrid();
+        grid.Columns[0].TooltipSelector = static o => ((Person)o!).Name == "Alice" ? "tip-A" : null;
+        var backend = RealizeWithBackend(grid);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseMove(10, 50); // row 1 — Bob has no tip
+
+        Assert.That(backend.Timers, Is.Empty);
+    }
 }

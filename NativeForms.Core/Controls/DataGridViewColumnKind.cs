@@ -49,4 +49,19 @@ public enum DataGridViewColumnKind
     /// engine as <see cref="Hawkynt.NativeForms.DateTimePicker"/>) and commits the picked day through
     /// <see cref="DataGridViewColumn.DateSetter"/>, keeping the time of day.</summary>
     DateTime,
+
+    /// <summary>Plain text whose editor is a hosted <see cref="Hawkynt.NativeForms.MaskedTextBox"/>
+    /// forcing the column's <see cref="DataGridViewColumn.Mask"/>; the masked rendering commits
+    /// through <see cref="DataGridViewColumn.TextSetter"/>.</summary>
+    MaskedText,
+
+    /// <summary>Plain text whose editor is a hosted <see cref="Hawkynt.NativeForms.DomainUpDown"/>
+    /// stepping through the choices from <see cref="DataGridViewColumn.ItemsSelector"/>; the picked
+    /// choice commits through <see cref="DataGridViewColumn.ValueSetter"/>.</summary>
+    DomainUpDown,
+
+    /// <summary>A color swatch from <see cref="DataGridViewColumn.ColorSelector"/>; editing opens the
+    /// platform's native color dialog and commits the picked color through
+    /// <see cref="DataGridViewColumn.ColorSetter"/>.</summary>
+    Color,
 }

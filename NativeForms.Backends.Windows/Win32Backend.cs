@@ -155,6 +155,42 @@ public sealed partial class Win32Backend : IPlatformBackend
     }
 
     /// <inheritdoc/>
+    public string? GetClipboardText()
+    {
+        if (NativeMethods.OpenClipboard(0) == 0)
+            return null;
+
+        try
+        {
+            // CF_UNICODETEXT arrives as a zero-terminated UTF-16 string in a global block the
+            // clipboard keeps owning — lock, copy into a managed string, unlock, never free.
+            var handle = NativeMethods.GetClipboardData(NativeMethods.CF_UNICODETEXT);
+            if (handle == 0)
+                return null;
+
+            var source = NativeMethods.GlobalLock(handle);
+            if (source == 0)
+                return null;
+
+            try
+            {
+                unsafe
+                {
+                    return new string((char*)source);
+                }
+            }
+            finally
+            {
+                NativeMethods.GlobalUnlock(handle);
+            }
+        }
+        finally
+        {
+            NativeMethods.CloseClipboard();
+        }
+    }
+
+    /// <inheritdoc/>
     public void Post(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);

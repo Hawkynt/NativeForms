@@ -86,6 +86,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public void SetClipboardText(string text) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
+    public string? GetClipboardText() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public void Post(Action action) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

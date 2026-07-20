@@ -113,10 +113,16 @@ public interface IPlatformBackend
 
     /// <summary>
     /// Places plain text on the system clipboard, replacing its current content. The seam behind copy
-    /// gestures (a grid's Ctrl+C); reading the clipboard and non-text formats are not part of the
-    /// contract.
+    /// gestures (a grid's Ctrl+C); non-text formats are not part of the contract.
     /// </summary>
     void SetClipboardText(string text);
+
+    /// <summary>
+    /// Reads the plain-text content of the system clipboard, or <see langword="null"/> when it holds
+    /// no text. The seam behind paste gestures (a grid's Ctrl+V); non-text formats are not part of
+    /// the contract.
+    /// </summary>
+    string? GetClipboardText();
 
     /// <summary>
     /// Queues <paramref name="action"/> for execution on the UI thread the message loop runs on and

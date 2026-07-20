@@ -11,14 +11,16 @@ namespace Hawkynt.NativeForms;
 /// An owner-drawn, vertically virtualized data grid painted in the native theme. Rows are arbitrary
 /// objects bound through an <see cref="ObservableList{T}"/>; each <see cref="DataGridViewColumn"/>
 /// maps a row to its cell content via reflection-free selector delegates, so binding stays
-/// trim/AOT-safe. Columns render as text, check, button, link, multi-image or progress cells
+/// trim/AOT-safe. Columns render as text, check, button, link, multi-image, progress or color cells
 /// (<see cref="DataGridViewColumnKind"/>), headers sort through an index indirection that never
-/// mutates <see cref="Items"/>, and presentation (row colors/heights/visibility, cell styles) is
-/// driven by optional per-row/per-cell selectors. Cells edit in place through
-/// <see cref="BeginEdit"/> — a hosted editor or popup per <see cref="DataGridViewColumnKind"/> —
-/// columns can be frozen, drag-reordered through a display-order indirection and copied to the
-/// clipboard as tab-separated text, and <see cref="MultiSelect"/> extends the full-row selection to
-/// Ctrl/Shift sets.
+/// mutates <see cref="Items"/>, and presentation (row colors/heights/visibility, cell styles,
+/// display formatting, cell tooltips) is driven by optional per-row/per-cell selectors. Cells edit
+/// in place through <see cref="BeginEdit"/> — a hosted editor, popup or dialog per
+/// <see cref="DataGridViewColumnKind"/>, entered per <see cref="EditMode"/>, with Tab/Enter walking
+/// the editable cells — columns can be frozen, fill-sized by weight, drag-reordered through a
+/// display-order indirection and copied to (or pasted from, via <see cref="Paste"/>) the clipboard
+/// as tab-separated text, <see cref="MultiSelect"/> extends the full-row selection to Ctrl/Shift
+/// sets, and overflowing content grows interactive scrollbar strips along the grid's edges.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -80,6 +82,8 @@ public class DataGridView : OwnerDrawnControl
     private int _editColumnIndex = -1;
     private TextBox? _textEditor;
     private NumericUpDown? _numericEditor;
+    private DomainUpDown? _domainEditor;
+    private bool _editDirty;
     private IPopupPeer? _editPopup;
     private bool _editPopupShown;
     private CalendarCore? _editCalendar;
@@ -88,6 +92,21 @@ public class DataGridView : OwnerDrawnControl
     private int _editPopupTop;
     private int _editPopupRows;
     private Size _editPopupSize;
+
+    private bool _verticalScrollBarVisible;
+    private bool _horizontalScrollBarVisible;
+    private bool _scrollDragging;
+    private bool _scrollDragVertical;
+    private int _scrollDragOffset;
+
+    private int _hoverRowIndex = -1;
+    private int _hoverColumnIndex = -1;
+    private Point _hoverPoint;
+    private Timer? _tipTimer;
+    private IPopupPeer? _tipPopup;
+    private string _tipText = string.Empty;
+    private bool _tipShown;
+    private bool _tipAutoPopPhase;
 
     /// <summary>Creates a data grid.</summary>
     public DataGridView()
@@ -259,6 +278,9 @@ public class DataGridView : OwnerDrawnControl
         set
         {
             var clamped = value < -1 || value >= this.Items.Count ? -1 : value;
+            if (clamped != _selectedRowIndex && !this.ValidateRowChange())
+                return;
+
             var multiChanged = false;
             if (_multiSelection is { } multi)
             {
@@ -314,8 +336,55 @@ public class DataGridView : OwnerDrawnControl
         set => _currentColumnIndex = Math.Max(0, value);
     }
 
-    /// <summary>The display index of the first visible data row (vertical scroll position).</summary>
-    public int TopRow => _topRow;
+    /// <summary>The display index of the first visible data row (vertical scroll position).
+    /// Assigning scrolls there, clamped to the scrollable range — the same state the vertical
+    /// scrollbar's thumb reads and writes.</summary>
+    public int TopRow
+    {
+        get => _topRow;
+        set
+        {
+            _topRow = Math.Max(0, value);
+            this.ClampScroll();
+            this.Invalidate();
+            this.SyncEditorToScroll();
+        }
+    }
+
+    /// <summary>How cells enter edit mode. Defaults to
+    /// <see cref="DataGridViewEditMode.EditOnKeystrokeOrF2"/>.</summary>
+    public DataGridViewEditMode EditMode { get; set; }
+
+    /// <summary>Whether resting the pointer on a cell whose column has a
+    /// <see cref="DataGridViewColumn.TooltipSelector"/> pops that text up near the cursor. Defaults
+    /// to <see langword="true"/>.</summary>
+    public bool ShowCellToolTips { get; set; } = true;
+
+    /// <summary>Whether the hosted editor's content has changed since the edit began — cleared when
+    /// the edit ends. Popup-based kinds commit through their pick gesture and never report dirty.</summary>
+    public bool IsCurrentCellDirty => _editDirty;
+
+    /// <summary>Whether the vertical scrollbar strip is currently shown (the rows overflow the
+    /// viewport).</summary>
+    public bool IsVerticalScrollBarVisible
+    {
+        get
+        {
+            this.UpdateScrollBarVisibility();
+            return _verticalScrollBarVisible;
+        }
+    }
+
+    /// <summary>Whether the horizontal scrollbar strip is currently shown (the columns overflow the
+    /// viewport).</summary>
+    public bool IsHorizontalScrollBarVisible
+    {
+        get
+        {
+            this.UpdateScrollBarVisibility();
+            return _horizontalScrollBarVisible;
+        }
+    }
 
     /// <summary>The column the grid is currently sorted by, or <see langword="null"/>.</summary>
     public DataGridViewColumn? SortedColumn => _sortedColumn;
@@ -348,6 +417,21 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>Raised after a cell leaves edit mode, whether the edit committed or was cancelled.</summary>
     public event EventHandler<DataGridViewCellEventArgs>? CellEndEdit;
 
+    /// <summary>Raised when <see cref="IsCurrentCellDirty"/> flips — on the first editor change after
+    /// the edit begins, and again when the edit ends.</summary>
+    public event EventHandler? CellDirtyStateChanged;
+
+    /// <summary>Raised before the current row is left for another one, carrying the row being left;
+    /// setting <see cref="DataGridViewCellCancelEventArgs.Cancel"/> keeps the selection where it is.</summary>
+    public event EventHandler<DataGridViewCellCancelEventArgs>? RowValidating;
+
+    /// <summary>Raised after the current row was left without a <see cref="RowValidating"/> veto.</summary>
+    public event EventHandler<DataGridViewCellEventArgs>? RowValidated;
+
+    /// <summary>Raised after <see cref="Paste"/> processed clipboard text — every attempted cell
+    /// already ran its own <see cref="CellValidating"/>.</summary>
+    public event EventHandler? PasteCompleted;
+
     /// <summary>Replaces the rows from any sequence (one-way binding convenience).</summary>
     public IEnumerable? DataSource
     {
@@ -365,15 +449,26 @@ public class DataGridView : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
-    /// <summary>The grid claims Enter (activate/commit) always and Escape while a cell edit runs.</summary>
+    /// <summary>The grid claims Enter (activate/commit) always, plus Escape (cancel) and
+    /// Tab/Shift+Tab (in-grid cell navigation) while a cell edit runs.</summary>
     protected override bool IsInputKey(Keys keyData)
-        => keyData == Keys.Enter || (keyData == Keys.Escape && this.IsEditing);
+        => keyData == Keys.Enter
+           || (this.IsEditing && keyData is Keys.Escape or Keys.Tab or (Keys.Tab | Keys.Shift));
 
     /// <summary>The pixel height of the column-header row, or 0 when hidden.</summary>
     protected int HeaderHeight => this.ShowColumnHeaders ? this.ColumnHeaderHeight : 0;
 
-    /// <summary>The number of fully visible data rows, assuming the default <see cref="RowHeight"/>.</summary>
-    protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.RowHeight);
+    /// <summary>The number of fully visible data rows, assuming the default <see cref="RowHeight"/>
+    /// and accounting for the horizontal scrollbar strip when it is shown.</summary>
+    protected int VisibleRowCount
+    {
+        get
+        {
+            this.UpdateScrollBarVisibility();
+            var height = this.Height - this.HeaderHeight - (_horizontalScrollBarVisible ? this.Theme.ScrollBarSize : 0);
+            return Math.Max(1, height / this.RowHeight);
+        }
+    }
 
     /// <summary>The x-coordinate where the data columns start (right of the row headers).</summary>
     private int ContentLeft => this.ShowRowHeaders ? this.RowHeaderWidth : 0;
@@ -404,26 +499,59 @@ public class DataGridView : OwnerDrawnControl
     }
 
     /// <summary>The largest permitted <see cref="HorizontalOffset"/> for the current column widths;
-    /// only the non-frozen columns scroll, within the viewport right of the frozen run.</summary>
+    /// only the non-frozen columns scroll, within the viewport right of the frozen run (narrowed by
+    /// the vertical scrollbar strip when it is shown).</summary>
     private int MaxHorizontalOffset
     {
         get
         {
+            this.UpdateScrollBarVisibility();
             var frozenWidth = this.FrozenWidth;
-            return Math.Max(0, this.TotalColumnWidth - frozenWidth - Math.Max(0, this.Width - this.ContentLeft - frozenWidth));
+            var viewport = this.Width - this.ContentLeft - frozenWidth - (_verticalScrollBarVisible ? this.Theme.ScrollBarSize : 0);
+            return Math.Max(0, this.TotalColumnWidth - frozenWidth - Math.Max(0, viewport));
         }
     }
 
     /// <summary>Whether a cell is currently in edit mode.</summary>
     public bool IsEditing => _editRowIndex >= 0;
 
-    /// <summary>The hosted editor control while a <see cref="DataGridViewColumnKind.Text"/> or
-    /// <see cref="DataGridViewColumnKind.NumericUpDown"/> cell is in edit mode, or
-    /// <see langword="null"/> (popup-based kinds host no child control).</summary>
-    public Control? EditingControl => _textEditor is not null ? _textEditor : _numericEditor;
+    /// <summary>The hosted editor control while a <see cref="DataGridViewColumnKind.Text"/>,
+    /// <see cref="DataGridViewColumnKind.MaskedText"/>, <see cref="DataGridViewColumnKind.NumericUpDown"/>
+    /// or <see cref="DataGridViewColumnKind.DomainUpDown"/> cell is in edit mode, or
+    /// <see langword="null"/> (popup- and dialog-based kinds host no child control).</summary>
+    public Control? EditingControl => _textEditor is not null ? _textEditor
+        : _numericEditor is not null ? _numericEditor
+        : _domainEditor;
 
     /// <summary>Raises <see cref="SelectionChanged"/>.</summary>
     protected virtual void OnSelectionChanged(EventArgs e) => this.SelectionChanged?.Invoke(this, e);
+
+    /// <summary>
+    /// Runs the row-validation pair for leaving the current row: <see cref="RowValidating"/> first —
+    /// a veto returns <see langword="false"/> and the caller keeps the selection — then
+    /// <see cref="RowValidated"/>. Trivially <see langword="true"/> without a current row, and
+    /// allocation-free while nobody listens.
+    /// </summary>
+    private bool ValidateRowChange()
+    {
+        var current = _selectedRowIndex;
+        if (current < 0)
+            return true;
+
+        var columnIndex = _columns.Count == 0 ? -1 : Math.Min(_currentColumnIndex, _columns.Count - 1);
+        if (this.RowValidating is not null)
+        {
+            var e = new DataGridViewCellCancelEventArgs(current, columnIndex);
+            this.OnRowValidating(e);
+            if (e.Cancel)
+                return false;
+        }
+
+        if (this.RowValidated is not null)
+            this.OnRowValidated(new(current, columnIndex));
+
+        return true;
+    }
 
     /// <summary>Raises <see cref="CellClick"/>.</summary>
     protected virtual void OnCellClick(DataGridViewCellEventArgs e) => this.CellClick?.Invoke(this, e);
@@ -442,6 +570,18 @@ public class DataGridView : OwnerDrawnControl
 
     /// <summary>Raises <see cref="CellEndEdit"/>.</summary>
     protected virtual void OnCellEndEdit(DataGridViewCellEventArgs e) => this.CellEndEdit?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="CellDirtyStateChanged"/>.</summary>
+    protected virtual void OnCellDirtyStateChanged(EventArgs e) => this.CellDirtyStateChanged?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="RowValidating"/>.</summary>
+    protected virtual void OnRowValidating(DataGridViewCellCancelEventArgs e) => this.RowValidating?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="RowValidated"/>.</summary>
+    protected virtual void OnRowValidated(DataGridViewCellEventArgs e) => this.RowValidated?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="PasteCompleted"/>.</summary>
+    protected virtual void OnPasteCompleted(EventArgs e) => this.PasteCompleted?.Invoke(this, e);
 
     /// <summary>
     /// Whether the given cell refuses edits and check toggling: read-only at any level (grid, column,
@@ -739,8 +879,22 @@ public class DataGridView : OwnerDrawnControl
 
     private int GetRowHeightFor(object? item) => Math.Max(1, this.RowHeightSelector?.Invoke(item) ?? this.RowHeight);
 
+    /// <summary>The text a cell displays: the display-text override, else the value formatted by
+    /// <see cref="DataGridViewColumn.FormatSelector"/> (the CellFormatting seam), else the value's
+    /// <c>ToString()</c>.</summary>
     private static string GetDisplayText(DataGridViewColumn column, object? item)
-        => column.DisplayTextSelector?.Invoke(item) ?? column.ValueSelector(item)?.ToString() ?? string.Empty;
+    {
+        if (column.DisplayTextSelector?.Invoke(item) is { } overridden)
+            return overridden;
+
+        var value = column.ValueSelector(item);
+        return (column.FormatSelector is { } format ? format(value) : value?.ToString()) ?? string.Empty;
+    }
+
+    /// <summary>The text an editor seeds from: the raw <see cref="DataGridViewColumn.ValueSelector"/>
+    /// value — formatting is display-only.</summary>
+    private static string GetEditText(DataGridViewColumn column, object? item)
+        => column.ValueSelector(item)?.ToString() ?? string.Empty;
 
     /// <summary>Finds the data row at the given y-coordinate by walking the visible window (skipping
     /// hidden rows, honoring per-row heights). Returns the model index, or -1.</summary>
@@ -787,6 +941,7 @@ public class DataGridView : OwnerDrawnControl
         if (x < contentLeft)
             return -1;
 
+        this.ApplyFillWidths();
         this.EnsureDisplayMap();
         var map = _displayMap!;
         var scrollEdge = contentLeft + this.FrozenWidth;
@@ -839,6 +994,191 @@ public class DataGridView : OwnerDrawnControl
         }
 
         return -1;
+    }
+
+    // --- Scrollbars --------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Recomputes which scrollbar strips are needed: rows against the viewport height, columns
+    /// against the viewport width, each retried once with the other bar's strip subtracted — the
+    /// classic two-pass resolution. The row extent is approximated from the default
+    /// <see cref="RowHeight"/>, like the rest of the scroll range under per-row heights.
+    /// </summary>
+    private void UpdateScrollBarVisibility()
+    {
+        var size = this.Theme.ScrollBarSize;
+        var viewportWidth = this.Width - this.ContentLeft;
+        var viewportHeight = this.Height - this.HeaderHeight;
+        var contentWidth = this.TotalColumnWidth;
+        var contentHeight = this.Items.Count * this.RowHeight;
+        var vertical = contentHeight > viewportHeight;
+        var horizontal = contentWidth > viewportWidth - (vertical ? size : 0);
+        if (horizontal)
+            vertical = contentHeight > viewportHeight - size;
+
+        _verticalScrollBarVisible = vertical;
+        _horizontalScrollBarVisible = horizontal;
+    }
+
+    /// <summary>The strip the vertical scrollbar occupies: the right edge below the header, stopping
+    /// above the horizontal strip when both are shown.</summary>
+    private Rectangle VerticalScrollBarBounds
+    {
+        get
+        {
+            var size = this.Theme.ScrollBarSize;
+            var height = this.Height - this.HeaderHeight - (_horizontalScrollBarVisible ? size : 0);
+            return new(this.Width - size, this.HeaderHeight, size, Math.Max(0, height));
+        }
+    }
+
+    /// <summary>The strip the horizontal scrollbar occupies: the bottom edge, stopping left of the
+    /// vertical strip when both are shown.</summary>
+    private Rectangle HorizontalScrollBarBounds
+    {
+        get
+        {
+            var size = this.Theme.ScrollBarSize;
+            var width = this.Width - (_verticalScrollBarVisible ? size : 0);
+            return new(0, this.Height - size, Math.Max(0, width), size);
+        }
+    }
+
+    /// <summary>The vertical scroll range in display rows: <see cref="TopRow"/> travels it with the
+    /// visible page as the thumb's share.</summary>
+    private void GetVerticalScrollRange(out int maximum, out int largeChange)
+    {
+        maximum = Math.Max(0, this.Items.Count - 1);
+        largeChange = this.VisibleRowCount;
+    }
+
+    /// <summary>The horizontal scroll range in pixels over the scrolling (non-frozen) columns:
+    /// <see cref="HorizontalOffset"/> travels it with the scrolling viewport as the thumb's share.</summary>
+    private void GetHorizontalScrollRange(out int maximum, out int largeChange)
+    {
+        var scrollable = this.TotalColumnWidth - this.FrozenWidth;
+        maximum = Math.Max(0, scrollable - 1);
+        largeChange = Math.Max(1, scrollable - this.MaxHorizontalOffset);
+    }
+
+    /// <summary>
+    /// Paints the scrollbar strips (and the corner square between them) when the content overflows —
+    /// the same renderer as the standalone <see cref="ScrollBar"/>, driven directly by
+    /// <see cref="TopRow"/> and <see cref="HorizontalOffset"/> so the thumbs can never drift from the
+    /// scroll state.
+    /// </summary>
+    private void PaintScrollBars(IGraphics g, ITheme theme)
+    {
+        this.UpdateScrollBarVisibility();
+        if (_verticalScrollBarVisible)
+        {
+            this.GetVerticalScrollRange(out var maximum, out var largeChange);
+            ScrollBarRenderer.Paint(g, theme, this.VerticalScrollBarBounds, vertical: true, 0, maximum, _topRow, largeChange,
+                _scrollDragging && _scrollDragVertical ? ScrollBarPart.Thumb : ScrollBarPart.None);
+        }
+
+        if (_horizontalScrollBarVisible)
+        {
+            this.GetHorizontalScrollRange(out var maximum, out var largeChange);
+            ScrollBarRenderer.Paint(g, theme, this.HorizontalScrollBarBounds, vertical: false, 0, maximum, this.HorizontalOffset, largeChange,
+                _scrollDragging && !_scrollDragVertical ? ScrollBarPart.Thumb : ScrollBarPart.None);
+        }
+
+        if (_verticalScrollBarVisible && _horizontalScrollBarVisible)
+        {
+            var size = theme.ScrollBarSize;
+            g.FillRectangle(theme.ControlBackground, new Rectangle(this.Width - size, this.Height - size, size, size));
+        }
+    }
+
+    /// <summary>
+    /// Routes a press inside a scrollbar strip: arrows step one row / one horizontal notch, the
+    /// channel pages, the thumb arms a drag. Returns whether the press was consumed by a strip.
+    /// </summary>
+    private bool HandleScrollBarMouseDown(Point location)
+    {
+        this.UpdateScrollBarVisibility();
+        if (_verticalScrollBarVisible && this.VerticalScrollBarBounds.Contains(location))
+        {
+            var bounds = this.VerticalScrollBarBounds;
+            this.GetVerticalScrollRange(out var maximum, out var largeChange);
+            switch (ScrollBarRenderer.HitTest(bounds, true, 0, maximum, _topRow, largeChange, location))
+            {
+                case ScrollBarPart.DecreaseArrow: this.ScrollRows(-1); break;
+                case ScrollBarPart.IncreaseArrow: this.ScrollRows(1); break;
+                case ScrollBarPart.DecreaseChannel: this.ScrollRows(-largeChange); break;
+                case ScrollBarPart.IncreaseChannel: this.ScrollRows(largeChange); break;
+                case ScrollBarPart.Thumb:
+                {
+                    var thumb = ScrollBarRenderer.ThumbRect(bounds, true, 0, maximum, _topRow, largeChange);
+                    _scrollDragging = true;
+                    _scrollDragVertical = true;
+                    _scrollDragOffset = location.Y - thumb.Y;
+                    this.Invalidate();
+                    break;
+                }
+            }
+
+            return true;
+        }
+
+        if (_horizontalScrollBarVisible && this.HorizontalScrollBarBounds.Contains(location))
+        {
+            var bounds = this.HorizontalScrollBarBounds;
+            this.GetHorizontalScrollRange(out var maximum, out var largeChange);
+            switch (ScrollBarRenderer.HitTest(bounds, false, 0, maximum, this.HorizontalOffset, largeChange, location))
+            {
+                case ScrollBarPart.DecreaseArrow: this.HorizontalOffset -= _WheelHorizontalStep; break;
+                case ScrollBarPart.IncreaseArrow: this.HorizontalOffset += _WheelHorizontalStep; break;
+                case ScrollBarPart.DecreaseChannel: this.HorizontalOffset -= largeChange; break;
+                case ScrollBarPart.IncreaseChannel: this.HorizontalOffset += largeChange; break;
+                case ScrollBarPart.Thumb:
+                {
+                    var thumb = ScrollBarRenderer.ThumbRect(bounds, false, 0, maximum, this.HorizontalOffset, largeChange);
+                    _scrollDragging = true;
+                    _scrollDragVertical = false;
+                    _scrollDragOffset = location.X - thumb.X;
+                    this.Invalidate();
+                    break;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Scrubs the dragged thumb to the pointer, mapping the pixel offset back onto
+    /// <see cref="TopRow"/> or <see cref="HorizontalOffset"/>.</summary>
+    private void HandleScrollBarDrag(MouseEventArgs e)
+    {
+        if (_scrollDragVertical)
+        {
+            var bounds = this.VerticalScrollBarBounds;
+            this.GetVerticalScrollRange(out var maximum, out var largeChange);
+            var track = ScrollBarRenderer.TrackRect(bounds, true);
+            var offset = e.Y - _scrollDragOffset - track.Y;
+            this.TopRow = ScrollBarRenderer.ValueFromThumbOffset(bounds, true, 0, maximum, largeChange, offset);
+            return;
+        }
+
+        var hBounds = this.HorizontalScrollBarBounds;
+        this.GetHorizontalScrollRange(out var hMaximum, out var hLargeChange);
+        var hTrack = ScrollBarRenderer.TrackRect(hBounds, false);
+        var hOffset = e.X - _scrollDragOffset - hTrack.X;
+        this.HorizontalOffset = ScrollBarRenderer.ValueFromThumbOffset(hBounds, false, 0, hMaximum, hLargeChange, hOffset);
+    }
+
+    /// <summary>Scrolls the top row by the given number of display rows, skipping hidden rows —
+    /// the shared tail of the wheel, the scrollbar arrows and the channel pages.</summary>
+    private void ScrollRows(int delta)
+    {
+        this.EnsureSortMap();
+        _topRow = this.StepDisplayRow(_topRow, Math.Sign(delta), Math.Abs(delta));
+        this.ClampScroll();
+        this.Invalidate();
+        this.SyncEditorToScroll();
     }
 
     /// <summary>Steps a display row index by up to <paramref name="steps"/> non-hidden rows.</summary>
@@ -929,7 +1269,14 @@ public class DataGridView : OwnerDrawnControl
     protected override void OnMouseDown(MouseEventArgs e)
     {
         this.Focus();
+        this.HideCellToolTip();
         if (e.Button != MouseButtons.Left)
+            return;
+
+        // A press inside a scrollbar strip scrolls without touching selection — or the active edit,
+        // whose scroll-out commit the strips share with the wheel.
+        this.ApplyFillWidths();
+        if (this.HandleScrollBarMouseDown(e.Location))
             return;
 
         // A press on the grid surface while a cell edits is a commit point (click-away); a
@@ -961,20 +1308,19 @@ public class DataGridView : OwnerDrawnControl
 
         _currentColumnIndex = columnIndex;
         this.HandleCellMouseDown(rowIndex, columnIndex, item, e.X - cellLeft, rowHeight);
+        if (this.EditMode == DataGridViewEditMode.EditOnEnter)
+            this.BeginEdit(rowIndex, columnIndex); // the cell became current, so it edits
     }
 
     private void HandleHeaderMouseDown(int x)
     {
-        if (this.AllowUserToResizeColumns)
+        var divider = this.HitTestColumnDivider(x);
+        if (divider >= 0 && this.CanUserResizeColumn(_columns[divider]))
         {
-            var divider = this.HitTestColumnDivider(x);
-            if (divider >= 0)
-            {
-                _resizeColumnIndex = divider;
-                _resizeStartX = x;
-                _resizeStartWidth = _columns[divider].Width;
-                return;
-            }
+            _resizeColumnIndex = divider;
+            _resizeStartX = x;
+            _resizeStartWidth = _columns[divider].Width;
+            return;
         }
 
         var columnIndex = this.HitTestColumn(x, out _);
@@ -994,6 +1340,19 @@ public class DataGridView : OwnerDrawnControl
         this.Sort(column, order);
     }
 
+    /// <summary>Whether the user may drag this column's divider: the column's tri-state
+    /// <see cref="DataGridViewColumn.Resizable"/> wins over the grid's
+    /// <see cref="AllowUserToResizeColumns"/> default, and auto-sized columns never resize by hand —
+    /// their width is the auto-size policy's to give.</summary>
+    private bool CanUserResizeColumn(DataGridViewColumn column)
+        => column.AutoSizeMode == DataGridViewAutoSizeColumnMode.None
+            && column.Resizable switch
+            {
+                DataGridViewTriState.True => true,
+                DataGridViewTriState.False => false,
+                _ => this.AllowUserToResizeColumns,
+            };
+
     private void HandleCellMouseDown(int rowIndex, int columnIndex, object? item, int cellX, int rowHeight)
     {
         var now = Environment.TickCount64;
@@ -1008,7 +1367,8 @@ public class DataGridView : OwnerDrawnControl
         if (isDouble)
         {
             this.OnCellDoubleClick(new(rowIndex, columnIndex));
-            this.BeginEdit(rowIndex, columnIndex);
+            if (this.EditMode != DataGridViewEditMode.EditProgrammatically)
+                this.BeginEdit(rowIndex, columnIndex);
         }
 
         var column = _columns[columnIndex];
@@ -1061,10 +1421,16 @@ public class DataGridView : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        if (_scrollDragging)
+        {
+            this.HandleScrollBarDrag(e);
+            return;
+        }
+
         if (_resizeColumnIndex >= 0 && _resizeColumnIndex < _columns.Count)
         {
             var column = _columns[_resizeColumnIndex];
-            var width = Math.Max(_MinColumnWidth, _resizeStartWidth + (e.X - _resizeStartX));
+            var width = Math.Max(Math.Max(_MinColumnWidth, column.MinimumWidth), _resizeStartWidth + (e.X - _resizeStartX));
             if (width == column.Width)
                 return;
 
@@ -1073,18 +1439,21 @@ public class DataGridView : OwnerDrawnControl
             return;
         }
 
-        if (_dragColumnIndex < 0 || _dragColumnIndex >= _columns.Count)
+        if (_dragColumnIndex >= 0 && _dragColumnIndex < _columns.Count)
+        {
+            var target = this.HitTestColumn(e.X, out _);
+            if (target < 0 || target == _dragColumnIndex)
+                return;
+
+            if (_columns[target].Frozen != _columns[_dragColumnIndex].Frozen)
+                return; // a drag never crosses the frozen boundary
+
+            this.MoveColumnToDisplayPositionOf(_dragColumnIndex, target);
+            this.Invalidate();
             return;
+        }
 
-        var target = this.HitTestColumn(e.X, out _);
-        if (target < 0 || target == _dragColumnIndex)
-            return;
-
-        if (_columns[target].Frozen != _columns[_dragColumnIndex].Frozen)
-            return; // a drag never crosses the frozen boundary
-
-        this.MoveColumnToDisplayPositionOf(_dragColumnIndex, target);
-        this.Invalidate();
+        this.TrackHoverCell(e);
     }
 
     /// <summary>
@@ -1115,24 +1484,35 @@ public class DataGridView : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {
+        if (_scrollDragging)
+        {
+            _scrollDragging = false;
+            this.Invalidate();
+        }
+
         _resizeColumnIndex = -1;
         _dragColumnIndex = -1;
     }
 
     /// <inheritdoc/>
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        _hoverRowIndex = -1;
+        _hoverColumnIndex = -1;
+        this.HideCellToolTip();
+    }
+
+    /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)
     {
+        this.HideCellToolTip();
         if ((e.Modifiers & KeyModifiers.Shift) != 0)
         {
             this.HorizontalOffset = this.HorizontalOffset - (Math.Sign(e.Delta) * _WheelHorizontalStep);
             return;
         }
 
-        this.EnsureSortMap();
-        _topRow = this.StepDisplayRow(_topRow, -Math.Sign(e.Delta), _WheelRows);
-        this.ClampScroll();
-        this.Invalidate();
-        this.SyncEditorToScroll();
+        this.ScrollRows(-Math.Sign(e.Delta) * _WheelRows);
     }
 
     /// <inheritdoc/>
@@ -1153,7 +1533,8 @@ public class DataGridView : OwnerDrawnControl
             case Keys.End: this.SelectEdge(first: false); break;
             case Keys.PageDown: this.MoveSelection(this.VisibleRowCount, e.Shift); break;
             case Keys.PageUp: this.MoveSelection(-this.VisibleRowCount, e.Shift); break;
-            case Keys.F2 when _selectedRowIndex >= 0 && _columns.Count > 0:
+            case Keys.F2 when _selectedRowIndex >= 0 && _columns.Count > 0
+                && this.EditMode != DataGridViewEditMode.EditProgrammatically:
                 this.BeginEdit(_selectedRowIndex, Math.Min(_currentColumnIndex, _columns.Count - 1));
                 break;
             case Keys.C when e.Control:
@@ -1161,6 +1542,13 @@ public class DataGridView : OwnerDrawnControl
                 var content = this.GetClipboardContent();
                 if (content.Length > 0)
                     this.Backend?.SetClipboardText(content);
+                break;
+            }
+
+            case Keys.V when e.Control:
+            {
+                if (this.Backend?.GetClipboardText() is { Length: > 0 } text)
+                    this.Paste(text);
                 break;
             }
 
@@ -1179,12 +1567,12 @@ public class DataGridView : OwnerDrawnControl
         if (this.IsEditing || char.IsControl(e.KeyChar))
             return;
 
-        if (_selectedRowIndex < 0 || _columns.Count == 0)
+        if (_selectedRowIndex < 0 || _columns.Count == 0 || this.EditMode == DataGridViewEditMode.EditProgrammatically)
             return;
 
         var columnIndex = Math.Min(_currentColumnIndex, _columns.Count - 1);
         var kind = _columns[columnIndex].Kind;
-        if (kind is not (DataGridViewColumnKind.Text or DataGridViewColumnKind.NumericUpDown))
+        if (kind is not (DataGridViewColumnKind.Text or DataGridViewColumnKind.NumericUpDown or DataGridViewColumnKind.MaskedText))
             return; // typing only seeds editors that take free text
 
         if (!this.BeginEdit(_selectedRowIndex, columnIndex))
@@ -1210,6 +1598,7 @@ public class DataGridView : OwnerDrawnControl
         this.EnsureSortMap();
         this.EnsureDisplayMap();
         this.AutoSizeColumns(g);
+        this.ApplyFillWidths();
 
         var header = this.HeaderHeight;
         var contentLeft = this.ContentLeft;
@@ -1294,6 +1683,7 @@ public class DataGridView : OwnerDrawnControl
         if (this.ShowRowHeaders)
             this.PaintRowHeaders(g, theme, header, height, count);
 
+        this.PaintScrollBars(g, theme);
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
     }
 
@@ -1491,6 +1881,18 @@ public class DataGridView : OwnerDrawnControl
                 break;
             }
 
+            case DataGridViewColumnKind.Color:
+            {
+                var swatch = new Rectangle(
+                    cellRect.X + _CellPadding,
+                    cellRect.Y + _CellPadding,
+                    Math.Max(0, cellRect.Width - (_CellPadding * 2)),
+                    Math.Max(0, cellRect.Height - (_CellPadding * 2)));
+                g.FillRectangle(column.ColorSelector?.Invoke(item) ?? theme.FieldBackground, swatch);
+                g.DrawRectangle(theme.Border, swatch);
+                break;
+            }
+
             case DataGridViewColumnKind.ComboBox:
             {
                 var arrowZone = Math.Min(_ComboArrowZone, cellRect.Width);
@@ -1593,6 +1995,52 @@ public class DataGridView : OwnerDrawnControl
         }
     }
 
+    /// <summary>
+    /// Applies <see cref="DataGridViewAutoSizeColumnMode.Fill"/>: the viewport width left after the
+    /// fixed columns is split over the fill columns proportionally to their
+    /// <see cref="DataGridViewColumn.FillWeight"/>, each floored at its
+    /// <see cref="DataGridViewColumn.MinimumWidth"/>, with running-share rounding so the widths sum
+    /// to the viewport. Recomputed on demand (paint, hit-testing, resize) — no cached layout, so a
+    /// grid resize re-fills on its next paint.
+    /// </summary>
+    private void ApplyFillWidths()
+    {
+        var columns = _columns;
+        var totalWeight = 0f;
+        var fixedWidth = 0;
+        var hasFill = false;
+        for (var i = 0; i < columns.Count; ++i)
+        {
+            var column = columns[i];
+            if (column.AutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+            {
+                totalWeight += column.FillWeight;
+                hasFill = true;
+            }
+            else
+                fixedWidth += column.Width;
+        }
+
+        if (!hasFill)
+            return;
+
+        var verticalOverflow = this.Items.Count * this.RowHeight > this.Height - this.HeaderHeight;
+        var available = Math.Max(0, this.Width - this.ContentLeft - (verticalOverflow ? this.Theme.ScrollBarSize : 0) - fixedWidth);
+        var assigned = 0;
+        var weightUsed = 0f;
+        for (var i = 0; i < columns.Count; ++i)
+        {
+            var column = columns[i];
+            if (column.AutoSizeMode != DataGridViewAutoSizeColumnMode.Fill)
+                continue;
+
+            weightUsed += column.FillWeight;
+            var share = (int)(available * weightUsed / totalWeight) - assigned;
+            assigned += share;
+            column.Width = Math.Max(column.MinimumWidth, share);
+        }
+    }
+
     // --- Cell editing ------------------------------------------------------------------------------
 
     /// <summary>
@@ -1625,15 +2073,18 @@ public class DataGridView : OwnerDrawnControl
         if (this.MergedTextOf(item) is not null || this.IsRowHidden(item))
             return false;
 
-        var isPopupKind = column.Kind is DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DateTime;
+        var needsBackend = column.Kind is DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DateTime or DataGridViewColumnKind.Color;
         var backend = this.Backend;
-        if (isPopupKind && backend is null)
-            return false; // only a live widget knows where to float the popup
+        if (needsBackend && backend is null)
+            return false; // only a live widget knows where to float the popup (or run the dialog)
 
         var beginArgs = new DataGridViewCellCancelEventArgs(rowIndex, columnIndex);
         this.OnCellBeginEdit(beginArgs);
         if (beginArgs.Cancel)
             return false;
+
+        if (column.Kind == DataGridViewColumnKind.Color)
+            return this.EditColorCell(backend!, rowIndex, columnIndex, column, item);
 
         this.EnsureVisible(rowIndex);
         var cellBounds = this.GetCellBounds(rowIndex, columnIndex);
@@ -1644,9 +2095,20 @@ public class DataGridView : OwnerDrawnControl
         {
             case DataGridViewColumnKind.Text:
             {
-                var editor = new TextBox { Text = GetDisplayText(column, item), Bounds = cellBounds, TabStop = false };
+                var editor = new TextBox { Text = GetEditText(column, item), Bounds = cellBounds, TabStop = false };
                 _textEditor = editor;
                 this.Controls.Add(editor);
+                this.HookEditorDirty(editor);
+                break;
+            }
+
+            case DataGridViewColumnKind.MaskedText:
+            {
+                var editor = new MaskedTextBox { Mask = column.Mask, Bounds = cellBounds, TabStop = false };
+                editor.Text = GetEditText(column, item); // after the mask, so the seed maps into it
+                _textEditor = editor;
+                this.Controls.Add(editor);
+                this.HookEditorDirty(editor);
                 break;
             }
 
@@ -1664,6 +2126,29 @@ public class DataGridView : OwnerDrawnControl
                 };
                 _numericEditor = editor;
                 this.Controls.Add(editor);
+                this.HookEditorDirty(editor);
+                break;
+            }
+
+            case DataGridViewColumnKind.DomainUpDown:
+            {
+                var choices = column.ItemsSelector!(item);
+                _editChoices = choices;
+                var editor = new DomainUpDown { Bounds = cellBounds, TabStop = false };
+                var current = column.ValueSelector(item);
+                for (var i = 0; i < choices.Count; ++i)
+                    editor.Items.Add(ChoiceDisplayText(column, choices[i]));
+
+                for (var i = 0; i < choices.Count; ++i)
+                    if (Equals(choices[i], current))
+                    {
+                        editor.SelectedIndex = i;
+                        break;
+                    }
+
+                _domainEditor = editor;
+                this.Controls.Add(editor);
+                this.HookEditorDirty(editor);
                 break;
             }
 
@@ -1701,9 +2186,9 @@ public class DataGridView : OwnerDrawnControl
         var item = this.Items[rowIndex];
         switch (column.Kind)
         {
-            case DataGridViewColumnKind.Text:
+            case DataGridViewColumnKind.Text or DataGridViewColumnKind.MaskedText:
             {
-                var text = _textEditor!.Text;
+                var text = _textEditor!.Text; // for a masked cell this is the masked rendering
                 if (!this.ValidateCell(rowIndex, columnIndex, text))
                     return false;
 
@@ -1719,6 +2204,27 @@ public class DataGridView : OwnerDrawnControl
 
                 column.NumberSetter!(item, value);
                 break;
+            }
+
+            case DataGridViewColumnKind.DomainUpDown:
+            {
+                // Match the editor's text against the choices, like the editor's own commit points
+                // do — this also catches a typed choice that was never stepped to.
+                var text = _domainEditor!.Text;
+                var choices = _editChoices!;
+                for (var i = 0; i < choices.Count; ++i)
+                {
+                    if (!string.Equals(ChoiceDisplayText(column, choices[i]), text, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (!this.ValidateCell(rowIndex, columnIndex, choices[i]))
+                        return false;
+
+                    column.ValueSetter!(item, choices[i]);
+                    break;
+                }
+
+                break; // no match writes nothing — the cell keeps its value, like the editor's revert
             }
         }
 
@@ -1739,10 +2245,11 @@ public class DataGridView : OwnerDrawnControl
     /// is display-only.</summary>
     private static bool IsCellEditable(DataGridViewColumn column) => column.Kind switch
     {
-        DataGridViewColumnKind.Text => column.TextSetter is not null,
-        DataGridViewColumnKind.ComboBox => column.ItemsSelector is not null && column.ValueSetter is not null,
+        DataGridViewColumnKind.Text or DataGridViewColumnKind.MaskedText => column.TextSetter is not null,
+        DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DomainUpDown => column.ItemsSelector is not null && column.ValueSetter is not null,
         DataGridViewColumnKind.NumericUpDown => column.NumberSelector is not null && column.NumberSetter is not null,
         DataGridViewColumnKind.DateTime => column.DateSelector is not null && column.DateSetter is not null,
+        DataGridViewColumnKind.Color => column.ColorSelector is not null && column.ColorSetter is not null,
         _ => false,
     };
 
@@ -1755,6 +2262,28 @@ public class DataGridView : OwnerDrawnControl
         return !e.Cancel;
     }
 
+    /// <summary>
+    /// The modal edit of a <see cref="DataGridViewColumnKind.Color"/> cell: the platform color dialog
+    /// opens seeded with the cell's color, a pick validates and writes through
+    /// <see cref="DataGridViewColumn.ColorSetter"/>, cancelling (or a validation veto) writes
+    /// nothing. The session begins and ends within this call — the grid never stays in edit mode —
+    /// and <see cref="CellEndEdit"/> closes it either way; the return value says whether a color was
+    /// picked.
+    /// </summary>
+    private bool EditColorCell(IPlatformBackend backend, int rowIndex, int columnIndex, DataGridViewColumn column, object? item)
+    {
+        _currentColumnIndex = columnIndex;
+        var picked = backend.ShowColorDialog(column.ColorSelector!(item));
+        if (picked is { } color && this.ValidateCell(rowIndex, columnIndex, color))
+        {
+            column.ColorSetter!(item, color);
+            this.Invalidate();
+        }
+
+        this.OnCellEndEdit(new(rowIndex, columnIndex));
+        return picked is not null;
+    }
+
     /// <summary>Tears the editor surface down (hosted child or popup), resets the edit state and
     /// raises <see cref="CellEndEdit"/> — the shared tail of commit and cancel.</summary>
     private void EndEdit(int rowIndex, int columnIndex)
@@ -1765,13 +2294,22 @@ public class DataGridView : OwnerDrawnControl
         if (_textEditor is { } textEditor)
         {
             _textEditor = null;
+            textEditor.TextChanged -= this.OnEditorTextChanged;
             this.Controls.Remove(textEditor);
         }
 
         if (_numericEditor is { } numericEditor)
         {
             _numericEditor = null;
+            numericEditor.TextChanged -= this.OnEditorTextChanged;
             this.Controls.Remove(numericEditor);
+        }
+
+        if (_domainEditor is { } domainEditor)
+        {
+            _domainEditor = null;
+            domainEditor.TextChanged -= this.OnEditorTextChanged;
+            this.Controls.Remove(domainEditor);
         }
 
         if (_editPopupShown)
@@ -1780,8 +2318,28 @@ public class DataGridView : OwnerDrawnControl
             _editPopup?.Hide();
         }
 
+        if (_editDirty)
+        {
+            _editDirty = false;
+            this.OnCellDirtyStateChanged(EventArgs.Empty);
+        }
+
         this.Invalidate();
         this.OnCellEndEdit(new(rowIndex, columnIndex));
+    }
+
+    /// <summary>Watches a hosted editor for its first content change, which flips
+    /// <see cref="IsCurrentCellDirty"/>.</summary>
+    private void HookEditorDirty(Control editor) => editor.TextChanged += this.OnEditorTextChanged;
+
+    /// <summary>Flips the dirty flag on the first editor change of the active edit.</summary>
+    private void OnEditorTextChanged(object? sender, EventArgs e)
+    {
+        if (_editDirty || !this.IsEditing)
+            return;
+
+        _editDirty = true;
+        this.OnCellDirtyStateChanged(EventArgs.Empty);
     }
 
     /// <summary>Handles a key while a cell edits: Enter commits and Escape cancels everywhere; the
@@ -1836,7 +2394,7 @@ public class DataGridView : OwnerDrawnControl
                 switch (e.KeyCode)
                 {
                     case Keys.Enter:
-                        this.CommitEdit();
+                        this.CommitAndMoveDown();
                         e.Handled = true;
                         break;
 
@@ -1844,10 +2402,123 @@ public class DataGridView : OwnerDrawnControl
                         this.CancelEdit();
                         e.Handled = true;
                         break;
+
+                    case Keys.Tab:
+                        this.CommitAndMoveSideways(e.Shift ? -1 : 1);
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Up when _domainEditor is { } domainUp:
+                        domainUp.UpButton();
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Down when _domainEditor is { } domainDown:
+                        domainDown.DownButton();
+                        e.Handled = true;
+                        break;
                 }
 
                 break;
         }
+    }
+
+    /// <summary>
+    /// The hosted editors' Enter: commits the edit and moves the selection one display row down in
+    /// the same column, matching the classic grid; under
+    /// <see cref="DataGridViewEditMode.EditOnEnter"/> the new current cell starts editing again. A
+    /// validation veto keeps the edit where it is.
+    /// </summary>
+    private void CommitAndMoveDown()
+    {
+        var columnIndex = _editColumnIndex;
+        if (!this.CommitEdit())
+            return;
+
+        this.MoveSelection(1);
+        if (this.EditMode == DataGridViewEditMode.EditOnEnter)
+            this.BeginEdit(_selectedRowIndex, columnIndex);
+    }
+
+    /// <summary>
+    /// The hosted editors' Tab and Shift+Tab: commits the edit and makes the next (or previous)
+    /// editable cell in display order the current cell, wrapping to the following (or preceding)
+    /// navigable row; under <see cref="DataGridViewEditMode.EditOnEnter"/> that cell starts editing
+    /// again. A validation veto keeps the edit where it is; without another editable cell the commit
+    /// stands and nothing moves.
+    /// </summary>
+    private void CommitAndMoveSideways(int direction)
+    {
+        var rowIndex = _editRowIndex;
+        var columnIndex = _editColumnIndex;
+        if (!this.CommitEdit())
+            return;
+
+        if (!this.FindNextEditableCell(rowIndex, columnIndex, direction, out var nextRow, out var nextColumn))
+            return;
+
+        if (nextRow != _selectedRowIndex)
+            this.SelectedRowIndex = nextRow;
+
+        _currentColumnIndex = nextColumn;
+        if (this.EditMode == DataGridViewEditMode.EditOnEnter)
+            this.BeginEdit(nextRow, nextColumn);
+    }
+
+    /// <summary>
+    /// Finds the next cell Tab can edit, walking the display columns from the given cell in
+    /// <paramref name="direction"/> and wrapping over navigable rows; bails out immediately when no
+    /// column can edit at all, so a grid of display-only columns never walks its rows.
+    /// </summary>
+    private bool FindNextEditableCell(int rowIndex, int columnIndex, int direction, out int nextRow, out int nextColumn)
+    {
+        nextRow = -1;
+        nextColumn = -1;
+
+        var anyEditable = false;
+        for (var i = 0; i < _columns.Count; ++i)
+            anyEditable |= IsCellEditable(_columns[i]);
+        if (!anyEditable)
+            return false;
+
+        this.EnsureSortMap();
+        this.EnsureDisplayMap();
+        var map = _displayMap!;
+        var count = this.Items.Count;
+        var display = this.ToDisplayIndex(rowIndex);
+        if (display < 0)
+            return false;
+
+        var d = Array.IndexOf(map, columnIndex) + direction;
+        while (display >= 0 && display < count)
+        {
+            var modelRow = this.ToModelIndex(display);
+            if (this.IsRowNavigable(modelRow))
+            {
+                var item = this.Items[modelRow];
+                while (d >= 0 && d < map.Length)
+                {
+                    var column = _columns[map[d]];
+                    if (IsCellEditable(column) && !this.IsCellReadOnly(item, column))
+                    {
+                        nextRow = modelRow;
+                        nextColumn = map[d];
+                        return true;
+                    }
+
+                    d += direction;
+                }
+            }
+
+            var next = display + direction;
+            if (next < 0 || next >= count)
+                break;
+
+            display = next;
+            d = direction > 0 ? 0 : map.Length - 1;
+        }
+
+        return false;
     }
 
     /// <summary>Repositions the hosted editor over its (possibly scrolled) cell, or commits when the
@@ -1888,6 +2559,15 @@ public class DataGridView : OwnerDrawnControl
         _editPopup?.Dispose();
         _editPopup = null;
         _editCalendar = null;
+        _scrollDragging = false;
+        _hoverRowIndex = -1;
+        _hoverColumnIndex = -1;
+        _tipShown = false;
+        _tipAutoPopPhase = false;
+        _tipTimer?.Dispose();
+        _tipTimer = null;
+        _tipPopup?.Dispose();
+        _tipPopup = null;
     }
 
     /// <summary>
@@ -1900,6 +2580,7 @@ public class DataGridView : OwnerDrawnControl
         if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
             return Rectangle.Empty;
 
+        this.ApplyFillWidths();
         this.EnsureSortMap();
         this.EnsureDisplayMap();
 
@@ -2214,6 +2895,98 @@ public class DataGridView : OwnerDrawnControl
     private static string ChoiceDisplayText(DataGridViewColumn column, object? choice)
         => column.ItemDisplaySelector?.Invoke(choice) ?? choice?.ToString() ?? string.Empty;
 
+    // --- Cell tooltips -----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Tracks the hovered cell for the tooltip: entering a cell whose column yields tooltip text arms
+    /// the show delay, leaving it hides the tip — the grid-internal, per-cell sibling of the
+    /// <see cref="ToolTip"/> component, sharing its delays and popup painting.
+    /// </summary>
+    private void TrackHoverCell(MouseEventArgs e)
+    {
+        if (!this.ShowCellToolTips || this.Backend is null)
+            return;
+
+        var rowIndex = e.Y >= this.HeaderHeight ? this.HitTestRow(e.Y, out _, out _) : -1;
+        var columnIndex = rowIndex >= 0 ? this.HitTestColumn(e.X, out _) : -1;
+        _hoverPoint = e.Location;
+        if (rowIndex == _hoverRowIndex && columnIndex == _hoverColumnIndex)
+            return;
+
+        _hoverRowIndex = rowIndex;
+        _hoverColumnIndex = columnIndex;
+        this.HideCellToolTip();
+        if (rowIndex < 0 || columnIndex < 0 || this.GetCellTooltip(rowIndex, columnIndex) is null)
+            return;
+
+        var timer = this.EnsureTipTimer();
+        timer.Interval = 500; // the ToolTip component's initial delay
+        timer.Start();
+    }
+
+    /// <summary>Hides the cell tip and disarms any pending delay.</summary>
+    private void HideCellToolTip()
+    {
+        _tipTimer?.Stop();
+        _tipAutoPopPhase = false;
+        if (!_tipShown)
+            return;
+
+        _tipShown = false;
+        _tipPopup?.Hide();
+    }
+
+    /// <summary>The delay elapsed: shows the hovered cell's tip near the cursor, then hides it again
+    /// after the auto-pop phase.</summary>
+    private void OnTipTimerTick(object? sender, EventArgs e)
+    {
+        var timer = _tipTimer!;
+        timer.Stop();
+        if (_tipAutoPopPhase)
+        {
+            this.HideCellToolTip();
+            return;
+        }
+
+        if (this.Backend is not { } backend || this.GetCellTooltip(_hoverRowIndex, _hoverColumnIndex) is not { } text)
+            return;
+
+        _tipText = text;
+        var popup = this.EnsureTipPopup(backend);
+        _tipShown = true;
+        popup.ShowAt(this.PointToScreen(new Point(_hoverPoint.X, _hoverPoint.Y + ToolTip.CursorOffset)), ToolTip.MeasureTip(backend, text));
+
+        _tipAutoPopPhase = true;
+        timer.Interval = 5000; // the ToolTip component's auto-pop delay
+        timer.Start();
+    }
+
+    /// <summary>Creates the tip delay timer on first use.</summary>
+    private Timer EnsureTipTimer()
+    {
+        var timer = _tipTimer;
+        if (timer is not null)
+            return timer;
+
+        timer = new(this.Backend!);
+        timer.Tick += this.OnTipTimerTick;
+        return _tipTimer = timer;
+    }
+
+    /// <summary>Creates the tip popup on first use, painting through the shared
+    /// <see cref="ToolTip"/> renderer.</summary>
+    private IPopupPeer EnsureTipPopup(IPlatformBackend backend)
+    {
+        var popup = _tipPopup;
+        if (popup is not null)
+            return popup;
+
+        popup = backend.CreatePopup();
+        popup.Paint += (_, e) => ToolTip.PaintTip(e.Graphics, this.Theme, _tipText);
+        popup.Dismissed += (_, _) => _tipShown = false;
+        return _tipPopup = popup;
+    }
+
     // --- Clipboard ---------------------------------------------------------------------------------
 
     /// <summary>
@@ -2257,5 +3030,152 @@ public class DataGridView : OwnerDrawnControl
         }
 
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// Pastes tab-separated text into the grid starting at the current cell: lines map onto display
+    /// rows from the current row downward (skipping hidden, unselectable and merged rows), cells onto
+    /// display columns from the current column rightward; content past the last column or row is
+    /// dropped. Each target cell converts its text to the column kind's value and writes through that
+    /// kind's setter — read-only cells, display-only columns and unparseable text are skipped, their
+    /// position still consumed, and every write runs <see cref="CellValidating"/> first (a veto skips
+    /// that one cell). <see cref="PasteCompleted"/> closes the operation. Ctrl+V feeds this from the
+    /// system clipboard through the backend. A no-op without a current cell.
+    /// </summary>
+    /// <remarks>
+    /// The classic toolkit ships no built-in grid paste, so this follows its clipboard-copy shape in
+    /// reverse (the Excel-style block paste every WinForms grid hand-rolls).
+    /// </remarks>
+    public void Paste(string text)
+    {
+        if (string.IsNullOrEmpty(text) || _selectedRowIndex < 0 || _columns.Count == 0)
+            return;
+
+        this.EnsureSortMap();
+        this.EnsureDisplayMap();
+        var map = _displayMap!;
+        var startColumn = Array.IndexOf(map, Math.Min(_currentColumnIndex, _columns.Count - 1));
+        var display = this.ToDisplayIndex(_selectedRowIndex);
+        if (startColumn < 0 || display < 0)
+            return;
+
+        var count = this.Items.Count;
+        var lines = text.Split('\n');
+        var lineCount = lines.Length;
+        if (lineCount > 0 && lines[lineCount - 1].Length == 0)
+            --lineCount; // a trailing newline carries no row
+
+        for (var l = 0; l < lineCount && display < count; ++l)
+        {
+            while (display < count && !this.IsRowNavigable(this.ToModelIndex(display)))
+                ++display;
+            if (display >= count)
+                break;
+
+            var rowIndex = this.ToModelIndex(display);
+            ++display;
+
+            var cells = lines[l].TrimEnd('\r').Split('\t');
+            for (var c = 0; c < cells.Length && startColumn + c < map.Length; ++c)
+                this.TryPasteCell(rowIndex, map[startColumn + c], cells[c]);
+        }
+
+        this.Invalidate();
+        this.OnPasteCompleted(EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Writes one pasted cell: converts the text to the column kind's value, runs
+    /// <see cref="CellValidating"/> and writes through the kind's setter. Returns
+    /// <see langword="false"/> — writing nothing — for read-only cells, kinds without a text form or
+    /// setter, unparseable text and validation vetoes.
+    /// </summary>
+    private bool TryPasteCell(int rowIndex, int columnIndex, string text)
+    {
+        var column = _columns[columnIndex];
+        var item = this.Items[rowIndex];
+        if (this.IsCellReadOnly(item, column))
+            return false;
+
+        switch (column.Kind)
+        {
+            case DataGridViewColumnKind.Text or DataGridViewColumnKind.MaskedText:
+            {
+                if (column.TextSetter is not { } setter || !this.ValidateCell(rowIndex, columnIndex, text))
+                    return false;
+
+                setter(item, text);
+                return true;
+            }
+
+            case DataGridViewColumnKind.Check:
+            {
+                if (column.CheckedSetter is not { } setter)
+                    return false;
+
+                bool state;
+                if (bool.TryParse(text, out var parsed))
+                    state = parsed;
+                else if (text is "1" or "0")
+                    state = text == "1";
+                else
+                    return false;
+
+                if (!this.ValidateCell(rowIndex, columnIndex, state))
+                    return false;
+
+                setter(item, state);
+                return true;
+            }
+
+            case DataGridViewColumnKind.NumericUpDown:
+            {
+                if (column.NumberSetter is not { } setter || !decimal.TryParse(text, out var number))
+                    return false;
+
+                number = Math.Clamp(number, column.Minimum, column.Maximum);
+                if (!this.ValidateCell(rowIndex, columnIndex, number))
+                    return false;
+
+                setter(item, number);
+                return true;
+            }
+
+            case DataGridViewColumnKind.DateTime:
+            {
+                if (column.DateSetter is not { } setter || !DateTime.TryParse(text, out var date))
+                    return false;
+
+                if (!this.ValidateCell(rowIndex, columnIndex, date))
+                    return false;
+
+                setter(item, date);
+                return true;
+            }
+
+            case DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DomainUpDown:
+            {
+                if (column.ItemsSelector is null || column.ValueSetter is not { } setter)
+                    return false;
+
+                var choices = column.ItemsSelector(item);
+                for (var i = 0; i < choices.Count; ++i)
+                {
+                    if (!string.Equals(ChoiceDisplayText(column, choices[i]), text, StringComparison.Ordinal))
+                        continue;
+
+                    if (!this.ValidateCell(rowIndex, columnIndex, choices[i]))
+                        return false;
+
+                    setter(item, choices[i]);
+                    return true;
+                }
+
+                return false;
+            }
+
+            default:
+                return false; // button, link, image, progress and color cells take no pasted text
+        }
     }
 }

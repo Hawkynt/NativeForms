@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms;
 using Hawkynt.NativeForms.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
@@ -21,6 +22,18 @@ internal sealed class DataGridViewColumnTypesTests
         public string Name = string.Empty;
         public bool Done;
         public int Percent;
+        public string Code = string.Empty;
+        public string Status = string.Empty;
+        public Color Tint;
+    }
+
+    private static HeadlessBackend RealizeWithBackend(OwnerDrawnControl control)
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(control);
+        Application.Run(form, backend);
+        return backend;
     }
 
     private static HeadlessCanvasPeer Realize(OwnerDrawnControl control)
@@ -360,6 +373,164 @@ internal sealed class DataGridViewColumnTypesTests
             Assert.That(g.Operations, Does.Contain("fill #FFFFFFFF 2,24,96,18"), "track");
             Assert.That(g.Operations, Does.Contain($"fill {_Accent} 3,25,47,16"), "proportional fill");
             Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 2,24,95,17"), "border");
+        });
+    }
+
+    [Test]
+    public void MaskedText_editing_hosts_a_masked_box_and_commits_the_masked_rendering()
+    {
+        var grid = MakeGrid(new("Code", static o => ((Row)o!).Code)
+        {
+            Kind = DataGridViewColumnKind.MaskedText,
+            Mask = "00-00",
+            TextSetter = static (o, value) => ((Row)o!).Code = value,
+        });
+        var row = new Row { Code = "1234" };
+        grid.Items.Add(row);
+        var backend = RealizeWithBackend(grid);
+
+        grid.BeginEdit(0, 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.EditingControl, Is.InstanceOf<MaskedTextBox>());
+            Assert.That(grid.EditingControl!.Text, Is.EqualTo("12-34"), "the raw value maps into the mask");
+        });
+
+        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("87-65");
+        grid.CommitEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.Code, Is.EqualTo("87-65"), "the masked rendering commits through the text setter");
+            Assert.That(grid.IsEditing, Is.False);
+        });
+    }
+
+    [Test]
+    public void MaskedText_editor_rejects_input_the_mask_refuses()
+    {
+        var grid = MakeGrid(new("Code", static o => ((Row)o!).Code)
+        {
+            Kind = DataGridViewColumnKind.MaskedText,
+            Mask = "00-00",
+            TextSetter = static (o, value) => ((Row)o!).Code = value,
+        });
+        var row = new Row { Code = "1234" };
+        grid.Items.Add(row);
+        var backend = RealizeWithBackend(grid);
+        grid.BeginEdit(0, 0);
+
+        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("ab-cd");
+
+        Assert.That(grid.EditingControl!.Text, Is.EqualTo("12-34"), "letters cannot fill digit slots, so the edit reverts");
+    }
+
+    [Test]
+    public void DomainUpDown_editing_steps_the_choices_and_commits_through_the_value_setter()
+    {
+        var choices = new object?[] { "Low", "Mid", "High" };
+        var grid = MakeGrid(new("Level", static o => ((Row)o!).Status)
+        {
+            Kind = DataGridViewColumnKind.DomainUpDown,
+            ItemsSelector = _ => choices,
+            ValueSetter = static (o, value) => ((Row)o!).Status = (string)value!,
+        });
+        var row = new Row { Status = "Mid" };
+        grid.Items.Add(row);
+        var backend = RealizeWithBackend(grid);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().First(static peer => peer is not HeadlessPopupPeer);
+
+        grid.BeginEdit(0, 0);
+        var editor = grid.EditingControl as DomainUpDown;
+        Assert.Multiple(() =>
+        {
+            Assert.That(editor, Is.Not.Null);
+            Assert.That(editor!.SelectedIndex, Is.EqualTo(1), "seeded on the current value");
+        });
+
+        canvas.RaiseKeyDown(Keys.Down); // the grid routes stepping into the hosted editor
+        canvas.RaiseKeyDown(Keys.Enter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.Status, Is.EqualTo("High"), "the stepped choice commits through the value setter");
+            Assert.That(grid.IsEditing, Is.False);
+            Assert.That(grid.Controls, Is.Empty, "no hosted child left behind");
+        });
+    }
+
+    [Test]
+    public void Color_column_paints_a_bordered_swatch()
+    {
+        var grid = MakeGrid(new("Tint", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.Color,
+            ColorSelector = static o => ((Row)o!).Tint,
+        });
+        grid.Items.Add(new Row { Tint = Color.FromArgb(0xFF, 0x0A, 0x14, 0x1E) });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        // The swatch insets 4px into the 100x22 cell of row 0 (y 22..44).
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations, Does.Contain("fill #FF0A141E 4,26,92,14"), "swatch");
+            Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 4,26,92,14"), "outline");
+        });
+    }
+
+    [Test]
+    public void Color_editing_opens_the_native_dialog_and_commits_the_pick()
+    {
+        var grid = MakeGrid(new("Tint", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.Color,
+            ColorSelector = static o => ((Row)o!).Tint,
+            ColorSetter = static (o, value) => ((Row)o!).Tint = value,
+        });
+        var row = new Row { Tint = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) };
+        grid.Items.Add(row);
+        var backend = RealizeWithBackend(grid);
+        backend.ColorDialogResult = Color.FromArgb(0xFF, 0x01, 0x02, 0x03);
+        var ended = 0;
+        grid.CellEndEdit += (_, _) => ++ended;
+
+        var edited = grid.BeginEdit(0, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(edited, Is.True);
+            Assert.That(backend.LastColorDialogColor, Is.EqualTo(Color.FromArgb(0xFF, 0x11, 0x22, 0x33)), "seeded with the cell's color");
+            Assert.That(row.Tint, Is.EqualTo(Color.FromArgb(0xFF, 0x01, 0x02, 0x03)), "the pick wrote through the setter");
+            Assert.That(grid.IsEditing, Is.False, "the modal session never lingers");
+            Assert.That(ended, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Color_dialog_cancel_writes_nothing()
+    {
+        var grid = MakeGrid(new("Tint", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.Color,
+            ColorSelector = static o => ((Row)o!).Tint,
+            ColorSetter = static (o, value) => ((Row)o!).Tint = value,
+        });
+        var row = new Row { Tint = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) };
+        grid.Items.Add(row);
+        var backend = RealizeWithBackend(grid);
+        backend.ColorDialogResult = null;
+        var ended = 0;
+        grid.CellEndEdit += (_, _) => ++ended;
+
+        var edited = grid.BeginEdit(0, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(edited, Is.False, "a cancelled dialog picked nothing");
+            Assert.That(row.Tint, Is.EqualTo(Color.FromArgb(0xFF, 0x11, 0x22, 0x33)));
+            Assert.That(ended, Is.EqualTo(1), "the edit cycle still closes");
         });
     }
 }

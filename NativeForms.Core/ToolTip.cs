@@ -1,6 +1,7 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.ComponentModel;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
@@ -187,16 +188,27 @@ public sealed class ToolTip : Component
     /// <summary>Paints the tip: themed background, border and the registered text.</summary>
     private void OnPopupPaint(object? sender, PaintEventArgs e)
     {
-        var theme = _backend?.Theme;
-        if (theme is null)
-            return;
+        if (_backend?.Theme is { } theme)
+            PaintTip(e.Graphics, theme, _shownText);
+    }
 
-        var g = e.Graphics;
-        var textSize = g.MeasureText(_shownText, theme.DefaultFont);
+    /// <summary>The popup size a tip text needs: the measured text plus border padding — shared with
+    /// hosts that float their own tips (a grid's per-cell tooltips).</summary>
+    internal static Size MeasureTip(IPlatformBackend backend, string text)
+    {
+        var textSize = backend.MeasureText(text, backend.Theme.DefaultFont);
+        return new(textSize.Width + (2 * TextPadding), textSize.Height + (2 * TextPadding));
+    }
+
+    /// <summary>Paints a tip surface — themed background, border and text — shared with hosts that
+    /// float their own tips.</summary>
+    internal static void PaintTip(IGraphics g, ITheme theme, string text)
+    {
+        var textSize = g.MeasureText(text, theme.DefaultFont);
         var size = new Size(textSize.Width + (2 * TextPadding), textSize.Height + (2 * TextPadding));
         g.FillRectangle(theme.FieldBackground, new(0, 0, size.Width, size.Height));
         g.DrawRectangle(theme.Border, new(0, 0, size.Width - 1, size.Height - 1));
-        g.DrawText(_shownText, theme.DefaultFont, theme.ControlText, new(TextPadding, TextPadding, textSize.Width, textSize.Height));
+        g.DrawText(text, theme.DefaultFont, theme.ControlText, new(TextPadding, TextPadding, textSize.Width, textSize.Height));
     }
 
     /// <summary>The shared delay timer, created against the first backend that needs it.</summary>

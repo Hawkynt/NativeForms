@@ -250,6 +250,20 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public string? GetClipboardText()
+    {
+        EnsureInitialized();
+        var clipboard = NativeMethods.gtk_clipboard_get(NativeMethods.gdk_atom_intern("CLIPBOARD", 0));
+        var ptr = NativeMethods.gtk_clipboard_wait_for_text(clipboard);
+        if (ptr == 0)
+            return null;
+
+        var text = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr);
+        NativeMethods.g_free(ptr);
+        return text;
+    }
+
+    /// <inheritdoc />
     /// <remarks>
     /// Queues through <c>g_idle_add_full</c>, which is thread-safe by GLib contract, so posting works
     /// from any thread. The action travels as a normal <see cref="GCHandle"/> threaded through

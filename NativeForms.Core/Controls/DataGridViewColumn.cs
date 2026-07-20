@@ -30,6 +30,30 @@ public sealed class DataGridViewColumn
     /// <summary>The column width in pixels.</summary>
     public int Width { get; set; } = 100;
 
+    /// <summary>The narrowest width the column accepts, floored at 2 px: the lower bound of a user's
+    /// divider drag and of the share a <see cref="DataGridViewAutoSizeColumnMode.Fill"/> column
+    /// receives.</summary>
+    public int MinimumWidth
+    {
+        get => field;
+        set => field = Math.Max(2, value);
+    } = 8;
+
+    /// <summary>The column's share of the leftover viewport width under
+    /// <see cref="DataGridViewAutoSizeColumnMode.Fill"/>, relative to the other fill columns'
+    /// weights. Kept above zero.</summary>
+    public float FillWeight
+    {
+        get => field;
+        set => field = value > 0f ? value : 1f;
+    } = 100f;
+
+    /// <summary>Whether the user may drag this column's divider: <see cref="DataGridViewTriState.True"/>
+    /// and <see cref="DataGridViewTriState.False"/> override the grid's
+    /// <see cref="DataGridView.AllowUserToResizeColumns"/>; <see cref="DataGridViewTriState.NotSet"/>
+    /// (the default) inherits it — WinForms semantics.</summary>
+    public DataGridViewTriState Resizable { get; set; }
+
     /// <summary>Alignment of the cell content within the column.</summary>
     public ContentAlignment Alignment { get; set; } = ContentAlignment.MiddleLeft;
 
@@ -77,6 +101,11 @@ public sealed class DataGridViewColumn
     /// <summary>Optional override of the displayed cell text; return <see langword="null"/> to fall
     /// back to <see cref="ValueSelector"/>.</summary>
     public Func<object?, string?>? DisplayTextSelector { get; set; }
+
+    /// <summary>Optional formatter over the <see cref="ValueSelector"/> result — the reflection-free
+    /// <c>CellFormatting</c> seam: it runs after the value selector and shapes the displayed text
+    /// only, so editors still seed from the raw value. Runs on the paint path — capture nothing.</summary>
+    public Func<object?, string>? FormatSelector { get; set; }
 
     /// <summary>Optional per-cell tooltip text, surfaced through
     /// <see cref="DataGridView.GetCellTooltip"/>; <see langword="null"/> for none.</summary>
@@ -152,4 +181,20 @@ public sealed class DataGridViewColumn
     /// <summary>Writes the day picked in a <see cref="DataGridViewColumnKind.DateTime"/> editor back
     /// to the row item; the time of day of the <see cref="DateSelector"/> value is preserved.</summary>
     public Action<object?, DateTime>? DateSetter { get; set; }
+
+    /// <summary>The input mask a <see cref="DataGridViewColumnKind.MaskedText"/> editor forces —
+    /// the <see cref="MaskedTextBox.Mask"/> language; empty hosts a plain masked box.</summary>
+    public string Mask
+    {
+        get => field;
+        set => field = value ?? string.Empty;
+    } = string.Empty;
+
+    /// <summary>Maps a row item to the swatch color of a <see cref="DataGridViewColumnKind.Color"/>
+    /// cell; required (with <see cref="ColorSetter"/>) for the cell to edit.</summary>
+    public Func<object?, Color>? ColorSelector { get; set; }
+
+    /// <summary>Writes the color picked in the native color dialog back to the row item when a
+    /// <see cref="DataGridViewColumnKind.Color"/> cell edits.</summary>
+    public Action<object?, Color>? ColorSetter { get; set; }
 }

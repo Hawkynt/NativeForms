@@ -550,6 +550,208 @@ internal sealed class DataGridViewEditingTests
         });
     }
 
+    /// <summary>Adds a third, writable Status column so Tab has an editable cell to walk to past the
+    /// display-only Age column.</summary>
+    private static void AddStatusColumn(DataGridView grid)
+        => grid.Columns.Add(new DataGridViewColumn("Status", static o => ((Row)o!).Status)
+        {
+            TextSetter = static (o, value) => ((Row)o!).Status = value,
+        });
+
+    [Test]
+    public void EditProgrammatically_ignores_every_edit_gesture()
+    {
+        var grid = MakeGrid(out _);
+        grid.EditMode = DataGridViewEditMode.EditProgrammatically;
+        var backend = RealizeBackend(grid);
+        var canvas = CanvasOf(backend);
+        grid.SelectedRowIndex = 0;
+        grid.CurrentColumnIndex = 0;
+
+        canvas.RaiseKeyDown(Keys.F2);
+        Assert.That(grid.IsEditing, Is.False, "F2 is ignored");
+
+        canvas.RaiseKeyPress('x');
+        Assert.That(grid.IsEditing, Is.False, "typing is ignored");
+
+        canvas.RaiseMouseDown(10, 30);
+        canvas.RaiseMouseDown(10, 30);
+        Assert.That(grid.IsEditing, Is.False, "double-click is ignored");
+
+        Assert.That(grid.BeginEdit(0, 0), Is.True, "the explicit call still edits");
+    }
+
+    [Test]
+    public void EditOnEnter_begins_editing_on_a_cell_click()
+    {
+        var grid = MakeGrid(out _);
+        grid.EditMode = DataGridViewEditMode.EditOnEnter;
+        var backend = RealizeBackend(grid);
+
+        CanvasOf(backend).RaiseMouseDown(10, 30); // row 0, Name
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsEditing, Is.True);
+            Assert.That(grid.EditingControl!.Text, Is.EqualTo("Alice"));
+        });
+    }
+
+    [Test]
+    public void Enter_commits_and_moves_the_selection_down()
+    {
+        var grid = MakeGrid(out var rows);
+        var backend = RealizeBackend(grid);
+        grid.SelectedRowIndex = 0;
+        grid.BeginEdit(0, 0);
+        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("Ann");
+
+        CanvasOf(backend).RaiseKeyDown(Keys.Enter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows[0].Name, Is.EqualTo("Ann"), "Enter committed first");
+            Assert.That(grid.IsEditing, Is.False);
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(1), "then the selection moved down");
+        });
+    }
+
+    [Test]
+    public void Tab_commits_and_moves_to_the_next_editable_cell()
+    {
+        var grid = MakeGrid(out var rows);
+        AddStatusColumn(grid);
+        var backend = RealizeBackend(grid);
+        grid.BeginEdit(0, 0);
+        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("Ann");
+
+        CanvasOf(backend).RaiseKeyDown(Keys.Tab);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows[0].Name, Is.EqualTo("Ann"), "Tab committed first");
+            Assert.That(grid.IsEditing, Is.False, "the next cell waits for a gesture under the default mode");
+            Assert.That(grid.SelectedRowIndex, Is.Zero);
+            Assert.That(grid.CurrentColumnIndex, Is.EqualTo(2), "the display-only Age column was skipped");
+        });
+    }
+
+    [Test]
+    public void Tab_wraps_to_the_next_row_and_Shift_Tab_walks_backwards()
+    {
+        var grid = MakeGrid(out _);
+        AddStatusColumn(grid);
+        var backend = RealizeBackend(grid);
+        var canvas = CanvasOf(backend);
+
+        grid.BeginEdit(0, 2); // the last editable cell of row 0
+        canvas.RaiseKeyDown(Keys.Tab);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(1), "wrapped to the next row");
+            Assert.That(grid.CurrentColumnIndex, Is.Zero);
+        });
+
+        grid.BeginEdit(1, 0);
+        canvas.RaiseKeyDown(Keys.Tab, KeyModifiers.Shift);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.Zero, "wrapped back to the previous row");
+            Assert.That(grid.CurrentColumnIndex, Is.EqualTo(2), "arriving at its last editable cell");
+        });
+    }
+
+    [Test]
+    public void Tab_under_EditOnEnter_reopens_the_editor_on_the_next_cell()
+    {
+        var grid = MakeGrid(out var rows);
+        AddStatusColumn(grid);
+        rows[0].Status = "New";
+        grid.EditMode = DataGridViewEditMode.EditOnEnter;
+        var backend = RealizeBackend(grid);
+        grid.BeginEdit(0, 0);
+
+        CanvasOf(backend).RaiseKeyDown(Keys.Tab);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsEditing, Is.True);
+            Assert.That(grid.EditingControl!.Text, Is.EqualTo("New"), "the Status cell edits now");
+        });
+    }
+
+    [Test]
+    public void IsCurrentCellDirty_flips_on_the_first_editor_change()
+    {
+        var grid = MakeGrid(out _);
+        var backend = RealizeBackend(grid);
+        var flips = 0;
+        grid.CellDirtyStateChanged += (_, _) => ++flips;
+
+        grid.BeginEdit(0, 0);
+        Assert.That(grid.IsCurrentCellDirty, Is.False, "seeding the editor is not an edit");
+
+        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("Ann");
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsCurrentCellDirty, Is.True);
+            Assert.That(flips, Is.EqualTo(1));
+        });
+
+        grid.CommitEdit();
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsCurrentCellDirty, Is.False, "ending the edit clears the flag");
+            Assert.That(flips, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void RowValidating_veto_keeps_the_selection_on_the_row()
+    {
+        var grid = MakeGrid(out _);
+        RealizeBackend(grid);
+        grid.SelectedRowIndex = 0;
+        var veto = true;
+        DataGridViewCellCancelEventArgs? validating = null;
+        grid.RowValidating += (_, e) =>
+        {
+            validating = e;
+            e.Cancel = veto;
+        };
+
+        grid.SelectedRowIndex = 1;
+        Assert.Multiple(() =>
+        {
+            Assert.That(validating, Is.Not.Null);
+            Assert.That(validating!.RowIndex, Is.Zero, "the row being left");
+            Assert.That(grid.SelectedRowIndex, Is.Zero, "the veto kept it");
+        });
+
+        veto = false;
+        grid.SelectedRowIndex = 1;
+        Assert.That(grid.SelectedRowIndex, Is.EqualTo(1), "the released change goes through");
+    }
+
+    [Test]
+    public void RowValidated_fires_after_the_row_is_left()
+    {
+        var grid = MakeGrid(out _);
+        var backend = RealizeBackend(grid);
+        grid.SelectedRowIndex = 0;
+        DataGridViewCellEventArgs? validated = null;
+        grid.RowValidated += (_, e) => validated = e;
+
+        CanvasOf(backend).RaiseMouseDown(10, 50); // click row 1
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(validated, Is.Not.Null);
+            Assert.That(validated!.RowIndex, Is.Zero, "the row that was left");
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(1));
+        });
+    }
+
     [Test]
     public void Date_editing_escape_cancels_without_writing()
     {

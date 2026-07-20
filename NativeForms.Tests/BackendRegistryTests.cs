@@ -70,6 +70,7 @@ internal sealed class BackendRegistryTests
 
         public INotifyIconPeer CreateNotifyIcon() => throw new NotSupportedException();
         public void SetClipboardText(string text) => throw new NotSupportedException();
+        public string? GetClipboardText() => throw new NotSupportedException();
         public void Post(Action action) => throw new NotSupportedException();
         public void Run(IWindowPeer mainWindow) { }
         public void Quit() { }

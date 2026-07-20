@@ -10,4 +10,9 @@ public enum DataGridViewAutoSizeColumnMode
     /// demand each paint. Deliberately window-scoped: measuring all rows would defeat virtualization,
     /// so the width may adapt as the grid scrolls.</summary>
     AllCells,
+
+    /// <summary>The column shares the viewport width left over after the fixed columns with the other
+    /// fill columns, proportionally to <see cref="DataGridViewColumn.FillWeight"/> and floored at
+    /// <see cref="DataGridViewColumn.MinimumWidth"/>; recomputed whenever the grid's size changes.</summary>
+    Fill,
 }
