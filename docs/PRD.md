@@ -109,13 +109,21 @@ Targets (measured by the `NativeForms.Benchmarks` project; treat as CI-guarded g
       **~1.6 MB** self-contained (whole app + runtime); size reported in CI every run.
 - [x] Append to a bound `ObservableList<T>` with no listener allocates **0 bytes** (null-conditional
       short-circuits the event args) — asserted.
-- [ ] Empty `Form` realized: **< 8 KB** managed allocation beyond the native window.
-- [ ] Zero per-frame managed allocation for owner-drawn controls in steady state (no GC in scroll).
+- [x] Empty `Form` realized: **< 8 KB** managed allocation (measured ~920 B, asserted).
+- [x] Zero per-frame managed allocation in steady state — asserted for EVERY owner-drawn
+      control (31-control sweep incl. open menus); per-frame sort-map closure and per-cell
+      display-text recomputation in the grid were found and removed (display text now cached
+      per row, invalidated on data/selector changes).
 - [x] No boxing on the event hot path; `EventHandler` slots are null until subscribed.
 - [ ] Startup (cold) to first window shown: **< 50 ms** on a trimmed self-contained build.
-- [ ] Backend assemblies: only the registered backend is linked (verified by trim size test).
-- [ ] Data structures: prefer `struct`, `Span<T>`, pooled buffers; avoid LINQ on hot paths.
-- [ ] Benchmark harness + regression thresholds wired into `nightly.yml`.
+- [x] Backend linking: `NativeForms.TrimProbe` (GTK-only) publishes without the Windows/macOS
+      assemblies (asserted in nightly CI); AOT probe 1.4 MB vs 2.4 MB all-backends demo.
+- [x] Data structures: Span at the pixel/text seams, LINQ eliminated from all paint/input/
+      layout paths (one cold-path exception message kept), gesture-scoped transients audited —
+      pooling rejected as unwarranted at current sizes.
+- [x] `NativeForms.Benchmarks` (dependency-free Stopwatch harness: construction ns+bytes,
+      realize, paints/s, 100k-row scroll) + nightly job with 2× regression thresholds and JSON
+      artifact; trim job alongside.
 
 Design rules that serve the budget: buffered-then-flushed peer state (no shadow trees), lazy child
 realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflection metadata cache.
