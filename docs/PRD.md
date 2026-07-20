@@ -326,7 +326,9 @@ strategy (may differ per platform; note exceptions inline).
         setter, read-only-gated), [x] button (per-cell enabled à la
         `DataGridViewDisableButtonColumn`), [x] link, [x] multi-image (per-icon click index),
         [x] progress (shared `GlyphRenderer` fill), [x] combo (popup list),
-        [x] numeric up-down (hosted editor), [x] date-time picker (CalendarCore popup)
+        [x] numeric up-down (hosted editor), [x] date-time picker (CalendarCore popup),
+        [x] masked text (hosted MaskedTextBox + per-column `Mask`), [x] domain up-down,
+        [x] color (swatch + native ColorDialog edit); radio/rating/tree cells deliberately out
   - [x] Read-only story: grid `ReadOnly`, column `ReadOnly`, per-cell `ReadOnlyCellSelector`
         row predicate — any level wins, WinForms semantics
   - [~] Per-row/cell presentation via lambdas (the `System.Windows.Forms.Extensions` attribute
@@ -346,14 +348,16 @@ strategy (may differ per platform; note exceptions inline).
         selectors pending
   - [~] [x] full-row selection, [x] keyboard nav (Up/Down/PageUp/PageDown/Home/End), [x] header rendering
         in native theme, [x] sorting, [x] `MultiSelect` (Ctrl/Shift, display-order ranges),
-        [x] clipboard copy (TSV via `IPlatformBackend.SetClipboardText`) done; [ ] paste pending
+        [x] clipboard copy and [x] Excel-style TSV paste (`GetClipboardText`, per-cell setter
+        conversion + validation veto, `PasteCompleted`) done
   - [~] [x] alternating row styles, [x] per-cell styles (`CellStyleSelector`, see the lambda
         presentation box) done; [ ] DPI + dark mode verification pending
   - [~] [x] Row headers (`ShowRowHeaders`/`RowHeaderWidth`, current-row marker), [x] column
         auto-size modes, [x] column drag-reorder (`DisplayIndex` indirection, model `Columns`
         untouched)
-  - [x] Vertical virtualization (paints only the visible row range); [ ] horizontal scrollbar
-        (`HorizontalOffset` shift exists; interactive scrollbar) pending
+  - [x] Vertical virtualization (paints only the visible row range); [x] interactive vertical +
+        horizontal scrollbars embedded via the shared renderer (structurally synced with
+        `TopRow`/`HorizontalOffset`), auto-shown on overflow
 
 ### 7.5 Range & date
 - [x] `TrackBar` (owner) — Min/Max/Value, `TickFrequency` ticks, horizontal/vertical, themed
