@@ -547,4 +547,25 @@ internal sealed class FocusModelTests
 
         Assert.That(focusedInLoop, Is.True);
     }
+
+    [Test]
+    public void Tab_navigation_reuses_one_scratch_list_and_allocates_nothing()
+    {
+        var form = new Form();
+        var first = new Button();
+        var second = new Button();
+        form.Controls.AddRange(first, second);
+        Realize(form);
+
+        // Warm up: the first pass allocates the scratch list once; later passes must reuse it.
+        form.MoveFocus(null, forward: true);
+        form.MoveFocus(first, forward: true);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        form.MoveFocus(second, forward: true);
+        form.MoveFocus(first, forward: true);
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.That(bytes, Is.Zero, $"{bytes} bytes for two keyboard focus moves");
+    }
 }

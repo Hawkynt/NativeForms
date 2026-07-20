@@ -146,6 +146,15 @@ public interface IWindowPeer : IContainerPeer
     /// </summary>
     void SetOpacity(double opacity);
 
+    /// <summary>
+    /// Raised before the window commits to closing — from <c>WM_CLOSE</c> on Win32, the
+    /// <c>delete-event</c> signal on GTK, or a <see cref="Close"/> call. Setting
+    /// <see cref="System.ComponentModel.CancelEventArgs.Cancel"/> vetoes the close and the window
+    /// stays open; otherwise the close proceeds and <see cref="Closed"/> follows. The seam behind
+    /// <see cref="Form.FormClosing"/>.
+    /// </summary>
+    event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested;
+
     /// <summary>Raised when the user closes the window (native close button, Alt+F4, ⌘Q …).</summary>
     event EventHandler? Closed;
 

@@ -92,6 +92,17 @@ public sealed class LinkClickedEventArgs(string linkText) : EventArgs
     public string LinkText { get; } = linkText;
 }
 
+/// <summary>
+/// Describes an imminent <see cref="Form"/> close, matching
+/// <c>System.Windows.Forms.FormClosingEventArgs</c>: the <see cref="CloseReason"/> says who asked,
+/// and setting <see cref="System.ComponentModel.CancelEventArgs.Cancel"/> vetoes the close.
+/// </summary>
+public sealed class FormClosingEventArgs(CloseReason closeReason) : System.ComponentModel.CancelEventArgs
+{
+    /// <summary>Why the form is closing.</summary>
+    public CloseReason CloseReason { get; } = closeReason;
+}
+
 /// <summary>Describes a character typed, matching <c>System.Windows.Forms.KeyPressEventArgs</c>.</summary>
 public sealed class KeyPressEventArgs(char keyChar) : EventArgs
 {

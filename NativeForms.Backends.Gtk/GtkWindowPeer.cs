@@ -27,6 +27,9 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     private bool _maximizeBox = true;
 
     /// <inheritdoc />
+    public event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested;
+
+    /// <inheritdoc />
     public event EventHandler? Closed;
 
     /// <inheritdoc />
@@ -248,13 +251,24 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     /// <inheritdoc />
     public void Close()
     {
-        if (_widget == 0)
+        if (_widget == 0 || this.IsCloseVetoed())
             return;
 
         if (_modal)
             this.CloseModal();
         else
             NativeMethods.gtk_widget_destroy(_widget);
+    }
+
+    /// <summary>Raises <see cref="CloseRequested"/> and reports whether a subscriber vetoed the close.</summary>
+    private bool IsCloseVetoed()
+    {
+        if (CloseRequested is not { } handler)
+            return false;
+
+        var args = new System.ComponentModel.CancelEventArgs();
+        handler.Invoke(this, args);
+        return args.Cancel;
     }
 
     /// <summary>Ends a modal run: hides the window, announces the close, and quits the nested loop.</summary>
@@ -270,14 +284,21 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     private void RaiseClosed() => Closed?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
-    /// Native handler for the window's "delete-event" signal (the window-manager close button). A
-    /// modal window intercepts it — hide instead of destroy, so the peer outlives its nested loop —
-    /// by returning 1; a modeless window returns 0 and lets GTK proceed to "destroy".
+    /// Native handler for the window's "delete-event" signal (the window-manager close button). The
+    /// core may veto the close (returning 1 keeps the window open). Past the veto, a modal window
+    /// intercepts the event — hide instead of destroy, so the peer outlives its nested loop — by
+    /// returning 1; a modeless window returns 0 and lets GTK proceed to "destroy".
     /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int OnDeleteEvent(nint widget, nint evt, nint userData)
     {
-        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkWindowPeer { _modal: true } peer)
+        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkWindowPeer peer)
+            return 0;
+
+        if (peer.IsCloseVetoed())
+            return 1;
+
+        if (!peer._modal)
             return 0;
 
         peer.CloseModal();

@@ -164,9 +164,10 @@ internal static class DragDropSession
     /// </summary>
     private static Control? FindDropTarget(Control node, Point screen)
     {
-        for (var i = node.Controls.Count - 1; i >= 0; --i)
-            if (FindDropTarget(node.Controls[i], screen) is { } hit)
-                return hit;
+        if (node.ChildrenOrNull is { } children)
+            for (var i = children.Count - 1; i >= 0; --i)
+                if (FindDropTarget(children[i], screen) is { } hit)
+                    return hit;
 
         if (!node.AllowDrop || !node.Visible || !node.Enabled || node.Peer is null)
             return null;

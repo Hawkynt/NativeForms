@@ -32,6 +32,21 @@ public enum CursorKind
 
     /// <summary>The "not allowed" slashed circle.</summary>
     No,
+
+    /// <summary>The four-headed move arrows.</summary>
+    SizeAll,
+
+    /// <summary>The arrow with a question mark shown for context help.</summary>
+    Help,
+
+    /// <summary>The arrow with a busy indicator — working in the background.</summary>
+    AppStarting,
+
+    /// <summary>The vertical-splitter cursor: parallel bars with east-west arrows.</summary>
+    VSplit,
+
+    /// <summary>The horizontal-splitter cursor: parallel bars with north-south arrows.</summary>
+    HSplit,
 }
 
 /// <summary>
@@ -81,4 +96,25 @@ public static class Cursors
 
     /// <summary>The "not allowed" slashed circle.</summary>
     public static Cursor No { get; } = new(CursorKind.No);
+
+    /// <summary>The default arrow pointer — the Windows Forms alias for <see cref="Arrow"/>.</summary>
+    public static Cursor Default => Arrow;
+
+    /// <summary>The busy/wait indicator — the Windows Forms alias for <see cref="Wait"/>.</summary>
+    public static Cursor WaitCursor => Wait;
+
+    /// <summary>The four-headed move arrows.</summary>
+    public static Cursor SizeAll { get; } = new(CursorKind.SizeAll);
+
+    /// <summary>The arrow with a question mark shown for context help.</summary>
+    public static Cursor Help { get; } = new(CursorKind.Help);
+
+    /// <summary>The arrow with a busy indicator — working in the background.</summary>
+    public static Cursor AppStarting { get; } = new(CursorKind.AppStarting);
+
+    /// <summary>The vertical-splitter cursor.</summary>
+    public static Cursor VSplit { get; } = new(CursorKind.VSplit);
+
+    /// <summary>The horizontal-splitter cursor.</summary>
+    public static Cursor HSplit { get; } = new(CursorKind.HSplit);
 }

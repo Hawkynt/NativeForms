@@ -151,21 +151,37 @@ internal sealed class TimerTests
     }
 
     [Test]
-    public void Enabling_before_the_loop_runs_arms_on_the_next_touch_inside_it()
+    public void Enabling_before_the_loop_runs_arms_when_the_loop_starts()
+    {
+        var backend = new HeadlessBackend();
+        var timer = new Timer { Interval = 50 };
+
+        // No application loop yet: the wish joins the pending registry, nothing is created.
+        timer.Enabled = true;
+        Assert.That(backend.Timers, Is.Empty);
+
+        var runningInsideLoop = false;
+        backend.RunAction = () => runningInsideLoop = backend.Timers.Count == 1 && backend.Timers[0].IsRunning;
+        Application.Run(new Form(), backend);
+
+        // The registry armed the timer the moment the loop started — no further touch needed.
+        Assert.That(runningInsideLoop, Is.True, "ticking while the loop pumps");
+        Assert.That(backend.Timers, Has.Count.EqualTo(1));
+        Assert.That(backend.Timers[0].StartedIntervals, Is.EqualTo(new[] { 50 }));
+        timer.Dispose();
+    }
+
+    [Test]
+    public void A_pending_timer_disabled_again_never_arms()
     {
         var backend = new HeadlessBackend();
         var timer = new Timer();
 
-        // No application loop yet: the wish is remembered, nothing is created.
         timer.Enabled = true;
-        Assert.That(backend.Timers, Is.Empty);
-
-        // Touching Interval while the loop is "running" flushes the wish onto the live backend.
-        backend.RunAction = () => timer.Interval = 50;
+        timer.Enabled = false;
         Application.Run(new Form(), backend);
 
-        Assert.That(backend.Timers, Has.Count.EqualTo(1));
-        Assert.That(backend.Timers[0].StartedIntervals, Is.EqualTo(new[] { 50 }));
+        Assert.That(backend.Timers, Is.Empty);
         timer.Dispose();
     }
 

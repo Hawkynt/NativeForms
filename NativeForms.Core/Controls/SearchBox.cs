@@ -106,7 +106,7 @@ public class SearchBox : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
     {
-        if (!this.Enabled || e.Button != MouseButtons.Left)
+        if (e.Button != MouseButtons.Left)
             return;
 
         if (e.X < this.Width - ClearZoneWidth || this.Text.Length == 0)
@@ -119,7 +119,7 @@ public class SearchBox : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (!this.Enabled || e.KeyCode is not Keys.Enter)
+        if (e.KeyCode is not Keys.Enter)
             return;
 
         this.OnSearchCommitted(EventArgs.Empty);

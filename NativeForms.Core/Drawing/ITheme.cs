@@ -66,4 +66,11 @@ public interface ITheme
 
     /// <summary>The thickness of a scrollbar, in logical pixels (primary-monitor scale).</summary>
     int ScrollBarSize { get; }
+
+    /// <summary>
+    /// The maximum interval, in milliseconds, between two clicks that count as a double-click —
+    /// the user's own setting (<c>GetDoubleClickTime</c> on Windows, the
+    /// <c>gtk-double-click-time</c> setting on GTK), 500 in the fallback theme.
+    /// </summary>
+    int DoubleClickTime { get; }
 }

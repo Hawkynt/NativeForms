@@ -51,6 +51,9 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     private nint _icon;
 
     /// <inheritdoc/>
+    public event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested;
+
+    /// <inheritdoc/>
     public event EventHandler? Closed;
 
     /// <inheritdoc/>
@@ -403,6 +406,17 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     /// <summary>Raises <see cref="Closed"/>.</summary>
     private void RaiseClosed() => Closed?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>Raises <see cref="CloseRequested"/> and reports whether a subscriber vetoed the close.</summary>
+    private bool IsCloseVetoed()
+    {
+        if (CloseRequested is not { } handler)
+            return false;
+
+        var args = new System.ComponentModel.CancelEventArgs();
+        handler.Invoke(this, args);
+        return args.Cancel;
+    }
+
     /// <summary>Registers the shared window class exactly once for the lifetime of the process.</summary>
     private static void EnsureClassRegistered()
     {
@@ -539,14 +553,22 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                 break;
 
             case NativeMethods.WM_CLOSE:
-                // A modal window hides instead of dying: the peer must outlive its nested loop so
-                // the core can read state and dispose it after ShowDialog returns.
-                if (_windows.TryGetValue(hwnd, out var closingModal) && closingModal._modal)
+                // The single close gate for both the native close button and Form.Close (which
+                // sends WM_CLOSE): the core may veto here, in which case the window stays open.
+                if (_windows.TryGetValue(hwnd, out var closingWindow))
                 {
-                    NativeMethods.ShowWindow(hwnd, NativeMethods.SW_HIDE);
-                    closingModal._modalClosed = true;
-                    closingModal.RaiseClosed();
-                    return 0;
+                    if (closingWindow.IsCloseVetoed())
+                        return 0;
+
+                    // A modal window hides instead of dying: the peer must outlive its nested loop
+                    // so the core can read state and dispose it after ShowDialog returns.
+                    if (closingWindow._modal)
+                    {
+                        NativeMethods.ShowWindow(hwnd, NativeMethods.SW_HIDE);
+                        closingWindow._modalClosed = true;
+                        closingWindow.RaiseClosed();
+                        return 0;
+                    }
                 }
 
                 NativeMethods.DestroyWindow(hwnd);

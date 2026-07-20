@@ -170,6 +170,14 @@ internal abstract class Win32ControlPeer : IControlPeer
         CursorKind.SizeNWSE => NativeMethods.IDC_SIZENWSE,
         CursorKind.SizeNESW => NativeMethods.IDC_SIZENESW,
         CursorKind.No => NativeMethods.IDC_NO,
+        CursorKind.SizeAll => NativeMethods.IDC_SIZEALL,
+        CursorKind.Help => NativeMethods.IDC_HELP,
+        CursorKind.AppStarting => NativeMethods.IDC_APPSTARTING,
+
+        // USER32 ships no splitter cursors (WinForms carries them as private resources); the plain
+        // resize arrows are the honest stock stand-ins.
+        CursorKind.VSplit => NativeMethods.IDC_SIZEWE,
+        CursorKind.HSplit => NativeMethods.IDC_SIZENS,
         _ => NativeMethods.IDC_ARROW,
     };
 

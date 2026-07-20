@@ -56,6 +56,18 @@ public enum Keys
     /// <summary>Enter/Return.</summary>
     Enter = 0x0D,
 
+    /// <summary>Enter/Return — the classic alias for <see cref="Enter"/>, kept for ported code.</summary>
+    Return = Enter,
+
+    /// <summary>The Shift key itself (either side), as opposed to the <see cref="Shift"/> modifier bit.</summary>
+    ShiftKey = 0x10,
+
+    /// <summary>The Ctrl key itself (either side), as opposed to the <see cref="Control"/> modifier bit.</summary>
+    ControlKey = 0x11,
+
+    /// <summary>The Alt key itself — <c>VK_MENU</c>, hence the classic name.</summary>
+    Menu = 0x12,
+
     /// <summary>Escape.</summary>
     Escape = 0x1B,
 
@@ -95,6 +107,39 @@ public enum Keys
     /// <summary>Delete.</summary>
     Delete = 0x2E,
 
+    /// <summary>The context-menu (application) key.</summary>
+    Apps = 0x5D,
+
+    /// <summary>Numeric-keypad 0.</summary>
+    NumPad0 = 0x60,
+
+    /// <summary>Numeric-keypad 1.</summary>
+    NumPad1 = 0x61,
+
+    /// <summary>Numeric-keypad 2.</summary>
+    NumPad2 = 0x62,
+
+    /// <summary>Numeric-keypad 3.</summary>
+    NumPad3 = 0x63,
+
+    /// <summary>Numeric-keypad 4.</summary>
+    NumPad4 = 0x64,
+
+    /// <summary>Numeric-keypad 5.</summary>
+    NumPad5 = 0x65,
+
+    /// <summary>Numeric-keypad 6.</summary>
+    NumPad6 = 0x66,
+
+    /// <summary>Numeric-keypad 7.</summary>
+    NumPad7 = 0x67,
+
+    /// <summary>Numeric-keypad 8.</summary>
+    NumPad8 = 0x68,
+
+    /// <summary>Numeric-keypad 9.</summary>
+    NumPad9 = 0x69,
+
     /// <summary>Numeric-keypad multiply (*).</summary>
     Multiply = 0x6A,
 
@@ -103,6 +148,24 @@ public enum Keys
 
     /// <summary>Numeric-keypad subtract (−).</summary>
     Subtract = 0x6D,
+
+    /// <summary>Numeric-keypad decimal separator (.).</summary>
+    Decimal = 0x6E,
+
+    /// <summary>Numeric-keypad divide (/).</summary>
+    Divide = 0x6F,
+
+    /// <summary>The =/+ key on the main keyboard row (<c>VK_OEM_PLUS</c>).</summary>
+    Oemplus = 0xBB,
+
+    /// <summary>The -/_ key on the main keyboard row (<c>VK_OEM_MINUS</c>).</summary>
+    OemMinus = 0xBD,
+
+    /// <summary>The comma key (<c>VK_OEM_COMMA</c>).</summary>
+    Oemcomma = 0xBC,
+
+    /// <summary>The period key (<c>VK_OEM_PERIOD</c>).</summary>
+    OemPeriod = 0xBE,
 
     /// <summary>The digit 0.</summary>
     D0 = 0x30,

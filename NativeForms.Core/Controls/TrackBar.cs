@@ -245,7 +245,6 @@ public class TrackBar : OwnerDrawnControl
         if (e.Button != MouseButtons.Left)
             return;
 
-        this.Focus();
         var position = this.IsVertical ? e.Y : e.X;
         if (this.ThumbRect.Contains(e.Location))
         {

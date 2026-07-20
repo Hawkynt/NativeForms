@@ -58,4 +58,7 @@ public sealed class DefaultTheme : ITheme
 
     /// <inheritdoc/>
     public int ScrollBarSize => 16;
+
+    /// <inheritdoc/>
+    public int DoubleClickTime => 500;
 }

@@ -23,7 +23,6 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     private const int _IconGap = 4;
     private const int _TextPad = 2;
     private const int _CellPad = 2;
-    private const int _DoubleClickMs = 500;
 
     private readonly TreeRowList _rows;
     private readonly List<TreeListViewColumn> _watchedColumns = [];
@@ -321,7 +320,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         this.SelectedNode = node;
 
         var now = Environment.TickCount64;
-        if (ReferenceEquals(node, _lastClickNode) && now - _lastClickTicks <= _DoubleClickMs)
+        if (ReferenceEquals(node, _lastClickNode) && now - _lastClickTicks <= this.Theme.DoubleClickTime)
         {
             _lastClickNode = null;
             node.Toggle();

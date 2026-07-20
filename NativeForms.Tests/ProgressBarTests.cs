@@ -26,7 +26,7 @@ internal sealed class ProgressBarTests
         Assert.Multiple(() =>
         {
             Assert.That(bar.Style, Is.EqualTo(ProgressBarStyle.Blocks));
-            Assert.That(bar.MarqueeAnimationSpeed, Is.EqualTo(30));
+            Assert.That(bar.MarqueeAnimationSpeed, Is.EqualTo(100), "the WinForms default");
             Assert.That(bar.Step, Is.EqualTo(10));
             Assert.That(bar.Orientation, Is.EqualTo(Orientation.Horizontal));
         });
@@ -69,7 +69,7 @@ internal sealed class ProgressBarTests
         Assert.Multiple(() =>
         {
             Assert.That(timer.IsRunning, Is.True);
-            Assert.That(timer.StartedIntervals, Does.Contain(30));
+            Assert.That(timer.StartedIntervals, Does.Contain(100));
         });
     }
 

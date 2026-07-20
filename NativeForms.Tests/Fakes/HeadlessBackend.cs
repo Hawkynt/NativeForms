@@ -273,6 +273,7 @@ internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : Head
     /// <summary>Every window-management Set* call, in the order it arrived — the echo detector.</summary>
     public List<string> Calls { get; } = [];
 
+    public event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested;
     public event EventHandler? Closed;
     public event EventHandler<Rectangle>? BoundsChangedByUser;
     public event EventHandler<FormWindowState>? WindowStateChanged;
@@ -352,12 +353,25 @@ internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : Head
         backend?.ModalAction?.Invoke(this);
     }
 
-    /// <summary>Closes the window as the native close button would: hides it and raises <see cref="Closed"/>.</summary>
+    /// <summary>Closes the window as the native close button would: runs the
+    /// <see cref="CloseRequested"/> veto, then hides the window and raises <see cref="Closed"/> —
+    /// or leaves it open when a subscriber cancelled.</summary>
     public void Close()
     {
         ++this.CloseCount;
+        if (this.RaiseCloseRequested())
+            return;
+
         this.Shown = false;
         this.RaiseClosed();
+    }
+
+    /// <summary>Raises <see cref="CloseRequested"/> and reports whether a subscriber vetoed the close.</summary>
+    public bool RaiseCloseRequested()
+    {
+        var args = new System.ComponentModel.CancelEventArgs();
+        this.CloseRequested?.Invoke(this, args);
+        return args.Cancel;
     }
 
     public void RaiseClosed() => this.Closed?.Invoke(this, EventArgs.Empty);

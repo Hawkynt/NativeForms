@@ -10,18 +10,22 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 /// <remarks>
 /// The native timer source comes from the backend the application is running on, so a timer enabled
-/// before <see cref="Application.Run(Form)"/> has started cannot tick yet: the wish is remembered and
-/// the source is armed the next time <see cref="Enabled"/>, <see cref="Interval"/> or
-/// <see cref="Start"/> is touched while the loop is running — which is exactly when a handler inside
-/// that loop first pokes the timer.
+/// before <see cref="Application.Run(Form)"/> has started cannot tick yet: the wish joins a pending
+/// registry and the source is armed the moment the loop starts — designer-style code that enables a
+/// timer during construction just works, exactly like Windows Forms.
 /// </remarks>
 public sealed class Timer : Component
 {
+    /// <summary>Timers enabled before any loop ran, armed by <see cref="ArmPendingTimers"/> once one
+    /// does. UI-thread state, like the timers themselves.</summary>
+    private static readonly List<Timer> _pendingTimers = [];
+
     private readonly IPlatformBackend? _backend;
     private ITimerPeer? _peer;
     private int _interval = 100;
     private bool _enabled;
     private bool _running;
+    private bool _pending;
 
     /// <summary>Creates a timer bound to whatever backend the application runs on.</summary>
     public Timer() { }
@@ -60,6 +64,12 @@ public sealed class Timer : Component
             _enabled = value;
             if (!value)
             {
+                if (_pending)
+                {
+                    _pending = false;
+                    _pendingTimers.Remove(this);
+                }
+
                 if (wasRunning)
                 {
                     _peer!.Stop();
@@ -85,6 +95,12 @@ public sealed class Timer : Component
     {
         _enabled = false;
         _running = false;
+        if (_pending)
+        {
+            _pending = false;
+            _pendingTimers.Remove(this);
+        }
+
         var peer = _peer;
         if (peer is null)
             return;
@@ -96,8 +112,8 @@ public sealed class Timer : Component
 
     /// <summary>
     /// (Re)starts the native timer source at the current interval, creating the peer on first use.
-    /// Without a backend — the application loop has not started yet — the enabled wish is kept for the
-    /// next <see cref="Enabled"/>/<see cref="Interval"/> write.
+    /// Without a backend — the application loop has not started yet — the timer registers as pending
+    /// and is armed by <see cref="ArmPendingTimers"/> when a loop starts.
     /// </summary>
     private void Arm()
     {
@@ -106,7 +122,15 @@ public sealed class Timer : Component
         {
             var backend = _backend ?? Application.Current;
             if (backend is null)
+            {
+                if (!_pending)
+                {
+                    _pending = true;
+                    _pendingTimers.Add(this);
+                }
+
                 return;
+            }
 
             _peer = peer = backend.CreateTimer();
             peer.Tick += this.OnPeerTick;
@@ -114,6 +138,23 @@ public sealed class Timer : Component
 
         peer.Start(_interval);
         _running = true;
+    }
+
+    /// <summary>
+    /// Arms every timer that was enabled before a message loop existed. Called by
+    /// <see cref="Application.Run(Form, IPlatformBackend)"/> right before the loop starts pumping,
+    /// so pre-enabled timers begin ticking without being touched again.
+    /// </summary>
+    internal static void ArmPendingTimers()
+    {
+        while (_pendingTimers.Count > 0)
+        {
+            var timer = _pendingTimers[^1];
+            _pendingTimers.RemoveAt(_pendingTimers.Count - 1);
+            timer._pending = false;
+            if (timer._enabled && !timer._running)
+                timer.Arm();
+        }
     }
 
     /// <summary>Forwards a native tick to <see cref="Tick"/> subscribers; allocation-free.</summary>

@@ -28,9 +28,25 @@ public class Form : Control
     private int[]? _iconPixels;
     private int _iconWidth;
     private int _iconHeight;
+    private CloseReason _closeReason;
 
     /// <summary>The realized native window peer, or <see langword="null"/> before realization.</summary>
     internal IWindowPeer? WindowPeer => _window;
+
+    /// <summary>
+    /// Raised after the form is realized and before it is first shown — the moment initialization
+    /// code that needs live peers (measuring, focusing) traditionally runs. Fires on every show:
+    /// once per <see cref="Application.Run(Form)"/>, <see cref="Show"/> or <see cref="ShowDialog"/>,
+    /// since the form unrealizes between them.
+    /// </summary>
+    public event EventHandler? Load;
+
+    /// <summary>
+    /// Raised before the form closes — by the native close button, <see cref="Close"/>, or a modal
+    /// verdict — carrying the <see cref="CloseReason"/>. Set
+    /// <see cref="FormClosingEventArgs.Cancel"/> to veto and keep the window open.
+    /// </summary>
+    public event EventHandler<FormClosingEventArgs>? FormClosing;
 
     /// <summary>Raised after the user closes the window.</summary>
     public event EventHandler? FormClosed;
@@ -341,9 +357,12 @@ public class Form : Control
     /// <summary>Depth-first dispatch of a shortcut chord to every <see cref="MenuStrip"/> hosted on the form.</summary>
     private static bool DispatchMenuShortcut(Control parent, Keys keyData)
     {
-        for (var i = 0; i < parent.Controls.Count; ++i)
+        if (parent.ChildrenOrNull is not { } children)
+            return false;
+
+        for (var i = 0; i < children.Count; ++i)
         {
-            var child = parent.Controls[i];
+            var child = children[i];
             if (child is MenuStrip strip && strip.ProcessShortcut(keyData))
                 return true;
 
@@ -371,9 +390,12 @@ public class Form : Control
     /// <summary>Finds the first <see cref="MenuStrip"/> whose top-level mnemonic matches and opens that menu.</summary>
     private static bool OpenMenuMnemonic(Control parent, char mnemonic)
     {
-        for (var i = 0; i < parent.Controls.Count; ++i)
+        if (parent.ChildrenOrNull is not { } children)
+            return false;
+
+        for (var i = 0; i < children.Count; ++i)
         {
-            var child = parent.Controls[i];
+            var child = children[i];
             if (child is MenuStrip strip && strip.OpenMnemonic(mnemonic))
                 return true;
 
@@ -455,10 +477,10 @@ public class Form : Control
     /// </summary>
     private static void AppendInTabOrder(Control parent, List<Control> order)
     {
-        var children = parent.Controls;
-        var count = children.Count;
-        if (count == 0)
+        if (parent.ChildrenOrNull is not { Count: > 0 } children)
             return;
+
+        var count = children.Count;
 
         Span<int> indices = count <= 64 ? stackalloc int[count] : new int[count];
         for (var i = 0; i < count; ++i)
@@ -504,6 +526,12 @@ public class Form : Control
 
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateWindow();
 
+    /// <summary>Raises <see cref="Load"/>.</summary>
+    protected virtual void OnLoad(EventArgs e) => this.Load?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="FormClosing"/>.</summary>
+    protected virtual void OnFormClosing(FormClosingEventArgs e) => this.FormClosing?.Invoke(this, e);
+
     /// <summary>Raises <see cref="FormClosed"/>.</summary>
     protected virtual void OnFormClosed(EventArgs e) => this.FormClosed?.Invoke(this, e);
 
@@ -521,6 +549,7 @@ public class Form : Control
 
         _window = window;
         _lastSize = this.Bounds.Size;
+        window.CloseRequested += this.OnPeerCloseRequested;
         window.Closed += this.OnPeerClosed;
         window.BoundsChangedByUser += this.OnPeerBoundsChanged;
         window.WindowStateChanged += this.OnPeerWindowStateChanged;
@@ -541,6 +570,7 @@ public class Form : Control
         if (_window is not { } window)
             return;
 
+        window.CloseRequested -= this.OnPeerCloseRequested;
         window.Closed -= this.OnPeerClosed;
         window.BoundsChangedByUser -= this.OnPeerBoundsChanged;
         window.WindowStateChanged -= this.OnPeerWindowStateChanged;
@@ -565,10 +595,56 @@ public class Form : Control
     }
 
     /// <summary>
-    /// Closes the form as the native close button would. A no-op before realization; on a modal form
-    /// this ends the <see cref="ShowDialog"/> loop.
+    /// Closes the form as the native close button would, running the <see cref="FormClosing"/> veto
+    /// with <see cref="CloseReason.ProgrammaticClosing"/> first. A no-op before realization; on a
+    /// modal form this ends the <see cref="ShowDialog"/> loop.
     /// </summary>
-    public void Close() => _window?.Close();
+    public void Close()
+    {
+        if (_window is not { } window)
+            return;
+
+        _closeReason = CloseReason.ProgrammaticClosing;
+        try
+        {
+            window.Close();
+        }
+        finally
+        {
+            _closeReason = CloseReason.None;
+        }
+    }
+
+    /// <summary>
+    /// The size of the form. Windows Forms subtracts the non-client frame here; no peer reports its
+    /// non-client metrics yet, so for now <see cref="ClientSize"/> equals <see cref="Control.Size"/>
+    /// on every platform — a documented platform gap, not a contract.
+    /// </summary>
+    public Size ClientSize
+    {
+        get => this.Size;
+        set => this.Size = value;
+    }
+
+    /// <summary>
+    /// Shows this form modelessly on the running application's backend: the form realizes, appears,
+    /// and the call returns immediately — the window then lives on the already-pumping message loop
+    /// and closes through the usual <see cref="FormClosing"/>/<see cref="FormClosed"/> path.
+    /// Showing an already-realized form just re-shows its window.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No application message loop is running.</exception>
+    public void Show()
+    {
+        if (_window is { } window)
+        {
+            window.Show();
+            return;
+        }
+
+        var backend = Application.Current ?? throw new InvalidOperationException(
+            "Form.Show needs a running message loop — call it while Application.Run is active.");
+        this.RealizeWindow(backend);
+    }
 
     /// <summary>
     /// Shows this form modally: <paramref name="owner"/> (when given) is disabled while a nested
@@ -590,6 +666,7 @@ public class Form : Control
         this.DialogResult = DialogResult.None;
         this.ApplyStartPosition(backend, owner);
         var window = this.RealizeAsWindow(backend);
+        this.OnLoad(EventArgs.Empty);
         this.ApplyInitialFocus();
         _modal = true;
         try
@@ -618,6 +695,7 @@ public class Form : Control
     {
         this.ApplyStartPosition(backend, owner: null);
         var window = this.RealizeAsWindow(backend);
+        this.OnLoad(EventArgs.Empty);
         window.Show();
         this.ApplyInitialFocus();
         return window;
@@ -648,6 +726,19 @@ public class Form : Control
         this.Location = new(
             area.X + (area.Width - size.Width) / 2,
             area.Y + (area.Height - size.Height) / 2);
+    }
+
+    /// <summary>
+    /// Runs the <see cref="FormClosing"/> veto for a close the peer announces before committing:
+    /// the reason is <see cref="CloseReason.ProgrammaticClosing"/> while a <see cref="Close"/> call
+    /// is on the stack, <see cref="CloseReason.UserClosing"/> for a platform-initiated close (the
+    /// native close button, Alt+F4). Cancelling keeps the window open.
+    /// </summary>
+    private void OnPeerCloseRequested(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var args = new FormClosingEventArgs(_closeReason == CloseReason.None ? CloseReason.UserClosing : _closeReason);
+        this.OnFormClosing(args);
+        e.Cancel = args.Cancel;
     }
 
     /// <summary>Forwards the peer's close notification to <see cref="OnFormClosed"/>.</summary>

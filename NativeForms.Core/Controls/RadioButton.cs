@@ -58,10 +58,15 @@ public class RadioButton : OwnerDrawnControl
     protected virtual void OnCheckedChanged(EventArgs e) => this.CheckedChanged?.Invoke(this, e);
 
     /// <summary>Selects this button (checking it) and raises <see cref="Control.Click"/>.</summary>
-    protected void Select()
+    protected void Select() => this.OnClick(EventArgs.Empty);
+
+    /// <summary>Checks the button, then raises <see cref="Control.Click"/> — the Windows Forms
+    /// order (<see cref="CheckedChanged"/> first), shared by mouse, Space and
+    /// <see cref="Control.PerformClick"/>.</summary>
+    protected override void OnClick(EventArgs e)
     {
         this.Checked = true;
-        this.OnClick(EventArgs.Empty);
+        base.OnClick(e);
     }
 
     /// <summary>Clears the checked state of the sibling radio buttons in the same parent.</summary>
@@ -81,16 +86,17 @@ public class RadioButton : OwnerDrawnControl
     protected override void OnMouseUp(MouseEventArgs e)
     {
         if (e.Button == MouseButtons.Left && HitTest.ClientContains(this, e.Location))
-            this.Select();
+            this.OnClick(EventArgs.Empty);
     }
 
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
+    /// <summary>Space selects on the key <em>release</em>, like the Windows Forms button base — a
+    /// held key must not auto-repeat the click.</summary>
+    protected override void OnKeyUp(KeyEventArgs e)
     {
         if (e.KeyCode is not Keys.Space)
             return;
 
-        this.Select();
+        this.OnClick(EventArgs.Empty);
         e.Handled = true;
     }
 

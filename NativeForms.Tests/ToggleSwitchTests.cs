@@ -90,11 +90,15 @@ internal sealed class ToggleSwitchTests
     }
 
     [Test]
-    public void Space_toggles()
+    public void Space_toggles_on_key_release()
     {
         var toggle = CreateSwitch(out var canvas);
 
+        // Like the WinForms button base, Space acts on key-up — a held key must not auto-repeat.
         canvas.RaiseKeyDown(Keys.Space);
+        Assert.That(toggle.Checked, Is.False, "key-down alone must not toggle");
+
+        canvas.RaiseKeyUp(Keys.Space);
 
         Assert.That(toggle.Checked, Is.True);
     }
@@ -105,6 +109,7 @@ internal sealed class ToggleSwitchTests
         var toggle = CreateSwitch(out var canvas);
 
         canvas.RaiseKeyDown(Keys.Enter);
+        canvas.RaiseKeyUp(Keys.Enter);
 
         Assert.That(toggle.Checked, Is.False);
     }
@@ -133,6 +138,7 @@ internal sealed class ToggleSwitchTests
         canvas.RaiseMouseDown(10, 10);
         canvas.RaiseMouseUp(10, 10);
         canvas.RaiseKeyDown(Keys.Space);
+        canvas.RaiseKeyUp(Keys.Space);
 
         var g = canvas.RaisePaint();
         Assert.Multiple(() =>

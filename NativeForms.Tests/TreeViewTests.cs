@@ -194,6 +194,27 @@ internal sealed class TreeViewTests
     }
 
     [Test]
+    public void Double_click_detection_honors_the_theme_interval()
+    {
+        var backend = new HeadlessBackend
+        {
+            // An impossible interval: even two clicks in the same millisecond miss it, proving the
+            // control reads the theme's user setting instead of a hard-coded 500 ms.
+            Theme = new StubTheme { DoubleClickTime = -1 },
+        };
+        var form = new Form();
+        var tree = MakeTree();
+        form.Controls.Add(tree);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(150, 11);
+        canvas.RaiseMouseDown(150, 11);
+
+        Assert.That(tree.Nodes[0].IsExpanded, Is.False, "no interval, no double-click");
+    }
+
+    [Test]
     public void Arrow_keys_walk_the_visible_rows()
     {
         var tree = MakeTree();

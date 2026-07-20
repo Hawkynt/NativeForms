@@ -470,6 +470,10 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial int GetSystemMetrics(int nIndex);
 
+    /// <summary>Retrieves the user's double-click interval in milliseconds.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetDoubleClickTime();
+
     /// <summary>Draws formatted text inside a rectangle (see <c>DT_*</c>).</summary>
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial int DrawTextW(nint hdc, string lpchText, int cchText, ref RECT lprc, uint format);

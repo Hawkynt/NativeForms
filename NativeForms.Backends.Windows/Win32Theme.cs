@@ -14,6 +14,7 @@ internal sealed unsafe class Win32Theme : ITheme
     private readonly Font _defaultFont;
     private readonly int _rowHeight;
     private readonly int _scrollBarSize;
+    private readonly int _doubleClickTime;
 
     /// <summary>Reads the current desktop palette, font and metrics into an immutable snapshot.</summary>
     public Win32Theme()
@@ -36,6 +37,9 @@ internal sealed unsafe class Win32Theme : ITheme
         this._rowHeight = fontPixelHeight + 10;
         this._scrollBarSize = Metric(NativeMethods.SM_CXVSCROLL, fallback: 16);
         this.IsHighContrast = ReadHighContrast();
+
+        var doubleClickTime = (int)NativeMethods.GetDoubleClickTime();
+        this._doubleClickTime = doubleClickTime > 0 ? doubleClickTime : 500;
     }
 
     /// <inheritdoc/>
@@ -85,6 +89,9 @@ internal sealed unsafe class Win32Theme : ITheme
 
     /// <inheritdoc/>
     public int ScrollBarSize => this._scrollBarSize;
+
+    /// <inheritdoc/>
+    public int DoubleClickTime => this._doubleClickTime;
 
     /// <summary>Reads whether the desktop runs a high-contrast scheme via <c>SPI_GETHIGHCONTRAST</c>.</summary>
     private static bool ReadHighContrast()

@@ -241,6 +241,11 @@ internal abstract class GtkControlPeer : IControlPeer
             CursorKind.SizeNWSE => "nwse-resize",
             CursorKind.SizeNESW => "nesw-resize",
             CursorKind.No => "not-allowed",
+            CursorKind.SizeAll => "move",
+            CursorKind.Help => "help",
+            CursorKind.AppStarting => "progress",
+            CursorKind.VSplit => "col-resize",
+            CursorKind.HSplit => "row-resize",
             _ => "default",
         };
 

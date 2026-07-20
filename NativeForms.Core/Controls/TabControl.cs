@@ -139,13 +139,45 @@ public class TabControl : OwnerDrawnControl
     /// <summary>Called by <see cref="TabPageCollection.Add"/> after the page joined the list.</summary>
     internal void OnPageAdded(TabPage page)
     {
+        this.OnPageAdopted(page);
+        this.Controls.Add(page);
+    }
+
+    /// <summary>Selection and geometry bookkeeping for a page that just joined <see cref="TabPages"/> —
+    /// shared by <see cref="TabPageCollection.Add"/> and the designer-style
+    /// <c>Controls.Add(tabPage)</c> route.</summary>
+    private void OnPageAdopted(TabPage page)
+    {
         if (_selectedIndex < 0)
             _selectedIndex = 0;
 
         page.Visible = this.TabPages.Count - 1 == _selectedIndex;
         page.Bounds = this.GetContentArea();
-        this.Controls.Add(page);
         this.Invalidate();
+    }
+
+    /// <summary>
+    /// Routes designer-style <c>Controls.Add(tabPage)</c> into <see cref="TabPages"/>, exactly like
+    /// Windows Forms; anything that is not a <see cref="TabPage"/> is rejected — a tab control hosts
+    /// pages only.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The child is not a <see cref="TabPage"/>.</exception>
+    private protected override void OnChildAdded(Control child)
+    {
+        if (child is not TabPage page)
+        {
+            this.Controls.Remove(child);
+            throw new InvalidOperationException(
+                "Only TabPage instances can be added to a TabControl — add pages through TabPages or Controls.Add(tabPage), and put other controls onto a page.");
+        }
+
+        if (this.TabPages.IndexOf(page) < 0)
+        {
+            this.TabPages.Adopt(page);
+            this.OnPageAdopted(page);
+        }
+
+        base.OnChildAdded(child);
     }
 
     /// <summary>Called by <see cref="TabPageCollection"/> after the page left the list at <paramref name="index"/>.</summary>
@@ -379,6 +411,10 @@ public sealed class TabPageCollection : IReadOnlyList<TabPage>
         _pages.Add(page);
         _owner.OnPageAdded(page);
     }
+
+    /// <summary>Registers a page that arrived through <c>Controls.Add(tabPage)</c> — it is already a
+    /// child control, so only the page list itself needs the entry.</summary>
+    internal void Adopt(TabPage page) => _pages.Add(page);
 
     /// <summary>Appends several pages in order.</summary>
     public void AddRange(params TabPage[] pages)

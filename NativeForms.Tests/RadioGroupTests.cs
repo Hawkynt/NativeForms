@@ -69,12 +69,16 @@ internal sealed class RadioGroupTests
     }
 
     [Test]
-    public void RadioButton_space_key_selects()
+    public void RadioButton_space_key_release_selects()
     {
         var radio = new RadioButton { Bounds = new(0, 0, 120, 20) };
         var canvas = Realize(radio);
 
+        // Like the WinForms button base, Space acts on key-up — a held key must not auto-repeat.
         canvas.RaiseKeyDown(Keys.Space);
+        Assert.That(radio.Checked, Is.False, "key-down alone must not select");
+
+        canvas.RaiseKeyUp(Keys.Space);
 
         Assert.That(radio.Checked, Is.True);
     }

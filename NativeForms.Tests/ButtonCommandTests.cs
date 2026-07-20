@@ -53,7 +53,7 @@ internal sealed class ButtonCommandTests
     }
 
     [Test]
-    public void Click_still_raises_the_event_but_skips_a_declining_command()
+    public void A_declining_command_disables_the_button_and_swallows_PerformClick()
     {
         var executed = 0;
         var clicked = 0;
@@ -62,7 +62,10 @@ internal sealed class ButtonCommandTests
 
         button.PerformClick();
 
-        Assert.That(clicked, Is.EqualTo(1));
+        // The guard drove Enabled to false, and PerformClick on a disabled control is a no-op —
+        // the WinForms contract: neither the event nor the command fires.
+        Assert.That(button.Enabled, Is.False);
+        Assert.That(clicked, Is.Zero);
         Assert.That(executed, Is.Zero);
     }
 

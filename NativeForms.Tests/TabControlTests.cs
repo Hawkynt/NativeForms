@@ -237,4 +237,41 @@ internal sealed class TabControlTests
             Assert.That(pageCanvases[1].Visible, Is.True);
         });
     }
+
+    [Test]
+    public void Controls_Add_routes_a_TabPage_into_TabPages()
+    {
+        // Designer-generated code adds pages through Controls, not TabPages — both routes must
+        // land in the same place, exactly like WinForms.
+        var tabs = new TabControl { Bounds = new(0, 0, 400, 300) };
+        var one = new TabPage("First");
+        var two = new TabPage("Second");
+
+        tabs.Controls.Add(one);
+        tabs.Controls.Add(two);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tabs.TabPages.Count, Is.EqualTo(2));
+            Assert.That(tabs.TabPages[0], Is.SameAs(one));
+            Assert.That(tabs.TabPages[1], Is.SameAs(two));
+            Assert.That(tabs.SelectedIndex, Is.Zero);
+            Assert.That(one.Visible, Is.True, "the first page added is selected and shown");
+            Assert.That(two.Visible, Is.False);
+        });
+    }
+
+    [Test]
+    public void Controls_Add_rejects_anything_but_a_TabPage()
+    {
+        var tabs = new TabControl { Bounds = new(0, 0, 400, 300) };
+        var stray = new Button();
+
+        Assert.Throws<InvalidOperationException>(() => tabs.Controls.Add(stray));
+        Assert.Multiple(() =>
+        {
+            Assert.That(tabs.Controls.Contains(stray), Is.False, "the rejected child is rolled back");
+            Assert.That(stray.Parent, Is.Null);
+        });
+    }
 }

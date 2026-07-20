@@ -9,7 +9,8 @@ namespace Hawkynt.NativeForms.Tests;
 /// resizes, each <see cref="DockStyle.None"/> child repositions per <see cref="Control.Anchor"/>
 /// (anchored edges keep their distance to the container's <see cref="Control.DisplayRectangle"/>,
 /// opposing anchors stretch, no anchors drift by half the delta), while docked children claim
-/// edges of the remaining rectangle in <see cref="Control.Controls"/> order with
+/// edges of the remaining rectangle in reverse <see cref="Control.Controls"/> order — the
+/// last-added child docks first, as WinForms designer code relies on — with
 /// <see cref="DockStyle.Fill"/> taking the rest. Layout panels that own their children's bounds
 /// keep ignoring both properties; plain containers (Form, Panel, GroupBox, TabPage,
 /// SplitContainer panels) honor them.
@@ -189,7 +190,7 @@ internal sealed class AnchorDockTests
     }
 
     [Test]
-    public void Docked_children_claim_edges_in_Controls_order_and_Fill_takes_the_rest()
+    public void Docked_children_claim_edges_in_reverse_Controls_order_and_Fill_takes_the_rest()
     {
         var panel = MakeContainer(200, 100);
         var top = MakeChild(0, 0, 10, 20);
@@ -201,11 +202,36 @@ internal sealed class AnchorDockTests
         left.Dock = DockStyle.Left;
         fill.Dock = DockStyle.Fill;
 
+        // WinForms docks last-added first: left claims the full-height strip, then top spans what
+        // is left of the width, and fill takes the remainder.
         Assert.Multiple(() =>
         {
-            Assert.That(top.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, 20)));
-            Assert.That(left.Bounds, Is.EqualTo(new Rectangle(0, 20, 30, 80)));
+            Assert.That(left.Bounds, Is.EqualTo(new Rectangle(0, 0, 30, 100)));
+            Assert.That(top.Bounds, Is.EqualTo(new Rectangle(30, 0, 170, 20)));
             Assert.That(fill.Bounds, Is.EqualTo(new Rectangle(30, 20, 170, 80)));
+        });
+    }
+
+    [Test]
+    public void Designer_add_order_stacks_the_last_added_child_at_its_edge_first()
+    {
+        // The designer emits Add(fill); Add(toolbar); Add(menu) — the menu must land topmost,
+        // the toolbar directly under it, and the fill child takes the rest, exactly like WinForms.
+        var panel = MakeContainer(200, 100);
+        var fill = MakeChild(0, 0, 10, 10);
+        var toolbar = MakeChild(0, 0, 10, 25);
+        var menu = MakeChild(0, 0, 10, 20);
+        panel.Controls.AddRange(fill, toolbar, menu);
+
+        fill.Dock = DockStyle.Fill;
+        toolbar.Dock = DockStyle.Top;
+        menu.Dock = DockStyle.Top;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(menu.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, 20)), "last-added docks first");
+            Assert.That(toolbar.Bounds, Is.EqualTo(new Rectangle(0, 20, 200, 25)), "stacks below the menu");
+            Assert.That(fill.Bounds, Is.EqualTo(new Rectangle(0, 45, 200, 55)), "fill takes the remainder");
         });
     }
 
@@ -238,10 +264,11 @@ internal sealed class AnchorDockTests
         right.Dock = DockStyle.Right;
         bottom.Dock = DockStyle.Bottom;
 
+        // Last-added docks first: bottom spans the full width, right fills the height above it.
         Assert.Multiple(() =>
         {
-            Assert.That(right.Bounds, Is.EqualTo(new Rectangle(160, 0, 40, 100)));
-            Assert.That(bottom.Bounds, Is.EqualTo(new Rectangle(0, 70, 160, 30)));
+            Assert.That(bottom.Bounds, Is.EqualTo(new Rectangle(0, 70, 200, 30)));
+            Assert.That(right.Bounds, Is.EqualTo(new Rectangle(160, 0, 40, 70)));
         });
     }
 

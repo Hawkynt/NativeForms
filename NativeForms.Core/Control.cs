@@ -59,8 +59,11 @@ public abstract class Control
     private int _tabIndex;
     private State _state;
     private byte _layoutSuspend;
+    private bool _visible = true;
+    private bool _enabled = true;
     private Rectangle _layoutBounds;
     private AppearanceState? _appearance;
+    private ControlCollection? _controls;
 
     /// <summary>
     /// The rarely-set appearance slots, allocated on the first explicit set so the thousands of
@@ -86,9 +89,6 @@ public abstract class Control
         /// <summary>The explicitly set pointer shape, or <see langword="null"/> for ambient.</summary>
         public Cursor? Cursor;
     }
-
-    /// <summary>Initializes the control and its (initially empty) child collection.</summary>
-    protected Control() => this.Controls = new(this);
 
     /// <summary>The caption text: a button label, a form's title bar, a label's text.</summary>
     public virtual string Text
@@ -164,33 +164,89 @@ public abstract class Control
         set => this.Size = new(this.Bounds.Width, value);
     }
 
-    /// <summary>Whether the widget is shown.</summary>
+    /// <summary>
+    /// Whether the widget is shown. The getter is <em>effective</em>, exactly like Windows Forms: a
+    /// control inside a hidden ancestor reports <see langword="false"/> even while its own flag is
+    /// still set. The setter only writes this control's own flag; the peer receives the local value —
+    /// native widget nesting already hides children with their parent.
+    /// </summary>
     public bool Visible
     {
-        get => field;
+        get
+        {
+            for (var control = this; control is not null; control = control.Parent)
+                if (!control._visible)
+                    return false;
+
+            return true;
+        }
         set
         {
-            if (field == value)
+            if (_visible == value)
                 return;
 
-            field = value;
+            _visible = value;
             this.PushPeerVisible();
         }
-    } = true;
+    }
 
-    /// <summary>Whether the widget accepts user interaction.</summary>
+    /// <summary>
+    /// Whether the widget accepts user interaction. The getter is <em>effective</em>, exactly like
+    /// Windows Forms: a control inside a disabled ancestor reports <see langword="false"/> even
+    /// while its own flag is still set. The setter only writes this control's own flag; the peer
+    /// receives the local value — native widgets grey out with their disabled parent already.
+    /// </summary>
     public bool Enabled
     {
-        get => field;
+        get
+        {
+            for (var control = this; control is not null; control = control.Parent)
+                if (!control._enabled)
+                    return false;
+
+            return true;
+        }
         set
         {
-            if (field == value)
+            if (_enabled == value)
                 return;
 
-            field = value;
+            _enabled = value;
             _peer?.SetEnabled(value);
         }
-    } = true;
+    }
+
+    /// <summary>This control's own <see cref="Visible"/> flag, ignoring the ancestor chain — the
+    /// value peers are fed and container vetoes combine with.</summary>
+    internal bool IsVisibleLocal => _visible;
+
+    /// <summary>Arbitrary caller-owned data attached to the control, exactly like Windows Forms —
+    /// the toolkit never reads it.</summary>
+    public object? Tag { get; set; }
+
+    /// <summary>The programmatic name of the control — designer-style lookup data, never rendered.
+    /// Defaults to the empty string; assigning <see langword="null"/> resets to it.</summary>
+    public string Name
+    {
+        get => field;
+        set => field = value ?? string.Empty;
+    } = string.Empty;
+
+    /// <summary>
+    /// Requests a full repaint. Owner-drawn controls forward to their canvas surface; controls
+    /// backed by a native widget repaint themselves through the platform and treat this as a no-op —
+    /// <see cref="IControlPeer"/> exposes no invalidation seam.
+    /// </summary>
+    public virtual void Invalidate() { }
+
+    /// <summary>Requests a repaint of a client-space sub-region (see <see cref="Invalidate()"/>).</summary>
+    public virtual void Invalidate(Rectangle region) { }
+
+    /// <summary>
+    /// Invalidates the whole control. Unlike Windows Forms the repaint is not forced synchronously —
+    /// it arrives with the platform's next paint cycle, which every backend schedules promptly.
+    /// </summary>
+    public void Refresh() => this.Invalidate();
 
     /// <summary>
     /// The spacing layout containers (<see cref="FlowLayoutPanel"/>, <see cref="TableLayoutPanel"/>)
@@ -238,9 +294,10 @@ public abstract class Control
 
     /// <summary>
     /// The parent edge this control glues itself to, <see cref="DockStyle.None"/> by default.
-    /// Docked siblings claim their edges of the parent's <see cref="DisplayRectangle"/> in
-    /// <see cref="Controls"/> order, each shrinking the rectangle left for the next;
-    /// <see cref="DockStyle.Fill"/> takes whatever remains. Assigning a dock resets
+    /// Docked siblings claim their edges of the parent's <see cref="DisplayRectangle"/> in reverse
+    /// <see cref="Controls"/> order — the last-added sibling docks first — each shrinking the
+    /// rectangle left for the next; <see cref="DockStyle.Fill"/> takes whatever remains. Assigning
+    /// a dock resets
     /// <see cref="Anchor"/> to its default — the property assigned last wins, exactly like
     /// Windows Forms.
     /// </summary>
@@ -380,9 +437,12 @@ public abstract class Control
     private void NotifyRightToLeftChanged()
     {
         this.OnRightToLeftChanged(EventArgs.Empty);
-        for (var i = 0; i < this.Controls.Count; ++i)
-            if (this.Controls[i].RightToLeft == RightToLeft.Inherit)
-                this.Controls[i].NotifyRightToLeftChanged();
+        if (_controls is not { } children)
+            return;
+
+        for (var i = 0; i < children.Count; ++i)
+            if (children[i].RightToLeft == RightToLeft.Inherit)
+                children[i].NotifyRightToLeftChanged();
     }
 
     /// <summary>The resolved text direction: walks the <see cref="Parent"/> chain past
@@ -565,8 +625,14 @@ public abstract class Control
     /// </summary>
     public ContextMenuStrip? ContextMenuStrip { get; set; }
 
-    /// <summary>The child controls hosted by this control.</summary>
-    public ControlCollection Controls { get; }
+    /// <summary>The child controls hosted by this control. Created on first access, so the many leaf
+    /// controls that never host children pay no collection allocation — internal traversals go
+    /// through <see cref="ChildrenOrNull"/> and skip the empty case.</summary>
+    public ControlCollection Controls => _controls ??= new(this);
+
+    /// <summary>The child collection when one exists, or <see langword="null"/> for a control no
+    /// child was ever added to — the allocation-free traversal seam.</summary>
+    internal ControlCollection? ChildrenOrNull => _controls;
 
     /// <summary>Raised when the control is activated by the user.</summary>
     public event EventHandler? Click;
@@ -700,8 +766,14 @@ public abstract class Control
         DragDropSession.Begin(this, data, allowedEffects);
     }
 
-    /// <summary>Programmatically triggers the <see cref="Click"/> event.</summary>
-    public void PerformClick() => this.OnClick(EventArgs.Empty);
+    /// <summary>Programmatically triggers the <see cref="Click"/> event — a no-op while the control
+    /// is not effectively <see cref="Enabled"/> and <see cref="Visible"/>, the Windows Forms
+    /// contract a disabled dialog button relies on.</summary>
+    public void PerformClick()
+    {
+        if (this.Enabled && this.Visible)
+            this.OnClick(EventArgs.Empty);
+    }
 
     /// <summary>
     /// Whether the caller must marshal through <see cref="Invoke"/>/<see cref="BeginInvoke"/> to
@@ -835,9 +907,12 @@ public abstract class Control
     {
         _peer?.SetFont(font);
         this.OnAppearanceChanged();
-        for (var i = 0; i < this.Controls.Count; ++i)
+        if (_controls is not { } children)
+            return;
+
+        for (var i = 0; i < children.Count; ++i)
         {
-            var child = this.Controls[i];
+            var child = children[i];
             if (child._appearance?.Font is null)
                 child.PushAmbientFont(font);
         }
@@ -851,8 +926,11 @@ public abstract class Control
     {
         _peer?.SetColors(this.GetAmbientForeColor(), this.GetAmbientBackColor());
         this.OnAppearanceChanged();
-        for (var i = 0; i < this.Controls.Count; ++i)
-            this.Controls[i].PushAmbientColors();
+        if (_controls is not { } children)
+            return;
+
+        for (var i = 0; i < children.Count; ++i)
+            children[i].PushAmbientColors();
     }
 
     /// <summary>
@@ -861,9 +939,12 @@ public abstract class Control
     private void PushAmbientCursor(Cursor cursor)
     {
         _peer?.SetCursor(cursor);
-        for (var i = 0; i < this.Controls.Count; ++i)
+        if (_controls is not { } children)
+            return;
+
+        for (var i = 0; i < children.Count; ++i)
         {
-            var child = this.Controls[i];
+            var child = children[i];
             if (child._appearance?.Cursor is null)
                 child.PushAmbientCursor(cursor);
         }
@@ -964,8 +1045,10 @@ public abstract class Control
 
     /// <summary>
     /// The layout pass. The base is the Windows Forms default engine: docked children claim edges
-    /// of the <see cref="DisplayRectangle"/> in <see cref="Controls"/> order (<see cref="DockStyle.Fill"/>
-    /// children take the final remainder), then every undocked child repositions per its
+    /// of the <see cref="DisplayRectangle"/> in <em>reverse</em> <see cref="Controls"/> order — the
+    /// last-added child docks first, so designer-style <c>Add(fill); Add(toolbar); Add(menu)</c>
+    /// stacks the menu topmost, exactly like Windows Forms — with <see cref="DockStyle.Fill"/>
+    /// children taking the final remainder. Then every undocked child repositions per its
     /// <see cref="Anchor"/> against how each display-rectangle edge moved since the previous pass —
     /// anchored edges hold their distance, opposing anchors stretch, unanchored axes drift by half.
     /// The engine keeps one rectangle per container (the display rectangle it last laid out) and
@@ -979,14 +1062,13 @@ public abstract class Control
         var display = this.DisplayRectangle;
         var previous = _layoutBounds;
         _layoutBounds = display;
-        var children = this.Controls;
-        var count = children.Count;
-        if (count == 0)
+        if (_controls is not { Count: > 0 } children)
             return;
 
+        var count = children.Count;
         var remaining = display;
         var fills = false;
-        for (var i = 0; i < count; ++i)
+        for (var i = count - 1; i >= 0; --i)
         {
             var child = children[i];
             var size = child.Bounds.Size;
@@ -1090,11 +1172,12 @@ public abstract class Control
     private protected virtual Rectangle GetChildPeerBounds(Control child) => child.Bounds;
 
     /// <summary>
-    /// Whether a child's peer should currently be shown. The default honors the child's own
-    /// <see cref="Visible"/>; containers that hide their content wholesale (a collapsed expander)
-    /// veto it without clobbering the child's logical visibility.
+    /// Whether a child's peer should currently be shown. The default honors the child's own local
+    /// <see cref="Visible"/> flag (native nesting hides children with a hidden ancestor already);
+    /// containers that hide their content wholesale (a collapsed expander) veto it without
+    /// clobbering the child's logical visibility.
     /// </summary>
-    private protected virtual bool GetChildPeerVisible(Control child) => child.Visible;
+    private protected virtual bool GetChildPeerVisible(Control child) => child._visible;
 
     /// <summary>
     /// Adopts bounds the native peer reports (a user resize or move) without echoing them back into
@@ -1114,9 +1197,9 @@ public abstract class Control
     internal void PushPeerBounds()
         => _peer?.SetBounds(this.Parent is { } parent ? parent.GetChildPeerBounds(this) : this.Bounds);
 
-    /// <summary>Re-applies this control's effective visibility to its peer through the parent's veto.</summary>
+    /// <summary>Re-applies this control's local visibility to its peer through the parent's veto.</summary>
     internal void PushPeerVisible()
-        => _peer?.SetVisible(this.Parent is { } parent ? parent.GetChildPeerVisible(this) : this.Visible);
+        => _peer?.SetVisible(this.Parent is { } parent ? parent.GetChildPeerVisible(this) : _visible);
 
     /// <summary>
     /// Creates this control's peer and pushes its buffered state into it. When the peer can host
@@ -1133,7 +1216,7 @@ public abstract class Control
         peer.LostFocus += this.OnPeerLostFocus;
         this.PushPeerBounds();
         peer.SetText(this.Text);
-        peer.SetEnabled(this.Enabled);
+        peer.SetEnabled(_enabled);
         this.PushPeerVisible();
 
         // Appearance is only flushed when set somewhere up the chain, so the overwhelmingly common
@@ -1151,9 +1234,9 @@ public abstract class Control
 
         this.OnRealized(peer);
 
-        if (peer is IContainerPeer container)
-            for (var i = 0; i < this.Controls.Count; ++i)
-                container.AddChild(this.Controls[i].RealizeSelf(backend));
+        if (peer is IContainerPeer container && _controls is { } children)
+            for (var i = 0; i < children.Count; ++i)
+                container.AddChild(children[i].RealizeSelf(backend));
 
         return peer;
     }
@@ -1177,8 +1260,9 @@ public abstract class Control
     /// </summary>
     internal void DisposePeerTree()
     {
-        for (var i = 0; i < this.Controls.Count; ++i)
-            this.Controls[i].DisposePeerTree();
+        if (_controls is { } children)
+            for (var i = 0; i < children.Count; ++i)
+                children[i].DisposePeerTree();
 
         if (_peer is null)
             return;

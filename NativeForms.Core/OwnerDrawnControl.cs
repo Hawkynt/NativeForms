@@ -22,11 +22,11 @@ public abstract class OwnerDrawnControl : Control
     /// <summary>Owner-drawn surfaces take no focus by default; interactive controls override.</summary>
     protected override bool Focusable => false;
 
-    /// <summary>Requests a full repaint.</summary>
-    public void Invalidate() => _canvas?.InvalidateAll();
+    /// <summary>Requests a full repaint of the canvas surface.</summary>
+    public override void Invalidate() => _canvas?.InvalidateAll();
 
-    /// <summary>Requests a repaint of a sub-region.</summary>
-    public void Invalidate(Rectangle region) => _canvas?.Invalidate(region);
+    /// <summary>Requests a repaint of a sub-region of the canvas surface.</summary>
+    public override void Invalidate(Rectangle region) => _canvas?.Invalidate(region);
 
     private protected override IControlPeer CreatePeer(IPlatformBackend backend)
     {
@@ -78,10 +78,20 @@ public abstract class OwnerDrawnControl : Control
         if (peer is not ICanvasPeer canvas)
             return;
 
+        // Input is gated once, here, on the effective Enabled — a disabled control (or one inside a
+        // disabled ancestor) receives no mouse or key input at all, the Windows Forms contract, so
+        // no subclass needs its own Enabled guard.
         canvas.SetFocusable(this.Focusable);
         canvas.Paint += (_, e) => this.OnPaint(e);
         canvas.MouseDown += (_, e) =>
         {
+            if (!this.Enabled)
+                return;
+
+            // Clicking a focusable control focuses it before the handler runs, like WM_MOUSEACTIVATE.
+            if (this.Focusable)
+                this.Focus();
+
             this.OnMouseDown(e);
             this.CanvasMouseDown?.Invoke(this, e);
             if (e.Button == MouseButtons.Right && this.ContextMenuStrip is { } menu)
@@ -94,6 +104,9 @@ public abstract class OwnerDrawnControl : Control
             if (DragDropSession.RouteMouseUp(this, e))
                 return;
 
+            if (!this.Enabled)
+                return;
+
             this.OnMouseUp(e);
         };
         canvas.MouseMove += (_, e) =>
@@ -101,17 +114,28 @@ public abstract class OwnerDrawnControl : Control
             if (DragDropSession.RouteMouseMove(this, e))
                 return;
 
+            if (!this.Enabled)
+                return;
+
             this.OnMouseMove(e);
             this.CanvasMouseMove?.Invoke(this, e);
         };
-        canvas.MouseWheel += (_, e) => this.OnMouseWheel(e);
+        canvas.MouseWheel += (_, e) =>
+        {
+            if (this.Enabled)
+                this.OnMouseWheel(e);
+        };
         canvas.MouseLeave += (_, _) =>
         {
+            // Deliberately not gated: a control disabled mid-hover must still clear its hot state.
             this.OnMouseLeave(EventArgs.Empty);
             this.CanvasMouseLeave?.Invoke(this, EventArgs.Empty);
         };
         canvas.KeyDown += (_, e) =>
         {
+            if (!this.Enabled)
+                return;
+
             // The form's dialog-key chain previews every key ahead of the control — Tab navigation,
             // Enter/Escape routing, menu shortcuts and Alt+mnemonics — unless IsInputKey claims it.
             if (this.FindForm() is { } form && form.ProcessDialogKey(this, e))
@@ -122,8 +146,16 @@ public abstract class OwnerDrawnControl : Control
 
             this.OnKeyDown(e);
         };
-        canvas.KeyUp += (_, e) => this.OnKeyUp(e);
-        canvas.KeyPress += (_, e) => this.OnKeyPress(e);
+        canvas.KeyUp += (_, e) =>
+        {
+            if (this.Enabled)
+                this.OnKeyUp(e);
+        };
+        canvas.KeyPress += (_, e) =>
+        {
+            if (this.Enabled)
+                this.OnKeyPress(e);
+        };
     }
 
     /// <inheritdoc/>

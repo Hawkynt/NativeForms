@@ -56,6 +56,7 @@ public static class Application
         try
         {
             var window = mainForm.RealizeWindow(backend);
+            Timer.ArmPendingTimers();
             backend.Run(window);
         }
         finally

@@ -47,7 +47,6 @@ public class DataGridView : OwnerDrawnControl
     private const int _DividerZone = 3;
     private const int _MinColumnWidth = 8;
     private const int _CheckBoxSize = 14;
-    private const int _DoubleClickMs = 500;
     private const int _ComboArrowRows = 5;
     private const int _ComboArrowZone = 16;
     private const int _MaxComboPopupRows = 8;
@@ -1403,7 +1402,7 @@ public class DataGridView : OwnerDrawnControl
         var now = Environment.TickCount64;
         var isDouble = rowIndex == _lastClickRowIndex
             && columnIndex == _lastClickColumnIndex
-            && now - _lastClickTime <= _DoubleClickMs;
+            && now - _lastClickTime <= this.Theme.DoubleClickTime;
         _lastClickRowIndex = rowIndex;
         _lastClickColumnIndex = columnIndex;
         _lastClickTime = isDouble ? 0 : now; // reset so a triple click is not two doubles

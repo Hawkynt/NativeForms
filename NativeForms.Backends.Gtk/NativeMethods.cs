@@ -494,6 +494,14 @@ internal static partial class NativeMethods
     [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void g_object_get(nint @object, string firstPropertyName, out nint value, nint terminator);
 
+    /// <summary>
+    /// Reads a single <c>gint</c> object property (the <c>gtk-double-click-time</c> setting) through
+    /// the same fixed-signature variadic mapping as the string overload; GObject writes exactly
+    /// <c>sizeof(gint)</c> bytes into the out slot.
+    /// </summary>
+    [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void g_object_get_int(nint @object, string firstPropertyName, out int value, nint terminator);
+
     /// <summary>Drops one reference to a <c>GObject</c>.</summary>
     [LibraryImport(GObject)]
     internal static partial void g_object_unref(nint @object);

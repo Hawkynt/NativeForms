@@ -42,6 +42,7 @@ internal sealed class GtkTheme : ITheme
         this.HeaderText = foreground;
         this.DefaultFont = ReadDefaultFont();
         this.IsHighContrast = ReadIsHighContrast();
+        this.DoubleClickTime = ReadDoubleClickTime();
 
         NativeMethods.gtk_widget_destroy(widget);
     }
@@ -94,6 +95,9 @@ internal sealed class GtkTheme : ITheme
     /// <inheritdoc />
     public int ScrollBarSize => _fallback.ScrollBarSize;
 
+    /// <inheritdoc />
+    public int DoubleClickTime { get; }
+
     /// <summary>Reads a named theme color, or returns <paramref name="fallback"/> if the name is unknown.</summary>
     private static Color ReadColor(nint context, string name, Color fallback)
         => NativeMethods.gtk_style_context_lookup_color(context, name, out var rgba) != 0 ? ToColor(rgba) : fallback;
@@ -113,6 +117,17 @@ internal sealed class GtkTheme : ITheme
 
     /// <summary>Clamps a 0..1 component and scales it to a 0..255 byte.</summary>
     private static int Channel(double value) => (int)Math.Round(Math.Clamp(value, 0, 1) * 255);
+
+    /// <summary>Reads the user's <c>gtk-double-click-time</c> setting, else the 500 ms fallback.</summary>
+    private static int ReadDoubleClickTime()
+    {
+        var settings = NativeMethods.gtk_settings_get_default();
+        if (settings == 0)
+            return _fallback.DoubleClickTime;
+
+        NativeMethods.g_object_get_int(settings, "gtk-double-click-time", out var time, 0);
+        return time > 0 ? time : _fallback.DoubleClickTime;
+    }
 
     /// <summary>Whether <c>gtk-theme-name</c> names a high-contrast theme (GNOME ships "HighContrast").</summary>
     private static bool ReadIsHighContrast()

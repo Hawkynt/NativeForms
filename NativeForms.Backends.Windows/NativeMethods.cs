@@ -246,11 +246,20 @@ internal static partial class NativeMethods
     /// <summary>The north-south resize cursor resource id.</summary>
     internal const nint IDC_SIZENS = 32645;
 
+    /// <summary>The four-headed move cursor resource id.</summary>
+    internal const nint IDC_SIZEALL = 32646;
+
     /// <summary>The "not allowed" cursor resource id.</summary>
     internal const nint IDC_NO = 32648;
 
     /// <summary>The pointing-hand cursor resource id.</summary>
     internal const nint IDC_HAND = 32649;
+
+    /// <summary>The arrow-with-hourglass (working in background) cursor resource id.</summary>
+    internal const nint IDC_APPSTARTING = 32650;
+
+    /// <summary>The arrow-with-question-mark (help) cursor resource id.</summary>
+    internal const nint IDC_HELP = 32651;
 
     /// <summary>Sent to decide the pointer shape; the low word of <c>lParam</c> is the hit-test code.</summary>
     internal const uint WM_SETCURSOR = 0x0020;

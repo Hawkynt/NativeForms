@@ -100,6 +100,7 @@ internal abstract class BenchPeer : IControlPeer
 internal sealed class BenchWindowPeer : BenchPeer, IWindowPeer
 {
     public event EventHandler? Closed { add { } remove { } }
+    public event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested { add { } remove { } }
     public event EventHandler<Rectangle>? BoundsChangedByUser { add { } remove { } }
     public event EventHandler<FormWindowState>? WindowStateChanged { add { } remove { } }
 

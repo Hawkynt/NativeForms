@@ -105,7 +105,7 @@ public class ProgressBar : OwnerDrawnControl
             field = value;
             this.UpdateMarqueeTimer();
         }
-    } = 30;
+    } = 100;
 
     /// <summary>The amount <see cref="PerformStep"/> advances <see cref="Value"/> by.</summary>
     public int Step { get; set; } = 10;

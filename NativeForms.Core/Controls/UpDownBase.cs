@@ -141,7 +141,6 @@ public abstract class UpDownBase : OwnerDrawnControl
         if (e.Button != MouseButtons.Left)
             return;
 
-        this.Focus();
         if (this.UpButtonRect.Contains(e.Location))
             this.PressButton(+1);
         else if (this.DownButtonRect.Contains(e.Location))

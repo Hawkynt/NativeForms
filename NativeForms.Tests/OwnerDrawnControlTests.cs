@@ -50,14 +50,99 @@ internal sealed class OwnerDrawnControlTests
     }
 
     [Test]
-    public void CheckBox_toggles_on_space_key()
+    public void CheckBox_toggles_on_space_key_release()
     {
         var check = new CheckBox { Bounds = new(0, 0, 120, 20) };
         var canvas = Realize(check);
 
+        // Like the WinForms button base, Space acts on key-up — a held key must not auto-repeat.
         canvas.RaiseKeyDown(Keys.Space);
+        Assert.That(check.Checked, Is.False, "key-down alone must not toggle");
+
+        canvas.RaiseKeyUp(Keys.Space);
 
         Assert.That(check.Checked, Is.True);
+    }
+
+    [Test]
+    public void Disabled_control_receives_no_mouse_or_key_input()
+    {
+        var check = new CheckBox { Bounds = new(0, 0, 120, 20), Enabled = false };
+        var canvas = Realize(check);
+
+        canvas.RaiseMouseDown(5, 10);
+        canvas.RaiseMouseUp(5, 10);
+        canvas.RaiseKeyDown(Keys.Space);
+        canvas.RaiseKeyUp(Keys.Space);
+
+        Assert.That(check.Checked, Is.False, "the central gate must block every input path");
+    }
+
+    [Test]
+    public void Control_inside_a_disabled_container_receives_no_input()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        var panel = new Panel();
+        var check = new CheckBox { Bounds = new(0, 0, 120, 20) };
+        panel.Controls.Add(check);
+        form.Controls.Add(panel);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Last();
+
+        panel.Enabled = false;
+        canvas.RaiseMouseUp(5, 10);
+        canvas.RaiseKeyUp(Keys.Space);
+
+        Assert.That(check.Checked, Is.False, "the gate honors the effective Enabled");
+    }
+
+    [Test]
+    public void Mouse_down_focuses_a_focusable_owner_drawn_control()
+    {
+        var check = new CheckBox { Bounds = new(0, 0, 120, 20) };
+        var canvas = Realize(check);
+
+        canvas.RaiseMouseDown(5, 10);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canvas.FocusRequested, Is.True, "click-focus happens centrally");
+            Assert.That(check.Focused, Is.True);
+        });
+    }
+
+    [Test]
+    public void PerformClick_toggles_a_CheckBox_with_CheckedChanged_before_Click()
+    {
+        var check = new CheckBox();
+        var sequence = new List<string>();
+        check.CheckedChanged += (_, _) => sequence.Add($"changed:{check.Checked}");
+        check.Click += (_, _) => sequence.Add("click");
+
+        check.PerformClick();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(check.Checked, Is.True, "PerformClick routes through the toggling OnClick chain");
+            Assert.That(sequence, Is.EqualTo(new[] { "changed:True", "click" }), "CheckedChanged precedes Click");
+        });
+
+        check.Enabled = false;
+        check.PerformClick();
+        Assert.That(check.Checked, Is.True, "a disabled box never toggles");
+    }
+
+    [Test]
+    public void PerformClick_toggles_a_ToggleSwitch_and_checks_a_RadioButton()
+    {
+        var toggle = new ToggleSwitch();
+        toggle.PerformClick();
+        Assert.That(toggle.Checked, Is.True);
+
+        var radio = new RadioButton();
+        radio.PerformClick();
+        Assert.That(radio.Checked, Is.True);
     }
 
     [Test]

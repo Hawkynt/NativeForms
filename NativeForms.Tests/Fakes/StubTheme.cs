@@ -28,4 +28,5 @@ internal sealed class StubTheme : ITheme
     public Font DefaultFont { get; set; } = _defaults.DefaultFont;
     public int RowHeight { get; set; } = _defaults.RowHeight;
     public int ScrollBarSize { get; set; } = _defaults.ScrollBarSize;
+    public int DoubleClickTime { get; set; } = _defaults.DoubleClickTime;
 }
