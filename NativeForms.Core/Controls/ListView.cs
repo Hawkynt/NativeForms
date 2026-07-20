@@ -336,6 +336,34 @@ public class ListView : OwnerDrawnControl
     /// <summary>Raised after a label edit finished; see <see cref="LabelEditEventArgs"/>.</summary>
     public event EventHandler<LabelEditEventArgs>? AfterLabelEdit;
 
+    /// <summary>
+    /// Replaces the rows from a model sequence (one-way binding convenience, the
+    /// <see cref="ListBox.DataSource"/> parity for this control). Because a row here is a structured
+    /// <see cref="ListViewItem"/> rather than a single display string, the mapping is a
+    /// reflection-free item factory instead of a display selector. Each produced item whose
+    /// <see cref="ListViewItem.Tag"/> the factory left <see langword="null"/> gets its source model
+    /// stored there, so the selection maps back to the model. A <see langword="null"/> sequence
+    /// just clears.
+    /// </summary>
+    /// <typeparam name="T">The model type.</typeparam>
+    /// <param name="items">The models to show, or <see langword="null"/> to clear.</param>
+    /// <param name="itemFactory">Builds the row for one model.</param>
+    public void SetDataSource<T>(IEnumerable<T>? items, Func<T, ListViewItem> itemFactory)
+    {
+        ArgumentNullException.ThrowIfNull(itemFactory);
+
+        this.Items.Clear();
+        if (items is null)
+            return;
+
+        foreach (var model in items)
+        {
+            var item = itemFactory(model);
+            item.Tag ??= model;
+            this.Items.Add(item);
+        }
+    }
+
     /// <inheritdoc/>
     protected override bool Focusable => true;
 

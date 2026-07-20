@@ -37,6 +37,7 @@ public sealed class PropertyBinding<T> : IDisposable
     private readonly Func<T>? _getTarget;
     private readonly Action<EventHandler>? _unsubscribeTargetChanged;
     private readonly EventHandler? _targetChangedHandler;
+    private Action? _onDisposed;
     private bool _syncing;
     private bool _disposed;
 
@@ -145,6 +146,10 @@ public sealed class PropertyBinding<T> : IDisposable
         }
     }
 
+    /// <summary>Registers extra teardown to run once on <see cref="Dispose"/> — how the binding
+    /// sugar detaches companion subscriptions (e.g. the validation-error callback).</summary>
+    internal void RegisterDisposeCallback(Action callback) => _onDisposed += callback;
+
     /// <summary>Detaches the binding from both endpoints.</summary>
     public void Dispose()
     {
@@ -155,5 +160,76 @@ public sealed class PropertyBinding<T> : IDisposable
         _source.PropertyChanged -= this.OnSourcePropertyChanged;
         if (_targetChangedHandler is not null)
             _unsubscribeTargetChanged?.Invoke(_targetChangedHandler);
+
+        _onDisposed?.Invoke();
+        _onDisposed = null;
     }
+}
+
+/// <summary>
+/// A <see cref="PropertyBinding{T}"/> whose source and target hold different types, bridged by a
+/// delegate converter pair — the reflection-free <c>IValueConverter</c> equivalent. One-way needs
+/// only <c>convert</c>; the write-back modes additionally require <c>convertBack</c>. Fully additive
+/// over the single-type binding: it composes the converters into the inner delegates and owns an
+/// ordinary <see cref="PropertyBinding{T}"/> underneath.
+/// </summary>
+/// <typeparam name="TSource">The source property's value type.</typeparam>
+/// <typeparam name="TTarget">The target's value type.</typeparam>
+public sealed class PropertyBinding<TSource, TTarget> : IDisposable
+{
+    private readonly PropertyBinding<TTarget> _inner;
+
+    /// <summary>
+    /// Creates and immediately activates a converting binding. Source values pass through
+    /// <paramref name="convert"/> before reaching the target; target values pass through
+    /// <paramref name="convertBack"/> before being written to the source.
+    /// </summary>
+    /// <param name="source">The change-notifying source object.</param>
+    /// <param name="sourcePropertyName">The source property to observe.</param>
+    /// <param name="getSource">Reads the current source value.</param>
+    /// <param name="convert">Converts a source value for the target.</param>
+    /// <param name="setTarget">Applies a converted value to the target.</param>
+    /// <param name="mode">The flow direction.</param>
+    /// <param name="convertBack">Converts a target value for the source (two-way / to-source).</param>
+    /// <param name="setSource">Writes a converted value back to the source (two-way / to-source).</param>
+    /// <param name="getTarget">Reads the current target value (two-way / to-source).</param>
+    /// <param name="subscribeTargetChanged">Subscribes a handler to the target's change event.</param>
+    /// <param name="unsubscribeTargetChanged">Removes that handler.</param>
+    public PropertyBinding(
+        INotifyPropertyChanged source,
+        string sourcePropertyName,
+        Func<TSource> getSource,
+        Func<TSource, TTarget> convert,
+        Action<TTarget> setTarget,
+        BindingMode mode = BindingMode.OneWay,
+        Func<TTarget, TSource>? convertBack = null,
+        Action<TSource>? setSource = null,
+        Func<TTarget>? getTarget = null,
+        Action<EventHandler>? subscribeTargetChanged = null,
+        Action<EventHandler>? unsubscribeTargetChanged = null)
+    {
+        ArgumentNullException.ThrowIfNull(getSource);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        if (mode is BindingMode.TwoWay or BindingMode.OneWayToSource && convertBack is null)
+            throw new ArgumentException(
+                "Two-way and to-source converting bindings require convertBack.", nameof(convertBack));
+
+        _inner = new(
+            source,
+            sourcePropertyName,
+            () => convert(getSource()),
+            setTarget,
+            mode,
+            setSource is null || convertBack is null ? null : v => setSource(convertBack(v)),
+            getTarget,
+            subscribeTargetChanged,
+            unsubscribeTargetChanged);
+    }
+
+    /// <summary>The flow direction chosen at construction.</summary>
+    public BindingMode Mode => _inner.Mode;
+
+    /// <summary>Detaches the binding from both endpoints.</summary>
+    public void Dispose() => _inner.Dispose();
 }

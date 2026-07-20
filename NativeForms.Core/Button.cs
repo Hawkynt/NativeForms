@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -76,6 +77,49 @@ public class Button : Control
     /// </summary>
     public DialogResult DialogResult { get; set; }
 
+    /// <summary>
+    /// The MVVM command a click executes (with <see cref="CommandParameter"/>). Attaching a command
+    /// puts <see cref="Control.Enabled"/> under its guard: <see cref="ICommand.CanExecute"/> is
+    /// applied immediately and re-applied on every <see cref="ICommand.CanExecuteChanged"/>, so a
+    /// view-model greys the button out automatically. Setting <see langword="null"/> detaches the
+    /// subscription and leaves <see cref="Control.Enabled"/> at its last value.
+    /// </summary>
+    public ICommand? Command
+    {
+        get => field;
+        set
+        {
+            if (ReferenceEquals(field, value))
+                return;
+
+            if (field is not null)
+                field.CanExecuteChanged -= this.OnCommandCanExecuteChanged;
+
+            field = value;
+            if (value is null)
+                return;
+
+            value.CanExecuteChanged += this.OnCommandCanExecuteChanged;
+            this.Enabled = value.CanExecute(this.CommandParameter);
+        }
+    }
+
+    /// <summary>The argument handed to <see cref="Command"/>'s guard and execute delegates.
+    /// Changing it re-queries the guard.</summary>
+    public object? CommandParameter
+    {
+        get => field;
+        set
+        {
+            if (Equals(field, value))
+                return;
+
+            field = value;
+            if (this.Command is { } command)
+                this.Enabled = command.CanExecute(value);
+        }
+    }
+
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateButton();
 
     private protected override void OnRealized(IControlPeer peer)
@@ -94,10 +138,22 @@ public class Button : Control
     /// <summary>Forwards the buffered image triple to the realized peer.</summary>
     private void PushImage() => _buttonPeer?.SetImage(this.Image, this.ImageAlign, this.TextImageRelation);
 
-    /// <summary>Raises <see cref="Control.Click"/>, then reports <see cref="DialogResult"/> to the owning form.</summary>
+    /// <summary>The guard's answer may have changed; re-apply it to <see cref="Control.Enabled"/>.</summary>
+    private void OnCommandCanExecuteChanged(object? sender, EventArgs e)
+    {
+        if (this.Command is { } command)
+            this.Enabled = command.CanExecute(this.CommandParameter);
+    }
+
+    /// <summary>Raises <see cref="Control.Click"/>, executes <see cref="Command"/> when its guard
+    /// agrees, then reports <see cref="DialogResult"/> to the owning form.</summary>
     protected override void OnClick(EventArgs e)
     {
         base.OnClick(e);
+
+        var command = this.Command;
+        if (command is not null && command.CanExecute(this.CommandParameter))
+            command.Execute(this.CommandParameter);
 
         if (this.DialogResult == DialogResult.None)
             return;

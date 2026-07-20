@@ -14,6 +14,30 @@ internal sealed class BindingTests
         } = string.Empty;
     }
 
+    private sealed class Counter : ObservableObject
+    {
+        public int Count
+        {
+            get => field;
+            set => this.SetProperty(ref field, value);
+        }
+    }
+
+    private sealed class ValidatingPerson : ObservableObject
+    {
+        public string Name
+        {
+            get => field;
+            set
+            {
+                if (this.SetProperty(ref field, value))
+                    this.SetError(nameof(this.Name), value.Length == 0 ? "Name is required." : null);
+            }
+        } = "seed";
+
+        public void ReportNameError(string? error) => this.SetError(nameof(this.Name), error);
+    }
+
     /// <summary>A stand-in for a control property with a change notification, for two-way tests.</summary>
     private sealed class FakeTarget
     {
@@ -128,5 +152,112 @@ internal sealed class BindingTests
         person.Name = "b";
 
         Assert.That(target.Value, Is.EqualTo("a"));
+    }
+
+    [Test]
+    public void Converting_binding_pushes_converted_source_values()
+    {
+        var counter = new Counter { Count = 3 };
+        var target = new FakeTarget();
+
+        using var _ = new PropertyBinding<int, string>(
+            counter,
+            nameof(Counter.Count),
+            () => counter.Count,
+            static count => $"#{count}",
+            v => target.Value = v);
+
+        Assert.That(target.Value, Is.EqualTo("#3"), "initial sync");
+
+        counter.Count = 7;
+        Assert.That(target.Value, Is.EqualTo("#7"));
+    }
+
+    [Test]
+    public void Converting_binding_converts_target_writes_back()
+    {
+        var counter = new Counter { Count = 1 };
+        var target = new FakeTarget();
+
+        using var _ = new PropertyBinding<int, string>(
+            counter,
+            nameof(Counter.Count),
+            () => counter.Count,
+            static count => count.ToString(),
+            v => target.Value = v,
+            BindingMode.TwoWay,
+            convertBack: static text => int.Parse(text),
+            setSource: v => counter.Count = v,
+            getTarget: () => target.Value,
+            subscribeTargetChanged: h => target.ValueChanged += h,
+            unsubscribeTargetChanged: h => target.ValueChanged -= h);
+
+        target.Value = "42";
+        Assert.That(counter.Count, Is.EqualTo(42));
+
+        counter.Count = 5;
+        Assert.That(target.Value, Is.EqualTo("5"));
+    }
+
+    [Test]
+    public void Converting_binding_requires_convert_back_for_two_way()
+    {
+        var counter = new Counter();
+        var target = new FakeTarget();
+
+        Assert.Throws<ArgumentException>(() => new PropertyBinding<int, string>(
+            counter,
+            nameof(Counter.Count),
+            () => counter.Count,
+            static count => count.ToString(),
+            v => target.Value = v,
+            BindingMode.TwoWay,
+            setSource: v => counter.Count = v,
+            getTarget: () => target.Value,
+            subscribeTargetChanged: h => target.ValueChanged += h,
+            unsubscribeTargetChanged: h => target.ValueChanged -= h));
+    }
+
+    [Test]
+    public void SetError_raises_ErrorsChanged_and_GetError_reports_it()
+    {
+        var person = new ValidatingPerson();
+        var notified = new List<string?>();
+        person.ErrorsChanged += (_, e) => notified.Add(e.PropertyName);
+
+        person.Name = string.Empty;
+
+        Assert.That(person.GetError(nameof(ValidatingPerson.Name)), Is.EqualTo("Name is required."));
+        Assert.That(notified, Is.EqualTo(new[] { nameof(ValidatingPerson.Name) }));
+    }
+
+    [Test]
+    public void SetError_null_clears_the_error_and_notifies()
+    {
+        var person = new ValidatingPerson();
+        person.Name = string.Empty;
+
+        var notified = 0;
+        person.ErrorsChanged += (_, _) => ++notified;
+
+        person.Name = "Ada";
+
+        Assert.That(person.GetError(nameof(ValidatingPerson.Name)), Is.Null);
+        Assert.That(notified, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SetError_is_silent_while_the_error_is_unchanged()
+    {
+        var person = new ValidatingPerson();
+        var notified = 0;
+        person.ErrorsChanged += (_, _) => ++notified;
+
+        person.ReportNameError("bad");
+        person.ReportNameError("bad");
+        person.ReportNameError(null);
+        person.ReportNameError(null);
+
+        Assert.That(notified, Is.EqualTo(2));
     }
 }
