@@ -11,8 +11,6 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class FlowLayoutPanel : Panel
 {
-    private bool _layingOut;
-
     /// <summary>The edge children flow from and the axis they advance along.</summary>
     public FlowDirection FlowDirection
     {
@@ -41,27 +39,13 @@ public class FlowLayoutPanel : Panel
         }
     } = true;
 
-    /// <inheritdoc/>
-    private protected override void OnBoundsChanged() => this.PerformLayout();
-
-    /// <inheritdoc/>
-    private protected override void OnChildAdded(Control child) => this.PerformLayout();
-
-    /// <inheritdoc/>
-    private protected override void OnChildRemoved(Control child) => this.PerformLayout();
-
-    /// <inheritdoc/>
-    private protected override void OnChildLayoutChanged(Control child)
-    {
-        if (!_layingOut)
-            this.PerformLayout();
-    }
-
     /// <summary>
     /// Repositions every child along the flow in a single pass. Runs automatically whenever the
-    /// panel resizes, a child joins, leaves or resizes, or a flow property changes.
+    /// panel resizes, a child joins, leaves or resizes, or a flow property changes. The flow owns
+    /// every child's position, so <see cref="Control.Anchor"/>/<see cref="Control.Dock"/> are
+    /// ignored — the Windows Forms flow-panel contract.
     /// </summary>
-    public void PerformLayout()
+    private protected override void OnLayout()
     {
         var direction = this.FlowDirection;
         var horizontal = direction is FlowDirection.LeftToRight or FlowDirection.RightToLeft;
@@ -69,38 +53,30 @@ public class FlowLayoutPanel : Panel
         var main = 0;
         var cross = 0;
         var lineSize = 0;
-        _layingOut = true;
-        try
+        for (var i = 0; i < this.Controls.Count; ++i)
         {
-            for (var i = 0; i < this.Controls.Count; ++i)
+            var child = this.Controls[i];
+            var margin = child.Margin;
+            var size = child.Size;
+            var mainConsumed = horizontal ? margin.Horizontal + size.Width : margin.Vertical + size.Height;
+            var crossConsumed = horizontal ? margin.Vertical + size.Height : margin.Horizontal + size.Width;
+            if (this.WrapContents && main > 0 && main + mainConsumed > lineExtent)
             {
-                var child = this.Controls[i];
-                var margin = child.Margin;
-                var size = child.Size;
-                var mainConsumed = horizontal ? margin.Horizontal + size.Width : margin.Vertical + size.Height;
-                var crossConsumed = horizontal ? margin.Vertical + size.Height : margin.Horizontal + size.Width;
-                if (this.WrapContents && main > 0 && main + mainConsumed > lineExtent)
-                {
-                    main = 0;
-                    cross += lineSize;
-                    lineSize = 0;
-                }
-
-                var location = direction switch
-                {
-                    FlowDirection.LeftToRight => new Point(main + margin.Left, cross + margin.Top),
-                    FlowDirection.RightToLeft => new Point(this.Width - main - margin.Right - size.Width, cross + margin.Top),
-                    FlowDirection.TopDown => new Point(cross + margin.Left, main + margin.Top),
-                    _ => new Point(cross + margin.Left, this.Height - main - margin.Bottom - size.Height),
-                };
-                child.Bounds = new(location, size);
-                main += mainConsumed;
-                lineSize = Math.Max(lineSize, crossConsumed);
+                main = 0;
+                cross += lineSize;
+                lineSize = 0;
             }
-        }
-        finally
-        {
-            _layingOut = false;
+
+            var location = direction switch
+            {
+                FlowDirection.LeftToRight => new Point(main + margin.Left, cross + margin.Top),
+                FlowDirection.RightToLeft => new Point(this.Width - main - margin.Right - size.Width, cross + margin.Top),
+                FlowDirection.TopDown => new Point(cross + margin.Left, main + margin.Top),
+                _ => new Point(cross + margin.Left, this.Height - main - margin.Bottom - size.Height),
+            };
+            child.Bounds = new(location, size);
+            main += mainConsumed;
+            lineSize = Math.Max(lineSize, crossConsumed);
         }
 
         this.Invalidate();

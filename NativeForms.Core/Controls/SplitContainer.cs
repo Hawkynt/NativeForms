@@ -108,9 +108,15 @@ public class SplitContainer : OwnerDrawnControl
     /// <summary>Raises <see cref="SplitterMoved"/>.</summary>
     protected virtual void OnSplitterMoved(EventArgs e) => this.SplitterMoved?.Invoke(this, e);
 
-    /// <inheritdoc/>
-    private protected override void OnBoundsChanged()
+    /// <summary>Re-clamps the distance and re-applies both panels' bounds — the split container owns
+    /// its panels' bounds, so the base Anchor/Dock engine is replaced wholesale. Each panel then
+    /// lays out its own children per their Anchor/Dock like any plain container. A no-op while the
+    /// control has no size yet, so constructing it never clamps the default distance away.</summary>
+    private protected override void OnLayout()
     {
+        if (this.Width == 0 && this.Height == 0)
+            return;
+
         this.ApplyDistance(_splitterDistance);
         this.LayoutPanels();
     }

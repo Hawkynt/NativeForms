@@ -125,8 +125,10 @@ public class TabControl : OwnerDrawnControl
             this.TabPages[i].Bounds = this.GetContentArea();
     }
 
-    /// <inheritdoc/>
-    private protected override void OnBoundsChanged()
+    /// <summary>Re-applies the content-area bounds to every page — the tab control owns its pages'
+    /// bounds, so the base Anchor/Dock engine is replaced wholesale. Each page then lays out its
+    /// own children per their Anchor/Dock like any plain container.</summary>
+    private protected override void OnLayout()
     {
         for (var i = 0; i < this.TabPages.Count; ++i)
             this.TabPages[i].Bounds = this.GetContentArea();

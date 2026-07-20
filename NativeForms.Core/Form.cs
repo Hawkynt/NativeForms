@@ -537,9 +537,13 @@ public class Form : Control
         _activeControl = null;
     }
 
-    /// <summary>Raises <see cref="Resize"/> and <see cref="SizeChanged"/> whenever the size part of the bounds changes.</summary>
+    /// <summary>Runs the Anchor/Dock layout pass over the form's children, then raises
+    /// <see cref="Resize"/> and <see cref="SizeChanged"/> whenever the size part of the bounds
+    /// changed — so handlers doing manual layout see the engine's results, not the other way
+    /// around.</summary>
     private protected override void OnBoundsChanged()
     {
+        base.OnBoundsChanged();
         var size = this.Bounds.Size;
         if (size == _lastSize)
             return;

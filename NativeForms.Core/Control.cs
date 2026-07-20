@@ -18,9 +18,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public abstract class Control
 {
-    /// <summary>Packed boolean state, kept in one byte so the focus model costs no per-flag fields.</summary>
+    /// <summary>Packed flag state, kept in one word so focus and layout cost no per-flag fields.</summary>
     [Flags]
-    private enum State : byte
+    private enum State : ushort
     {
         /// <summary><see cref="TabStop"/> was assigned explicitly and overrides the per-kind default.</summary>
         TabStopAssigned = 1,
@@ -30,13 +30,36 @@ public abstract class Control
 
         /// <summary>The peer currently holds keyboard focus.</summary>
         Focused = 4,
+
+        /// <summary><see cref="Anchor"/> was assigned explicitly and overrides the Top|Left default.</summary>
+        AnchorAssigned = 8,
+
+        /// <summary>Bits 4–7: the assigned <see cref="AnchorStyles"/> flags, shifted by <see cref="_AnchorShift"/>.</summary>
+        AnchorBits = 0xF << _AnchorShift,
+
+        /// <summary>Bits 8–10: the <see cref="DockStyle"/> value, shifted by <see cref="_DockShift"/>.</summary>
+        DockBits = 0x7 << _DockShift,
+
+        /// <summary>A layout pass is running; re-entrant <see cref="PerformLayout"/> calls return at once.</summary>
+        LayoutInProgress = 1 << 11,
+
+        /// <summary>A layout was requested while suspended and runs on the closing <see cref="ResumeLayout()"/>.</summary>
+        LayoutPending = 1 << 12,
     }
+
+    /// <summary>The bit position of the packed <see cref="AnchorStyles"/> flags inside <see cref="_state"/>.</summary>
+    private const int _AnchorShift = 4;
+
+    /// <summary>The bit position of the packed <see cref="DockStyle"/> value inside <see cref="_state"/>.</summary>
+    private const int _DockShift = 8;
 
     private IControlPeer? _peer;
     private IPlatformBackend? _backend;
     private Rectangle _bounds;
     private int _tabIndex;
     private State _state;
+    private byte _layoutSuspend;
+    private Rectangle _layoutBounds;
     private AppearanceState? _appearance;
 
     /// <summary>
@@ -186,6 +209,61 @@ public abstract class Control
             this.Parent?.OnChildLayoutChanged(this);
         }
     }
+
+    /// <summary>
+    /// The container edges this control is bound to, <see cref="AnchorStyles.Top"/> |
+    /// <see cref="AnchorStyles.Left"/> by default. When the parent resizes, every anchored edge
+    /// keeps its distance to the matching edge of the parent's <see cref="DisplayRectangle"/>:
+    /// opposing anchors stretch the control, a single anchor translates it, and
+    /// <see cref="AnchorStyles.None"/> drifts by half the delta. Assigning an anchor resets
+    /// <see cref="Dock"/> to <see cref="DockStyle.None"/> — the two are mutually exclusive and the
+    /// property assigned last wins, exactly like Windows Forms.
+    /// </summary>
+    public AnchorStyles Anchor
+    {
+        get => (_state & State.AnchorAssigned) != 0
+            ? (AnchorStyles)((int)(_state & State.AnchorBits) >> _AnchorShift)
+            : AnchorStyles.Top | AnchorStyles.Left;
+        set
+        {
+            if (this.Dock == DockStyle.None && (_state & State.AnchorAssigned) != 0 && this.Anchor == value)
+                return;
+
+            _state = _state & ~State.AnchorBits & ~State.DockBits
+                | State.AnchorAssigned
+                | (State)(((int)value << _AnchorShift) & (int)State.AnchorBits);
+            this.Parent?.PerformLayout();
+        }
+    }
+
+    /// <summary>
+    /// The parent edge this control glues itself to, <see cref="DockStyle.None"/> by default.
+    /// Docked siblings claim their edges of the parent's <see cref="DisplayRectangle"/> in
+    /// <see cref="Controls"/> order, each shrinking the rectangle left for the next;
+    /// <see cref="DockStyle.Fill"/> takes whatever remains. Assigning a dock resets
+    /// <see cref="Anchor"/> to its default — the property assigned last wins, exactly like
+    /// Windows Forms.
+    /// </summary>
+    public DockStyle Dock
+    {
+        get => (DockStyle)((int)(_state & State.DockBits) >> _DockShift);
+        set
+        {
+            if (this.Dock == value)
+                return;
+
+            var state = _state & ~State.DockBits | (State)(((int)value << _DockShift) & (int)State.DockBits);
+            if (value != DockStyle.None)
+                state &= ~State.AnchorBits & ~State.AnchorAssigned;
+
+            _state = state;
+            this.Parent?.PerformLayout();
+        }
+    }
+
+    /// <summary>Whether <see cref="Anchor"/> was assigned explicitly (layout containers with their
+    /// own placement rules, like the table's in-cell arrangement, only honor explicit anchors).</summary>
+    internal bool IsAnchorAssigned => (_state & State.AnchorAssigned) != 0;
 
     /// <summary>
     /// The position of this control in its container's tab order. Siblings are visited in ascending
@@ -426,6 +504,7 @@ public abstract class Control
 
             (_appearance ??= new()).Padding = value;
             this.OnAppearanceChanged();
+            this.PerformLayout(); // the DisplayRectangle changed, so docked/anchored children move
         }
     }
 
@@ -803,20 +882,199 @@ public abstract class Control
     /// <summary>Hook for subclasses to drop their typed peer references when the peer tree is torn down.</summary>
     private protected virtual void OnUnrealized() { }
 
-    /// <summary>Hook for subclasses that lay out children whenever their own bounds change.</summary>
-    private protected virtual void OnBoundsChanged() { }
+    /// <summary>Hook for subclasses that lay out children whenever their own bounds change. The
+    /// base schedules a layout pass, so plain containers reflow their Anchor/Dock children.</summary>
+    private protected virtual void OnBoundsChanged() => this.PerformLayout();
 
-    /// <summary>Hook for layout containers: a child joined <see cref="Controls"/>.</summary>
-    private protected virtual void OnChildAdded(Control child) { }
+    /// <summary>Hook for layout containers: a child joined <see cref="Controls"/>. The base
+    /// schedules a layout pass so a pre-assigned dock takes effect immediately.</summary>
+    private protected virtual void OnChildAdded(Control child) => this.PerformLayout();
 
-    /// <summary>Hook for layout containers: a child left <see cref="Controls"/>.</summary>
-    private protected virtual void OnChildRemoved(Control child) { }
+    /// <summary>Hook for layout containers: a child left <see cref="Controls"/>. The base
+    /// schedules a layout pass so the remaining docked children reclaim its edge.</summary>
+    private protected virtual void OnChildRemoved(Control child) => this.PerformLayout();
 
     /// <summary>
     /// Hook for layout containers: a child's <see cref="Bounds"/> or <see cref="Margin"/> changed —
-    /// including by the container's own layout pass, so containers guard against re-entry.
+    /// including by the container's own layout pass; <see cref="PerformLayout"/> swallows that
+    /// re-entry, so overrides that call it (the base does) need no guard of their own.
     /// </summary>
-    private protected virtual void OnChildLayoutChanged(Control child) { }
+    private protected virtual void OnChildLayoutChanged(Control child) => this.PerformLayout();
+
+    /// <summary>
+    /// Suspends the layout engine on this container until a matching <see cref="ResumeLayout()"/>,
+    /// so bulk changes (adding many children, resizing several of them) coalesce into one pass.
+    /// Calls nest; each needs its own resume.
+    /// </summary>
+    public void SuspendLayout()
+    {
+        if (_layoutSuspend < byte.MaxValue)
+            ++_layoutSuspend;
+    }
+
+    /// <summary>Resumes the layout engine and runs the pass the suspension held back, if any.</summary>
+    public void ResumeLayout() => this.ResumeLayout(performLayout: true);
+
+    /// <summary>
+    /// Resumes the layout engine after a <see cref="SuspendLayout"/>. With
+    /// <paramref name="performLayout"/> the held-back pass runs now; without it the request is
+    /// dropped and the children keep their current bounds until the next layout trigger or an
+    /// explicit <see cref="PerformLayout"/>.
+    /// </summary>
+    public void ResumeLayout(bool performLayout)
+    {
+        if (_layoutSuspend > 0)
+            --_layoutSuspend;
+
+        if (_layoutSuspend > 0)
+            return;
+
+        var pending = (_state & State.LayoutPending) != 0;
+        _state &= ~State.LayoutPending;
+        if (performLayout && pending)
+            this.PerformLayout();
+    }
+
+    /// <summary>
+    /// Runs this container's layout pass — the Anchor/Dock engine, or the specialized layout of a
+    /// flow, table, tab or splitter container. Deferred while suspended, swallowed while a pass is
+    /// already running (the bounds writes of a pass re-enter here through the child hooks).
+    /// </summary>
+    public void PerformLayout()
+    {
+        if (_layoutSuspend > 0)
+        {
+            _state |= State.LayoutPending;
+            return;
+        }
+
+        if ((_state & State.LayoutInProgress) != 0)
+            return;
+
+        _state |= State.LayoutInProgress;
+        try
+        {
+            this.OnLayout();
+        }
+        finally
+        {
+            _state &= ~State.LayoutInProgress;
+        }
+    }
+
+    /// <summary>
+    /// The layout pass. The base is the Windows Forms default engine: docked children claim edges
+    /// of the <see cref="DisplayRectangle"/> in <see cref="Controls"/> order (<see cref="DockStyle.Fill"/>
+    /// children take the final remainder), then every undocked child repositions per its
+    /// <see cref="Anchor"/> against how each display-rectangle edge moved since the previous pass —
+    /// anchored edges hold their distance, opposing anchors stretch, unanchored axes drift by half.
+    /// The engine keeps one rectangle per container (the display rectangle it last laid out) and
+    /// derives every child's anchor distance from its current bounds, instead of the per-child
+    /// offset cache Windows Forms carries; the standard flows behave identically. Containers that
+    /// own their children's bounds (flow, table, tabs, splitter) override this wholesale and
+    /// thereby ignore Anchor/Dock, exactly like their WinForms counterparts.
+    /// </summary>
+    private protected virtual void OnLayout()
+    {
+        var display = this.DisplayRectangle;
+        var previous = _layoutBounds;
+        _layoutBounds = display;
+        var children = this.Controls;
+        var count = children.Count;
+        if (count == 0)
+            return;
+
+        var remaining = display;
+        var fills = false;
+        for (var i = 0; i < count; ++i)
+        {
+            var child = children[i];
+            var size = child.Bounds.Size;
+            switch (child.Dock)
+            {
+                case DockStyle.Top:
+                    child.Bounds = new(remaining.X, remaining.Y, remaining.Width, size.Height);
+                    remaining.Y += size.Height;
+                    remaining.Height = Math.Max(0, remaining.Height - size.Height);
+                    break;
+                case DockStyle.Bottom:
+                    child.Bounds = new(remaining.X, remaining.Bottom - size.Height, remaining.Width, size.Height);
+                    remaining.Height = Math.Max(0, remaining.Height - size.Height);
+                    break;
+                case DockStyle.Left:
+                    child.Bounds = new(remaining.X, remaining.Y, size.Width, remaining.Height);
+                    remaining.X += size.Width;
+                    remaining.Width = Math.Max(0, remaining.Width - size.Width);
+                    break;
+                case DockStyle.Right:
+                    child.Bounds = new(remaining.Right - size.Width, remaining.Y, size.Width, remaining.Height);
+                    remaining.Width = Math.Max(0, remaining.Width - size.Width);
+                    break;
+                case DockStyle.Fill:
+                    fills = true;
+                    break;
+                case DockStyle.None:
+                default:
+                    break;
+            }
+        }
+
+        if (fills)
+            for (var i = 0; i < count; ++i)
+            {
+                var child = children[i];
+                if (child.Dock == DockStyle.Fill)
+                    child.Bounds = remaining;
+            }
+
+        // Per-edge deltas, so an inset shift (padding, a group box growing its caption) moves only
+        // the children anchored to the edge that actually moved.
+        var deltaLeft = display.X - previous.X;
+        var deltaRight = display.Right - previous.Right;
+        var deltaTop = display.Y - previous.Y;
+        var deltaBottom = display.Bottom - previous.Bottom;
+        if (previous == default || (deltaLeft == 0 && deltaRight == 0 && deltaTop == 0 && deltaBottom == 0))
+            return;
+
+        for (var i = 0; i < count; ++i)
+        {
+            var child = children[i];
+            if (child.Dock != DockStyle.None)
+                continue;
+
+            var anchor = child.Anchor;
+            var bounds = child.Bounds;
+            var x = bounds.X;
+            var width = bounds.Width;
+            if ((anchor & (AnchorStyles.Left | AnchorStyles.Right)) == (AnchorStyles.Left | AnchorStyles.Right))
+            {
+                x += deltaLeft;
+                width = Math.Max(0, width + deltaRight - deltaLeft);
+            }
+            else if ((anchor & AnchorStyles.Right) != 0)
+                x += deltaRight;
+            else if ((anchor & AnchorStyles.Left) != 0)
+                x += deltaLeft;
+            else
+                x += (deltaLeft + deltaRight) / 2;
+
+            var y = bounds.Y;
+            var height = bounds.Height;
+            if ((anchor & (AnchorStyles.Top | AnchorStyles.Bottom)) == (AnchorStyles.Top | AnchorStyles.Bottom))
+            {
+                y += deltaTop;
+                height = Math.Max(0, height + deltaBottom - deltaTop);
+            }
+            else if ((anchor & AnchorStyles.Bottom) != 0)
+                y += deltaBottom;
+            else if ((anchor & AnchorStyles.Top) != 0)
+                y += deltaTop;
+            else
+                y += (deltaTop + deltaBottom) / 2;
+
+            child.Bounds = new(x, y, width, height);
+        }
+    }
 
     /// <summary>Routes <see cref="ControlCollection.Add"/> to the <see cref="OnChildAdded"/> hook.</summary>
     internal void NotifyChildAdded(Control child) => this.OnChildAdded(child);

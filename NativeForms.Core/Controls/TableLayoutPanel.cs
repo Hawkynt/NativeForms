@@ -145,9 +145,6 @@ public class TableLayoutPanel : Panel
         => _slots.TryGetValue(control, out var slot) ? slot.RowSpan : 1;
 
     /// <inheritdoc/>
-    private protected override void OnBoundsChanged() => this.PerformLayout();
-
-    /// <inheritdoc/>
     private protected override void OnChildAdded(Control child)
     {
         this.RecordPreferredSize(child);
@@ -190,9 +187,11 @@ public class TableLayoutPanel : Panel
 
     /// <summary>
     /// Recomputes the grid and repositions every child. Runs automatically whenever the panel
-    /// resizes, a child joins, leaves or resizes, or the grid structure changes.
+    /// resizes, a child joins, leaves or resizes, or the grid structure changes. Children are
+    /// arranged inside their cells by <see cref="ArrangeInCell"/>, which honors an explicitly
+    /// assigned <see cref="Control.Dock"/>/<see cref="Control.Anchor"/> cell-relatively.
     /// </summary>
-    public void PerformLayout()
+    private protected override void OnLayout()
     {
         var columns = this.ColumnCount;
         var rows = this.RowCount;
@@ -217,11 +216,12 @@ public class TableLayoutPanel : Panel
                 var margin = child.Margin;
                 var width = SpanExtent(_columnWidths, placement.Column, placement.ColumnSpan, border);
                 var height = SpanExtent(_rowHeights, placement.Row, placement.RowSpan, border);
-                child.Bounds = new(
+                var cell = new Rectangle(
                     _columnOffsets[placement.Column] + margin.Left,
                     _rowOffsets[placement.Row] + margin.Top,
                     Math.Max(0, width - margin.Horizontal),
                     Math.Max(0, height - margin.Vertical));
+                child.Bounds = ArrangeInCell(child, cell, placement.Preferred);
             }
         }
         finally
@@ -409,6 +409,76 @@ public class TableLayoutPanel : Panel
             offsets[i] = position;
             position += sizes[i] + border;
         }
+    }
+
+    /// <summary>
+    /// The bounds a child takes inside its (margin-deflated) cell. A child without an explicit
+    /// <see cref="Control.Dock"/> or <see cref="Control.Anchor"/> fills the cell — the panel's
+    /// historical default. An explicit dock claims the matching cell edge at the child's measured
+    /// size (<see cref="DockStyle.Fill"/> keeps the whole cell); an explicit anchor pins the
+    /// measured size to the anchored cell edges, stretching between opposing anchors and centering
+    /// on an axis with neither — the Windows Forms in-cell contract.
+    /// </summary>
+    private static Rectangle ArrangeInCell(Control child, Rectangle cell, Size preferred)
+    {
+        switch (child.Dock)
+        {
+            case DockStyle.Fill:
+                return cell;
+            case DockStyle.Top:
+                return new(cell.X, cell.Y, cell.Width, Math.Min(cell.Height, preferred.Height));
+            case DockStyle.Bottom:
+            {
+                var docked = Math.Min(cell.Height, preferred.Height);
+                return new(cell.X, cell.Bottom - docked, cell.Width, docked);
+            }
+
+            case DockStyle.Left:
+                return new(cell.X, cell.Y, Math.Min(cell.Width, preferred.Width), cell.Height);
+            case DockStyle.Right:
+            {
+                var docked = Math.Min(cell.Width, preferred.Width);
+                return new(cell.Right - docked, cell.Y, docked, cell.Height);
+            }
+
+            case DockStyle.None:
+            default:
+                break;
+        }
+
+        if (!child.IsAnchorAssigned)
+            return cell;
+
+        var anchor = child.Anchor;
+        int x, width;
+        if ((anchor & (AnchorStyles.Left | AnchorStyles.Right)) == (AnchorStyles.Left | AnchorStyles.Right))
+        {
+            x = cell.X;
+            width = cell.Width;
+        }
+        else
+        {
+            width = Math.Min(cell.Width, preferred.Width);
+            x = (anchor & AnchorStyles.Right) != 0 ? cell.Right - width
+                : (anchor & AnchorStyles.Left) != 0 ? cell.X
+                : cell.X + ((cell.Width - width) / 2);
+        }
+
+        int y, height;
+        if ((anchor & (AnchorStyles.Top | AnchorStyles.Bottom)) == (AnchorStyles.Top | AnchorStyles.Bottom))
+        {
+            y = cell.Y;
+            height = cell.Height;
+        }
+        else
+        {
+            height = Math.Min(cell.Height, preferred.Height);
+            y = (anchor & AnchorStyles.Bottom) != 0 ? cell.Bottom - height
+                : (anchor & AnchorStyles.Top) != 0 ? cell.Y
+                : cell.Y + ((cell.Height - height) / 2);
+        }
+
+        return new(x, y, width, height);
     }
 
     /// <summary>The pixel extent of a span: the covered tracks plus the grid lines between them.</summary>
