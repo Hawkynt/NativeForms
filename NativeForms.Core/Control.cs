@@ -244,6 +244,56 @@ public abstract class Control
         return false;
     }
 
+    /// <summary>
+    /// Whether this control accepts in-process drag-and-drop: only opted-in controls are considered
+    /// by the hit-test a drag performs, and only they raise <see cref="DragEnter"/>/
+    /// <see cref="DragOver"/>/<see cref="DragLeave"/>/<see cref="DragDrop"/>.
+    /// </summary>
+    public bool AllowDrop { get; set; }
+
+    /// <summary>
+    /// The text direction, <see cref="NativeForms.RightToLeft.Inherit"/> by default: the effective
+    /// value comes from the nearest ancestor with an explicit setting, falling back to
+    /// <see cref="NativeForms.RightToLeft.No"/>. Owner-drawn controls mirror their glyph/text
+    /// painting when it resolves to <see cref="NativeForms.RightToLeft.Yes"/>; containers do not
+    /// mirror their child layout yet (tracked in <c>docs/PRD.md</c> §8).
+    /// </summary>
+    public RightToLeft RightToLeft
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.NotifyRightToLeftChanged();
+        }
+    } = RightToLeft.Inherit;
+
+    /// <summary>Fans a direction change out to this control and every descendant that inherits it.</summary>
+    private void NotifyRightToLeftChanged()
+    {
+        this.OnRightToLeftChanged(EventArgs.Empty);
+        for (var i = 0; i < this.Controls.Count; ++i)
+            if (this.Controls[i].RightToLeft == RightToLeft.Inherit)
+                this.Controls[i].NotifyRightToLeftChanged();
+    }
+
+    /// <summary>The resolved text direction: walks the <see cref="Parent"/> chain past
+    /// <see cref="NativeForms.RightToLeft.Inherit"/> values, defaulting to left-to-right.</summary>
+    internal bool IsRightToLeft
+    {
+        get
+        {
+            for (var control = this; control is not null; control = control.Parent)
+                if (control.RightToLeft != RightToLeft.Inherit)
+                    return control.RightToLeft == RightToLeft.Yes;
+
+            return false;
+        }
+    }
+
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
 
@@ -281,6 +331,18 @@ public abstract class Control
     /// entirely. On the control itself it follows <see cref="LostFocus"/>.
     /// </summary>
     public event EventHandler? Leave;
+
+    /// <summary>Raised when an in-process drag first moves over this control (see <see cref="AllowDrop"/>).</summary>
+    public event EventHandler<DragEventArgs>? DragEnter;
+
+    /// <summary>Raised while an in-process drag keeps moving over this control.</summary>
+    public event EventHandler<DragEventArgs>? DragOver;
+
+    /// <summary>Raised when an in-process drag moves off this control or ends refused.</summary>
+    public event EventHandler? DragLeave;
+
+    /// <summary>Raised when an in-process drag is dropped on this control with an accepted effect.</summary>
+    public event EventHandler<DragEventArgs>? DragDrop;
 
     /// <summary>Raises <see cref="Click"/>.</summary>
     protected virtual void OnClick(EventArgs e) => this.Click?.Invoke(this, e);
@@ -335,8 +397,93 @@ public abstract class Control
         this.OnLeave(EventArgs.Empty);
     }
 
+    /// <summary>Hook for subclasses when <see cref="RightToLeft"/> changes; owner-drawn controls repaint.</summary>
+    protected virtual void OnRightToLeftChanged(EventArgs e) { }
+
+    /// <summary>Raises <see cref="DragEnter"/>.</summary>
+    protected virtual void OnDragEnter(DragEventArgs e) => this.DragEnter?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="DragOver"/>.</summary>
+    protected virtual void OnDragOver(DragEventArgs e) => this.DragOver?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="DragLeave"/>.</summary>
+    protected virtual void OnDragLeave(EventArgs e) => this.DragLeave?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="DragDrop"/>.</summary>
+    protected virtual void OnDragDrop(DragEventArgs e) => this.DragDrop?.Invoke(this, e);
+
+    /// <summary>Routes the drag engine's enter notification into <see cref="OnDragEnter"/>.</summary>
+    internal void RaiseDragEnter(DragEventArgs e) => this.OnDragEnter(e);
+
+    /// <summary>Routes the drag engine's over notification into <see cref="OnDragOver"/>.</summary>
+    internal void RaiseDragOver(DragEventArgs e) => this.OnDragOver(e);
+
+    /// <summary>Routes the drag engine's leave notification into <see cref="OnDragLeave"/>.</summary>
+    internal void RaiseDragLeave() => this.OnDragLeave(EventArgs.Empty);
+
+    /// <summary>Routes the drag engine's drop notification into <see cref="OnDragDrop"/>.</summary>
+    internal void RaiseDragDrop(DragEventArgs e) => this.OnDragDrop(e);
+
+    /// <summary>
+    /// Starts an in-process drag with this control as the source. The call returns immediately —
+    /// unlike WinForms there is no nested message loop — and the drag then follows the source's
+    /// captured mouse stream: targets with <see cref="AllowDrop"/> receive <see cref="DragEnter"/>/
+    /// <see cref="DragOver"/>/<see cref="DragLeave"/>, and releasing the button raises
+    /// <see cref="DragDrop"/> on the target that accepted an effect. The source must be a realized
+    /// <see cref="OwnerDrawnControl"/> (only those own a mouse stream); in-process only — OS-level
+    /// drag sources and drop targets are tracked in <c>docs/PRD.md</c> §8.
+    /// </summary>
+    public void DoDragDrop(object data, DragDropEffects allowedEffects)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        DragDropSession.Begin(this, data, allowedEffects);
+    }
+
     /// <summary>Programmatically triggers the <see cref="Click"/> event.</summary>
     public void PerformClick() => this.OnClick(EventArgs.Empty);
+
+    /// <summary>
+    /// Whether the caller must marshal through <see cref="Invoke"/>/<see cref="BeginInvoke"/> to
+    /// touch this control: <see langword="true"/> only while a message loop is running on another
+    /// thread. <see langword="false"/> outside <see cref="Application.Run(Form)"/>, matching the
+    /// WinForms convention for a control without a created handle.
+    /// </summary>
+    public bool InvokeRequired => Application.InvokeRequired;
+
+    /// <summary>
+    /// Executes <paramref name="action"/> on the UI thread and blocks until it completed. On the UI
+    /// thread (or with no loop running) it runs inline; from any other thread it is queued onto the
+    /// loop and awaited. Exceptions propagate to the caller either way.
+    /// </summary>
+    public void Invoke(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (!this.InvokeRequired)
+        {
+            action();
+            return;
+        }
+
+        NativeFormsSynchronizationContext.SendBlocking(this.ResolveInvokeBackend(), action);
+    }
+
+    /// <summary>
+    /// Queues <paramref name="action"/> for execution on the UI thread and returns immediately.
+    /// Callable from any thread.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// No message loop is running and the control is not realized, so there is nothing to queue onto.
+    /// </exception>
+    public void BeginInvoke(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        this.ResolveInvokeBackend().Post(action);
+    }
+
+    /// <summary>The backend to marshal through: the realized one, else the running application's.</summary>
+    private IPlatformBackend ResolveInvokeBackend()
+        => _backend ?? Application.Current ?? throw new InvalidOperationException(
+            "Control.Invoke/BeginInvoke need a message loop — call them while Application.Run is active or after the control is realized.");
 
     /// <summary>
     /// Maps a point from this control's client space to screen coordinates. Only the native widget

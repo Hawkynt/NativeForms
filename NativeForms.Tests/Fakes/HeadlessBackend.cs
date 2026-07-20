@@ -53,6 +53,9 @@ internal sealed class HeadlessBackend : IPlatformBackend
     /// <summary>Every <see cref="SetClipboardText"/> call, in the order it arrived.</summary>
     public List<string> ClipboardTexts { get; } = [];
 
+    /// <summary>Every action handed to <see cref="Post"/>, recorded before it executes.</summary>
+    public List<Action> PostedActions { get; } = [];
+
     public string Name => "Headless";
     public bool IsSupported => true;
 
@@ -149,6 +152,14 @@ internal sealed class HeadlessBackend : IPlatformBackend
     }
 
     public void SetClipboardText(string text) => this.ClipboardTexts.Add(text);
+
+    /// <summary>Records the action, then executes it inline — there is no real loop to defer to, so
+    /// the "queue" drains immediately and marshalling logic stays observable and deterministic.</summary>
+    public void Post(Action action)
+    {
+        this.PostedActions.Add(action);
+        action();
+    }
 
     public void Quit() => this.DidQuit = true;
 

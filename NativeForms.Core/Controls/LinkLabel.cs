@@ -73,16 +73,19 @@ public class LinkLabel : OwnerDrawnControl
         if (this.Text.Length == 0)
             return;
 
+        // Right-to-left anchors the text (and its underline) at the right edge instead.
+        var rtl = this.IsRightToLeft;
         var font = theme.DefaultFont;
         var color = this.LinkColor(theme);
-        g.DrawText(this.Text, font, color, full, ContentAlignment.MiddleLeft);
+        g.DrawText(this.Text, font, color, full, rtl ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft);
 
         var extent = g.MeasureText(this.Text, font);
+        var underlineX = rtl ? this.Width - extent.Width : 0;
         var underlineY = (this.Height - extent.Height) / 2 + extent.Height - 1;
-        g.DrawLine(color, 0, underlineY, extent.Width, underlineY);
+        g.DrawLine(color, underlineX, underlineY, underlineX + extent.Width, underlineY);
 
         if (_focused)
-            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(0, (this.Height - extent.Height) / 2, extent.Width, extent.Height));
+            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(underlineX, (this.Height - extent.Height) / 2, extent.Width, extent.Height));
     }
 
     /// <inheritdoc/>
@@ -101,7 +104,8 @@ public class LinkLabel : OwnerDrawnControl
         this.Invalidate();
     }
 
-    /// <summary>The client-space rectangle the text occupies (middle-left aligned), for hit testing.</summary>
+    /// <summary>The client-space rectangle the text occupies (anchored middle-left, or middle-right
+    /// under right-to-left), for hit testing.</summary>
     private Rectangle TextExtentRectangle()
     {
         var backend = this.Backend;
@@ -109,7 +113,8 @@ public class LinkLabel : OwnerDrawnControl
             return Rectangle.Empty;
 
         var extent = backend.MeasureText(this.Text, this.Theme.DefaultFont);
-        return new(new Point(0, (this.Height - extent.Height) / 2), extent);
+        var rect = new Rectangle(new Point(0, (this.Height - extent.Height) / 2), extent);
+        return this.IsRightToLeft ? RtlLayout.Mirror(rect, this.Width) : rect;
     }
 
     /// <summary>Updates the hover state, repainting only on an actual change.</summary>

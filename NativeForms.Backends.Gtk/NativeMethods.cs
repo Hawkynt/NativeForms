@@ -492,6 +492,16 @@ internal static partial class NativeMethods
     [LibraryImport(GLib)]
     internal static partial int g_source_remove(uint tag);
 
+    /// <summary>
+    /// Registers <paramref name="function"/> (a <c>GSourceFunc</c> function pointer) to be invoked
+    /// once by the main loop when it is idle, threading <paramref name="data"/> through as the
+    /// callback's <c>user_data</c>. The callback returns 0 (<c>G_SOURCE_REMOVE</c>) to run exactly
+    /// once. <paramref name="notify"/> is a <c>GDestroyNotify</c> function pointer (0 = none).
+    /// Returns the source id.
+    /// </summary>
+    [LibraryImport(GLib)]
+    internal static partial uint g_idle_add_full(int priority, nint function, nint data, nint notify);
+
     // --- Signals --------------------------------------------------------------------------------
 
     /// <summary>

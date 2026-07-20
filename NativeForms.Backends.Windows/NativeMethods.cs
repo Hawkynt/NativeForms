@@ -443,6 +443,11 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial nint SendMessageW(nint hWnd, uint msg, nint wParam, nint lParam);
 
+    /// <summary>Queues a message into a window's thread message queue without waiting.</summary>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PostMessageW(nint hWnd, uint msg, nint wParam, nint lParam);
+
     /// <summary>Sends a message whose lParam is a string (for example <see cref="EM_SETCUEBANNER"/>).</summary>
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial nint SendMessageStringW(nint hWnd, uint msg, nint wParam, string lParam);

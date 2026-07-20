@@ -280,15 +280,16 @@ public class DateTimePicker : OwnerDrawnControl
         this.Invalidate();
     }
 
-    /// <summary>Formats <see cref="Value"/> with the invariant pattern of the active
-    /// <see cref="Format"/>, cached between value changes so painting stays allocation-free.</summary>
+    /// <summary>Formats <see cref="Value"/> with the pattern of the active <see cref="Format"/>
+    /// through <see cref="Strings.DateTimeFormat"/> (invariant by default), cached between value
+    /// changes so painting stays allocation-free.</summary>
     private string FormatValue()
         => _text ??= this.Format switch
         {
-            DateTimePickerFormat.Long => _value.ToString("dddd, dd MMMM yyyy", CultureInfo.InvariantCulture),
-            DateTimePickerFormat.Short => _value.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture),
-            DateTimePickerFormat.Time => _value.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
-            _ => this.CustomFormat.Length > 0 ? _value.ToString(this.CustomFormat, CultureInfo.InvariantCulture) : string.Empty,
+            DateTimePickerFormat.Long => _value.ToString("dddd, dd MMMM yyyy", Strings.DateTimeFormat),
+            DateTimePickerFormat.Short => _value.ToString("MM/dd/yyyy", Strings.DateTimeFormat),
+            DateTimePickerFormat.Time => _value.ToString("HH:mm:ss", Strings.DateTimeFormat),
+            _ => this.CustomFormat.Length > 0 ? _value.ToString(this.CustomFormat, Strings.DateTimeFormat) : string.Empty,
         };
 
     /// <summary>Moves <see cref="Value"/> by whole days, refusing steps that leave the clamp window

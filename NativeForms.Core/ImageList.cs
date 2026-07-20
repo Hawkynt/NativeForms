@@ -53,6 +53,51 @@ public sealed class ImageList : IDisposable
     }
 
     /// <summary>
+    /// Adds an image from encoded PNG bytes (the <see cref="ImageDecoder"/> subset: 8-bit
+    /// non-interlaced grayscale/RGB/RGBA/palette) and returns its index. A decoded size other than
+    /// <see cref="ImageSize"/> is resampled to fit with nearest-neighbor scaling — crisp for the
+    /// icon-sized art this list holds, no filtering.
+    /// </summary>
+    /// <exception cref="FormatException">The bytes are not a PNG in the supported subset.</exception>
+    public int AddPng(ReadOnlySpan<byte> png)
+    {
+        var (width, height, argb) = ImageDecoder.DecodePng(png);
+        return this.AddScaled(width, height, argb);
+    }
+
+    /// <summary>
+    /// Adds an image from encoded ICO bytes, letting the decoder pick the entry closest to
+    /// <see cref="ImageSize"/>, and returns its index. A decoded size other than
+    /// <see cref="ImageSize"/> is resampled to fit with nearest-neighbor scaling.
+    /// </summary>
+    /// <exception cref="FormatException">The bytes are not an ICO in the supported subset.</exception>
+    public int AddIco(ReadOnlySpan<byte> ico)
+    {
+        var (width, height, argb) = ImageDecoder.DecodeIco(ico, this.ImageSize.Width);
+        return this.AddScaled(width, height, argb);
+    }
+
+    /// <summary>Adds decoded pixels, nearest-neighbor-resampling them to <see cref="ImageSize"/> when needed.</summary>
+    private int AddScaled(int width, int height, int[] argb)
+    {
+        var targetWidth = this.ImageSize.Width;
+        var targetHeight = this.ImageSize.Height;
+        if (width == targetWidth && height == targetHeight)
+            return this.Add(argb);
+
+        var scaled = new int[targetWidth * targetHeight];
+        for (var y = 0; y < targetHeight; ++y)
+        {
+            var sourceRow = (int)((long)y * height / targetHeight) * width;
+            var targetRow = y * targetWidth;
+            for (var x = 0; x < targetWidth; ++x)
+                scaled[targetRow + x] = argb[sourceRow + (int)((long)x * width / targetWidth)];
+        }
+
+        return this.Add(scaled);
+    }
+
+    /// <summary>
     /// Adds a copy of the image at <paramref name="baseIndex"/> with a badge composed onto it —
     /// small status overlays like "modified" or "locked" — and returns the new entry's index. The
     /// badge pixels (row-major 32-bit ARGB, <paramref name="badgeWidth"/>×<paramref name="badgeHeight"/>)

@@ -80,14 +80,20 @@ public class ToggleSwitch : OwnerDrawnControl
 
         // The track: one rounded rectangle whose corner radius is half its height — a pill. The
         // accent only shows on an enabled, on switch; a disabled one keeps the grey track and
-        // reports its state through the thumb side alone.
+        // reports its state through the thumb side alone. Right-to-left mirrors the face: track at
+        // the right edge, caption to its left, and the thumb's on-side flipped to the left end.
+        var rtl = this.IsRightToLeft;
         var top = Math.Max(0, (this.Height - TrackHeight) / 2);
+        var track = new Rectangle(0, top, TrackWidth, TrackHeight);
+        if (rtl)
+            track = RtlLayout.Mirror(track, this.Width);
         var trackColor = this.Enabled && this.Checked ? theme.Accent : theme.Border;
-        g.FillRoundedRectangle(trackColor, new(0, top, TrackWidth, TrackHeight), TrackHeight / 2);
+        g.FillRoundedRectangle(trackColor, new(track.X, top, TrackWidth, TrackHeight), TrackHeight / 2);
 
-        // The thumb: a field-colored circle hugging the off (left) or on (right) end of the track.
+        // The thumb: a field-colored circle hugging the off or on end of the track (sides swap in RTL).
         var diameter = TrackHeight - (2 * _ThumbMargin);
-        var thumbX = this.Checked ? TrackWidth - diameter - _ThumbMargin : _ThumbMargin;
+        var thumbAtFarEnd = this.Checked != rtl;
+        var thumbX = track.X + (thumbAtFarEnd ? TrackWidth - diameter - _ThumbMargin : _ThumbMargin);
         var thumb = new Rectangle(thumbX, top + _ThumbMargin, diameter, diameter);
         g.FillEllipse(theme.FieldBackground, thumb);
         g.DrawEllipse(theme.Border, thumb);
@@ -96,14 +102,21 @@ public class ToggleSwitch : OwnerDrawnControl
             return;
 
         var content = new Rectangle(TrackWidth + _TextGap, 0, this.Width - TrackWidth - _TextGap, this.Height);
+        var alignment = ContentAlignment.MiddleLeft;
+        if (rtl)
+        {
+            content = RtlLayout.Mirror(content, this.Width);
+            alignment = RtlLayout.Mirror(alignment);
+        }
+
         ContentLayout.Arrange(
             content,
             Size.Empty,
             g.MeasureText(this.Text, theme.DefaultFont),
             TextImageRelation.ImageBeforeText,
-            ContentAlignment.MiddleLeft,
+            alignment,
             out _,
             out var textRect);
-        g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, ContentAlignment.MiddleLeft);
+        g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, alignment);
     }
 }

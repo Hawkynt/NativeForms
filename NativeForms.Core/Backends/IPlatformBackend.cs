@@ -119,6 +119,14 @@ public interface IPlatformBackend
     void SetClipboardText(string text);
 
     /// <summary>
+    /// Queues <paramref name="action"/> for execution on the UI thread the message loop runs on and
+    /// returns immediately. Safe to call from any thread; the loop executes queued work in posting
+    /// order. The seam behind <see cref="Control.BeginInvoke"/> and the toolkit's
+    /// <see cref="System.Threading.SynchronizationContext"/>.
+    /// </summary>
+    void Post(Action action);
+
+    /// <summary>
     /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>
     /// is called. Must be invoked on the thread that created the widgets.
     /// </summary>

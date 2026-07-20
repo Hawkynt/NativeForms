@@ -107,11 +107,11 @@ public class ToolStripMenuItem : ToolStripDropDownItem
 
         var builder = new StringBuilder();
         if ((shortcut & Keys.Control) != 0)
-            builder.Append("Ctrl+");
+            builder.Append(Strings.ShortcutControlPrefix);
         if ((shortcut & Keys.Shift) != 0)
-            builder.Append("Shift+");
+            builder.Append(Strings.ShortcutShiftPrefix);
         if ((shortcut & Keys.Alt) != 0)
-            builder.Append("Alt+");
+            builder.Append(Strings.ShortcutAltPrefix);
 
         var code = shortcut & Keys.KeyCode;
         var name = code.ToString();

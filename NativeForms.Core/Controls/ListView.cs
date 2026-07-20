@@ -50,7 +50,6 @@ public class ListView : OwnerDrawnControl
     private const int _LargeIconLabelGap = 4;
     private const int _MinLargeIconCellWidth = 64;
     private const int _SortArrowWidth = 10;
-    private const string _DefaultGroupHeader = "Default";
 
     /// <summary>The selected row indices, always kept sorted ascending.</summary>
     private readonly List<int> _selectedIndices = [];
@@ -1353,7 +1352,7 @@ public class ListView : OwnerDrawnControl
     /// <summary>Draws a group's header row: accent caption plus the accent separator rule.</summary>
     private void PaintGroupHeader(IGraphics g, ITheme theme, int groupIndex, int y, int rowHeight)
     {
-        var text = groupIndex >= 0 ? this.Groups[groupIndex].Header : _DefaultGroupHeader;
+        var text = groupIndex >= 0 ? this.Groups[groupIndex].Header : Strings.DefaultListViewGroupHeader;
         g.DrawText(text, theme.DefaultFont, theme.Accent, new Rectangle(_CellPad + 2, y, this.Width - 8, rowHeight), ContentAlignment.MiddleLeft);
         g.DrawLine(theme.Accent, _CellPad, y + rowHeight - 2, this.Width - _CellPad, y + rowHeight - 2);
     }

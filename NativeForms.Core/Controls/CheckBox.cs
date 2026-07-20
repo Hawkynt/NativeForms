@@ -83,11 +83,23 @@ public class CheckBox : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
 
+        // Right-to-left mirrors the whole face: check square at the right edge, content anchored
+        // toward it, image on the text's trailing (right) side.
+        var rtl = this.IsRightToLeft;
         var boxTop = Math.Max(0, (this.Height - GlyphRenderer.CheckBoxSize) / 2);
         var box = new Rectangle(0, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize);
+        if (rtl)
+            box = RtlLayout.Mirror(box, this.Width);
         GlyphRenderer.DrawCheckBox(g, theme, box, this.Checked);
 
         var content = new Rectangle(GlyphRenderer.CheckBoxSize + _TextGap, 0, this.Width - GlyphRenderer.CheckBoxSize - _TextGap, this.Height);
+        var alignment = ContentAlignment.MiddleLeft;
+        if (rtl)
+        {
+            content = RtlLayout.Mirror(content, this.Width);
+            alignment = RtlLayout.Mirror(alignment);
+        }
+
         var textColor = this.Enabled ? theme.ControlText : theme.DisabledText;
         if (this.Image is { } image)
         {
@@ -95,14 +107,14 @@ public class CheckBox : OwnerDrawnControl
                 content,
                 new Size(image.Width, image.Height),
                 g.MeasureText(this.Text, theme.DefaultFont),
-                TextImageRelation.ImageBeforeText,
-                ContentAlignment.MiddleLeft,
+                rtl ? TextImageRelation.TextBeforeImage : TextImageRelation.ImageBeforeText,
+                alignment,
                 out var imageRect,
                 out var textRect);
             g.DrawImage(image, imageRect);
-            g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
+            g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, alignment);
         }
         else
-            g.DrawText(this.Text, theme.DefaultFont, textColor, content, ContentAlignment.MiddleLeft);
+            g.DrawText(this.Text, theme.DefaultFont, textColor, content, alignment);
     }
 }

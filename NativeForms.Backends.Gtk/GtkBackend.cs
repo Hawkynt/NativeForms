@@ -250,6 +250,43 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Queues through <c>g_idle_add_full</c>, which is thread-safe by GLib contract, so posting works
+    /// from any thread. The action travels as a normal <see cref="GCHandle"/> threaded through
+    /// <c>user_data</c> — the same state-recovery pattern every signal handler uses — and the
+    /// <see cref="UnmanagedCallersOnlyAttribute"/> callback frees it after the single invocation.
+    /// </remarks>
+    public void Post(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnsureInitialized();
+        var handle = GCHandle.Alloc(action);
+        unsafe
+        {
+            var callback = (nint)(delegate* unmanaged[Cdecl]<nint, int>)&OnIdle;
+            NativeMethods.g_idle_add_full(NativeMethods.G_PRIORITY_DEFAULT, callback, GCHandle.ToIntPtr(handle), 0);
+        }
+    }
+
+    /// <summary>
+    /// Native <c>GSourceFunc</c> handler shaped as <c>gboolean (gpointer user_data)</c>; recovers the
+    /// posted action from <paramref name="userData"/>, frees the handle, runs the action once and
+    /// returns 0 (<c>G_SOURCE_REMOVE</c>) so the idle source retires.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnIdle(nint userData)
+    {
+        if (userData == 0)
+            return 0;
+
+        var handle = GCHandle.FromIntPtr(userData);
+        var action = handle.Target as Action;
+        handle.Free();
+        action?.Invoke();
+        return 0;
+    }
+
+    /// <inheritdoc />
     public void Run(IWindowPeer mainWindow)
     {
         EnsureInitialized();

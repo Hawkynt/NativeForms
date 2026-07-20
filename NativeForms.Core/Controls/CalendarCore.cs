@@ -36,8 +36,6 @@ internal sealed class CalendarCore
     /// <summary>The latest supported date, matching the classic toolkit's calendar ceiling.</summary>
     internal static readonly DateTime MaximumDate = new(9998, 12, 31);
 
-    /// <summary>Two-letter invariant day names, indexed by <see cref="DayOfWeek"/>.</summary>
-    private static readonly string[] _DayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
     /// <summary>The day-number strings "1"–"31", materialized once so painting stays allocation-free.</summary>
     private static string[]? _dayNumbers;
@@ -168,14 +166,15 @@ internal sealed class CalendarCore
         g.FillRectangle(theme.FieldBackground, new(0, 0, size.Width, size.Height));
 
         var rowHeight = theme.RowHeight;
-        var title = _title ??= _displayMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+        var title = _title ??= _displayMonth.ToString("MMMM yyyy", Strings.DateTimeFormat);
         g.DrawText(title, theme.DefaultFont, theme.ControlText, new(0, 0, size.Width, rowHeight), ContentAlignment.MiddleCenter);
         DrawArrow(g, theme, new(0, 0, rowHeight, rowHeight), true);
         DrawArrow(g, theme, new(size.Width - rowHeight, 0, rowHeight, rowHeight), false);
 
         var cellWidth = size.Width / 7;
+        var dayNames = Strings.AbbreviatedDayNames;
         for (var i = 0; i < 7; ++i)
-            g.DrawText(_DayNames[((int)this.FirstDayOfWeek + i) % 7], theme.DefaultFont, theme.HeaderText, new(i * cellWidth, rowHeight, cellWidth, rowHeight), ContentAlignment.MiddleCenter);
+            g.DrawText(dayNames[((int)this.FirstDayOfWeek + i) % 7], theme.DefaultFont, theme.HeaderText, new(i * cellWidth, rowHeight, cellWidth, rowHeight), ContentAlignment.MiddleCenter);
 
         var top = 2 * rowHeight;
         var cellHeight = (size.Height - top) / 6;

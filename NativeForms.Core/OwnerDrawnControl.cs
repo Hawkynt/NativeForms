@@ -84,9 +84,20 @@ public abstract class OwnerDrawnControl : Control
             if (e.Button == MouseButtons.Right && this.ContextMenuStrip is { } menu)
                 menu.Show(this, e.Location);
         };
-        canvas.MouseUp += (_, e) => this.OnMouseUp(e);
+        canvas.MouseUp += (_, e) =>
+        {
+            // A drag in flight consumes the source's mouse stream — matching how an OS drag steals
+            // the pointer from the source window.
+            if (DragDropSession.RouteMouseUp(this, e))
+                return;
+
+            this.OnMouseUp(e);
+        };
         canvas.MouseMove += (_, e) =>
         {
+            if (DragDropSession.RouteMouseMove(this, e))
+                return;
+
             this.OnMouseMove(e);
             this.CanvasMouseMove?.Invoke(this, e);
         };
@@ -116,6 +127,13 @@ public abstract class OwnerDrawnControl : Control
     protected override void OnTextChanged(EventArgs e)
     {
         base.OnTextChanged(e);
+        this.Invalidate();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnRightToLeftChanged(EventArgs e)
+    {
+        base.OnRightToLeftChanged(e);
         this.Invalidate();
     }
 

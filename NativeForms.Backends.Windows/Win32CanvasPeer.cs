@@ -384,27 +384,37 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                     peer.OnPaintMessage(hwnd);
                     return 0;
 
+                // A press captures the mouse until the release, like every WinForms control surface:
+                // held-button moves keep flowing to this canvas even outside its bounds — what
+                // slider thumbs and the in-process drag engine rely on. (GTK gets the same behavior
+                // from the X11 implicit grab, without asking.)
                 case NativeMethods.WM_LBUTTONDOWN:
+                    NativeMethods.SetCapture(hwnd);
                     peer.RaiseMouse(peer.MouseDown, MouseButtons.Left, lParam);
                     return 0;
 
                 case NativeMethods.WM_RBUTTONDOWN:
+                    NativeMethods.SetCapture(hwnd);
                     peer.RaiseMouse(peer.MouseDown, MouseButtons.Right, lParam);
                     return 0;
 
                 case NativeMethods.WM_MBUTTONDOWN:
+                    NativeMethods.SetCapture(hwnd);
                     peer.RaiseMouse(peer.MouseDown, MouseButtons.Middle, lParam);
                     return 0;
 
                 case NativeMethods.WM_LBUTTONUP:
+                    NativeMethods.ReleaseCapture();
                     peer.RaiseMouse(peer.MouseUp, MouseButtons.Left, lParam);
                     return 0;
 
                 case NativeMethods.WM_RBUTTONUP:
+                    NativeMethods.ReleaseCapture();
                     peer.RaiseMouse(peer.MouseUp, MouseButtons.Right, lParam);
                     return 0;
 
                 case NativeMethods.WM_MBUTTONUP:
+                    NativeMethods.ReleaseCapture();
                     peer.RaiseMouse(peer.MouseUp, MouseButtons.Middle, lParam);
                     return 0;
 

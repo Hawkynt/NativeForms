@@ -155,9 +155,20 @@ public sealed partial class Win32Backend : IPlatformBackend
     }
 
     /// <inheritdoc/>
+    public void Post(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        Win32Dispatcher.Post(action);
+    }
+
+    /// <inheritdoc/>
     public void Run(IWindowPeer mainWindow)
     {
         ArgumentNullException.ThrowIfNull(mainWindow);
+
+        // The dispatcher's message-only window must live on the loop thread; creating it here also
+        // drains anything posted before the loop started.
+        Win32Dispatcher.EnsureCreated();
 
         while (true)
         {
