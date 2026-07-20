@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
@@ -149,7 +150,7 @@ public class MenuStrip : OwnerDrawnControl
             var rect = new Rectangle(x, 0, width, this.Height);
             var active = i == _openIndex || (i == _hoverIndex && item.Enabled);
             if (active)
-                g.FillRectangle(theme.SelectionBackground, rect);
+                GlyphRenderer.FillSelection(g, theme, rect);
 
             var textColor = !item.Enabled ? theme.DisabledText : active ? theme.SelectionText : theme.ControlText;
             var textRect = new Rectangle(x + ItemPadding, 0, width - (2 * ItemPadding), this.Height);

@@ -3,14 +3,23 @@ using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
-/// <summary>Carries the drawing surface and clip region to a paint handler.</summary>
+/// <summary>Carries the drawing surface and clip region to a paint handler. Valid only for the
+/// duration of that paint: canvas peers reuse one instance across frames (via <see cref="Reset"/>)
+/// so a steady-state repaint allocates nothing.</summary>
 public sealed class PaintEventArgs(IGraphics graphics, Rectangle clipRectangle) : EventArgs
 {
     /// <summary>The surface to draw on.</summary>
-    public IGraphics Graphics { get; } = graphics;
+    public IGraphics Graphics { get; private set; } = graphics;
 
     /// <summary>The region that needs repainting; drawing may be clipped to it.</summary>
-    public Rectangle ClipRectangle { get; } = clipRectangle;
+    public Rectangle ClipRectangle { get; private set; } = clipRectangle;
+
+    /// <summary>Rebinds the instance to the next paint's surface and clip — the peer-side reuse hook.</summary>
+    internal void Reset(IGraphics graphics, Rectangle clipRectangle)
+    {
+        this.Graphics = graphics;
+        this.ClipRectangle = clipRectangle;
+    }
 }
 
 /// <summary>Describes a mouse event, matching <c>System.Windows.Forms.MouseEventArgs</c> plus the

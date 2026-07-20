@@ -17,9 +17,6 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class ComboBox : OwnerDrawnControl
 {
-    /// <summary>The height in rows of the drop-down arrow glyph (and half its width, roughly).</summary>
-    private const int _ArrowRows = 5;
-
     private int _selectedIndex = -1;
     private bool _droppedDown;
     private bool _focused;
@@ -282,12 +279,9 @@ public class ComboBox : OwnerDrawnControl
                 g.DrawText(this.PlaceholderText, theme.DefaultFont, theme.DisabledText, new Rectangle(fieldRect.X + 2, fieldRect.Y, fieldRect.Width - 2, fieldRect.Height), ContentAlignment.MiddleLeft);
         }
 
-        // The drop-down arrow: a themed triangle of stacked lines, centered in the button zone.
+        // The drop-down arrow, centered in the button zone.
         var arrowColor = this.Enabled ? theme.ControlText : theme.DisabledText;
-        var centerX = width - buttonWidth + (buttonWidth / 2);
-        var arrowTop = (height - _ArrowRows) / 2;
-        for (var i = 0; i < _ArrowRows; ++i)
-            g.DrawLine(arrowColor, centerX - _ArrowRows + 1 + i, arrowTop + i, centerX + _ArrowRows - 1 - i, arrowTop + i);
+        GlyphRenderer.DrawComboArrow(g, arrowColor, new Rectangle(width - buttonWidth, 0, buttonWidth, height));
 
         g.DrawRectangle(_focused ? theme.Accent : theme.Border, new Rectangle(0, 0, width - 1, height - 1));
     }
@@ -475,7 +469,7 @@ public class ComboBox : OwnerDrawnControl
             var rowRect = new Rectangle(0, (i - _popupTopIndex) * rowHeight, size.Width, rowHeight);
             var hovered = i == _hoverIndex;
             if (hovered)
-                g.FillRectangle(theme.SelectionBackground, rowRect);
+                GlyphRenderer.FillSelection(g, theme, rowRect);
 
             var item = this.Items[i];
             ListBox.DrawRowContent(g, theme, rowRect, this.DisplaySelector(item), this.IconOf(item), hovered);

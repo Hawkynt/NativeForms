@@ -87,6 +87,10 @@ internal static partial class NativeMethods
     [LibraryImport(Cairo)]
     internal static partial void cairo_arc(nint cr, double xc, double yc, double radius, double angle1, double angle2);
 
+    /// <summary>Closes the current sub-path with a straight line back to its starting point.</summary>
+    [LibraryImport(Cairo)]
+    internal static partial void cairo_close_path(nint cr);
+
     /// <summary>Fills the current path with the current source and clears the path.</summary>
     [LibraryImport(Cairo)]
     internal static partial void cairo_fill(nint cr);
@@ -120,6 +124,11 @@ internal static partial class NativeMethods
     /// <summary>Renders a laid-out <c>PangoLayout</c> at the Cairo current point using the current source.</summary>
     [LibraryImport(PangoCairo)]
     internal static partial void pango_cairo_show_layout(nint cr, nint layout);
+
+    /// <summary>Re-syncs a layout with a Cairo context's font options and resolution — the call that
+    /// lets one long-lived layout be reused across draw callbacks with differing contexts.</summary>
+    [LibraryImport(PangoCairo)]
+    internal static partial void pango_cairo_update_layout(nint cr, nint layout);
 
     /// <summary>Returns the default PangoCairo font map (owned by Pango; do not unref).</summary>
     [LibraryImport(PangoCairo)]

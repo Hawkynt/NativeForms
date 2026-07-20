@@ -11,6 +11,15 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// </summary>
 public sealed partial class Win32Backend : IPlatformBackend
 {
+    /// <summary>The most recently constructed backend — the instance the static window procedures
+    /// notify when a system-wide theme message arrives (an app runs exactly one backend).</summary>
+    private static Win32Backend? _current;
+
+    private Win32Theme? _theme;
+
+    /// <summary>Registers this instance as the receiver of system theme-change notifications.</summary>
+    public Win32Backend() => _current = this;
+
     /// <inheritdoc/>
     public string Name => "Win32";
 
@@ -19,8 +28,35 @@ public sealed partial class Win32Backend : IPlatformBackend
 
     /// <inheritdoc/>
     // Built lazily and cached: constructing it queries the OS, so we defer that until a control paints
-    // (and never touch USER32/GDI just by instantiating the backend on a non-Windows host).
-    public ITheme Theme => field ??= new Win32Theme();
+    // (and never touch USER32/GDI just by instantiating the backend on a non-Windows host). The cache
+    // is dropped when the desktop announces a theme change, so the next read snapshots fresh values.
+    public ITheme Theme => _theme ??= new Win32Theme();
+
+    /// <inheritdoc/>
+    public event EventHandler? ThemeChanged;
+
+    /// <summary>
+    /// Called from the window procedures when the desktop announces a theme change
+    /// (<c>WM_THEMECHANGED</c>, <c>WM_SYSCOLORCHANGE</c>, <c>WM_SETTINGCHANGE</c>): drops the cached
+    /// theme snapshot, then raises <see cref="ThemeChanged"/> so realized owner-drawn controls
+    /// re-read it and repaint.
+    /// </summary>
+    internal static void NotifySystemThemeChanged()
+    {
+        var backend = _current;
+        if (backend is null)
+            return;
+
+        backend._theme = null;
+        backend.ThemeChanged?.Invoke(backend, EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    public double GetDpiScale()
+    {
+        var dpi = NativeMethods.GetDpiForSystem();
+        return dpi > 0 ? dpi / 96.0 : 1.0;
+    }
 
     /// <inheritdoc/>
     public IWindowPeer CreateWindow() => new WindowPeer();

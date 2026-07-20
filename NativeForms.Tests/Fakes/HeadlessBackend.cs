@@ -55,7 +55,22 @@ internal sealed class HeadlessBackend : IPlatformBackend
 
     public string Name => "Headless";
     public bool IsSupported => true;
-    public ITheme Theme => DefaultTheme.Instance;
+
+    /// <summary>The theme served to controls; swappable so tests can script a desktop theme change
+    /// (swap, then <see cref="FireThemeChanged"/>).</summary>
+    public ITheme Theme { get; set; } = DefaultTheme.Instance;
+
+    /// <inheritdoc/>
+    public event EventHandler? ThemeChanged;
+
+    /// <summary>Raises <see cref="ThemeChanged"/> as the platform would after a desktop theme change.</summary>
+    public void FireThemeChanged() => this.ThemeChanged?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The fake DPI scale <see cref="GetDpiScale"/> reports; settable so tests can assert
+    /// logical-to-device math against a known factor.</summary>
+    public double DpiScale { get; set; } = 1.0;
+
+    public double GetDpiScale() => this.DpiScale;
 
     /// <summary>The peer holding the simulated keyboard focus, or null while nothing is focused.</summary>
     public HeadlessPeer? FocusedPeer { get; private set; }
@@ -570,12 +585,24 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public void InvalidateAll() => ++this.InvalidateCount;
     public void SetFocusable(bool focusable) => this.Focusable = focusable;
 
+    private PaintEventArgs? _paintArgs;
+
     // Test helpers — drive the control as the native surface would.
     public RecordingGraphics RaisePaint()
     {
         var graphics = new RecordingGraphics();
         this.Paint?.Invoke(this, new PaintEventArgs(graphics, new Rectangle(Point.Empty, this.Bounds.Size)));
         return graphics;
+    }
+
+    /// <summary>Raises <see cref="Paint"/> over a caller-supplied surface, reusing one
+    /// <see cref="PaintEventArgs"/> across calls exactly like the real canvas peers — the hook the
+    /// steady-state paint-allocation test drives.</summary>
+    public void RaisePaint(IGraphics graphics)
+    {
+        var args = _paintArgs ??= new PaintEventArgs(graphics, default);
+        args.Reset(graphics, new Rectangle(Point.Empty, this.Bounds.Size));
+        this.Paint?.Invoke(this, args);
     }
 
     public void RaiseMouseDown(int x, int y, MouseButtons button = MouseButtons.Left, KeyModifiers modifiers = KeyModifiers.None)
@@ -653,6 +680,12 @@ internal sealed class RecordingGraphics : IGraphics
 
     public void DrawEllipse(Color color, Rectangle bounds, int thickness = 1)
         => this.Operations.Add($"ellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+
+    public void FillRoundedRectangle(Color color, Rectangle bounds, int radius)
+        => this.Operations.Add($"fillround {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height} r{radius}");
+
+    public void DrawRoundedRectangle(Color color, Rectangle bounds, int radius, int thickness = 1)
+        => this.Operations.Add($"round {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height} r{radius}");
 
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
         => this.Operations.Add($"line {Hex(color)} {x1},{y1}-{x2},{y2}");

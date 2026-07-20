@@ -14,6 +14,7 @@ namespace Hawkynt.NativeForms;
 public abstract class OwnerDrawnControl : Control
 {
     private ICanvasPeer? _canvas;
+    private IPlatformBackend? _themeSource;
 
     /// <summary>The native theme to paint with; the fallback until the control is realized.</summary>
     protected ITheme Theme { get; private set; } = DefaultTheme.Instance;
@@ -32,11 +33,32 @@ public abstract class OwnerDrawnControl : Control
         this.Theme = backend.Theme;
         var canvas = backend.CreateCanvas();
         _canvas = canvas;
+        _themeSource = backend;
+        backend.ThemeChanged += this.OnBackendThemeChanged;
         return canvas;
     }
 
     /// <inheritdoc/>
-    private protected override void OnUnrealized() => _canvas = null;
+    private protected override void OnUnrealized()
+    {
+        if (_themeSource is { } backend)
+        {
+            backend.ThemeChanged -= this.OnBackendThemeChanged;
+            _themeSource = null;
+        }
+
+        _canvas = null;
+    }
+
+    /// <summary>The desktop theme changed: adopt the backend's fresh snapshot and repaint.</summary>
+    private void OnBackendThemeChanged(object? sender, EventArgs e)
+    {
+        if (_themeSource is not { } backend)
+            return;
+
+        this.Theme = backend.Theme;
+        this.Invalidate();
+    }
 
     /// <summary>Mirrors the canvas's pointer moves for components (tool tips) that observe a control
     /// without subclassing it. Raised after the control's own <see cref="OnMouseMove"/>.</summary>

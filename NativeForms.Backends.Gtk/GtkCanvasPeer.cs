@@ -141,13 +141,40 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 
     // --- Event raisers (called from the native callbacks) ---------------------------------------
 
-    /// <summary>Wraps the Cairo context and raises <see cref="Paint"/> for the whole allocation.</summary>
+    // GTK 3 already double-buffers every "draw" dispatch (the cairo_t* targets an off-screen
+    // surface GDK flips at the end of the frame), so no explicit buffer is needed here — only the
+    // managed wrappers are cached and reused so a steady-state repaint allocates nothing.
+    private GtkGraphics? _graphics;
+    private PaintEventArgs? _paintArgs;
+
+    /// <summary>Wraps the Cairo context and raises <see cref="Paint"/> for the invalidated region
+    /// (the context's clip, which GDK set from the queued draw areas), falling back to the whole
+    /// allocation when the clip is unbounded.</summary>
     private void RaisePaint(nint cr)
     {
-        var width = NativeMethods.gtk_widget_get_allocated_width(_widget);
-        var height = NativeMethods.gtk_widget_get_allocated_height(_widget);
-        var graphics = new GtkGraphics(cr);
-        Paint?.Invoke(this, new PaintEventArgs(graphics, new Rectangle(0, 0, width, height)));
+        Rectangle clip;
+        if (NativeMethods.gdk_cairo_get_clip_rectangle(cr, out var clipRect) != 0)
+            clip = new Rectangle(clipRect.X, clipRect.Y, clipRect.Width, clipRect.Height);
+        else
+        {
+            var width = NativeMethods.gtk_widget_get_allocated_width(_widget);
+            var height = NativeMethods.gtk_widget_get_allocated_height(_widget);
+            clip = new Rectangle(0, 0, width, height);
+        }
+
+        var graphics = _graphics ??= new GtkGraphics(cr);
+        graphics.Bind(cr);
+        var args = _paintArgs ??= new PaintEventArgs(graphics, clip);
+        args.Reset(graphics, clip);
+        Paint?.Invoke(this, args);
+    }
+
+    /// <inheritdoc />
+    public override void Dispose()
+    {
+        _graphics?.Dispose();
+        _graphics = null;
+        base.Dispose();
     }
 
     private void RaiseMouseDown(MouseButtons button, int x, int y, KeyModifiers modifiers)

@@ -459,6 +459,14 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
 
                 break;
 
+            case NativeMethods.WM_THEMECHANGED:
+            case NativeMethods.WM_SYSCOLORCHANGE:
+            case NativeMethods.WM_SETTINGCHANGE:
+                // The desktop announced a theme/system-color/settings change: drop the backend's
+                // cached theme and let owner-drawn controls repaint, then let USER32 do its part.
+                Win32Backend.NotifySystemThemeChanged();
+                break;
+
             case NativeMethods.WM_CLOSE:
                 // A modal window hides instead of dying: the peer must outlive its nested loop so
                 // the core can read state and dispose it after ShowDialog returns.

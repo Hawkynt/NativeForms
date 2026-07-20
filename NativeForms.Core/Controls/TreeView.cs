@@ -311,7 +311,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     {
         var selected = ReferenceEquals(node, _selectedNode);
         if (selected)
-            g.FillRectangle(theme.SelectionBackground, new Rectangle(0, y, this.Width, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, this.Width, rowHeight));
 
         var indent = rowHeight;
         var glyphCellLeft = this.GlyphCellLeft(node);

@@ -14,9 +14,12 @@
   </PropertyGroup>
 
   <!-- Tests assert against internal seams (peer wiring, lazy materialization) that must not
-       become public API just to be testable. -->
+       become public API just to be testable. The backends share the peer-side infrastructure
+       (paint-args reuse) for the same reason. -->
   <ItemGroup>
     <InternalsVisibleTo Include="Hawkynt.NativeForms.Tests" />
+    <InternalsVisibleTo Include="Hawkynt.NativeForms.Backends.Windows" />
+    <InternalsVisibleTo Include="Hawkynt.NativeForms.Backends.Gtk" />
   </ItemGroup>
 
 </Project>

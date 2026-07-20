@@ -79,7 +79,7 @@ public class RadioButton : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Left && new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
+        if (e.Button == MouseButtons.Left && HitTest.ClientContains(this, e.Location))
             this.Select();
     }
 

@@ -45,7 +45,7 @@ public class SplitButton : DropDownButtonBase
             return;
 
         this.Focus();
-        if (e.X >= this.Width - ArrowZoneWidth && new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
+        if (e.X >= this.Width - ArrowZoneWidth && HitTest.ClientContains(this, e.Location))
             this.ShowDropDown();
     }
 

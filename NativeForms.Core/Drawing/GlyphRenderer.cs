@@ -80,4 +80,57 @@ internal static class GlyphRenderer
         for (var i = 0; i < 4; ++i)
             g.DrawLine(color, left + i, cy - 3 + i, left + i, cy + 4 - i);
     }
+
+    /// <summary>The number of stacked-line rows in the themed drop-down arrow.</summary>
+    private const int _ComboArrowRows = 5;
+
+    /// <summary>Draws the drop-down arrow every combo-style field shows: a downward triangle of five
+    /// stacked lines, centered in <paramref name="bounds"/>.</summary>
+    public static void DrawComboArrow(IGraphics g, Color color, Rectangle bounds)
+    {
+        var centerX = bounds.X + (bounds.Width / 2);
+        var top = bounds.Y + ((bounds.Height - _ComboArrowRows) / 2);
+        for (var i = 0; i < _ComboArrowRows; ++i)
+            g.DrawLine(color, centerX - _ComboArrowRows + 1 + i, top + i, centerX + _ComboArrowRows - 1 - i, top + i);
+    }
+
+    /// <summary>Draws one column-header cell: header-colored face, the caption clipped and padded
+    /// inside it, and optionally the separator after its trailing edge.</summary>
+    public static void DrawHeaderCell(
+        IGraphics g,
+        ITheme theme,
+        Rectangle bounds,
+        string text,
+        ContentAlignment alignment,
+        int textPadding,
+        bool separator)
+    {
+        g.FillRectangle(theme.HeaderBackground, bounds);
+        g.PushClip(bounds);
+        var textRect = new Rectangle(bounds.X + textPadding, bounds.Y, Math.Max(0, bounds.Width - (2 * textPadding)), bounds.Height);
+        g.DrawText(text, theme.DefaultFont, theme.HeaderText, textRect, alignment);
+        g.PopClip();
+
+        if (separator)
+            g.DrawLine(theme.Border, bounds.Right, bounds.Y, bounds.Right, bounds.Bottom);
+    }
+
+    /// <summary>Draws the keyboard-focus ring: a one-pixel rectangle in a faint accent (accent blended
+    /// halfway toward the control background) — the modern take on the classic dotted marquee, and
+    /// arithmetic rather than alpha so it renders identically on GDI. Under high contrast the blend
+    /// is skipped and the full accent is used.</summary>
+    public static void DrawFocusRing(IGraphics g, ITheme theme, Rectangle bounds)
+    {
+        var accent = theme.Accent;
+        var color = theme.IsHighContrast ? accent : Blend(accent, theme.ControlBackground);
+        g.DrawRectangle(color, bounds);
+    }
+
+    /// <summary>Fills the themed selected-item highlight behind an item, row or cell.</summary>
+    public static void FillSelection(IGraphics g, ITheme theme, Rectangle bounds)
+        => g.FillRectangle(theme.SelectionBackground, bounds);
+
+    /// <summary>Mixes two opaque colors 50:50, channel-wise.</summary>
+    private static Color Blend(Color a, Color b)
+        => Color.FromArgb(0xFF, (a.R + b.R) / 2, (a.G + b.G) / 2, (a.B + b.B) / 2);
 }

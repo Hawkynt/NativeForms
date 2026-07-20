@@ -173,7 +173,7 @@ public class ToolStrip : OwnerDrawnControl
         var pressed = index == _pressedIndex;
         var hovered = index == _hoverIndex && item.Enabled;
         if (pressed)
-            g.FillRectangle(theme.SelectionBackground, bounds);
+            GlyphRenderer.FillSelection(g, theme, bounds);
         else if (hovered || isChecked)
             g.FillRectangle(theme.HeaderBackground, bounds);
 

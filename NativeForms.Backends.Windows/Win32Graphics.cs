@@ -5,34 +5,52 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 
 /// <summary>
 /// A GDI-backed <see cref="IGraphics"/> valid for the duration of one <c>WM_PAINT</c>. It borrows the
-/// paint <c>HDC</c> (it does not own it) and renders through immediate GDI calls, creating and deleting
-/// each pen/brush/font it uses so no GDI object leaks. Clipping is layered on the DC's own save/restore
-/// stack, mirrored by <see cref="_clipStack"/> so <see cref="PopClip"/> restores the matching state.
+/// paint <c>HDC</c> (it does not own it); the owning canvas peer keeps one instance alive and
+/// <see cref="Bind"/>s it to each paint's DC, so a steady-state repaint allocates no managed memory.
+/// Pens, brushes and fonts come from small process-wide caches keyed by color/thickness/font instead
+/// of being created and destroyed per call — the GDI-object churn would otherwise dominate the paint
+/// path. Clipping is layered on the DC's own save/restore stack, mirrored by <see cref="_clipStack"/>
+/// so <see cref="PopClip"/> restores the matching state.
 /// </summary>
 internal sealed class Win32Graphics : IGraphics
 {
-    private readonly nint _hdc;
-    private readonly int _dpi;
+    /// <summary>The cache ceiling; reaching it flushes everything (a paint immediately re-primes the
+    /// handful of theme entries, so the flush is a rare, cheap safety valve against unbounded growth).</summary>
+    private const int _CacheLimit = 64;
+
+    // GDI objects are process-global (not DC-bound), so one UI-thread cache serves every DC.
+    private static readonly Dictionary<uint, nint> _brushes = new();
+    private static readonly Dictionary<ulong, nint> _pens = new();
+    private static readonly Dictionary<FontKey, nint> _fonts = new();
+
+    /// <summary>The identity a realized <c>HFONT</c> is cached under.</summary>
+    private readonly record struct FontKey(string Family, float SizeInPoints, FontStyle Style, int Dpi);
+
+    private nint _hdc;
+    private int _dpi;
     private readonly Stack<int> _clipStack = new();
 
     /// <summary>Wraps a paint device context, caching its vertical DPI for font sizing.</summary>
-    public Win32Graphics(nint hdc)
+    public Win32Graphics(nint hdc) => this.Bind(hdc);
+
+    /// <summary>Rebinds the instance to the next paint's device context — the peer-side reuse hook.</summary>
+    internal void Bind(nint hdc)
     {
         this._hdc = hdc;
         var dpi = NativeMethods.GetDeviceCaps(hdc, NativeMethods.LOGPIXELSY);
         this._dpi = dpi > 0 ? dpi : 96;
+        this._clipStack.Clear();
     }
 
     /// <inheritdoc/>
     public void FillRectangle(Color color, Rectangle bounds)
     {
-        var brush = NativeMethods.CreateSolidBrush(ToColorRef(color));
+        var brush = GetBrush(color);
         if (brush == 0)
             return;
 
         var rect = ToRect(bounds);
         NativeMethods.FillRect(this._hdc, in rect, brush);
-        NativeMethods.DeleteObject(brush);
     }
 
     /// <inheritdoc/>
@@ -41,7 +59,7 @@ internal sealed class Win32Graphics : IGraphics
         if (thickness <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
-        var brush = NativeMethods.CreateSolidBrush(ToColorRef(color));
+        var brush = GetBrush(color);
         if (brush == 0)
             return;
 
@@ -52,8 +70,6 @@ internal sealed class Win32Graphics : IGraphics
         FillEdge(bounds.X, bounds.Bottom - t, bounds.Width, t);                          // bottom
         FillEdge(bounds.X, bounds.Y + t, t, bounds.Height - 2 * t);                      // left
         FillEdge(bounds.Right - t, bounds.Y + t, t, bounds.Height - 2 * t);             // right
-
-        NativeMethods.DeleteObject(brush);
 
         void FillEdge(int x, int y, int w, int h)
         {
@@ -71,25 +87,17 @@ internal sealed class Win32Graphics : IGraphics
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
-        var brush = NativeMethods.CreateSolidBrush(ToColorRef(color));
-        if (brush == 0)
-            return;
-
         // A matching pen paints the boundary so the whole inscribed ellipse is covered.
-        var pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, 1, ToColorRef(color));
-        if (pen == 0)
-        {
-            NativeMethods.DeleteObject(brush);
+        var brush = GetBrush(color);
+        var pen = GetPen(color, 1);
+        if (brush == 0 || pen == 0)
             return;
-        }
 
         var oldBrush = NativeMethods.SelectObject(this._hdc, brush);
         var oldPen = NativeMethods.SelectObject(this._hdc, pen);
         NativeMethods.Ellipse(this._hdc, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
         NativeMethods.SelectObject(this._hdc, oldPen);
         NativeMethods.SelectObject(this._hdc, oldBrush);
-        NativeMethods.DeleteObject(pen);
-        NativeMethods.DeleteObject(brush);
     }
 
     /// <inheritdoc/>
@@ -98,7 +106,7 @@ internal sealed class Win32Graphics : IGraphics
         if (thickness <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
-        var pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, thickness, ToColorRef(color));
+        var pen = GetPen(color, thickness);
         if (pen == 0)
             return;
 
@@ -109,13 +117,63 @@ internal sealed class Win32Graphics : IGraphics
         NativeMethods.Ellipse(this._hdc, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
         NativeMethods.SelectObject(this._hdc, oldBrush);
         NativeMethods.SelectObject(this._hdc, oldPen);
-        NativeMethods.DeleteObject(pen);
+    }
+
+    /// <inheritdoc/>
+    public void FillRoundedRectangle(Color color, Rectangle bounds, int radius)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        radius = ClampRadius(radius, bounds);
+        if (radius <= 0)
+        {
+            this.FillRectangle(color, bounds);
+            return;
+        }
+
+        // A matching pen covers the boundary, exactly like FillEllipse.
+        var brush = GetBrush(color);
+        var pen = GetPen(color, 1);
+        if (brush == 0 || pen == 0)
+            return;
+
+        var oldBrush = NativeMethods.SelectObject(this._hdc, brush);
+        var oldPen = NativeMethods.SelectObject(this._hdc, pen);
+        NativeMethods.RoundRect(this._hdc, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom, 2 * radius, 2 * radius);
+        NativeMethods.SelectObject(this._hdc, oldPen);
+        NativeMethods.SelectObject(this._hdc, oldBrush);
+    }
+
+    /// <inheritdoc/>
+    public void DrawRoundedRectangle(Color color, Rectangle bounds, int radius, int thickness = 1)
+    {
+        if (thickness <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        radius = ClampRadius(radius, bounds);
+        if (radius <= 0)
+        {
+            this.DrawRectangle(color, bounds, thickness);
+            return;
+        }
+
+        var pen = GetPen(color, thickness);
+        if (pen == 0)
+            return;
+
+        var nullBrush = NativeMethods.GetStockObject(NativeMethods.NULL_BRUSH);
+        var oldPen = NativeMethods.SelectObject(this._hdc, pen);
+        var oldBrush = NativeMethods.SelectObject(this._hdc, nullBrush);
+        NativeMethods.RoundRect(this._hdc, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom, 2 * radius, 2 * radius);
+        NativeMethods.SelectObject(this._hdc, oldBrush);
+        NativeMethods.SelectObject(this._hdc, oldPen);
     }
 
     /// <inheritdoc/>
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
     {
-        var pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, thickness, ToColorRef(color));
+        var pen = GetPen(color, thickness);
         if (pen == 0)
             return;
 
@@ -123,7 +181,6 @@ internal sealed class Win32Graphics : IGraphics
         NativeMethods.MoveToEx(this._hdc, x1, y1, 0);
         NativeMethods.LineTo(this._hdc, x2, y2);
         NativeMethods.SelectObject(this._hdc, oldPen);
-        NativeMethods.DeleteObject(pen);
     }
 
     /// <inheritdoc/>
@@ -137,7 +194,7 @@ internal sealed class Win32Graphics : IGraphics
         if (string.IsNullOrEmpty(text))
             return;
 
-        var hFont = CreateFont(font, this._dpi);
+        var hFont = GetFont(font, this._dpi);
         if (hFont == 0)
             return;
 
@@ -149,7 +206,6 @@ internal sealed class Win32Graphics : IGraphics
         NativeMethods.DrawTextW(this._hdc, text, text.Length, ref rect, FormatFor(alignment));
 
         NativeMethods.SelectObject(this._hdc, oldFont);
-        NativeMethods.DeleteObject(hFont);
     }
 
     /// <inheritdoc/>
@@ -164,7 +220,7 @@ internal sealed class Win32Graphics : IGraphics
         if (string.IsNullOrEmpty(text))
             return Size.Empty;
 
-        var hFont = CreateFont(font, dpi);
+        var hFont = GetFont(font, dpi);
         if (hFont == 0)
             return Size.Empty;
 
@@ -189,7 +245,6 @@ internal sealed class Win32Graphics : IGraphics
         }
 
         NativeMethods.SelectObject(hdc, oldFont);
-        NativeMethods.DeleteObject(hFont);
         return result;
     }
 
@@ -250,6 +305,67 @@ internal sealed class Win32Graphics : IGraphics
 
         var saved = this._clipStack.Pop();
         NativeMethods.RestoreDC(this._hdc, saved);
+    }
+
+    /// <summary>Limits a corner radius to half the rectangle's smaller dimension.</summary>
+    private static int ClampRadius(int radius, Rectangle bounds)
+        => Math.Min(radius, Math.Min(bounds.Width, bounds.Height) / 2);
+
+    /// <summary>Returns the cached solid brush for a color, creating it on first use.</summary>
+    private static nint GetBrush(Color color)
+    {
+        var key = ToColorRef(color);
+        if (_brushes.TryGetValue(key, out var brush))
+            return brush;
+
+        TrimCache(_brushes);
+        brush = NativeMethods.CreateSolidBrush(key);
+        if (brush != 0)
+            _brushes[key] = brush;
+
+        return brush;
+    }
+
+    /// <summary>Returns the cached solid pen for a color and thickness, creating it on first use.</summary>
+    private static nint GetPen(Color color, int thickness)
+    {
+        var key = ToColorRef(color) | ((ulong)(uint)thickness << 32);
+        if (_pens.TryGetValue(key, out var pen))
+            return pen;
+
+        TrimCache(_pens);
+        pen = NativeMethods.CreatePen(NativeMethods.PS_SOLID, thickness, ToColorRef(color));
+        if (pen != 0)
+            _pens[key] = pen;
+
+        return pen;
+    }
+
+    /// <summary>Returns the cached <c>HFONT</c> for a font descriptor at a DPI, realizing it on first use.</summary>
+    private static nint GetFont(Font font, int dpi)
+    {
+        var key = new FontKey(font.Family, font.SizeInPoints, font.Style, dpi);
+        if (_fonts.TryGetValue(key, out var hFont))
+            return hFont;
+
+        TrimCache(_fonts);
+        hFont = CreateFont(font, dpi);
+        if (hFont != 0)
+            _fonts[key] = hFont;
+
+        return hFont;
+    }
+
+    /// <summary>Deletes and forgets every cached GDI object once <paramref name="cache"/> hits the ceiling.</summary>
+    private static void TrimCache<TKey>(Dictionary<TKey, nint> cache) where TKey : notnull
+    {
+        if (cache.Count < _CacheLimit)
+            return;
+
+        foreach (var handle in cache.Values)
+            NativeMethods.DeleteObject(handle);
+
+        cache.Clear();
     }
 
     /// <summary>Converts a managed color to a Win32 <c>COLORREF</c> (0x00BBGGRR); alpha is dropped for GDI.</summary>

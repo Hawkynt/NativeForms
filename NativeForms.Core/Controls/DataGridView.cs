@@ -1252,7 +1252,7 @@ public class DataGridView : OwnerDrawnControl
             var rowHeight = this.GetRowHeightFor(item);
             var selected = this.IsRowSelected(modelIndex);
             if (selected)
-                g.FillRectangle(theme.SelectionBackground, new Rectangle(0, y, width, rowHeight));
+                GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, width, rowHeight));
             else if (this.RowBackColorSelector?.Invoke(item) is { } rowBack)
                 g.FillRectangle(rowBack, new Rectangle(0, y, width, rowHeight));
             else if (this.AlternatingRows && (displayIndex & 1) == 1)
@@ -1315,8 +1315,7 @@ public class DataGridView : OwnerDrawnControl
 
             if (column.Frozen == frozen)
             {
-                var cellRect = new Rectangle(x + _CellPadding, 0, Math.Max(0, column.Width - (_CellPadding * 2)), header);
-                g.DrawText(column.HeaderText, theme.DefaultFont, theme.HeaderText, cellRect, column.Alignment);
+                GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, column.Width, header), column.HeaderText, column.Alignment, _CellPadding, separator: false);
                 if (ReferenceEquals(column, _sortedColumn) && _sortOrder != SortOrder.None)
                     GlyphRenderer.DrawSortArrow(g, theme.HeaderText, new Rectangle(x + column.Width - 14, 0, 10, header), _sortOrder == SortOrder.Ascending);
             }
@@ -2062,7 +2061,7 @@ public class DataGridView : OwnerDrawnControl
             var rowRect = new Rectangle(0, (i - _editPopupTop) * rowHeight, size.Width, rowHeight);
             var hovered = i == _editHoverIndex;
             if (hovered)
-                g.FillRectangle(theme.SelectionBackground, rowRect);
+                GlyphRenderer.FillSelection(g, theme, rowRect);
 
             ListBox.DrawRowContent(g, theme, rowRect, ChoiceDisplayText(column, choices[i]), null, hovered);
         }

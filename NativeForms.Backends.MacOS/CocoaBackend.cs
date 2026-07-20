@@ -26,6 +26,13 @@ public sealed class CocoaBackend : IPlatformBackend
     public ITheme Theme => DefaultTheme.Instance;
 
     /// <inheritdoc/>
+    /// <remarks>Never raised: the placeholder serves the static fallback theme only.</remarks>
+    public event EventHandler? ThemeChanged { add { } remove { } }
+
+    /// <inheritdoc/>
+    public double GetDpiScale() => throw new PlatformNotSupportedException(_NotImplemented);
+
+    /// <inheritdoc/>
     public IWindowPeer CreateWindow() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

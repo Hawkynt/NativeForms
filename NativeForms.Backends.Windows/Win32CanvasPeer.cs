@@ -146,6 +146,7 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     /// <inheritdoc/>
     public override void Dispose()
     {
+        this.ReleaseBuffer();
         if (this.Handle != 0)
             _canvases.TryRemove(this.Handle, out _);
 
@@ -167,20 +168,104 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
             child.OnNotify((int)header->code, lParam);
     }
 
-    /// <summary>Paints the update region by driving the managed <see cref="Paint"/> handler over a GDI surface.</summary>
+    // The classic double buffer: painting goes into a client-sized memory bitmap that is blitted to
+    // the window DC at the end of WM_PAINT, so partial repaints never flicker. The buffer, the
+    // graphics wrapper and the paint args all live in the peer and are reused frame over frame — a
+    // steady-state repaint performs zero managed allocations.
+    private nint _bufferDc;
+    private nint _bufferBitmap;
+    private nint _bufferOldBitmap;
+    private int _bufferWidth;
+    private int _bufferHeight;
+    private Win32Graphics? _graphics;
+    private PaintEventArgs? _paintArgs;
+
+    /// <summary>Paints the update region by driving the managed <see cref="Paint"/> handler over the
+    /// off-screen GDI buffer, then flips the invalid rectangle onto the window.</summary>
     private void OnPaintMessage(nint hwnd)
     {
         var hdc = NativeMethods.BeginPaint(hwnd, out var ps);
         try
         {
-            var graphics = new Win32Graphics(hdc);
             var clip = Rectangle.FromLTRB(ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right, ps.rcPaint.bottom);
-            this.Paint?.Invoke(this, new PaintEventArgs(graphics, clip));
+            if (clip.Width <= 0 || clip.Height <= 0)
+                return;
+
+            NativeMethods.GetClientRect(hwnd, out var client);
+            var target = this.EnsureBuffer(hdc, client.right - client.left, client.bottom - client.top);
+
+            var graphics = this._graphics ??= new Win32Graphics(target);
+            graphics.Bind(target);
+            var args = this._paintArgs ??= new PaintEventArgs(graphics, clip);
+            args.Reset(graphics, clip);
+            this.Paint?.Invoke(this, args);
+
+            if (target != hdc)
+                NativeMethods.BitBlt(hdc, clip.X, clip.Y, clip.Width, clip.Height, target, clip.X, clip.Y, NativeMethods.SRCCOPY);
         }
         finally
         {
             NativeMethods.EndPaint(hwnd, in ps);
         }
+    }
+
+    /// <summary>
+    /// Returns the memory DC to paint into, (re)creating the client-sized buffer bitmap when the
+    /// surface changed size. Falls back to the window DC — direct, unbuffered painting — when the
+    /// buffer cannot be created.
+    /// </summary>
+    private nint EnsureBuffer(nint hdc, int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            return hdc;
+
+        if (this._bufferDc != 0 && width == this._bufferWidth && height == this._bufferHeight)
+            return this._bufferDc;
+
+        this.ReleaseBuffer();
+
+        var memoryDc = NativeMethods.CreateCompatibleDC(hdc);
+        if (memoryDc == 0)
+            return hdc;
+
+        var bitmap = NativeMethods.CreateCompatibleBitmap(hdc, width, height);
+        if (bitmap == 0)
+        {
+            NativeMethods.DeleteDC(memoryDc);
+            return hdc;
+        }
+
+        this._bufferOldBitmap = NativeMethods.SelectObject(memoryDc, bitmap);
+        this._bufferDc = memoryDc;
+        this._bufferBitmap = bitmap;
+        this._bufferWidth = width;
+        this._bufferHeight = height;
+        return memoryDc;
+    }
+
+    /// <summary>Destroys the off-screen buffer's DC and bitmap, if any.</summary>
+    private void ReleaseBuffer()
+    {
+        if (this._bufferDc != 0)
+        {
+            if (this._bufferOldBitmap != 0)
+            {
+                NativeMethods.SelectObject(this._bufferDc, this._bufferOldBitmap);
+                this._bufferOldBitmap = 0;
+            }
+
+            NativeMethods.DeleteDC(this._bufferDc);
+            this._bufferDc = 0;
+        }
+
+        if (this._bufferBitmap != 0)
+        {
+            NativeMethods.DeleteObject(this._bufferBitmap);
+            this._bufferBitmap = 0;
+        }
+
+        this._bufferWidth = 0;
+        this._bufferHeight = 0;
     }
 
     /// <summary>Raises a button-changed event, decoding the client-space coordinates from the message

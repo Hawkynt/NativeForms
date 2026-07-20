@@ -1388,7 +1388,7 @@ public class ListView : OwnerDrawnControl
         if (selected)
         {
             var selWidth = this.FullRowSelect || this.Columns.Count == 0 ? this.Width : this.Columns[0].Width;
-            g.FillRectangle(theme.SelectionBackground, new Rectangle(0, y, selWidth, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, selWidth, rowHeight));
         }
 
         var textColor = selected ? theme.SelectionText : theme.ControlText;
@@ -1454,7 +1454,7 @@ public class ListView : OwnerDrawnControl
     {
         var smallIcon = this.View == ListViewView.SmallIcon;
         if (selected)
-            g.FillRectangle(theme.SelectionBackground, new Rectangle(cellX, y, smallIcon ? cellWidth : this.Width, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, smallIcon ? cellWidth : this.Width, rowHeight));
 
         if (smallIcon)
         {
@@ -1487,7 +1487,7 @@ public class ListView : OwnerDrawnControl
     private void PaintLargeIconCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight)
     {
         if (selected)
-            g.FillRectangle(theme.SelectionBackground, new Rectangle(cellX, y, cellWidth, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, cellWidth, rowHeight));
 
         var iconSize = this.LargeIconSize;
         if (this.GetIcon(item) is { } icon)
@@ -1506,7 +1506,7 @@ public class ListView : OwnerDrawnControl
     private void PaintTileCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight)
     {
         if (selected)
-            g.FillRectangle(theme.SelectionBackground, new Rectangle(cellX, y, cellWidth, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, cellWidth, rowHeight));
 
         var iconSize = this.LargeIconSize;
         if (this.GetIcon(item) is { } icon)

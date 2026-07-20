@@ -35,7 +35,11 @@ internal sealed unsafe class Win32Theme : ITheme
         this._defaultFont = ReadMessageFont(dpiY, out var fontPixelHeight);
         this._rowHeight = fontPixelHeight + 10;
         this._scrollBarSize = Metric(NativeMethods.SM_CXVSCROLL, fallback: 16);
+        this.IsHighContrast = ReadHighContrast();
     }
+
+    /// <inheritdoc/>
+    public bool IsHighContrast { get; }
 
     /// <inheritdoc/>
     public Color WindowBackground { get; }
@@ -81,6 +85,15 @@ internal sealed unsafe class Win32Theme : ITheme
 
     /// <inheritdoc/>
     public int ScrollBarSize => this._scrollBarSize;
+
+    /// <summary>Reads whether the desktop runs a high-contrast scheme via <c>SPI_GETHIGHCONTRAST</c>.</summary>
+    private static bool ReadHighContrast()
+    {
+        var hc = default(NativeMethods.HIGHCONTRASTW);
+        hc.cbSize = (uint)sizeof(NativeMethods.HIGHCONTRASTW);
+        return NativeMethods.SystemParametersInfoW(NativeMethods.SPI_GETHIGHCONTRAST, hc.cbSize, ref hc, 0)
+               && (hc.dwFlags & NativeMethods.HCF_HIGHCONTRASTON) != 0;
+    }
 
     /// <summary>Reads a system color and converts the <c>COLORREF</c> (0x00BBGGRR) to an opaque <see cref="Color"/>.</summary>
     private static Color SysColor(int index) => ColorRefToColor(NativeMethods.GetSysColor(index));

@@ -193,7 +193,7 @@ internal sealed class CalendarCore
                 var cell = new Rectangle(col * cellWidth, top + row * cellHeight, cellWidth, cellHeight);
                 var selected = date >= selectionStart && date <= selectionEnd;
                 if (selected)
-                    g.FillRectangle(theme.SelectionBackground, cell);
+                    GlyphRenderer.FillSelection(g, theme, cell);
 
                 if (date == today)
                     g.DrawEllipse(theme.Accent, new(cell.X + 1, cell.Y + 1, cell.Width - 2, cell.Height - 2));

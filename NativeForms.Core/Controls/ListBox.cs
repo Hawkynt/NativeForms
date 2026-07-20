@@ -446,7 +446,7 @@ public class ListBox : OwnerDrawnControl
             var rowRect = new Rectangle(0, y, this.Width, rowHeight);
             var selected = this.GetSelected(i);
             if (selected)
-                g.FillRectangle(theme.SelectionBackground, rowRect);
+                GlyphRenderer.FillSelection(g, theme, rowRect);
 
             this.OnDrawRow(g, i, rowRect, selected);
         }

@@ -16,19 +16,16 @@ internal static class HeaderRowPainter
     /// <summary>Draws the band across the top of a control that is <paramref name="width"/> pixels wide.</summary>
     public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight)
     {
+        // The band fill also covers the residual area beyond the last column; each cell face then
+        // comes from the shared header-cell primitive so the band matches every other header.
         g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, width, headerHeight));
 
         var x = 0;
         for (var c = 0; c < columns.Count; ++c)
         {
             var col = columns[c];
-            g.PushClip(new Rectangle(x, 0, col.Width, headerHeight));
-            var textRect = new Rectangle(x + _CellPad, 0, col.Width - (2 * _CellPad), headerHeight);
-            g.DrawText(col.Text, theme.DefaultFont, theme.HeaderText, textRect, col.TextAlign);
-            g.PopClip();
-
+            GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
             x += col.Width;
-            g.DrawLine(theme.Border, x, 0, x, headerHeight);
         }
 
         g.DrawLine(theme.Border, 0, headerHeight - 1, width, headerHeight - 1);

@@ -614,6 +614,67 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("gdi32.dll")]
     internal static partial int IntersectClipRect(nint hdc, int left, int top, int right, int bottom);
 
+    // --- Theme-change messages and high contrast ---
+
+    /// <summary>A system color changed (light/dark palette switch included).</summary>
+    internal const uint WM_SYSCOLORCHANGE = 0x0015;
+
+    /// <summary>A system-wide setting changed (<c>SystemParametersInfo</c>, "ImmersiveColorSet", …).</summary>
+    internal const uint WM_SETTINGCHANGE = 0x001A;
+
+    /// <summary>The visual-styles theme changed.</summary>
+    internal const uint WM_THEMECHANGED = 0x031A;
+
+    /// <summary>Retrieves the high-contrast accessibility parameters.</summary>
+    internal const uint SPI_GETHIGHCONTRAST = 0x0042;
+
+    /// <summary>The high-contrast feature is on (<see cref="HIGHCONTRASTW.dwFlags"/>).</summary>
+    internal const uint HCF_HIGHCONTRASTON = 0x00000001;
+
+    /// <summary>The high-contrast accessibility parameters, from <see cref="SPI_GETHIGHCONTRAST"/>.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct HIGHCONTRASTW
+    {
+        /// <summary>Size of this structure, in bytes.</summary>
+        public uint cbSize;
+
+        /// <summary>The high-contrast flags (<see cref="HCF_HIGHCONTRASTON"/> among them).</summary>
+        public uint dwFlags;
+
+        /// <summary>The name of the default color scheme (unused by the toolkit).</summary>
+        public nint lpszDefaultScheme;
+    }
+
+    /// <summary>Reads the high-contrast parameters (the <see cref="HIGHCONTRASTW"/> overload).</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SystemParametersInfoW(uint uiAction, uint uiParam, ref HIGHCONTRASTW pvParam, uint fWinIni);
+
+    /// <summary>Returns the system DPI (96 at 100% scale). Present since Windows 10 1607.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetDpiForSystem();
+
+    // --- Double buffering ---
+
+    /// <summary>Copies the source rectangle unchanged (<see cref="BitBlt"/> raster operation).</summary>
+    internal const uint SRCCOPY = 0x00CC0020;
+
+    /// <summary>Creates a bitmap compatible with the device context, for the off-screen buffer.</summary>
+    [LibraryImport("gdi32.dll")]
+    internal static partial nint CreateCompatibleBitmap(nint hdc, int cx, int cy);
+
+    /// <summary>Block-transfers pixels between device contexts.</summary>
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool BitBlt(nint hdc, int x, int y, int cx, int cy, nint hdcSrc, int x1, int y1, uint rop);
+
+    /// <summary>Draws a rectangle with rounded corners, filled with the current brush and outlined
+    /// with the current pen; <paramref name="width"/>/<paramref name="height"/> are the ellipse axes
+    /// of the corner rounding.</summary>
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool RoundRect(nint hdc, int left, int top, int right, int bottom, int width, int height);
+
     // --- KERNEL32 ---
 
     /// <summary>Multiplies two 32-bit values then divides by a third, rounding to the nearest integer.</summary>

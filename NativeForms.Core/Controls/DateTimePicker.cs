@@ -17,9 +17,6 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class DateTimePicker : OwnerDrawnControl
 {
-    /// <summary>The height in rows of the drop-down arrow glyph (and half its width, roughly).</summary>
-    private const int _ArrowRows = 5;
-
     /// <summary>The gap around the check box and before the text.</summary>
     private const int _Padding = 4;
 
@@ -199,12 +196,9 @@ public class DateTimePicker : OwnerDrawnControl
         var textColor = !this.Enabled || this.ValueLocked ? theme.DisabledText : theme.ControlText;
         g.DrawText(this.FormatValue(), theme.DefaultFont, textColor, new Rectangle(textLeft, 0, Math.Max(0, width - buttonWidth - textLeft), height), ContentAlignment.MiddleLeft);
 
-        // The drop-down arrow: a themed triangle of stacked lines, centered in the button zone.
+        // The drop-down arrow, centered in the button zone.
         var arrowColor = this.Enabled ? theme.ControlText : theme.DisabledText;
-        var centerX = width - buttonWidth + (buttonWidth / 2);
-        var arrowTop = (height - _ArrowRows) / 2;
-        for (var i = 0; i < _ArrowRows; ++i)
-            g.DrawLine(arrowColor, centerX - _ArrowRows + 1 + i, arrowTop + i, centerX + _ArrowRows - 1 - i, arrowTop + i);
+        GlyphRenderer.DrawComboArrow(g, arrowColor, new Rectangle(width - buttonWidth, 0, buttonWidth, height));
 
         g.DrawRectangle(_focused ? theme.Accent : theme.Border, new Rectangle(0, 0, width - 1, height - 1));
     }

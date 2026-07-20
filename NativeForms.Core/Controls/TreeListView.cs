@@ -367,7 +367,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     {
         var selected = ReferenceEquals(node, _selectedNode);
         if (selected)
-            g.FillRectangle(theme.SelectionBackground, new Rectangle(0, y, this.Width, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, this.Width, rowHeight));
 
         var textColor = selected ? theme.SelectionText : theme.ControlText;
         if (this.Columns.Count == 0)

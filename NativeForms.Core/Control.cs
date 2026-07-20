@@ -348,6 +348,17 @@ public abstract class Control
             ? _peer.PointToScreen(clientPoint)
             : throw new InvalidOperationException("The control must be realized before client coordinates can be mapped to the screen.");
 
+    /// <summary>
+    /// Scales a logical (96-DPI) pixel length to device pixels using the backend's current DPI
+    /// scale, rounding to the nearest pixel. Identity before realization — an unrealized control
+    /// has no monitor to scale for.
+    /// </summary>
+    public int LogicalToDevice(int value)
+        => _backend is { } backend ? (int)Math.Round(value * backend.GetDpiScale()) : value;
+
+    /// <summary>Scales a logical size to device pixels, component-wise.</summary>
+    public Size LogicalToDevice(Size size) => new(this.LogicalToDevice(size.Width), this.LogicalToDevice(size.Height));
+
     /// <summary>The realized native peer, or <see langword="null"/> before realization.</summary>
     internal IControlPeer? Peer => _peer;
 

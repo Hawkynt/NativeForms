@@ -50,6 +50,8 @@ internal sealed class BackendRegistryTests
         public abstract string Name { get; }
         public abstract bool IsSupported { get; }
         public ITheme Theme => DefaultTheme.Instance;
+        public event EventHandler? ThemeChanged { add { } remove { } }
+        public double GetDpiScale() => 1.0;
         public IWindowPeer CreateWindow() => throw new NotSupportedException();
         public IButtonPeer CreateButton() => throw new NotSupportedException();
         public ILabelPeer CreateLabel() => throw new NotSupportedException();

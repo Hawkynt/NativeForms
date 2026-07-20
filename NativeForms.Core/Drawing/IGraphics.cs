@@ -22,6 +22,13 @@ public interface IGraphics
     /// <summary>Strokes the outline of an ellipse inscribed in the given bounds.</summary>
     void DrawEllipse(Color color, Rectangle bounds, int thickness = 1);
 
+    /// <summary>Fills a rectangle whose corners are rounded with the given radius; a radius of at
+    /// least half the smaller dimension yields a pill/circle.</summary>
+    void FillRoundedRectangle(Color color, Rectangle bounds, int radius);
+
+    /// <summary>Strokes the outline of a rounded rectangle.</summary>
+    void DrawRoundedRectangle(Color color, Rectangle bounds, int radius, int thickness = 1);
+
     /// <summary>Draws a straight line.</summary>
     void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1);
 

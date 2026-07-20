@@ -41,9 +41,13 @@ internal sealed class GtkTheme : ITheme
         this.HeaderBackground = background;
         this.HeaderText = foreground;
         this.DefaultFont = ReadDefaultFont();
+        this.IsHighContrast = ReadIsHighContrast();
 
         NativeMethods.gtk_widget_destroy(widget);
     }
+
+    /// <inheritdoc />
+    public bool IsHighContrast { get; }
 
     /// <inheritdoc />
     public Color WindowBackground { get; }
@@ -110,21 +114,29 @@ internal sealed class GtkTheme : ITheme
     /// <summary>Clamps a 0..1 component and scales it to a 0..255 byte.</summary>
     private static int Channel(double value) => (int)Math.Round(Math.Clamp(value, 0, 1) * 255);
 
-    /// <summary>Reads and parses <c>gtk-font-name</c> (for example "Cantarell 11"), else the fallback font.</summary>
-    private static Font ReadDefaultFont()
+    /// <summary>Whether <c>gtk-theme-name</c> names a high-contrast theme (GNOME ships "HighContrast").</summary>
+    private static bool ReadIsHighContrast()
+        => ReadSettingsString("gtk-theme-name")?.Contains("HighContrast", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>Reads a string property from the default <c>GtkSettings</c>, or <see langword="null"/>.</summary>
+    private static string? ReadSettingsString(string property)
     {
         var settings = NativeMethods.gtk_settings_get_default();
         if (settings == 0)
-            return _fallback.DefaultFont;
+            return null;
 
-        NativeMethods.g_object_get(settings, "gtk-font-name", out var namePtr, 0);
-        if (namePtr == 0)
-            return _fallback.DefaultFont;
+        NativeMethods.g_object_get(settings, property, out var valuePtr, 0);
+        if (valuePtr == 0)
+            return null;
 
-        var name = Marshal.PtrToStringUTF8(namePtr);
-        NativeMethods.g_free(namePtr);
-        return ParseFont(name);
+        var value = Marshal.PtrToStringUTF8(valuePtr);
+        NativeMethods.g_free(valuePtr);
+        return value;
     }
+
+    /// <summary>Reads and parses <c>gtk-font-name</c> (for example "Cantarell 11"), else the fallback font.</summary>
+    private static Font ReadDefaultFont()
+        => ReadSettingsString("gtk-font-name") is { } name ? ParseFont(name) : _fallback.DefaultFont;
 
     /// <summary>Parses a Pango font string of the form "Family[ Style] Size" into a <see cref="Font"/>.</summary>
     private static Font ParseFont(string? description)

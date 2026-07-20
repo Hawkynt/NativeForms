@@ -13,6 +13,7 @@ namespace Hawkynt.NativeForms;
 public class LinkLabel : OwnerDrawnControl
 {
     private bool _hovered;
+    private bool _focused;
 
     /// <summary>Whether the link has been followed; shifts the paint color toward the theme's grey.</summary>
     public bool Visited
@@ -79,6 +80,25 @@ public class LinkLabel : OwnerDrawnControl
         var extent = g.MeasureText(this.Text, font);
         var underlineY = (this.Height - extent.Height) / 2 + extent.Height - 1;
         g.DrawLine(color, 0, underlineY, extent.Width, underlineY);
+
+        if (_focused)
+            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(0, (this.Height - extent.Height) / 2, extent.Width, extent.Height));
+    }
+
+    /// <inheritdoc/>
+    protected override void OnGotFocus(EventArgs e) => this.SetFocused(true);
+
+    /// <inheritdoc/>
+    protected override void OnLostFocus(EventArgs e) => this.SetFocused(false);
+
+    /// <summary>Updates the focus state, repainting only on an actual change.</summary>
+    private void SetFocused(bool focused)
+    {
+        if (_focused == focused)
+            return;
+
+        _focused = focused;
+        this.Invalidate();
     }
 
     /// <summary>The client-space rectangle the text occupies (middle-left aligned), for hit testing.</summary>

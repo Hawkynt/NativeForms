@@ -1,4 +1,6 @@
 using System.Drawing;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -14,7 +16,17 @@ public sealed partial class GtkBackend : IPlatformBackend
     private static readonly object _initGate = new();
     private static bool _initialized;
 
-    /// <summary>Calls <c>gtk_init</c> exactly once, before any widget is created or the loop runs.</summary>
+    /// <summary>The most recently constructed backend — the instance the static settings callback
+    /// notifies when the desktop theme changes (an app runs exactly one backend).</summary>
+    private static GtkBackend? _current;
+
+    private GtkTheme? _theme;
+
+    /// <summary>Registers this instance as the receiver of desktop theme-change notifications.</summary>
+    public GtkBackend() => _current = this;
+
+    /// <summary>Calls <c>gtk_init</c> exactly once, before any widget is created or the loop runs,
+    /// and hooks the <c>GtkSettings</c> notifications that announce a desktop theme change.</summary>
     private static void EnsureInitialized()
     {
         if (_initialized)
@@ -26,8 +38,40 @@ public sealed partial class GtkBackend : IPlatformBackend
                 return;
 
             NativeMethods.gtk_init(0, 0);
+            HookThemeNotifications();
             _initialized = true;
         }
+    }
+
+    /// <summary>
+    /// Subscribes to <c>notify::gtk-theme-name</c> and <c>notify::gtk-application-prefer-dark-theme</c>
+    /// on the default <c>GtkSettings</c>, so a theme or dark-mode switch invalidates the cached theme
+    /// and repaints every owner-drawn control.
+    /// </summary>
+    private static void HookThemeNotifications()
+    {
+        var settings = NativeMethods.gtk_settings_get_default();
+        if (settings == 0)
+            return;
+
+        unsafe
+        {
+            var handler = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSettingsChanged;
+            NativeMethods.g_signal_connect_data(settings, "notify::gtk-theme-name", handler, 0, 0, 0);
+            NativeMethods.g_signal_connect_data(settings, "notify::gtk-application-prefer-dark-theme", handler, 0, 0, 0);
+        }
+    }
+
+    /// <summary>Native <c>notify::…</c> handler: <c>void (GObject*, GParamSpec*, gpointer)</c>.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static void OnSettingsChanged(nint settings, nint pspec, nint userData)
+    {
+        var backend = _current;
+        if (backend is null)
+            return;
+
+        backend._theme = null;
+        backend.ThemeChanged?.Invoke(backend, EventArgs.Empty);
     }
 
     /// <inheritdoc />
@@ -37,13 +81,37 @@ public sealed partial class GtkBackend : IPlatformBackend
     public bool IsSupported => OperatingSystem.IsLinux();
 
     /// <inheritdoc />
+    // The cache is dropped when GtkSettings announces a theme change, so the next read snapshots
+    // fresh style-context values.
     public ITheme Theme
     {
         get
         {
             EnsureInitialized();
-            return field ??= new GtkTheme();
+            return _theme ??= new GtkTheme();
         }
+    }
+
+    /// <inheritdoc />
+    public event EventHandler? ThemeChanged;
+
+    /// <inheritdoc />
+    public double GetDpiScale()
+    {
+        EnsureInitialized();
+        var display = NativeMethods.gdk_display_get_default();
+        if (display == 0)
+            return 1.0;
+
+        var monitor = NativeMethods.gdk_display_get_primary_monitor(display);
+        if (monitor == 0)
+            monitor = NativeMethods.gdk_display_get_monitor(display, 0);
+
+        if (monitor == 0)
+            return 1.0;
+
+        var scale = NativeMethods.gdk_monitor_get_scale_factor(monitor);
+        return scale > 0 ? scale : 1.0;
     }
 
     /// <inheritdoc />

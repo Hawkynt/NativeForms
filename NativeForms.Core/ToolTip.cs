@@ -16,7 +16,8 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public sealed class ToolTip : IDisposable
 {
-    /// <summary>The offset from the cursor to the popup's top-left corner.</summary>
+    /// <summary>The offset from the cursor to the popup's top-left corner, in logical pixels —
+    /// scaled through <see cref="Control.LogicalToDevice(int)"/> when the tip is shown.</summary>
     internal const int CursorOffset = 18;
 
     /// <summary>The padding between the popup border and its text.</summary>
@@ -153,7 +154,7 @@ public sealed class ToolTip : IDisposable
         if (control?.Backend is not { } backend || !_texts.TryGetValue(control, out var text))
             return;
 
-        this.ShowPopup(backend, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + CursorOffset)), text);
+        this.ShowPopup(backend, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + control.LogicalToDevice(CursorOffset))), text);
 
         _autoPopPhase = true;
         var timer = this.TimerFor(backend);

@@ -57,7 +57,7 @@ public class ToggleSwitch : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {
-        if (this.Enabled && e.Button == MouseButtons.Left && new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
+        if (this.Enabled && e.Button == MouseButtons.Left && HitTest.ClientContains(this, e.Location))
             this.Toggle();
     }
 
@@ -78,14 +78,12 @@ public class ToggleSwitch : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
 
-        // The track: an ellipse at each end plus the center rectangle forms the pill — there is no
-        // rounded-rectangle primitive. The accent only shows on an enabled, on switch; a disabled
-        // one keeps the grey track and reports its state through the thumb side alone.
+        // The track: one rounded rectangle whose corner radius is half its height — a pill. The
+        // accent only shows on an enabled, on switch; a disabled one keeps the grey track and
+        // reports its state through the thumb side alone.
         var top = Math.Max(0, (this.Height - TrackHeight) / 2);
         var trackColor = this.Enabled && this.Checked ? theme.Accent : theme.Border;
-        g.FillEllipse(trackColor, new(0, top, TrackHeight, TrackHeight));
-        g.FillEllipse(trackColor, new(TrackWidth - TrackHeight, top, TrackHeight, TrackHeight));
-        g.FillRectangle(trackColor, new(TrackHeight / 2, top, TrackWidth - TrackHeight, TrackHeight));
+        g.FillRoundedRectangle(trackColor, new(0, top, TrackWidth, TrackHeight), TrackHeight / 2);
 
         // The thumb: a field-colored circle hugging the off (left) or on (right) end of the track.
         var diameter = TrackHeight - (2 * _ThumbMargin);

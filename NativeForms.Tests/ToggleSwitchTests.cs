@@ -32,10 +32,8 @@ internal sealed class ToggleSwitchTests
 
         Assert.Multiple(() =>
         {
-            // The pill: an ellipse at each end plus the center rectangle, all border-grey while off.
-            Assert.That(g.Operations, Does.Contain("fillellipse #FFC8C8C8 0,4,16,16"), "left cap");
-            Assert.That(g.Operations, Does.Contain("fillellipse #FFC8C8C8 20,4,16,16"), "right cap");
-            Assert.That(g.Operations, Does.Contain("fill #FFC8C8C8 8,4,20,16"), "center");
+            // The pill: one rounded rectangle whose radius is half its height, border-grey while off.
+            Assert.That(g.Operations, Does.Contain("fillround #FFC8C8C8 0,4,36,16 r8"), "track pill");
             Assert.That(g.Operations, Does.Contain("fillellipse #FFFFFFFF 2,6,12,12"), "thumb sits at the left end");
         });
     }
@@ -50,9 +48,7 @@ internal sealed class ToggleSwitchTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations, Does.Contain("fillellipse #FF0078D4 0,4,16,16"), "left cap");
-            Assert.That(g.Operations, Does.Contain("fillellipse #FF0078D4 20,4,16,16"), "right cap");
-            Assert.That(g.Operations, Does.Contain("fill #FF0078D4 8,4,20,16"), "center");
+            Assert.That(g.Operations, Does.Contain("fillround #FF0078D4 0,4,36,16 r8"), "accent track pill");
             Assert.That(g.Operations, Does.Contain("fillellipse #FFFFFFFF 22,6,12,12"), "thumb sits at the right end");
         });
     }
@@ -142,7 +138,7 @@ internal sealed class ToggleSwitchTests
         Assert.Multiple(() =>
         {
             Assert.That(toggle.Checked, Is.True, "input must be ignored");
-            Assert.That(g.Operations, Does.Contain("fill #FFC8C8C8 8,4,20,16"), "no accent while disabled");
+            Assert.That(g.Operations, Does.Contain("fillround #FFC8C8C8 0,4,36,16 r8"), "no accent while disabled");
             Assert.That(g.Operations, Does.Contain("fillellipse #FFFFFFFF 22,6,12,12"), "the thumb still shows the on state");
             Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Run\" #FF9A9A9A")), Is.True, "greyed caption");
         });

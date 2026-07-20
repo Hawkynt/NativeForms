@@ -114,6 +114,15 @@ internal static partial class NativeMethods
     [LibraryImport(Gdk)]
     internal static partial void gdk_monitor_get_geometry(nint monitor, out GdkRectangle geometry);
 
+    /// <summary>Returns a monitor's integer device-pixel scale factor (1 on classic displays, 2 on HiDPI).</summary>
+    [LibraryImport(Gdk)]
+    internal static partial int gdk_monitor_get_scale_factor(nint monitor);
+
+    /// <summary>Reads the Cairo context's clip extents as an integer rectangle; returns 0 when the
+    /// clip is unbounded (the rectangle then spans the whole surface).</summary>
+    [LibraryImport(Gdk)]
+    internal static partial int gdk_cairo_get_clip_rectangle(nint cr, out GdkRectangle rect);
+
     // --- GdkWindowState bits --------------------------------------------------------------------
 
     /// <summary>The window is minimized (iconified).</summary>

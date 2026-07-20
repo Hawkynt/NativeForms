@@ -23,6 +23,21 @@ public interface IPlatformBackend
     /// <summary>The native theme (colors, font, metrics) owner-drawn controls paint with.</summary>
     ITheme Theme { get; }
 
+    /// <summary>
+    /// Raised after the desktop theme changes (light/dark switch, accent or system-color change,
+    /// high-contrast toggle). By the time it fires, <see cref="Theme"/> already serves the fresh
+    /// values; realized owner-drawn controls re-read it and repaint.
+    /// </summary>
+    event EventHandler? ThemeChanged;
+
+    /// <summary>
+    /// The ratio of device pixels to logical (96-DPI) pixels on the primary monitor — 1.0 at 100%,
+    /// 1.5 at 150%, and so on. The groundwork for per-monitor DPI awareness: callers map logical
+    /// lengths through it (see <see cref="Control.LogicalToDevice(int)"/>); per-monitor rescale on
+    /// window move is tracked separately in <c>docs/PRD.md</c> §8.
+    /// </summary>
+    double GetDpiScale();
+
     /// <summary>Creates an unrealized top-level window peer.</summary>
     IWindowPeer CreateWindow();
 

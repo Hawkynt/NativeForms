@@ -402,7 +402,7 @@ internal sealed class MenuDropDown
             var row = new Rectangle(1, top, size.Width - 2, rowHeight);
             var hovered = i == level.HoverIndex && item.Enabled;
             if (hovered)
-                g.FillRectangle(theme.SelectionBackground, row);
+                GlyphRenderer.FillSelection(g, theme, row);
 
             var textColor = !item.Enabled ? theme.DisabledText : hovered ? theme.SelectionText : theme.ControlText;
 

@@ -106,4 +106,23 @@ internal sealed class LinkLabelTests
         canvas.RaiseMouseLeave();
         Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True, "leave restores accent");
     }
+
+    [Test]
+    public void Focus_paints_the_ring_around_the_text_extent_and_blur_removes_it()
+    {
+        // "Link" measures 28x16; MiddleLeft in a 30px control puts the extent at y = 7. The ring is
+        // the shared faint-accent primitive: accent blended halfway toward the control background.
+        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+        var canvas = Realize(link);
+
+        // Initial focus lands on the link (first control in tab order), so blur it first.
+        canvas.RaiseLostFocus();
+        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "no ring while unfocused");
+
+        canvas.RaiseGotFocus();
+        Assert.That(canvas.RaisePaint().Operations, Does.Contain("rect #FF7EBAE8 0,7,28,16"), "faint accent ring around the text");
+
+        canvas.RaiseLostFocus();
+        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "blur removes the ring");
+    }
 }

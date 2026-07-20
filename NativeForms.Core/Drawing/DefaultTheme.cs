@@ -48,6 +48,9 @@ public sealed class DefaultTheme : ITheme
     public Color HeaderText => Color.FromArgb(0xFF, 0x30, 0x30, 0x30);
 
     /// <inheritdoc/>
+    public bool IsHighContrast => false;
+
+    /// <inheritdoc/>
     public Font DefaultFont { get; } = new("Segoe UI", 9f);
 
     /// <inheritdoc/>
