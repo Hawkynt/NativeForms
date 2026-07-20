@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.ComponentModel;
 
 namespace Hawkynt.NativeForms;
 
@@ -13,7 +14,7 @@ namespace Hawkynt.NativeForms;
 /// toolkit yet (<c>GtkStatusIcon</c> is deprecated; StatusNotifier/D-Bus is tracked in
 /// <c>docs/PRD.md</c> §7.7), so showing the icon there throws <see cref="NotSupportedException"/>.
 /// </remarks>
-public sealed class NotifyIcon : IDisposable
+public sealed class NotifyIcon : Component
 {
     private readonly IPlatformBackend? _backend;
     private INotifyIconPeer? _peer;
@@ -92,7 +93,7 @@ public sealed class NotifyIcon : IDisposable
     }
 
     /// <summary>Removes the icon from the tray and releases the native peer.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
         _visible = false;
         var peer = _peer;

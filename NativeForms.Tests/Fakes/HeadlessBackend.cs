@@ -180,6 +180,18 @@ internal abstract class HeadlessPeer : IControlPeer
     public bool Enabled { get; private set; }
     public bool Disposed { get; private set; }
 
+    /// <summary>The last font pushed by the core, or null while the platform default applies.</summary>
+    public Font? Font { get; private set; }
+
+    /// <summary>The last text color pushed by the core; <see cref="Color.Empty"/> = platform default.</summary>
+    public Color ForeColor { get; private set; }
+
+    /// <summary>The last background color pushed by the core; <see cref="Color.Empty"/> = platform default.</summary>
+    public Color BackColor { get; private set; }
+
+    /// <summary>The last cursor pushed by the core, or null while the platform default applies.</summary>
+    public Cursor? Cursor { get; private set; }
+
     /// <summary>Where the widget's client origin sits on the fake screen; settable so tests can
     /// assert client-to-screen placement math without a windowing system.</summary>
     public Point ScreenOrigin { get; set; }
@@ -198,6 +210,15 @@ internal abstract class HeadlessPeer : IControlPeer
     public void SetText(string text) => this.Text = text;
     public void SetVisible(bool visible) => this.Visible = visible;
     public void SetEnabled(bool enabled) => this.Enabled = enabled;
+    public void SetFont(Font font) => this.Font = font;
+
+    public void SetColors(Color foreColor, Color backColor)
+    {
+        this.ForeColor = foreColor;
+        this.BackColor = backColor;
+    }
+
+    public void SetCursor(Cursor cursor) => this.Cursor = cursor;
     public Point PointToScreen(Point clientPoint) => new(this.ScreenOrigin.X + clientPoint.X, this.ScreenOrigin.Y + clientPoint.Y);
 
     /// <summary>Records the request and moves the backend's simulated focus here, so the previous
@@ -680,6 +701,9 @@ internal sealed class RecordingGraphics : IGraphics
 
     public List<string> Operations { get; } = [];
 
+    /// <summary>Every text draw with the font it used, so tests can assert font adoption.</summary>
+    public List<(string Text, Font Font)> TextDraws { get; } = [];
+
     public void FillRectangle(Color color, Rectangle bounds)
         => this.Operations.Add($"fill {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
 
@@ -702,7 +726,10 @@ internal sealed class RecordingGraphics : IGraphics
         => this.Operations.Add($"line {Hex(color)} {x1},{y1}-{x2},{y2}");
 
     public void DrawText(string text, Font font, Color color, Rectangle bounds, ContentAlignment alignment = ContentAlignment.TopLeft)
-        => this.Operations.Add($"text \"{text}\" {Hex(color)} {alignment} @{bounds.X},{bounds.Y}");
+    {
+        this.Operations.Add($"text \"{text}\" {Hex(color)} {alignment} @{bounds.X},{bounds.Y}");
+        this.TextDraws.Add((text, font));
+    }
 
     public Size MeasureText(string text, Font font) => Measure(text);
 
@@ -718,6 +745,10 @@ internal sealed class RecordingGraphics : IGraphics
 
     /// <summary>Whether any recorded draw-text op contains the given substring.</summary>
     public bool DrewText(string substring) => this.Operations.Exists(o => o.StartsWith("text ") && o.Contains(substring));
+
+    /// <summary>Whether any text containing the given substring was drawn in the given font.</summary>
+    public bool DrewTextWithFont(string substring, Font font)
+        => this.TextDraws.Exists(d => d.Text.Contains(substring) && d.Font == font);
 
     private static string Hex(Color c) => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
 }

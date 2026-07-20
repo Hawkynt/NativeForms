@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.ComponentModel;
 
 namespace Hawkynt.NativeForms;
 
@@ -14,7 +15,7 @@ namespace Hawkynt.NativeForms;
 /// <see cref="Start"/> is touched while the loop is running — which is exactly when a handler inside
 /// that loop first pokes the timer.
 /// </remarks>
-public sealed class Timer : IDisposable
+public sealed class Timer : Component
 {
     private readonly IPlatformBackend? _backend;
     private ITimerPeer? _peer;
@@ -80,7 +81,7 @@ public sealed class Timer : IDisposable
     public void Stop() => this.Enabled = false;
 
     /// <summary>Stops the timer and releases the native timer source.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
         _enabled = false;
         _running = false;

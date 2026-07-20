@@ -42,7 +42,7 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
         _fixed = NativeMethods.gtk_fixed_new();
         NativeMethods.gtk_container_add(_widget, _fixed);
 
-        _selfHandle = GCHandle.Alloc(this);
+        this.PinSelf();
         unsafe
         {
             var destroyCallback = (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnDestroy;

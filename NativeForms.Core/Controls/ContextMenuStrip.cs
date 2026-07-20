@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.ComponentModel;
 
 namespace Hawkynt.NativeForms;
 
@@ -14,7 +15,7 @@ namespace Hawkynt.NativeForms;
 /// Right-click opening is wired through the owner-drawn mouse pipeline; native-widget controls
 /// (Button, TextBox …) need right-click events on their peers first, tracked in <c>docs/PRD.md</c>.
 /// </remarks>
-public class ContextMenuStrip
+public class ContextMenuStrip : Component
 {
     private MenuDropDown? _dropDown;
     private IPlatformBackend? _backend;
@@ -62,4 +63,12 @@ public class ContextMenuStrip
 
     /// <summary>Closes the menu, if open.</summary>
     public void Close() => _dropDown?.CloseAll();
+
+    /// <summary>Closes the menu and drops the drop-down engine (and with it the native popups).</summary>
+    protected override void Dispose(bool disposing)
+    {
+        _dropDown?.CloseAll();
+        _dropDown = null;
+        _backend = null;
+    }
 }

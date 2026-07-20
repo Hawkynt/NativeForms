@@ -86,7 +86,11 @@ public class Panel : OwnerDrawnControl
             : bounds;
     }
 
-    /// <summary>The union bottom-right corner of all children — the size of the scrollable content.</summary>
+    /// <summary>
+    /// The union bottom-right corner of all children plus the trailing <see cref="Control.Padding"/>
+    /// — the size of the scrollable content, so a padded panel keeps breathing room after the last
+    /// child exactly like its Windows Forms namesake.
+    /// </summary>
     private Size GetContentExtent()
     {
         var width = 0;
@@ -98,7 +102,11 @@ public class Panel : OwnerDrawnControl
             height = Math.Max(height, bounds.Bottom);
         }
 
-        return new(width, height);
+        if (width == 0 && height == 0)
+            return Size.Empty;
+
+        var padding = this.Padding;
+        return new(width + padding.Right, height + padding.Bottom);
     }
 
     /// <summary>Determines which scrollbars are needed; each bar steals room from the other's axis.</summary>
@@ -232,7 +240,7 @@ public class Panel : OwnerDrawnControl
     {
         var g = e.Graphics;
         var full = new Rectangle(0, 0, this.Width, this.Height);
-        g.FillRectangle(this.Theme.ControlBackground, full);
+        g.FillRectangle(this.BackColor, full);
 
         switch (this.BorderStyle)
         {

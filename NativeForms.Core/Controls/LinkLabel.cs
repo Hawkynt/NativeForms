@@ -67,25 +67,25 @@ public class LinkLabel : OwnerDrawnControl
     {
         var g = e.Graphics;
         var theme = this.Theme;
-        var full = new Rectangle(0, 0, this.Width, this.Height);
-        g.FillRectangle(theme.ControlBackground, full);
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
         if (this.Text.Length == 0)
             return;
 
         // Right-to-left anchors the text (and its underline) at the right edge instead.
         var rtl = this.IsRightToLeft;
-        var font = theme.DefaultFont;
+        var client = this.DisplayRectangle;
+        var font = this.Font;
         var color = this.LinkColor(theme);
-        g.DrawText(this.Text, font, color, full, rtl ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft);
+        g.DrawText(this.Text, font, color, client, rtl ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft);
 
         var extent = g.MeasureText(this.Text, font);
-        var underlineX = rtl ? this.Width - extent.Width : 0;
-        var underlineY = (this.Height - extent.Height) / 2 + extent.Height - 1;
+        var underlineX = rtl ? client.Right - extent.Width : client.X;
+        var underlineY = client.Y + (client.Height - extent.Height) / 2 + extent.Height - 1;
         g.DrawLine(color, underlineX, underlineY, underlineX + extent.Width, underlineY);
 
         if (_focused)
-            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(underlineX, (this.Height - extent.Height) / 2, extent.Width, extent.Height));
+            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(underlineX, client.Y + (client.Height - extent.Height) / 2, extent.Width, extent.Height));
     }
 
     /// <inheritdoc/>
@@ -112,18 +112,27 @@ public class LinkLabel : OwnerDrawnControl
         if (backend is null || this.Text.Length == 0)
             return Rectangle.Empty;
 
-        var extent = backend.MeasureText(this.Text, this.Theme.DefaultFont);
-        var rect = new Rectangle(new Point(0, (this.Height - extent.Height) / 2), extent);
-        return this.IsRightToLeft ? RtlLayout.Mirror(rect, this.Width) : rect;
+        var client = this.DisplayRectangle;
+        var extent = backend.MeasureText(this.Text, this.Font);
+        var x = this.IsRightToLeft ? client.Right - extent.Width : client.X;
+        return new(new Point(x, client.Y + (client.Height - extent.Height) / 2), extent);
     }
 
-    /// <summary>Updates the hover state, repainting only on an actual change.</summary>
+    /// <summary>
+    /// Updates the hover state, repainting only on an actual change and switching the pointer to
+    /// the hand cursor while it rests on the link text (back to the ambient cursor off it).
+    /// </summary>
     private void SetHovered(bool hovered)
     {
         if (_hovered == hovered)
             return;
 
         _hovered = hovered;
+        if (hovered)
+            this.Cursor = Cursors.Hand;
+        else
+            this.ResetCursor();
+
         this.Invalidate();
     }
 

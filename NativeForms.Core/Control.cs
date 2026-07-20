@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
@@ -36,6 +37,32 @@ public abstract class Control
     private Rectangle _bounds;
     private int _tabIndex;
     private State _state;
+    private AppearanceState? _appearance;
+
+    /// <summary>
+    /// The rarely-set appearance slots, allocated on the first explicit set so the thousands of
+    /// controls that never touch them pay a single null reference — the footprint rule from
+    /// <c>docs/PRD.md</c> §4. A <see langword="null"/> slot means "unset": the property getters then
+    /// fall back to the ambient value inherited from the <see cref="Parent"/> chain and finally to
+    /// the theme, exactly like the Windows Forms ambient properties.
+    /// </summary>
+    private sealed class AppearanceState
+    {
+        /// <summary>The explicitly set font, or <see langword="null"/> for ambient.</summary>
+        public Font? Font;
+
+        /// <summary>The explicitly set text color; <see cref="Color.Empty"/> for ambient.</summary>
+        public Color ForeColor;
+
+        /// <summary>The explicitly set background color; <see cref="Color.Empty"/> for ambient.</summary>
+        public Color BackColor;
+
+        /// <summary>The interior spacing between the control's edges and its content.</summary>
+        public Padding Padding;
+
+        /// <summary>The explicitly set pointer shape, or <see langword="null"/> for ambient.</summary>
+        public Cursor? Cursor;
+    }
 
     /// <summary>Initializes the control and its (initially empty) child collection.</summary>
     protected Control() => this.Controls = new(this);
@@ -294,6 +321,161 @@ public abstract class Control
         }
     }
 
+    /// <summary>
+    /// The font the control's text renders in — an ambient property: unset controls inherit the
+    /// nearest ancestor's font and finally the theme's default, exactly like Windows Forms.
+    /// <see cref="ResetFont"/> returns an explicitly set control to the ambient value.
+    /// </summary>
+    public Font Font
+    {
+        get => this.GetAmbientFont() ?? this.AmbientTheme.DefaultFont;
+        set
+        {
+            if (_appearance?.Font == value)
+                return;
+
+            (_appearance ??= new()).Font = value;
+            this.PushAmbientFont(value);
+        }
+    }
+
+    /// <summary>Clears an explicitly set <see cref="Font"/> so the control inherits again.</summary>
+    public void ResetFont()
+    {
+        if (_appearance is not { Font: not null } state)
+            return;
+
+        state.Font = null;
+        this.PushAmbientFont(this.Font);
+    }
+
+    /// <summary>
+    /// The text color — ambient like <see cref="Font"/>: unset controls inherit from the parent
+    /// chain, then the theme. <see cref="ResetForeColor"/> returns to the ambient value.
+    /// </summary>
+    public Color ForeColor
+    {
+        get
+        {
+            var color = this.GetAmbientForeColor();
+            return color.IsEmpty ? this.FallbackForeColor : color;
+        }
+        set
+        {
+            if ((_appearance?.ForeColor ?? Color.Empty) == value)
+                return;
+
+            (_appearance ??= new()).ForeColor = value;
+            this.PushAmbientColors();
+        }
+    }
+
+    /// <summary>Clears an explicitly set <see cref="ForeColor"/> so the control inherits again.</summary>
+    public void ResetForeColor()
+    {
+        if (_appearance is not { } state || state.ForeColor.IsEmpty)
+            return;
+
+        state.ForeColor = Color.Empty;
+        this.PushAmbientColors();
+    }
+
+    /// <summary>
+    /// The background color — ambient like <see cref="Font"/>: unset controls inherit from the
+    /// parent chain, then the theme. <see cref="ResetBackColor"/> returns to the ambient value.
+    /// </summary>
+    public Color BackColor
+    {
+        get
+        {
+            var color = this.GetAmbientBackColor();
+            return color.IsEmpty ? this.FallbackBackColor : color;
+        }
+        set
+        {
+            if ((_appearance?.BackColor ?? Color.Empty) == value)
+                return;
+
+            (_appearance ??= new()).BackColor = value;
+            this.PushAmbientColors();
+        }
+    }
+
+    /// <summary>Clears an explicitly set <see cref="BackColor"/> so the control inherits again.</summary>
+    public void ResetBackColor()
+    {
+        if (_appearance is not { } state || state.BackColor.IsEmpty)
+            return;
+
+        state.BackColor = Color.Empty;
+        this.PushAmbientColors();
+    }
+
+    /// <summary>
+    /// The interior spacing between the control's edges and its content, in pixels per side. Not
+    /// ambient (each control owns its padding); owner-drawn controls honor it through
+    /// <see cref="DisplayRectangle"/> and their content layout.
+    /// </summary>
+    public Padding Padding
+    {
+        get => _appearance?.Padding ?? default;
+        set
+        {
+            if ((_appearance?.Padding ?? default) == value)
+                return;
+
+            (_appearance ??= new()).Padding = value;
+            this.OnAppearanceChanged();
+        }
+    }
+
+    /// <summary>
+    /// The pointer shape shown over the control — ambient like <see cref="Font"/>: unset controls
+    /// inherit from the parent chain, then <see cref="Cursors.Arrow"/>.
+    /// <see cref="ResetCursor"/> returns to the ambient value.
+    /// </summary>
+    public Cursor Cursor
+    {
+        get => this.GetAmbientCursor() ?? Cursors.Arrow;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (ReferenceEquals(_appearance?.Cursor, value))
+                return;
+
+            (_appearance ??= new()).Cursor = value;
+            this.PushAmbientCursor(value);
+        }
+    }
+
+    /// <summary>Clears an explicitly set <see cref="Cursor"/> so the control inherits again.</summary>
+    public void ResetCursor()
+    {
+        if (_appearance is not { Cursor: not null } state)
+            return;
+
+        state.Cursor = null;
+        this.PushAmbientCursor(this.Cursor);
+    }
+
+    /// <summary>
+    /// The client rectangle available to content: the full client area deflated by
+    /// <see cref="Padding"/>. Containers with chrome of their own (a <see cref="GroupBox"/> frame)
+    /// deflate further.
+    /// </summary>
+    public virtual Rectangle DisplayRectangle
+    {
+        get
+        {
+            var padding = this.Padding;
+            return new(
+                padding.Left,
+                padding.Top,
+                Math.Max(0, this.Width - padding.Horizontal),
+                Math.Max(0, this.Height - padding.Vertical));
+        }
+    }
+
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
 
@@ -515,6 +697,106 @@ public abstract class Control
     /// <summary>Creates the backend peer specific to this control kind (button, label, window …).</summary>
     private protected abstract IControlPeer CreatePeer(IPlatformBackend backend);
 
+    /// <summary>The theme the ambient appearance defaults resolve against; the neutral fallback until realized.</summary>
+    private ITheme AmbientTheme => _backend?.Theme ?? DefaultTheme.Instance;
+
+    /// <summary>The theme text color an unset <see cref="ForeColor"/> resolves to.</summary>
+    private protected virtual Color FallbackForeColor => this.AmbientTheme.ControlText;
+
+    /// <summary>The theme surface color an unset <see cref="BackColor"/> resolves to. Field-like
+    /// controls (lists, grids) override with the theme's field background, like Windows Forms
+    /// per-control default colors.</summary>
+    private protected virtual Color FallbackBackColor => this.AmbientTheme.ControlBackground;
+
+    /// <summary>The nearest explicitly set font up the parent chain, or <see langword="null"/>.</summary>
+    private Font? GetAmbientFont()
+    {
+        for (var control = this; control is not null; control = control.Parent)
+            if (control._appearance?.Font is { } font)
+                return font;
+
+        return null;
+    }
+
+    /// <summary>The nearest explicitly set text color up the parent chain, or <see cref="Color.Empty"/>.</summary>
+    private Color GetAmbientForeColor()
+    {
+        for (var control = this; control is not null; control = control.Parent)
+            if (control._appearance is { } state && !state.ForeColor.IsEmpty)
+                return state.ForeColor;
+
+        return Color.Empty;
+    }
+
+    /// <summary>The nearest explicitly set background color up the parent chain, or <see cref="Color.Empty"/>.</summary>
+    private Color GetAmbientBackColor()
+    {
+        for (var control = this; control is not null; control = control.Parent)
+            if (control._appearance is { } state && !state.BackColor.IsEmpty)
+                return state.BackColor;
+
+        return Color.Empty;
+    }
+
+    /// <summary>The nearest explicitly set cursor up the parent chain, or <see langword="null"/>.</summary>
+    private Cursor? GetAmbientCursor()
+    {
+        for (var control = this; control is not null; control = control.Parent)
+            if (control._appearance?.Cursor is { } cursor)
+                return cursor;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Forwards a font change to this control's peer and to every descendant that inherits it
+    /// (children with their own font keep theirs, cutting off that subtree's inheritance).
+    /// </summary>
+    private void PushAmbientFont(Font font)
+    {
+        _peer?.SetFont(font);
+        this.OnAppearanceChanged();
+        for (var i = 0; i < this.Controls.Count; ++i)
+        {
+            var child = this.Controls[i];
+            if (child._appearance?.Font is null)
+                child.PushAmbientFont(font);
+        }
+    }
+
+    /// <summary>
+    /// Forwards a color change down the tree, re-resolving the ambient pair per control so a child
+    /// with only one own color still combines it with the inherited other.
+    /// </summary>
+    private void PushAmbientColors()
+    {
+        _peer?.SetColors(this.GetAmbientForeColor(), this.GetAmbientBackColor());
+        this.OnAppearanceChanged();
+        for (var i = 0; i < this.Controls.Count; ++i)
+            this.Controls[i].PushAmbientColors();
+    }
+
+    /// <summary>
+    /// Forwards a cursor change to this control's peer and to every descendant that inherits it.
+    /// </summary>
+    private void PushAmbientCursor(Cursor cursor)
+    {
+        _peer?.SetCursor(cursor);
+        for (var i = 0; i < this.Controls.Count; ++i)
+        {
+            var child = this.Controls[i];
+            if (child._appearance?.Cursor is null)
+                child.PushAmbientCursor(cursor);
+        }
+    }
+
+    /// <summary>
+    /// Hook for subclasses that render their own appearance: the effective font, colors or padding
+    /// changed (on this control directly or inherited from an ancestor). Owner-drawn controls
+    /// repaint here.
+    /// </summary>
+    private protected virtual void OnAppearanceChanged() { }
+
     /// <summary>Hook for subclasses to wire native events once the peer exists.</summary>
     private protected virtual void OnRealized(IControlPeer peer) { }
 
@@ -595,6 +877,20 @@ public abstract class Control
         peer.SetText(this.Text);
         peer.SetEnabled(this.Enabled);
         this.PushPeerVisible();
+
+        // Appearance is only flushed when set somewhere up the chain, so the overwhelmingly common
+        // all-default control leaves the native widget's own font, colors and cursor untouched.
+        if (this.GetAmbientFont() is { } font)
+            peer.SetFont(font);
+
+        var foreColor = this.GetAmbientForeColor();
+        var backColor = this.GetAmbientBackColor();
+        if (!foreColor.IsEmpty || !backColor.IsEmpty)
+            peer.SetColors(foreColor, backColor);
+
+        if (this.GetAmbientCursor() is { } cursor)
+            peer.SetCursor(cursor);
+
         this.OnRealized(peer);
 
         if (peer is IContainerPeer container)

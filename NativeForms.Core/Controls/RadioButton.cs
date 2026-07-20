@@ -98,15 +98,23 @@ public class RadioButton : OwnerDrawnControl
     {
         var g = e.Graphics;
         var theme = this.Theme;
-        g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+        var font = this.Font;
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
         // Right-to-left mirrors the whole face: ring at the right edge, content anchored toward it,
         // image on the text's trailing (right) side.
         var rtl = this.IsRightToLeft;
-        var circleTop = Math.Max(0, (this.Height - _CircleSize) / 2);
-        var circle = new Rectangle(0, circleTop, _CircleSize, _CircleSize);
+        var client = this.DisplayRectangle;
+        var circleTop = client.Y + Math.Max(0, (client.Height - _CircleSize) / 2);
+        var circle = new Rectangle(client.X, circleTop, _CircleSize, _CircleSize);
+        var content = new Rectangle(circle.Right + _TextGap, client.Y, client.Right - circle.Right - _TextGap, client.Height);
+        var alignment = ContentAlignment.MiddleLeft;
         if (rtl)
+        {
             circle = RtlLayout.Mirror(circle, this.Width);
+            content = RtlLayout.Mirror(content, this.Width);
+            alignment = RtlLayout.Mirror(alignment);
+        }
         g.FillEllipse(theme.FieldBackground, circle);
         g.DrawEllipse(this.Checked ? theme.Accent : theme.Border, circle);
 
@@ -117,29 +125,21 @@ public class RadioButton : OwnerDrawnControl
             g.FillEllipse(theme.Accent, dot);
         }
 
-        var content = new Rectangle(_CircleSize + _TextGap, 0, this.Width - _CircleSize - _TextGap, this.Height);
-        var alignment = ContentAlignment.MiddleLeft;
-        if (rtl)
-        {
-            content = RtlLayout.Mirror(content, this.Width);
-            alignment = RtlLayout.Mirror(alignment);
-        }
-
-        var textColor = this.Enabled ? theme.ControlText : theme.DisabledText;
+        var textColor = this.Enabled ? this.ForeColor : theme.DisabledText;
         if (this.Image is { } image)
         {
             ContentLayout.Arrange(
                 content,
                 new Size(image.Width, image.Height),
-                g.MeasureText(this.Text, theme.DefaultFont),
+                g.MeasureText(this.Text, font),
                 rtl ? TextImageRelation.TextBeforeImage : TextImageRelation.ImageBeforeText,
                 alignment,
                 out var imageRect,
                 out var textRect);
             g.DrawImage(image, imageRect);
-            g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, alignment);
+            g.DrawText(this.Text, font, textColor, textRect, alignment);
         }
         else
-            g.DrawText(this.Text, theme.DefaultFont, textColor, content, alignment);
+            g.DrawText(this.Text, font, textColor, content, alignment);
     }
 }

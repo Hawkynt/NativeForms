@@ -359,6 +359,40 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
             child.OnCommand(notifyCode);
     }
 
+    /// <summary>The hosted child peer owning the given HWND, or <see langword="null"/>.</summary>
+    private Win32ChildPeer? ChildFromHandle(nint hwnd)
+    {
+        foreach (var child in _children.Values)
+            if (child.Handle == hwnd)
+                return child;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Answers a <c>WM_CTLCOLORSTATIC</c>/<c>EDIT</c>/<c>LISTBOX</c>/<c>BTN</c> for the child that
+    /// sent it (<paramref name="childHwnd"/>), returning the brush to erase with or 0 for default
+    /// handling. Classic <c>BUTTON</c> push buttons only honor the brush, not the text color — a
+    /// USER32 limit; rich edits take their colors through <c>EM_SETBKGNDCOLOR</c>/<c>CHARFORMAT</c>
+    /// instead and are not covered by this route.
+    /// </summary>
+    internal nint OnControlColor(nint hdc, nint childHwnd)
+        => this.ChildFromHandle(childHwnd)?.HandleControlColor(hdc) ?? 0;
+
+    /// <summary>
+    /// Resolves <c>WM_SETCURSOR</c> over the client area: activates the buffered cursor of the
+    /// window itself or of the native child under the pointer. Returns whether it was handled.
+    /// </summary>
+    internal bool OnSetCursor(nint targetHwnd)
+    {
+        var cursor = targetHwnd == Handle ? CursorValue : this.ChildFromHandle(targetHwnd)?.CursorValue;
+        if (cursor is null)
+            return false;
+
+        NativeMethods.SetCursor(NativeMethods.LoadCursorW(0, ToCursorResource(cursor.Kind)));
+        return true;
+    }
+
     /// <summary>Routes a <c>WM_NOTIFY</c> notification to the child identified by its control id.</summary>
     private void OnNotify(int controlId, int code, nint lParam)
     {
@@ -424,6 +458,43 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                 }
 
                 return 0;
+
+            case NativeMethods.WM_CTLCOLORSTATIC:
+            case NativeMethods.WM_CTLCOLOREDIT:
+            case NativeMethods.WM_CTLCOLORLISTBOX:
+            case NativeMethods.WM_CTLCOLORBTN:
+                // wParam is the child's paint HDC, lParam its HWND; a non-zero brush answers the
+                // message, 0 falls through to the default coloring.
+                if (_windows.TryGetValue(hwnd, out var coloringWindow))
+                {
+                    var brush = coloringWindow.OnControlColor(wParam, lParam);
+                    if (brush != 0)
+                        return brush;
+                }
+
+                break;
+
+            case NativeMethods.WM_SETCURSOR:
+                // Only the client area: frame edges keep their resize arrows. wParam names the
+                // window that contains the pointer (this window or a native child).
+                if ((lParam & 0xFFFF) == NativeMethods.HTCLIENT
+                    && _windows.TryGetValue(hwnd, out var cursorWindow)
+                    && cursorWindow.OnSetCursor(wParam))
+                    return 1;
+
+                break;
+
+            case NativeMethods.WM_ERASEBKGND:
+                // An explicit BackColor replaces the class background brush.
+                if (_windows.TryGetValue(hwnd, out var erasingWindow)
+                    && erasingWindow.HasBackColor
+                    && NativeMethods.GetClientRect(hwnd, out var clientRect))
+                {
+                    NativeMethods.FillRect(wParam, in clientRect, erasingWindow.BackBrush);
+                    return 1;
+                }
+
+                break;
 
             case NativeMethods.WM_SIZE:
                 if (_windows.TryGetValue(hwnd, out var sizedWindow))

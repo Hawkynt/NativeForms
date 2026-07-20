@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.Windows;
 
@@ -16,9 +17,16 @@ internal abstract class Win32ControlPeer : IControlPeer
     private Rectangle _bounds;
     private bool _visible = true;
     private bool _enabled = true;
+    private Font? _font;
+    private Color _foreColor;
+    private Color _backColor;
+    private nint _backBrush;
+
+    /// <summary>The buffered cursor, resolved by the parent's <c>WM_SETCURSOR</c> handler; null = default.</summary>
+    internal Cursor? CursorValue;
 
     /// <summary>The native window handle, or 0 before realization / after destruction.</summary>
-    protected nint Handle;
+    internal nint Handle;
 
     /// <inheritdoc/>
     public void SetBounds(Rectangle bounds)
@@ -72,6 +80,104 @@ internal abstract class Win32ControlPeer : IControlPeer
     protected void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
 
     /// <inheritdoc/>
+    public void SetFont(Font font)
+    {
+        _font = font;
+        this.ApplyFont();
+    }
+
+    /// <inheritdoc/>
+    public unsafe void SetColors(Color foreColor, Color backColor)
+    {
+        _foreColor = foreColor;
+        _backColor = backColor;
+
+        // The colors take effect through the next WM_CTLCOLOR* round trip; the cached brush is
+        // rebuilt on demand and the widget repaints with an erased background.
+        if (_backBrush != 0)
+        {
+            NativeMethods.DeleteObject(_backBrush);
+            _backBrush = 0;
+        }
+
+        if (Handle != 0)
+            NativeMethods.InvalidateRect(Handle, null, true);
+    }
+
+    /// <inheritdoc/>
+    public void SetCursor(Cursor cursor) => CursorValue = cursor;
+
+    /// <summary>Whether an explicit background color is buffered (drives the erase path of windows).</summary>
+    private protected bool HasBackColor => !_backColor.IsEmpty;
+
+    /// <summary>Sends <c>WM_SETFONT</c> with the cached <c>HFONT</c> for the buffered font, if any.</summary>
+    private void ApplyFont()
+    {
+        if (Handle == 0 || _font is not { } font)
+            return;
+
+        var hFont = Win32FontCache.Get(font, Win32FontCache.ScreenDpi);
+        if (hFont != 0)
+            NativeMethods.SendMessageW(Handle, NativeMethods.WM_SETFONT, hFont, 1);
+    }
+
+    /// <summary>
+    /// Answers a parent-routed <c>WM_CTLCOLOR*</c> for this control: applies the buffered text color
+    /// to the supplied HDC and returns the background brush to erase with, or 0 when no color is set
+    /// (letting <c>DefWindowProc</c> take over). The brush is cached per peer; an unset background
+    /// falls back to the button-face system color so an explicit foreground alone still works.
+    /// </summary>
+    internal nint HandleControlColor(nint hdc)
+    {
+        if (_foreColor.IsEmpty && _backColor.IsEmpty)
+            return 0;
+
+        NativeMethods.SetTextColor(
+            hdc,
+            _foreColor.IsEmpty ? NativeMethods.GetSysColor(NativeMethods.COLOR_WINDOWTEXT) : ToColorRef(_foreColor));
+
+        if (_backColor.IsEmpty)
+        {
+            NativeMethods.SetBkColor(hdc, NativeMethods.GetSysColor(NativeMethods.COLOR_BTNFACE));
+            return NativeMethods.GetSysColorBrush(NativeMethods.COLOR_BTNFACE);
+        }
+
+        NativeMethods.SetBkColor(hdc, ToColorRef(_backColor));
+        return this.BackBrush;
+    }
+
+    /// <summary>The cached solid brush for the buffered background color, created on first use.</summary>
+    private protected nint BackBrush
+    {
+        get
+        {
+            if (_backBrush == 0 && !_backColor.IsEmpty)
+                _backBrush = NativeMethods.CreateSolidBrush(ToColorRef(_backColor));
+
+            return _backBrush;
+        }
+    }
+
+    /// <summary>Maps a stock cursor to its <c>IDC_*</c> resource id.</summary>
+    internal static nint ToCursorResource(CursorKind kind) => kind switch
+    {
+        CursorKind.Hand => NativeMethods.IDC_HAND,
+        CursorKind.IBeam => NativeMethods.IDC_IBEAM,
+        CursorKind.Wait => NativeMethods.IDC_WAIT,
+        CursorKind.Cross => NativeMethods.IDC_CROSS,
+        CursorKind.SizeWE => NativeMethods.IDC_SIZEWE,
+        CursorKind.SizeNS => NativeMethods.IDC_SIZENS,
+        CursorKind.SizeNWSE => NativeMethods.IDC_SIZENWSE,
+        CursorKind.SizeNESW => NativeMethods.IDC_SIZENESW,
+        CursorKind.No => NativeMethods.IDC_NO,
+        _ => NativeMethods.IDC_ARROW,
+    };
+
+    /// <summary>Converts a managed color to a Win32 <c>COLORREF</c> (0x00BBGGRR); alpha is dropped for GDI.</summary>
+    private protected static uint ToColorRef(Color color)
+        => (uint)(color.R | (color.G << 8) | (color.B << 16));
+
+    /// <inheritdoc/>
     public Point PointToScreen(Point clientPoint)
     {
         if (Handle == 0)
@@ -88,12 +194,19 @@ internal abstract class Win32ControlPeer : IControlPeer
         NativeMethods.SetWindowTextW(Handle, _text);
         NativeMethods.MoveWindow(Handle, _bounds.X, _bounds.Y, _bounds.Width, _bounds.Height, true);
         NativeMethods.EnableWindow(Handle, _enabled);
+        this.ApplyFont();
         NativeMethods.ShowWindow(Handle, _visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
     }
 
     /// <inheritdoc/>
     public virtual void Dispose()
     {
+        if (_backBrush != 0)
+        {
+            NativeMethods.DeleteObject(_backBrush);
+            _backBrush = 0;
+        }
+
         if (Handle == 0)
             return;
 

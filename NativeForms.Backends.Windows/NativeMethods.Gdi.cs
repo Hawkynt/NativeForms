@@ -573,6 +573,18 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("gdi32.dll")]
     internal static partial int SetBkMode(nint hdc, int mode);
 
+    /// <summary>Sets the background fill color of a DC and returns the previous color.</summary>
+    [LibraryImport("gdi32.dll")]
+    internal static partial uint SetBkColor(nint hdc, uint color);
+
+    /// <summary>Returns the shared system brush for a <c>COLOR_*</c> index (never delete it).</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetSysColorBrush(int nIndex);
+
+    /// <summary>Activates a cursor and returns the previous one.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial nint SetCursor(nint hCursor);
+
     /// <summary>Measures the extent of a single-line string in the DC's current font.</summary>
     [LibraryImport("gdi32.dll", StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]

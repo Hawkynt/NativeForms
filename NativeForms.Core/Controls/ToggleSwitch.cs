@@ -76,19 +76,21 @@ public class ToggleSwitch : OwnerDrawnControl
     {
         var g = e.Graphics;
         var theme = this.Theme;
-        g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+        var font = this.Font;
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
         // The track: one rounded rectangle whose corner radius is half its height — a pill. The
         // accent only shows on an enabled, on switch; a disabled one keeps the grey track and
         // reports its state through the thumb side alone. Right-to-left mirrors the face: track at
         // the right edge, caption to its left, and the thumb's on-side flipped to the left end.
         var rtl = this.IsRightToLeft;
-        var top = Math.Max(0, (this.Height - TrackHeight) / 2);
-        var track = new Rectangle(0, top, TrackWidth, TrackHeight);
+        var client = this.DisplayRectangle;
+        var top = client.Y + Math.Max(0, (client.Height - TrackHeight) / 2);
+        var track = new Rectangle(client.X, top, TrackWidth, TrackHeight);
         if (rtl)
             track = RtlLayout.Mirror(track, this.Width);
         var trackColor = this.Enabled && this.Checked ? theme.Accent : theme.Border;
-        g.FillRoundedRectangle(trackColor, new(track.X, top, TrackWidth, TrackHeight), TrackHeight / 2);
+        g.FillRoundedRectangle(trackColor, track, TrackHeight / 2);
 
         // The thumb: a field-colored circle hugging the off or on end of the track (sides swap in RTL).
         var diameter = TrackHeight - (2 * _ThumbMargin);
@@ -101,7 +103,7 @@ public class ToggleSwitch : OwnerDrawnControl
         if (this.Text.Length == 0)
             return;
 
-        var content = new Rectangle(TrackWidth + _TextGap, 0, this.Width - TrackWidth - _TextGap, this.Height);
+        var content = new Rectangle(client.X + TrackWidth + _TextGap, client.Y, client.Right - client.X - TrackWidth - _TextGap, client.Height);
         var alignment = ContentAlignment.MiddleLeft;
         if (rtl)
         {
@@ -112,11 +114,11 @@ public class ToggleSwitch : OwnerDrawnControl
         ContentLayout.Arrange(
             content,
             Size.Empty,
-            g.MeasureText(this.Text, theme.DefaultFont),
+            g.MeasureText(this.Text, font),
             TextImageRelation.ImageBeforeText,
             alignment,
             out _,
             out var textRect);
-        g.DrawText(this.Text, theme.DefaultFont, this.Enabled ? theme.ControlText : theme.DisabledText, textRect, alignment);
+        g.DrawText(this.Text, font, this.Enabled ? this.ForeColor : theme.DisabledText, textRect, alignment);
     }
 }

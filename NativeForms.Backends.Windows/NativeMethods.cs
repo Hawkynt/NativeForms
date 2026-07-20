@@ -225,6 +225,54 @@ internal static partial class NativeMethods
     /// <summary>The standard arrow cursor resource id (used with <see cref="LoadCursorW"/>).</summary>
     internal const nint IDC_ARROW = 32512;
 
+    /// <summary>The text-insertion I-beam cursor resource id.</summary>
+    internal const nint IDC_IBEAM = 32513;
+
+    /// <summary>The busy/wait cursor resource id.</summary>
+    internal const nint IDC_WAIT = 32514;
+
+    /// <summary>The crosshair cursor resource id.</summary>
+    internal const nint IDC_CROSS = 32515;
+
+    /// <summary>The northwest-southeast resize cursor resource id.</summary>
+    internal const nint IDC_SIZENWSE = 32642;
+
+    /// <summary>The northeast-southwest resize cursor resource id.</summary>
+    internal const nint IDC_SIZENESW = 32643;
+
+    /// <summary>The west-east resize cursor resource id.</summary>
+    internal const nint IDC_SIZEWE = 32644;
+
+    /// <summary>The north-south resize cursor resource id.</summary>
+    internal const nint IDC_SIZENS = 32645;
+
+    /// <summary>The "not allowed" cursor resource id.</summary>
+    internal const nint IDC_NO = 32648;
+
+    /// <summary>The pointing-hand cursor resource id.</summary>
+    internal const nint IDC_HAND = 32649;
+
+    /// <summary>Sent to decide the pointer shape; the low word of <c>lParam</c> is the hit-test code.</summary>
+    internal const uint WM_SETCURSOR = 0x0020;
+
+    /// <summary>Applies a font handle to a control; <c>lParam != 0</c> requests an immediate redraw.</summary>
+    internal const uint WM_SETFONT = 0x0030;
+
+    /// <summary>The <c>WM_SETCURSOR</c> hit-test code for the client area.</summary>
+    internal const int HTCLIENT = 1;
+
+    /// <summary>Sent to an editable edit control's parent to pick text/background colors.</summary>
+    internal const uint WM_CTLCOLOREDIT = 0x0133;
+
+    /// <summary>Sent to a list box's parent to pick text/background colors.</summary>
+    internal const uint WM_CTLCOLORLISTBOX = 0x0134;
+
+    /// <summary>Sent to a button's parent; classic push buttons only honor the background brush.</summary>
+    internal const uint WM_CTLCOLORBTN = 0x0135;
+
+    /// <summary>Sent to a static (or read-only/disabled edit) control's parent to pick colors.</summary>
+    internal const uint WM_CTLCOLORSTATIC = 0x0138;
+
     /// <summary>The window background system color (used as <c>hbrBackground = COLOR_WINDOW + 1</c>).</summary>
     internal const int COLOR_WINDOW = 5;
 

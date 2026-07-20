@@ -7,10 +7,11 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// A GDI-backed <see cref="IGraphics"/> valid for the duration of one <c>WM_PAINT</c>. It borrows the
 /// paint <c>HDC</c> (it does not own it); the owning canvas peer keeps one instance alive and
 /// <see cref="Bind"/>s it to each paint's DC, so a steady-state repaint allocates no managed memory.
-/// Pens, brushes and fonts come from small process-wide caches keyed by color/thickness/font instead
-/// of being created and destroyed per call — the GDI-object churn would otherwise dominate the paint
-/// path. Clipping is layered on the DC's own save/restore stack, mirrored by <see cref="_clipStack"/>
-/// so <see cref="PopClip"/> restores the matching state.
+/// Pens and brushes come from small process-wide caches keyed by color/thickness instead of being
+/// created and destroyed per call — the GDI-object churn would otherwise dominate the paint path.
+/// Fonts come from the shared <see cref="Win32FontCache"/> (also feeding <c>WM_SETFONT</c>) and are
+/// never deleted here. Clipping is layered on the DC's own save/restore stack, mirrored by
+/// <see cref="_clipStack"/> so <see cref="PopClip"/> restores the matching state.
 /// </summary>
 internal sealed class Win32Graphics : IGraphics
 {
@@ -21,10 +22,6 @@ internal sealed class Win32Graphics : IGraphics
     // GDI objects are process-global (not DC-bound), so one UI-thread cache serves every DC.
     private static readonly Dictionary<uint, nint> _brushes = new();
     private static readonly Dictionary<ulong, nint> _pens = new();
-    private static readonly Dictionary<FontKey, nint> _fonts = new();
-
-    /// <summary>The identity a realized <c>HFONT</c> is cached under.</summary>
-    private readonly record struct FontKey(string Family, float SizeInPoints, FontStyle Style, int Dpi);
 
     private nint _hdc;
     private int _dpi;
@@ -194,7 +191,7 @@ internal sealed class Win32Graphics : IGraphics
         if (string.IsNullOrEmpty(text))
             return;
 
-        var hFont = GetFont(font, this._dpi);
+        var hFont = Win32FontCache.Get(font, this._dpi);
         if (hFont == 0)
             return;
 
@@ -220,7 +217,7 @@ internal sealed class Win32Graphics : IGraphics
         if (string.IsNullOrEmpty(text))
             return Size.Empty;
 
-        var hFont = GetFont(font, dpi);
+        var hFont = Win32FontCache.Get(font, dpi);
         if (hFont == 0)
             return Size.Empty;
 
@@ -341,21 +338,6 @@ internal sealed class Win32Graphics : IGraphics
         return pen;
     }
 
-    /// <summary>Returns the cached <c>HFONT</c> for a font descriptor at a DPI, realizing it on first use.</summary>
-    private static nint GetFont(Font font, int dpi)
-    {
-        var key = new FontKey(font.Family, font.SizeInPoints, font.Style, dpi);
-        if (_fonts.TryGetValue(key, out var hFont))
-            return hFont;
-
-        TrimCache(_fonts);
-        hFont = CreateFont(font, dpi);
-        if (hFont != 0)
-            _fonts[key] = hFont;
-
-        return hFont;
-    }
-
     /// <summary>Deletes and forgets every cached GDI object once <paramref name="cache"/> hits the ceiling.</summary>
     private static void TrimCache<TKey>(Dictionary<TKey, nint> cache) where TKey : notnull
     {
@@ -417,30 +399,5 @@ internal sealed class Win32Graphics : IGraphics
         }
 
         return format;
-    }
-
-    /// <summary>Realizes a <see cref="Font"/> descriptor into a GDI <c>HFONT</c> sized for the given DPI.</summary>
-    private static nint CreateFont(Font font, int dpi)
-    {
-        var height = -NativeMethods.MulDiv((int)Math.Round(font.SizeInPoints), dpi, 72);
-        var weight = (font.Style & FontStyle.Bold) != 0 ? NativeMethods.FW_BOLD : NativeMethods.FW_NORMAL;
-        var italic = (font.Style & FontStyle.Italic) != 0 ? 1u : 0u;
-        var underline = (font.Style & FontStyle.Underline) != 0 ? 1u : 0u;
-
-        return NativeMethods.CreateFontW(
-            height,
-            0,
-            0,
-            0,
-            weight,
-            italic,
-            underline,
-            0,
-            NativeMethods.DEFAULT_CHARSET,
-            0,
-            0,
-            0,
-            0,
-            font.Family);
     }
 }

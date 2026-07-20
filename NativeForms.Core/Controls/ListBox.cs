@@ -23,6 +23,10 @@ public class ListBox : OwnerDrawnControl
     private int _topIndex;
     private int? _itemHeight;
 
+    /// <summary>An unset <see cref="Control.BackColor"/> resolves to the theme's field background —
+    /// the list is an editable-field surface, like the WinForms per-control default.</summary>
+    private protected override Color FallbackBackColor => this.Theme.FieldBackground;
+
     /// <summary>Creates a list box.</summary>
     public ListBox()
     {
@@ -436,7 +440,7 @@ public class ListBox : OwnerDrawnControl
     {
         var g = e.Graphics;
         var theme = this.Theme;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, this.Width, this.Height));
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
         var rowHeight = this.ItemHeight;
         var last = Math.Min(this.Items.Count, _topIndex + this.VisibleRowCount + 1);
@@ -460,13 +464,32 @@ public class ListBox : OwnerDrawnControl
     /// the remaining, right-shifted bounds.
     /// </summary>
     protected virtual void OnDrawRow(IGraphics g, int index, Rectangle bounds, bool selected)
-        => DrawRowContent(g, this.Theme, bounds, this.DisplaySelector(this.Items[index]), this.ImageSelector?.Invoke(this.Items[index]), selected);
+        => DrawRowContent(
+            g,
+            this.Theme,
+            bounds,
+            this.DisplaySelector(this.Items[index]),
+            this.ImageSelector?.Invoke(this.Items[index]),
+            selected,
+            this.Font,
+            this.ForeColor);
 
     /// <summary>
     /// Paints the icon-plus-text body of one list row — the single row renderer every list-shaped
-    /// surface shares (list box rows, combo drop-down rows), so they stay pixel-identical.
+    /// surface shares (list box rows, combo drop-down rows), so they stay pixel-identical. The
+    /// optional font/color pair lets a hosting control apply its own appearance to unselected rows
+    /// (selected rows keep the theme's selection text, like Windows Forms); callers without a
+    /// hosting control (drop-down popups) omit them and get the plain theme rendering.
     /// </summary>
-    internal static void DrawRowContent(IGraphics g, ITheme theme, Rectangle bounds, string text, IImage? icon, bool selected)
+    internal static void DrawRowContent(
+        IGraphics g,
+        ITheme theme,
+        Rectangle bounds,
+        string text,
+        IImage? icon,
+        bool selected,
+        Font? font = null,
+        Color foreColor = default)
     {
         var textLeft = bounds.X + 2;
         if (icon is not null)
@@ -476,9 +499,9 @@ public class ListBox : OwnerDrawnControl
             textLeft += iconSize + _IconGap;
         }
 
-        var textColor = selected ? theme.SelectionText : theme.ControlText;
+        var textColor = selected ? theme.SelectionText : foreColor.IsEmpty ? theme.ControlText : foreColor;
         var textRect = new Rectangle(textLeft, bounds.Y, bounds.Right - textLeft, bounds.Height);
-        g.DrawText(text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
+        g.DrawText(text, font ?? theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
     }
 
     /// <summary>A live, allocation-free mapping of the selected indices onto their items.</summary>

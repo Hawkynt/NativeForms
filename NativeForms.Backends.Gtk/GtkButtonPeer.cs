@@ -37,12 +37,11 @@ internal sealed class GtkButtonPeer : GtkControlPeer, IButtonPeer
     /// <inheritdoc />
     protected override void OnWidgetRealized()
     {
-        _selfHandle = GCHandle.Alloc(this);
+        var data = this.PinSelf();
         unsafe
         {
             var callback = (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnClicked;
-            NativeMethods.g_signal_connect_data(
-                _widget, "clicked", callback, GCHandle.ToIntPtr(_selfHandle), 0, 0);
+            NativeMethods.g_signal_connect_data(_widget, "clicked", callback, data, 0, 0);
         }
 
         if (_image is not null)

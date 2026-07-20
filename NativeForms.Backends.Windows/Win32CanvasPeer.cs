@@ -168,6 +168,37 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
             child.OnNotify((int)header->code, lParam);
     }
 
+    /// <summary>The hosted child peer owning the given HWND, or <see langword="null"/>.</summary>
+    private Win32ChildPeer? ChildFromHandle(nint hwnd)
+    {
+        if (this._children is null)
+            return null;
+
+        foreach (var child in this._children.Values)
+            if (child.Handle == hwnd)
+                return child;
+
+        return null;
+    }
+
+    /// <summary>Answers a <c>WM_CTLCOLOR*</c> from a hosted native child (see the window peer's twin).</summary>
+    private nint OnControlColor(nint hdc, nint childHwnd)
+        => this.ChildFromHandle(childHwnd)?.HandleControlColor(hdc) ?? 0;
+
+    /// <summary>
+    /// Resolves <c>WM_SETCURSOR</c> over the surface: the canvas's own buffered cursor, or a hosted
+    /// native child's. Returns whether it was handled.
+    /// </summary>
+    private bool OnSetCursor(nint targetHwnd)
+    {
+        var cursor = targetHwnd == this.Handle ? CursorValue : this.ChildFromHandle(targetHwnd)?.CursorValue;
+        if (cursor is null)
+            return false;
+
+        NativeMethods.SetCursor(NativeMethods.LoadCursorW(0, ToCursorResource(cursor.Kind)));
+        return true;
+    }
+
     // The classic double buffer: painting goes into a client-sized memory bitmap that is blitted to
     // the window DC at the end of WM_PAINT, so partial repaints never flicker. The buffer, the
     // graphics wrapper and the paint args all live in the peer and are reused frame over frame — a
@@ -379,6 +410,22 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                     if (lParam != 0)
                         peer.OnNotifyMessage(lParam);
                     return 0;
+
+                case NativeMethods.WM_CTLCOLORSTATIC:
+                case NativeMethods.WM_CTLCOLOREDIT:
+                case NativeMethods.WM_CTLCOLORLISTBOX:
+                case NativeMethods.WM_CTLCOLORBTN:
+                    var brush = peer.OnControlColor(wParam, lParam);
+                    if (brush != 0)
+                        return brush;
+
+                    break;
+
+                case NativeMethods.WM_SETCURSOR:
+                    if ((lParam & 0xFFFF) == NativeMethods.HTCLIENT && peer.OnSetCursor(wParam))
+                        return 1;
+
+                    break;
 
                 case NativeMethods.WM_PAINT:
                     peer.OnPaintMessage(hwnd);

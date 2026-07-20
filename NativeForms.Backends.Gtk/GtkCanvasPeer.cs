@@ -87,8 +87,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             foreach (var child in _children)
                 child.Realize(_widget);
 
-        _selfHandle = GCHandle.Alloc(this);
-        var data = GCHandle.ToIntPtr(_selfHandle);
+        var data = this.PinSelf();
         unsafe
         {
             Connect("draw", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDraw, data);

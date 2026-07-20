@@ -210,6 +210,35 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial nint gtk_widget_get_window(nint widget);
 
+    /// <summary>Returns the <c>GdkDisplay</c> the widget renders on.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_widget_get_display(nint widget);
+
+    /// <summary>
+    /// Overrides the widget's font with a <c>PangoFontDescription</c> (0 clears the override).
+    /// Deprecated since GTK 3.16 in favor of per-widget CSS providers but fully functional through
+    /// GTK 3.24 — chosen here because it needs no CSS provider object per widget; see the remarks on
+    /// <see cref="Gtk.GtkControlPeer.SetFont"/>.
+    /// </summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_override_font(nint widget, nint fontDescription);
+
+    /// <summary>Overrides the widget's foreground color for a state (same deprecated-but-functional family).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_override_color(nint widget, uint state, in GdkRGBA color);
+
+    /// <summary>Clears a foreground override (the NULL-color form).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_override_color(nint widget, uint state, nint color);
+
+    /// <summary>Overrides the widget's background color for a state (same deprecated-but-functional family).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_override_background_color(nint widget, uint state, in GdkRGBA color);
+
+    /// <summary>Clears a background override (the NULL-color form).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_override_background_color(nint widget, uint state, nint color);
+
     /// <summary>Whether the widget has its own <c>GdkWindow</c> rather than sharing its parent's (<c>gboolean</c>).</summary>
     [LibraryImport(Gtk)]
     internal static partial int gtk_widget_get_has_window(nint widget);

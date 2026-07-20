@@ -222,6 +222,18 @@ internal sealed class GtkGraphics : IGraphics, IDisposable
     /// <summary>Builds and applies the Pango font description matching <paramref name="font"/>.</summary>
     private static void SetFontDescription(nint layout, Font font)
     {
+        var description = CreateFontDescription(font);
+        NativeMethods.pango_layout_set_font_description(layout, description);
+        NativeMethods.pango_font_description_free(description);
+    }
+
+    /// <summary>
+    /// Builds a <c>PangoFontDescription</c> from a font descriptor — family, point size and the
+    /// bold/italic flags (underline/strikeout are text attributes in Pango, not font properties, and
+    /// are not expressed here). The caller frees it.
+    /// </summary>
+    internal static nint CreateFontDescription(Font font)
+    {
         var description = NativeMethods.pango_font_description_new();
         NativeMethods.pango_font_description_set_family(description, font.Family);
         NativeMethods.pango_font_description_set_size(description, (int)(font.SizeInPoints * NativeMethods.PANGO_SCALE));
@@ -231,9 +243,7 @@ internal sealed class GtkGraphics : IGraphics, IDisposable
         NativeMethods.pango_font_description_set_style(
             description,
             (font.Style & FontStyle.Italic) != 0 ? NativeMethods.PANGO_STYLE_ITALIC : NativeMethods.PANGO_STYLE_NORMAL);
-
-        NativeMethods.pango_layout_set_font_description(layout, description);
-        NativeMethods.pango_font_description_free(description);
+        return description;
     }
 
     /// <summary>Adds an ellipse inscribed in <paramref name="bounds"/> to the current path via a scaled unit-circle arc.</summary>

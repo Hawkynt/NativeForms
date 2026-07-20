@@ -23,6 +23,28 @@ public interface IControlPeer : IDisposable
     /// <summary>Enables or greys out the widget for user interaction.</summary>
     void SetEnabled(bool enabled);
 
+    /// <summary>
+    /// Applies a font to the widget's text. Win32 sends <c>WM_SETFONT</c> with a cached
+    /// <c>HFONT</c>; GTK overrides the widget's Pango font description. The core only calls this
+    /// when a font was explicitly set on the control or inherited from an ancestor, so untouched
+    /// controls keep the platform's own default.
+    /// </summary>
+    void SetFont(Font font);
+
+    /// <summary>
+    /// Applies the text and background colors; <see cref="Color.Empty"/> for either component means
+    /// "platform default". Win32 answers the parent-routed <c>WM_CTLCOLOR*</c> messages with the
+    /// values (classic push buttons ignore them — a documented USER32 limit); GTK overrides the
+    /// widget's style colors.
+    /// </summary>
+    void SetColors(Color foreColor, Color backColor);
+
+    /// <summary>
+    /// Sets the pointer shape shown over the widget. Win32 resolves it in the <c>WM_SETCURSOR</c>
+    /// handler; GTK sets the GDK window's cursor once that window exists.
+    /// </summary>
+    void SetCursor(Cursor cursor);
+
     /// <summary>Maps a point in this widget's client space to screen coordinates.</summary>
     Point PointToScreen(Point clientPoint);
 

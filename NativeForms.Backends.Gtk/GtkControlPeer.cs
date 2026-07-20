@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.Gtk;
 
@@ -36,8 +37,35 @@ internal abstract class GtkControlPeer : IControlPeer
     /// <summary>Buffered enabled state.</summary>
     protected bool _enabled = true;
 
+    /// <summary>Buffered font override, or null while the theme font applies.</summary>
+    private Font? _font;
+
+    /// <summary>Buffered text color; <see cref="Color.Empty"/> while the theme color applies.</summary>
+    private Color _foreColor;
+
+    /// <summary>Buffered background color; <see cref="Color.Empty"/> while the theme color applies.</summary>
+    private Color _backColor;
+
+    /// <summary>Buffered cursor, or null for the default pointer.</summary>
+    private Cursor? _cursor;
+
+    /// <summary>Whether the "realize" signal is already connected (for late GDK-window state).</summary>
+    private bool _realizeHooked;
+
+    /// <summary>One shared <c>GdkCursor</c> per CSS name, created lazily and kept for the process.</summary>
+    private static readonly Dictionary<string, nint> _cursors = new();
+
     /// <summary>Pinning handle that keeps this peer reachable from native signal callbacks.</summary>
     protected GCHandle _selfHandle;
+
+    /// <summary>Allocates the pinning handle on first use and returns it as callback user data.</summary>
+    protected nint PinSelf()
+    {
+        if (!_selfHandle.IsAllocated)
+            _selfHandle = GCHandle.Alloc(this);
+
+        return GCHandle.ToIntPtr(_selfHandle);
+    }
 
     /// <summary>Converts a managed bool to the 1/0 GLib expects for a <c>gboolean</c>.</summary>
     protected static int Bool(bool value) => value ? 1 : 0;
@@ -99,6 +127,143 @@ internal abstract class GtkControlPeer : IControlPeer
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Applied through <c>gtk_widget_override_font</c> — deprecated since GTK 3.16 in favor of
+    /// per-widget CSS providers, but fully functional through GTK 3.24 and free of a provider
+    /// object per widget, which matches this toolkit's footprint rules.
+    /// </remarks>
+    public void SetFont(Font font)
+    {
+        _font = font;
+        if (_widget != 0)
+            this.ApplyFont();
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Applied through <c>gtk_widget_override_color</c>/<c>_background_color</c> — the same
+    /// deprecated-but-functional GTK 3 override family as <see cref="SetFont"/>.</remarks>
+    public void SetColors(Color foreColor, Color backColor)
+    {
+        _foreColor = foreColor;
+        _backColor = backColor;
+        if (_widget != 0)
+            this.ApplyColors();
+    }
+
+    /// <inheritdoc />
+    public void SetCursor(Cursor cursor)
+    {
+        _cursor = cursor;
+        if (_widget != 0)
+            this.ApplyCursor();
+    }
+
+    /// <summary>Pushes the buffered font override onto the live widget.</summary>
+    private void ApplyFont()
+    {
+        if (_font is not { } font)
+            return;
+
+        var description = GtkGraphics.CreateFontDescription(font);
+        NativeMethods.gtk_widget_override_font(_widget, description);
+        NativeMethods.pango_font_description_free(description);
+    }
+
+    /// <summary>Pushes the buffered color overrides onto the live widget (empty clears an override).</summary>
+    private void ApplyColors()
+    {
+        if (_foreColor.IsEmpty)
+            NativeMethods.gtk_widget_override_color(_widget, NativeMethods.GTK_STATE_FLAG_NORMAL, 0);
+        else
+            NativeMethods.gtk_widget_override_color(_widget, NativeMethods.GTK_STATE_FLAG_NORMAL, ToRgba(_foreColor));
+
+        if (_backColor.IsEmpty)
+            NativeMethods.gtk_widget_override_background_color(_widget, NativeMethods.GTK_STATE_FLAG_NORMAL, 0);
+        else
+            NativeMethods.gtk_widget_override_background_color(_widget, NativeMethods.GTK_STATE_FLAG_NORMAL, ToRgba(_backColor));
+    }
+
+    /// <summary>
+    /// Sets the buffered cursor on the widget's <c>GdkWindow</c>. Before the widget is realized (no
+    /// GDK window yet — GTK creates it on show), a one-shot "realize" signal hook re-applies it.
+    /// </summary>
+    private void ApplyCursor()
+    {
+        if (_cursor is not { } cursor)
+            return;
+
+        var window = NativeMethods.gtk_widget_get_window(_widget);
+        if (window == 0)
+        {
+            this.HookRealize();
+            return;
+        }
+
+        NativeMethods.gdk_window_set_cursor(window, CursorFor(NativeMethods.gtk_widget_get_display(_widget), cursor.Kind));
+    }
+
+    /// <summary>Connects the "realize" signal once so late GDK-window state (the cursor) is applied on show.</summary>
+    private void HookRealize()
+    {
+        if (_realizeHooked)
+            return;
+
+        _realizeHooked = true;
+        unsafe
+        {
+            var callback = (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnWidgetGdkRealized;
+            NativeMethods.g_signal_connect_data(_widget, "realize", callback, this.PinSelf(), 0, 0);
+        }
+    }
+
+    /// <summary>
+    /// Native "realize" handler, shaped as <c>void (GtkWidget*, gpointer)</c>: the GDK window now
+    /// exists, so the buffered cursor can finally land on it.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static void OnWidgetGdkRealized(nint widget, nint userData)
+    {
+        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkControlPeer peer)
+            peer.ApplyCursor();
+    }
+
+    /// <summary>The shared <c>GdkCursor</c> for a stock shape, created from its CSS name on first use.</summary>
+    private static nint CursorFor(nint display, CursorKind kind)
+    {
+        var name = kind switch
+        {
+            CursorKind.Hand => "pointer",
+            CursorKind.IBeam => "text",
+            CursorKind.Wait => "wait",
+            CursorKind.Cross => "crosshair",
+            CursorKind.SizeWE => "ew-resize",
+            CursorKind.SizeNS => "ns-resize",
+            CursorKind.SizeNWSE => "nwse-resize",
+            CursorKind.SizeNESW => "nesw-resize",
+            CursorKind.No => "not-allowed",
+            _ => "default",
+        };
+
+        if (_cursors.TryGetValue(name, out var cursor))
+            return cursor;
+
+        cursor = NativeMethods.gdk_cursor_new_from_name(display, name);
+        if (cursor != 0)
+            _cursors[name] = cursor;
+
+        return cursor;
+    }
+
+    /// <summary>Converts a managed color to the 0..1 doubles of a <c>GdkRGBA</c>.</summary>
+    private static GdkRGBA ToRgba(Color color) => new()
+    {
+        Red = color.R / 255.0,
+        Green = color.G / 255.0,
+        Blue = color.B / 255.0,
+        Alpha = color.A / 255.0,
+    };
+
+    /// <inheritdoc />
     public Point PointToScreen(Point clientPoint)
     {
         if (_widget == 0)
@@ -148,6 +313,11 @@ internal abstract class GtkControlPeer : IControlPeer
         NativeMethods.gtk_fixed_put(parentFixed, _widget, _bounds.X, _bounds.Y);
         NativeMethods.gtk_widget_set_size_request(_widget, _bounds.Width, _bounds.Height);
         NativeMethods.gtk_widget_set_sensitive(_widget, Bool(_enabled));
+        this.ApplyFont();
+        if (!_foreColor.IsEmpty || !_backColor.IsEmpty)
+            this.ApplyColors();
+
+        this.ApplyCursor();
         NativeMethods.gtk_widget_set_visible(_widget, Bool(_visible));
         return _widget;
     }

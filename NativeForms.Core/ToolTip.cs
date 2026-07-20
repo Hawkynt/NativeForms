@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.ComponentModel;
 
 namespace Hawkynt.NativeForms;
 
@@ -14,7 +15,7 @@ namespace Hawkynt.NativeForms;
 /// (Button, TextBox …) register their text, but showing it needs either hover events on their peers
 /// or the platform tooltip API — tracked in <c>docs/PRD.md</c> §7.6.
 /// </remarks>
-public sealed class ToolTip : IDisposable
+public sealed class ToolTip : Component
 {
     /// <summary>The offset from the cursor to the popup's top-left corner, in logical pixels —
     /// scaled through <see cref="Control.LogicalToDevice(int)"/> when the tip is shown.</summary>
@@ -101,7 +102,7 @@ public sealed class ToolTip : IDisposable
     }
 
     /// <summary>Hides the tip, detaches every observed control and releases the native popup and timer.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
         this.Hide();
         _timer?.Dispose();

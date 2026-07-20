@@ -60,6 +60,9 @@ public abstract class OwnerDrawnControl : Control
         this.Invalidate();
     }
 
+    /// <summary>Repaints when the effective font, colors or padding change — set directly or inherited.</summary>
+    private protected override void OnAppearanceChanged() => this.Invalidate();
+
     /// <summary>Mirrors the canvas's pointer moves for components (tool tips) that observe a control
     /// without subclassing it. Raised after the control's own <see cref="OnMouseMove"/>.</summary>
     internal event EventHandler<MouseEventArgs>? CanvasMouseMove;

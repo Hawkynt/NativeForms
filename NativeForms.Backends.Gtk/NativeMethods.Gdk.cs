@@ -71,6 +71,18 @@ internal static partial class NativeMethods
     [LibraryImport(Gdk)]
     internal static partial nint gdk_display_get_default();
 
+    /// <summary>
+    /// Creates a cursor from a CSS cursor name ("pointer", "text", "ew-resize" …), or returns 0 for
+    /// an unknown name. The returned reference is owned by the caller; this backend caches one per
+    /// name for the process lifetime instead of unreffing.
+    /// </summary>
+    [LibraryImport(Gdk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint gdk_cursor_new_from_name(nint display, string name);
+
+    /// <summary>Sets (or, with 0, clears) the cursor shown while the pointer is over a <c>GdkWindow</c>.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial void gdk_window_set_cursor(nint window, nint cursor);
+
     /// <summary>Returns the default <c>GdkSeat</c> (the user's pointer/keyboard pair) of a display.</summary>
     [LibraryImport(Gdk)]
     internal static partial nint gdk_display_get_default_seat(nint display);
