@@ -200,10 +200,13 @@ strategy (may differ per platform; note exceptions inline).
       via the form dialog-key chain done; native-widget key preview (peer key seam: Enter inside
       a native TextBox → AcceptButton, native Tab handling, button-mnemonic clicks) pending
 - [ ] Mouse (`MouseDown`/`Up`/`Move`/`Enter`/`Leave`/`Wheel`, `DoubleClick`)
-- [~] `Font`/`ForeColor`/`BackColor` (ambient chain, one lazy `AppearanceState`, peer forwarding
-      + owner-drawn adoption), `Padding` (+`DisplayRectangle`), `Margin` done; `Anchor`, `Dock`
-      pending
-- [ ] Layout engine: anchoring, docking, `AutoSize`, `TableLayoutPanel`/`FlowLayoutPanel` semantics
+- [x] `Font`/`ForeColor`/`BackColor` (ambient chain, one lazy `AppearanceState`, peer forwarding
+      + owner-drawn adoption), `Padding` (+`DisplayRectangle`), `Margin`, `Anchor`, `Dock`
+      (flag-packed, zero-cost defaults)
+- [~] Layout engine: anchoring (per-edge deltas against the container's display rectangle),
+      docking (Controls-order edge claiming + Fill remainder), `Suspend`/`ResumeLayout`,
+      free adoption by every plain container, TLP in-cell Dock/Anchor done; generalized
+      `AutoSize` and flow-row cross-axis anchoring pending
 
 ### 7.2 Top-level & containers
 - [x] **Nested child realization** — `IContainerPeer` (window + every canvas peer) hosts children;
@@ -239,8 +242,8 @@ strategy (may differ per platform; note exceptions inline).
       `SplitterMoved`, min-size clamps, keyboard splitter movement
 - [~] `FlowLayoutPanel` (all four `FlowDirection`s, `WrapContents`, `Control.Margin`,
       AutoScroll interplay) and `TableLayoutPanel` (absolute/percent/auto-size styles, spans,
-      auto-placement, cell borders) done; grid auto-grow, invisible-child skip, Anchor/Dock
-      interplay pending
+      auto-placement, cell borders, in-cell Dock/Anchor for explicitly assigned children) done;
+      grid auto-grow and invisible-child skip pending
 - [x] `Panel.AutoScroll` — themed scrollbars (shared `ScrollBarRenderer`), wheel + thumb drag,
       children scrolled via the logical→peer bounds mapping seam (`AutoScrollPosition`)
 
