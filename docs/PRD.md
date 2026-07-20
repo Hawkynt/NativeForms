@@ -184,8 +184,13 @@ strategy (may differ per platform; note exceptions inline).
       — hosts ComboBox drop-downs, menus, tooltips, calendar fly-outs
 - [ ] `Component`/`IContainer` + designer-free component model
 - [ ] `Cursor`, `Cursors`; `Control.Cursor`
-- [ ] Focus model (`Focus()`, `TabIndex`, `TabStop`, `Enter`/`Leave`/`GotFocus`/`LostFocus`)
-- [ ] Keyboard (`KeyDown`/`KeyUp`/`KeyPress`, mnemonics/accelerators)
+- [x] Focus model — `Focus()`/`Focused`/`CanFocus`, `TabIndex`/`TabStop` (defaults follow the
+      control kind), WinForms event order (Enter→GotFocus / LostFocus→Leave with container-chain
+      crossing), `Form.ActiveControl` + initial focus, Tab/Shift+Tab navigation through nested
+      containers, `IsInputKey` claims, form-wide menu shortcuts + Alt-mnemonic bar activation
+- [~] Keyboard — `KeyDown`/`KeyUp`/`KeyPress` on owner-drawn surfaces, mnemonics/accelerators
+      via the form dialog-key chain done; native-widget key preview (peer key seam: Enter inside
+      a native TextBox → AcceptButton, native Tab handling, button-mnemonic clicks) pending
 - [ ] Mouse (`MouseDown`/`Up`/`Move`/`Enter`/`Leave`/`Wheel`, `DoubleClick`)
 - [~] `Font`, `ForeColor`, `BackColor`, `Padding`, `Anchor`, `Dock` pending; `Margin`
       (`Padding` struct, consumed by the layout panels) done
@@ -203,9 +208,9 @@ strategy (may differ per platform; note exceptions inline).
   - [x] `StartPosition` (core-side against `GetScreenSize`/owner), `FormBorderStyle` (live
         Win32 style toggling, GTK resizable/decorated/type hints), `WindowState` with peer
         write-back sync, `MinimizeBox`/`MaximizeBox` (GTK advisory)
-  - [~] `MinimumSize`/`MaximumSize` (WM_GETMINMAXINFO / geometry hints) + `Resize`/`SizeChanged`
-        with echo-free peer write-back done; `AcceptButton`/`CancelButton` Enter/Escape routing
-        blocked on the §7.1 focus model
+  - [x] `MinimumSize`/`MaximumSize` (WM_GETMINMAXINFO / geometry hints) + `Resize`/`SizeChanged`
+        with echo-free peer write-back; `AcceptButton`/`CancelButton` Enter/Escape routing via the
+        dialog-key chain (owner-drawn reach; native-widget preview tracked in §7.1)
   - [~] `ShowDialog()` modal + `DialogResult` (nested native loops, owner disable/transient,
         `AcceptButton`/`CancelButton` properties; Enter/Escape routing blocked on §7.1 focus model)
   - [x] `MdiParent`/MDI — documented non-goal in the `Form` remarks
@@ -246,7 +251,7 @@ strategy (may differ per platform; note exceptions inline).
   - [x] `AutoSize` (canvas-free `IPlatformBackend.MeasureText`), `TextAlign`, `BorderStyle`
         (Win32 style bit; GTK documented no-op), mnemonic rendering (`&x` underline, GTK `_x`
         translation)
-  - [ ] Mnemonic activation focuses the next control (blocked on the §7.1 focus model)
+  - [x] Mnemonic activation focuses the next control in tab order
   - [~] `Image` + `ImageAlign`: peer surface done — Win32 `SS_BITMAP` and GTK widget-swap render
         image-only when the caption is empty (image+text is platform-limited, documented)
 - [~] `LinkLabel` (owner) — whole-text link: accent color + underline, hover + `Visited` states,
