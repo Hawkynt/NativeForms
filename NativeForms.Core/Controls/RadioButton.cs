@@ -71,8 +71,9 @@ public class RadioButton : OwnerDrawnControl
         if (parent is null)
             return;
 
-        foreach (var sibling in parent.Controls.OfType<RadioButton>())
-            if (!ReferenceEquals(sibling, this))
+        var siblings = parent.Controls;
+        for (var i = 0; i < siblings.Count; ++i)
+            if (siblings[i] is RadioButton sibling && !ReferenceEquals(sibling, this))
                 sibling.Checked = false;
     }
 

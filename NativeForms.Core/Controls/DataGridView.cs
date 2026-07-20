@@ -660,6 +660,7 @@ public class DataGridView : OwnerDrawnControl
             this.CancelEdit();
 
         _sortDirty = true;
+        this.InvalidateDisplayText();
         this.ClampScroll();
         this.Invalidate();
         this.SyncEditorToScroll();
@@ -671,8 +672,10 @@ public class DataGridView : OwnerDrawnControl
         _topRow = Math.Clamp(_topRow, 0, maxTop);
     }
 
-    /// <summary>Rebuilds the display→model sort map when a sort is active and the items changed. The
-    /// comparison closure allocates only here — on a sort gesture or item mutation, never per frame.</summary>
+    /// <summary>Rebuilds the display→model sort map when a sort is active and the items changed.
+    /// Kept closure-free so the steady-state calls (every repaint passes through here) allocate
+    /// nothing — the rebuild itself lives in <see cref="RebuildSortMap"/>, entered only on a sort
+    /// gesture or item mutation.</summary>
     private void EnsureSortMap()
     {
         var column = _sortedColumn;
@@ -687,6 +690,15 @@ public class DataGridView : OwnerDrawnControl
         if (!_sortDirty && map is not null && map.Length == count)
             return;
 
+        this.RebuildSortMap(column, count);
+    }
+
+    /// <summary>Sorts the display→model map. Lives apart from <see cref="EnsureSortMap"/> because the
+    /// comparison closure's display class is allocated on scope entry, unconditionally — inlined into
+    /// the ensure method it would cost 40 bytes per frame even while nothing sorts.</summary>
+    private void RebuildSortMap(DataGridViewColumn column, int count)
+    {
+        var map = _sortMap;
         if (map is null || map.Length != count)
             map = new int[count];
 
@@ -879,16 +891,49 @@ public class DataGridView : OwnerDrawnControl
 
     private int GetRowHeightFor(object? item) => Math.Max(1, this.RowHeightSelector?.Invoke(item) ?? this.RowHeight);
 
-    /// <summary>The text a cell displays: the display-text override, else the value formatted by
-    /// <see cref="DataGridViewColumn.FormatSelector"/> (the CellFormatting seam), else the value's
+    /// <summary>The text a cell displays, cached per model row in the column: selectors, boxing and
+    /// formatting run once per changed cell, never per frame, so a steady-state repaint (and a
+    /// scroll over already-shown rows) allocates nothing.</summary>
+    private string GetDisplayText(DataGridViewColumn column, object? item, int modelIndex)
+    {
+        var count = this.Items.Count;
+        var cache = column.DisplayTextCache;
+        if (cache is null || cache.Length != count)
+            column.DisplayTextCache = cache = count > 0 ? new string?[count] : [];
+
+        return (uint)modelIndex < (uint)cache.Length
+            ? cache[modelIndex] ??= ComputeDisplayText(column, item)
+            : ComputeDisplayText(column, item);
+    }
+
+    /// <summary>Builds the text a cell displays: the display-text override, else the value formatted
+    /// by <see cref="DataGridViewColumn.FormatSelector"/> (the CellFormatting seam), else the value's
     /// <c>ToString()</c>.</summary>
-    private static string GetDisplayText(DataGridViewColumn column, object? item)
+    private static string ComputeDisplayText(DataGridViewColumn column, object? item)
     {
         if (column.DisplayTextSelector?.Invoke(item) is { } overridden)
             return overridden;
 
         var value = column.ValueSelector(item);
         return (column.FormatSelector is { } format ? format(value) : value?.ToString()) ?? string.Empty;
+    }
+
+    /// <summary>Drops every column's cached display text — the row set itself changed.</summary>
+    private void InvalidateDisplayText()
+    {
+        var columns = _columns;
+        for (var i = 0; i < columns.Count; ++i)
+            columns[i].DisplayTextCache = null;
+    }
+
+    /// <summary>Drops one row's cached display text in every column — a cell write mutated the row
+    /// item, so any cell derived from it must re-format on the next repaint.</summary>
+    private void InvalidateDisplayText(int modelIndex)
+    {
+        var columns = _columns;
+        for (var i = 0; i < columns.Count; ++i)
+            if (columns[i].DisplayTextCache is { } cache && (uint)modelIndex < (uint)cache.Length)
+                cache[modelIndex] = null;
     }
 
     /// <summary>The text an editor seeds from: the raw <see cref="DataGridViewColumn.ValueSelector"/>
@@ -1381,6 +1426,7 @@ public class DataGridView : OwnerDrawnControl
                     break;
 
                 column.CheckedSetter(item, !(column.CheckedSelector?.Invoke(item) ?? false));
+                this.InvalidateDisplayText(rowIndex);
                 this.Invalidate();
                 break;
             }
@@ -1651,7 +1697,7 @@ public class DataGridView : OwnerDrawnControl
                 g.DrawText(mergedText, theme.DefaultFont, theme.ControlText,
                     new Rectangle(contentLeft + _CellPadding, y, Math.Max(0, width - contentLeft - _CellPadding), rowHeight), ContentAlignment.MiddleLeft);
             else if (frozenWidth == 0)
-                this.PaintRowCells(g, theme, item, y, rowHeight, selected, frozen: false);
+                this.PaintRowCells(g, theme, item, modelIndex, y, rowHeight, selected, frozen: false);
 
             if (showGridLines)
                 g.DrawLine(theme.GridLine, 0, y + rowHeight - 1, width, y + rowHeight - 1);
@@ -1716,7 +1762,7 @@ public class DataGridView : OwnerDrawnControl
 
     /// <summary>Paints the data cells of one row for one run (frozen or scrolling columns), walking
     /// the display order with the same geometry as <see cref="PaintHeaderCells"/>.</summary>
-    private void PaintRowCells(IGraphics g, ITheme theme, object? item, int y, int rowHeight, bool selected, bool frozen)
+    private void PaintRowCells(IGraphics g, ITheme theme, object? item, int modelIndex, int y, int rowHeight, bool selected, bool frozen)
     {
         var map = _displayMap!;
         var x = this.ContentLeft;
@@ -1731,7 +1777,7 @@ public class DataGridView : OwnerDrawnControl
             }
 
             if (column.Frozen == frozen)
-                this.PaintCell(g, theme, column, item, new Rectangle(x, y, column.Width, rowHeight), selected);
+                this.PaintCell(g, theme, column, item, modelIndex, new Rectangle(x, y, column.Width, rowHeight), selected);
 
             x += column.Width;
         }
@@ -1753,7 +1799,7 @@ public class DataGridView : OwnerDrawnControl
 
             var rowHeight = this.GetRowHeightFor(item);
             if (this.MergedTextOf(item) is null)
-                this.PaintRowCells(g, theme, item, y, rowHeight, this.IsRowSelected(modelIndex), frozen);
+                this.PaintRowCells(g, theme, item, modelIndex, y, rowHeight, this.IsRowSelected(modelIndex), frozen);
 
             y += rowHeight;
         }
@@ -1809,7 +1855,7 @@ public class DataGridView : OwnerDrawnControl
     }
 
     /// <summary>Paints one data cell according to its column's <see cref="DataGridViewColumnKind"/>.</summary>
-    private void PaintCell(IGraphics g, ITheme theme, DataGridViewColumn column, object? item, Rectangle cellRect, bool selected)
+    private void PaintCell(IGraphics g, ITheme theme, DataGridViewColumn column, object? item, int modelIndex, Rectangle cellRect, bool selected)
     {
         var style = column.CellStyleSelector?.Invoke(item) ?? default;
         if (style.BackColor is { } backColor)
@@ -1835,13 +1881,13 @@ public class DataGridView : OwnerDrawnControl
             case DataGridViewColumnKind.Button:
             {
                 var face = new Rectangle(cellRect.X + 2, cellRect.Y + 2, Math.Max(0, cellRect.Width - 4), Math.Max(0, cellRect.Height - 4));
-                GlyphRenderer.DrawButtonFace(g, theme, face, GetDisplayText(column, item), column.EnabledSelector?.Invoke(item) ?? true);
+                GlyphRenderer.DrawButtonFace(g, theme, face, this.GetDisplayText(column, item, modelIndex), column.EnabledSelector?.Invoke(item) ?? true);
                 break;
             }
 
             case DataGridViewColumnKind.Link:
             {
-                var text = GetDisplayText(column, item);
+                var text = this.GetDisplayText(column, item, modelIndex);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding), cellRect.Height);
                 g.DrawText(text, theme.DefaultFont, theme.Accent, textRect, alignment);
 
@@ -1897,7 +1943,7 @@ public class DataGridView : OwnerDrawnControl
             {
                 var arrowZone = Math.Min(_ComboArrowZone, cellRect.Width);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding - arrowZone), cellRect.Height);
-                g.DrawText(GetDisplayText(column, item), theme.DefaultFont, foreColor, textRect, alignment);
+                g.DrawText(this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, foreColor, textRect, alignment);
 
                 // The drop arrow: a themed triangle of stacked lines, like the ComboBox field's.
                 var centerX = cellRect.Right - arrowZone + (arrowZone / 2);
@@ -1919,7 +1965,7 @@ public class DataGridView : OwnerDrawnControl
                 }
 
                 var textRect = new Rectangle(textLeft, cellRect.Y, Math.Max(0, cellRect.Right - textLeft), cellRect.Height);
-                g.DrawText(GetDisplayText(column, item), theme.DefaultFont, foreColor, textRect, alignment);
+                g.DrawText(this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, foreColor, textRect, alignment);
                 break;
             }
         }
@@ -1975,13 +2021,14 @@ public class DataGridView : OwnerDrawnControl
             var display = Math.Max(0, _topRow);
             while (y < height && display < count)
             {
-                var item = this.Items[this.ToModelIndex(display)];
+                var modelIndex = this.ToModelIndex(display);
+                var item = this.Items[modelIndex];
                 ++display;
                 if (this.IsRowHidden(item))
                     continue;
 
                 var rowHeight = this.GetRowHeightFor(item);
-                var cellWidth = g.MeasureText(GetDisplayText(column, item), font).Width;
+                var cellWidth = g.MeasureText(this.GetDisplayText(column, item, modelIndex), font).Width;
                 if (column.ImageSelector?.Invoke(item) is not null)
                     cellWidth += rowHeight - 4 + _IconGap;
 
@@ -2228,6 +2275,7 @@ public class DataGridView : OwnerDrawnControl
             }
         }
 
+        this.InvalidateDisplayText(rowIndex);
         this.EndEdit(rowIndex, columnIndex);
         return true;
     }
@@ -2277,6 +2325,7 @@ public class DataGridView : OwnerDrawnControl
         if (picked is { } color && this.ValidateCell(rowIndex, columnIndex, color))
         {
             column.ColorSetter!(item, color);
+            this.InvalidateDisplayText(rowIndex);
             this.Invalidate();
         }
 
@@ -2837,6 +2886,7 @@ public class DataGridView : OwnerDrawnControl
             return;
 
         _columns[columnIndex].ValueSetter!(this.Items[rowIndex], choice);
+        this.InvalidateDisplayText(rowIndex);
         this.EndEdit(rowIndex, columnIndex);
     }
 
@@ -2857,6 +2907,7 @@ public class DataGridView : OwnerDrawnControl
             return;
 
         column.DateSetter!(item, proposed);
+        this.InvalidateDisplayText(rowIndex);
         this.EndEdit(rowIndex, columnIndex);
     }
 
@@ -3025,7 +3076,7 @@ public class DataGridView : OwnerDrawnControl
             {
                 if (d > 0)
                     builder.Append('\t');
-                builder.Append(GetDisplayText(_columns[map[d]], item));
+                builder.Append(this.GetDisplayText(_columns[map[d]], item, modelIndex));
             }
         }
 
@@ -3077,7 +3128,8 @@ public class DataGridView : OwnerDrawnControl
 
             var cells = lines[l].TrimEnd('\r').Split('\t');
             for (var c = 0; c < cells.Length && startColumn + c < map.Length; ++c)
-                this.TryPasteCell(rowIndex, map[startColumn + c], cells[c]);
+                if (this.TryPasteCell(rowIndex, map[startColumn + c], cells[c]))
+                    this.InvalidateDisplayText(rowIndex);
         }
 
         this.Invalidate();

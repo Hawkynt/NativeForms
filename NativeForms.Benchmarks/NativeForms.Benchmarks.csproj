@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Hawkynt.NativeForms.Benchmarks</AssemblyName>
+    <RootNamespace>Hawkynt.NativeForms.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- A deliberately dependency-free Stopwatch harness (no BenchmarkDotNet): the toolkit's whole
+         point is a tiny footprint, so its measuring stick carries no baggage either. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <TieredPgo>false</TieredPgo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+  </ItemGroup>
+
+</Project>

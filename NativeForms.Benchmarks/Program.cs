@@ -1,0 +1,272 @@
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
+using Hawkynt.NativeForms;
+
+namespace Hawkynt.NativeForms.Benchmarks;
+
+/// <summary>
+/// The §4 measuring stick: a dependency-free Stopwatch micro-harness covering construction cost per
+/// control type, realize cost, steady-state repaint throughput and large-scale scroll traversal —
+/// all headless. Emits one JSON line per metric to stdout (for machines) followed by an aligned
+/// table (for humans), and exits non-zero when a §4 regression threshold is crossed, so the nightly
+/// job fails loudly instead of drifting quietly. Thresholds carry 2× headroom over the PRD budgets
+/// to stay stable across runners.
+/// </summary>
+internal static class Program
+{
+    /// <summary>2× the §4 unrealized-control budget (512 B), the nightly regression gate.</summary>
+    private const int _PlainConstructionBudget = 1024;
+
+    /// <summary>2× the §4 owner-drawn construction budget (768 B).</summary>
+    private const int _OwnerDrawnConstructionBudget = 1536;
+
+    /// <summary>2× the §4 empty-form realization budget (8 KB).</summary>
+    private const int _EmptyFormRealizeBudget = 16384;
+
+    private const int _ConstructionCount = 4000;
+    private const int _PaintAllocationFrames = 100;
+    private const int _PaintThroughputFrames = 2000;
+    private const int _TraversalRows = 100_000;
+
+    private static readonly List<string> _failures = [];
+    private static readonly List<(string Metric, string Value)> _table = [];
+
+    private sealed record Row(string Name, int Value);
+
+    private static int Main()
+    {
+        // Construction: what a bare `new` costs per §4-governed control class.
+        Construct("Button", static () => new Button(), _PlainConstructionBudget);
+        Construct("Label", static () => new Label(), _PlainConstructionBudget);
+        Construct("TextBox", static () => new TextBox(), _PlainConstructionBudget);
+        Construct("CheckBox", static () => new CheckBox(), _OwnerDrawnConstructionBudget);
+        Construct("ListBox", static () => new ListBox(), _OwnerDrawnConstructionBudget);
+        Construct("ListView", static () => new ListView(), _OwnerDrawnConstructionBudget);
+        Construct("TreeView", static () => new TreeView(), _OwnerDrawnConstructionBudget);
+        Construct("DataGridView", static () => new DataGridView(), _OwnerDrawnConstructionBudget);
+        Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
+
+        RealizeEmptyForm();
+        RealizeHundredControlForm();
+
+        // Steady-state repaint throughput of the data-heavy controls; a warmed frame must allocate 0.
+        PaintThroughput("ListBox", MakeListBox(1000));
+        PaintThroughput("ListView", MakeListView(1000));
+        PaintThroughput("TreeView", MakeTreeView(1000));
+        PaintThroughput("DataGridView", MakeDataGridView(1000));
+
+        // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
+        ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
+        ScrollTraversal("DataGridView", MakeDataGridView(_TraversalRows), Keys.PageDown);
+        ScrollTraversal("TreeView", MakeTreeView(_TraversalRows), key: null);
+
+        PrintTable();
+
+        if (_failures.Count == 0)
+            return 0;
+
+        Console.WriteLine();
+        Console.WriteLine("§4 regression thresholds crossed:");
+        foreach (var failure in _failures)
+            Console.WriteLine($"  FAIL {failure}");
+
+        return 1;
+    }
+
+    // ---- Metric: construction ----
+
+    private static void Construct(string name, Func<Control> factory, int byteBudget)
+    {
+        var sink = new Control[_ConstructionCount];
+        for (var i = 0; i < _ConstructionCount; ++i)
+            sink[i] = factory(); // warm-up: JIT + static cctors stay out of the measurement
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < _ConstructionCount; ++i)
+            sink[i] = factory();
+        watch.Stop();
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        var nsPerOp = watch.Elapsed.TotalNanoseconds / _ConstructionCount;
+        var bytesPerOp = (double)bytes / _ConstructionCount;
+        Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytesPerOp)}}}",
+            $"{nsPerOp,8:F0} ns/op  {bytesPerOp,6:F0} B/op");
+
+        if (bytesPerOp >= byteBudget)
+            _failures.Add($"construct.{name}: {bytesPerOp:F0} B/op exceeds the {byteBudget} B budget");
+    }
+
+    // ---- Metric: realization ----
+
+    private static void RealizeEmptyForm()
+    {
+        // One warm-up pass, then a fresh form + backend per measured pass, like the unit test.
+        Realize(new Form());
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        Realize(new Form());
+        watch.Stop();
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        var micros = watch.Elapsed.TotalMicroseconds;
+        Emit("realize.emptyForm", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
+
+        if (bytes >= _EmptyFormRealizeBudget)
+            _failures.Add($"realize.emptyForm: {bytes} B exceeds the {_EmptyFormRealizeBudget} B budget");
+    }
+
+    private static void RealizeHundredControlForm()
+    {
+        Realize(MakeHundredControlForm()); // warm-up
+
+        var form = MakeHundredControlForm();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        Realize(form);
+        watch.Stop();
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        var micros = watch.Elapsed.TotalMicroseconds;
+        Emit("realize.form100", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
+    }
+
+    private static Form MakeHundredControlForm()
+    {
+        var form = new Form { Bounds = new(0, 0, 1200, 800) };
+        for (var i = 0; i < 25; ++i)
+        {
+            form.Controls.Add(new Button { Text = "Button", Bounds = new(0, i * 30, 100, 26) });
+            form.Controls.Add(new Label { Text = "Label", Bounds = new(110, i * 30, 100, 20) });
+            form.Controls.Add(new TextBox { Text = "Text", Bounds = new(220, i * 30, 100, 24) });
+            form.Controls.Add(new CheckBox { Text = "Check", Bounds = new(330, i * 30, 100, 20) });
+        }
+
+        return form;
+    }
+
+    // ---- Metric: steady-state repaint ----
+
+    private static void PaintThroughput(string name, OwnerDrawnControl control)
+    {
+        var canvas = RealizeOnCanvas(control);
+        canvas.PerformPaint();
+        canvas.PerformPaint(); // warm-up: JIT the paint path and build caches/reused args
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < _PaintAllocationFrames; ++i)
+            canvas.PerformPaint();
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < _PaintThroughputFrames; ++i)
+            canvas.PerformPaint();
+        watch.Stop();
+
+        var paintsPerSecond = _PaintThroughputFrames / watch.Elapsed.TotalSeconds;
+        Emit($"paint.{name}", $"{{\"paints_per_sec\":{F(paintsPerSecond)},\"bytes_per_frame\":{F((double)bytes / _PaintAllocationFrames)}}}",
+            $"{paintsPerSecond,8:F0} paints/s  {(double)bytes / _PaintAllocationFrames,4:F0} B/frame");
+
+        if (bytes != 0)
+            _failures.Add($"paint.{name}: {bytes} B allocated over {_PaintAllocationFrames} steady-state frames (must be 0)");
+    }
+
+    // ---- Metric: scroll traversal ----
+
+    private static void ScrollTraversal(string name, OwnerDrawnControl control, Keys? key)
+    {
+        var canvas = RealizeOnCanvas(control);
+        canvas.PerformPaint(); // warm-up frame
+
+        // Page keys cover a viewport per step; the wheel-driven fallback covers 3 rows per notch.
+        var steps = key is null ? _TraversalRows / 3 + 1 : _TraversalRows / 10 + 1;
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < steps; ++i)
+        {
+            if (key is { } k)
+                canvas.PerformKeyDown(k);
+            else
+                canvas.PerformMouseWheel(-120);
+
+            canvas.PerformPaint();
+        }
+
+        watch.Stop();
+        var rowsPerSecond = _TraversalRows / watch.Elapsed.TotalSeconds;
+        Emit($"scroll.{name}", $"{{\"rows\":{_TraversalRows},\"ms\":{F(watch.Elapsed.TotalMilliseconds)},\"rows_per_sec\":{F(rowsPerSecond)}}}",
+            $"{watch.Elapsed.TotalMilliseconds,8:F0} ms     {rowsPerSecond,10:F0} rows/s");
+    }
+
+    // ---- Control factories ----
+
+    private static ListBox MakeListBox(int rows)
+    {
+        var list = new ListBox { Bounds = new(0, 0, 320, 440) };
+        for (var i = 0; i < rows; ++i)
+            list.Items.Add("Row " + i);
+        list.SelectedIndex = 0;
+        return list;
+    }
+
+    private static ListView MakeListView(int rows)
+    {
+        var list = new ListView { Bounds = new(0, 0, 480, 440) };
+        list.Columns.Add(new ColumnHeader("Name", 240));
+        list.Columns.Add(new ColumnHeader("Size", 120));
+        for (var i = 0; i < rows; ++i)
+            list.Items.Add(new ListViewItem("Row " + i, "1 KB"));
+        list.SelectedIndex = 0;
+        return list;
+    }
+
+    private static TreeView MakeTreeView(int rows)
+    {
+        var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
+        for (var i = 0; i < rows; ++i)
+            tree.Nodes.Add("Node " + i);
+        return tree;
+    }
+
+    private static DataGridView MakeDataGridView(int rows)
+    {
+        var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
+        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
+        grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
+        for (var i = 0; i < rows; ++i)
+            grid.Items.Add(new Row("Row " + i, i));
+        grid.SelectedRowIndex = 0;
+        return grid;
+    }
+
+    // ---- Plumbing ----
+
+    private static void Realize(Form form) => Application.Run(form, new BenchBackend());
+
+    private static BenchCanvasPeer RealizeOnCanvas(OwnerDrawnControl control)
+    {
+        var backend = new BenchBackend();
+        var form = new Form { Bounds = new(0, 0, 640, 480) };
+        form.Controls.Add(control);
+        Application.Run(form, backend);
+        return backend.Canvases[0];
+    }
+
+    private static string F(double value) => value.ToString("F1", CultureInfo.InvariantCulture);
+
+    private static void Emit(string metric, string jsonBody, string human)
+    {
+        Console.WriteLine($"{{\"metric\":\"{metric}\",{jsonBody[1..]}");
+        _table.Add((metric, human));
+    }
+
+    private static void PrintTable()
+    {
+        Console.WriteLine();
+        Console.WriteLine($"{"metric",-22} value");
+        Console.WriteLine(new string('-', 60));
+        foreach (var (metric, value) in _table)
+            Console.WriteLine($"{metric,-22} {value}");
+    }
+}

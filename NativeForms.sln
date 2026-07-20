@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Demo", "NativeF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Tests", "NativeForms.Tests\NativeForms.Tests.csproj", "{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.Benchmarks", "NativeForms.Benchmarks\NativeForms.Benchmarks.csproj", "{41D8D74B-765B-4F54-8CD1-C2230CD75A25}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeForms.TrimProbe", "NativeForms.TrimProbe\NativeForms.TrimProbe.csproj", "{8C0100CA-209F-40CE-B750-D0A23680DFEE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +52,13 @@ Global
 		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{19DAA86E-504E-4CF8-ABF9-92862B28DBEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41D8D74B-765B-4F54-8CD1-C2230CD75A25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41D8D74B-765B-4F54-8CD1-C2230CD75A25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41D8D74B-765B-4F54-8CD1-C2230CD75A25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41D8D74B-765B-4F54-8CD1-C2230CD75A25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C0100CA-209F-40CE-B750-D0A23680DFEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C0100CA-209F-40CE-B750-D0A23680DFEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C0100CA-209F-40CE-B750-D0A23680DFEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C0100CA-209F-40CE-B750-D0A23680DFEE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

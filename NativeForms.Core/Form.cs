@@ -384,11 +384,23 @@ public class Form : Control
         return false;
     }
 
+    /// <summary>Scratch list the focus walks reuse, so a Tab press or mnemonic allocates nothing
+    /// once warm. Safe to share: every walk stops touching it the moment it moves focus.</summary>
+    private List<Control>? _tabOrder;
+
+    /// <summary>Rebuilds the flattened tab order into the reused scratch list.</summary>
+    private List<Control> BuildTabOrder()
+    {
+        var order = _tabOrder ??= [];
+        order.Clear();
+        AppendInTabOrder(this, order);
+        return order;
+    }
+
     /// <summary>Finds the label carrying <paramref name="mnemonic"/> and focuses the next tab stop after it.</summary>
     private bool FocusLabelMnemonic(char mnemonic)
     {
-        var order = new List<Control>();
-        AppendInTabOrder(this, order);
+        var order = this.BuildTabOrder();
         for (var i = 0; i < order.Count; ++i)
         {
             if (order[i] is not Label label || label.Mnemonic != mnemonic)
@@ -417,8 +429,7 @@ public class Form : Control
     /// </summary>
     internal void MoveFocus(Control? from, bool forward)
     {
-        var order = new List<Control>();
-        AppendInTabOrder(this, order);
+        var order = this.BuildTabOrder();
         var count = order.Count;
         if (count == 0)
             return;

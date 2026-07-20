@@ -31,6 +31,79 @@ jobs:
     with:
       ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
+  benchmark:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # The harness asserts the PRD §4 regression thresholds itself (construction byte budgets with
+      # 2x headroom, zero steady-state paint allocation) and exits non-zero on a regression — the
+      # pipefail keeps that exit code visible through the tee.
+      - name: Run benchmark harness (JSON lines + table)
+        run: |
+          set -o pipefail
+          dotnet run --project NativeForms.Benchmarks -c Release | tee benchmark-results.txt
+      - name: Publish benchmark step summary
+        if: always()
+        run: |
+          echo "### Benchmark results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat benchmark-results.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.txt
+
+  trim:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install NativeAOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      # The probe references every backend assembly but registers only GtkBackend, so a trimmed
+      # publish proves the §4 promise: only the registered backend is linked.
+      - name: Publish TrimProbe trimmed (assembly-per-file, so the linked set is inspectable)
+        run: >
+          dotnet publish NativeForms.TrimProbe/NativeForms.TrimProbe.csproj
+          --configuration Release --runtime linux-x64 --self-contained
+          -p:PublishTrimmed=true -p:TreatWarningsAsErrors=true
+          -o trim-out
+      - name: Assert only the registered backend survived trimming
+        run: |
+          ls -l trim-out
+          test -f trim-out/Hawkynt.NativeForms.Backends.Gtk.dll || { echo "registered GTK backend missing from output"; exit 1; }
+          for unregistered in Windows MacOS; do
+            if [ -e "trim-out/Hawkynt.NativeForms.Backends.$unregistered.dll" ]; then
+              echo "unregistered $unregistered backend assembly survived trimming"; exit 1
+            fi
+          done
+      # The same probe through NativeAOT, sized against the all-backends demo binary from CI.
+      - name: Publish TrimProbe with NativeAOT and report the size
+        run: |
+          dotnet publish NativeForms.TrimProbe/NativeForms.TrimProbe.csproj \
+            --configuration Release --runtime linux-x64 --self-contained \
+            -p:PublishAot=true -p:TreatWarningsAsErrors=true \
+            -o aot-out
+          echo "### TrimProbe size (single backend, linux-x64)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Trimmed publish (per-assembly):" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh trim-out | awk '{print $5, $NF}' >> "$GITHUB_STEP_SUMMARY"
+          echo "NativeAOT binary:" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh aot-out/Hawkynt.NativeForms.TrimProbe* 2>/dev/null | awk '{print $5, $NF}' >> "$GITHUB_STEP_SUMMARY" || true
+
   publish:
     needs: build
     runs-on: ubuntu-latest

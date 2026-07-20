@@ -57,8 +57,24 @@ public sealed class DataGridViewColumn
     /// <summary>Alignment of the cell content within the column.</summary>
     public ContentAlignment Alignment { get; set; } = ContentAlignment.MiddleLeft;
 
+    /// <summary>
+    /// The formatted cell text per model row, filled lazily by the grid and dropped whenever the
+    /// rows or this column's text-shaping selectors change. Repainting an unchanged cell must never
+    /// re-run a selector, box a value or re-format it — the §4 zero-steady-state-paint-allocation
+    /// guarantee for grids.
+    /// </summary>
+    internal string?[]? DisplayTextCache;
+
     /// <summary>Maps a row item to the value shown in this cell (rendered via <c>ToString()</c>).</summary>
-    public Func<object?, object?> ValueSelector { get; set; }
+    public Func<object?, object?> ValueSelector
+    {
+        get => field;
+        set
+        {
+            field = value;
+            this.DisplayTextCache = null;
+        }
+    }
 
     /// <summary>Optional selector producing a per-cell icon painted before the text;
     /// <see langword="null"/> for none.</summary>
@@ -100,12 +116,29 @@ public sealed class DataGridViewColumn
 
     /// <summary>Optional override of the displayed cell text; return <see langword="null"/> to fall
     /// back to <see cref="ValueSelector"/>.</summary>
-    public Func<object?, string?>? DisplayTextSelector { get; set; }
+    public Func<object?, string?>? DisplayTextSelector
+    {
+        get => field;
+        set
+        {
+            field = value;
+            this.DisplayTextCache = null;
+        }
+    }
 
     /// <summary>Optional formatter over the <see cref="ValueSelector"/> result — the reflection-free
     /// <c>CellFormatting</c> seam: it runs after the value selector and shapes the displayed text
-    /// only, so editors still seed from the raw value. Runs on the paint path — capture nothing.</summary>
-    public Func<object?, string>? FormatSelector { get; set; }
+    /// only, so editors still seed from the raw value. Its result is cached per cell until the row
+    /// changes, so it never runs per frame.</summary>
+    public Func<object?, string>? FormatSelector
+    {
+        get => field;
+        set
+        {
+            field = value;
+            this.DisplayTextCache = null;
+        }
+    }
 
     /// <summary>Optional per-cell tooltip text, surfaced through
     /// <see cref="DataGridView.GetCellTooltip"/>; <see langword="null"/> for none.</summary>

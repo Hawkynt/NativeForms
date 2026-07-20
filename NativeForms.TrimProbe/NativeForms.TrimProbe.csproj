@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Hawkynt.NativeForms.TrimProbe</AssemblyName>
+    <RootNamespace>Hawkynt.NativeForms.TrimProbe</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- The §4 backend-linking proof: this app references every backend assembly but registers only
+         the GTK one, so a trimmed publish must drop the others entirely. The nightly trim job
+         publishes it and asserts the Windows/macOS backend assemblies are absent from the output. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+    <ProjectReference Include="..\NativeForms.Backends.Windows\NativeForms.Backends.Windows.csproj" />
+    <ProjectReference Include="..\NativeForms.Backends.Gtk\NativeForms.Backends.Gtk.csproj" />
+    <ProjectReference Include="..\NativeForms.Backends.MacOS\NativeForms.Backends.MacOS.csproj" />
+  </ItemGroup>
+
+</Project>
