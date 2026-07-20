@@ -686,7 +686,7 @@ internal sealed class DataGridViewEditingTests
         var grid = MakeGrid(out _);
         var backend = RealizeBackend(grid);
         var flips = 0;
-        grid.CellDirtyStateChanged += (_, _) => ++flips;
+        grid.CurrentCellDirtyStateChanged += (_, _) => ++flips;
 
         grid.BeginEdit(0, 0);
         Assert.That(grid.IsCurrentCellDirty, Is.False, "seeding the editor is not an edit");

@@ -50,6 +50,7 @@ public class ListView : OwnerDrawnControl
     private const int _LargeIconLabelGap = 4;
     private const int _MinLargeIconCellWidth = 64;
     private const int _SortArrowWidth = 10;
+    private const int _DoubleClickMs = 500;
 
     /// <summary>The selected row indices, always kept sorted ascending.</summary>
     private readonly List<int> _selectedIndices = [];
@@ -74,6 +75,9 @@ public class ListView : OwnerDrawnControl
 
     private TextBox? _labelEditor;
     private int _editIndex = -1;
+
+    private int _lastClickIndex = -1;
+    private long _lastClickTicks;
 
     /// <summary>Creates a list view.</summary>
     public ListView()
@@ -299,6 +303,12 @@ public class ListView : OwnerDrawnControl
     /// <summary>The selected items, in index order. A live view over <see cref="SelectedIndices"/>.</summary>
     public IReadOnlyList<ListViewItem> SelectedItems => field ??= new SelectedItemList(this);
 
+    /// <summary>The checked item indices, sorted ascending. A live view over the items' check states.</summary>
+    public IReadOnlyList<int> CheckedIndices => field ??= new CheckedIndexList(this);
+
+    /// <summary>The checked items, in index order. A live view over the items' check states.</summary>
+    public IReadOnlyList<ListViewItem> CheckedItems => field ??= new CheckedItemList(this);
+
     /// <summary>The first selected item, or <see langword="null"/>.</summary>
     public ListViewItem? SelectedItem
     {
@@ -331,6 +341,13 @@ public class ListView : OwnerDrawnControl
 
     /// <summary>Raised after an item's check state flipped.</summary>
     public event EventHandler<ItemCheckedEventArgs>? ItemChecked;
+
+    /// <summary>Raised when an item is activated: double-clicked, or Enter while it holds the caret.</summary>
+    public event EventHandler? ItemActivate;
+
+    /// <summary>Raised before a label edit starts; setting <see cref="LabelEditEventArgs.CancelEdit"/>
+    /// keeps the label read-only for this attempt.</summary>
+    public event EventHandler<LabelEditEventArgs>? BeforeLabelEdit;
 
     /// <summary>Raised after a label edit finished; see <see cref="LabelEditEventArgs"/>.</summary>
     public event EventHandler<LabelEditEventArgs>? AfterLabelEdit;
@@ -366,9 +383,12 @@ public class ListView : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
-    /// <summary>A running label edit claims Enter (commit) and Escape (cancel) ahead of the form.</summary>
+    /// <summary>A running label edit claims Enter (commit) and Escape (cancel) ahead of the form;
+    /// outside an edit, Enter is claimed for item activation while an item holds the caret.</summary>
     protected override bool IsInputKey(Keys keyData)
-        => this.IsEditing && keyData is Keys.Enter or Keys.Escape;
+        => this.IsEditing
+            ? keyData is Keys.Enter or Keys.Escape
+            : keyData == Keys.Enter && _focusedIndex >= 0;
 
     /// <summary>The pixel height reserved for the header row (0 unless Details with headers shown).</summary>
     protected int HeaderHeight => this.View == ListViewView.Details && this.ShowColumnHeaders ? this.ItemHeight : 0;
@@ -442,6 +462,12 @@ public class ListView : OwnerDrawnControl
 
     /// <summary>Raises <see cref="ItemChecked"/>.</summary>
     protected virtual void OnItemChecked(ItemCheckedEventArgs e) => this.ItemChecked?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="ItemActivate"/>.</summary>
+    protected virtual void OnItemActivate(EventArgs e) => this.ItemActivate?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="BeforeLabelEdit"/>.</summary>
+    protected virtual void OnBeforeLabelEdit(LabelEditEventArgs e) => this.BeforeLabelEdit?.Invoke(this, e);
 
     /// <summary>Raises <see cref="AfterLabelEdit"/>.</summary>
     protected virtual void OnAfterLabelEdit(LabelEditEventArgs e) => this.AfterLabelEdit?.Invoke(this, e);
@@ -1012,7 +1038,8 @@ public class ListView : OwnerDrawnControl
 
     /// <summary>
     /// Starts editing the given item's label: a hosted native text box appears over the label,
-    /// pre-filled and fully selected. See the class remarks for the commit points.
+    /// pre-filled and fully selected. <see cref="BeforeLabelEdit"/> runs first and may veto the
+    /// edit. See the class remarks for the commit points.
     /// </summary>
     /// <exception cref="InvalidOperationException"><see cref="LabelEdit"/> is disabled.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The index is out of range.</exception>
@@ -1025,6 +1052,12 @@ public class ListView : OwnerDrawnControl
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.Items.Count);
 
         this.EndEdit(cancel: false);
+
+        var pending = new LabelEditEventArgs(index, this.Items[index].Text);
+        this.OnBeforeLabelEdit(pending);
+        if (pending.CancelEdit)
+            return;
+
         this.EnsureVisible(index);
 
         var editor = _labelEditor;
@@ -1183,10 +1216,14 @@ public class ListView : OwnerDrawnControl
 
         var index = this.HitTest(e.X, e.Y, out var cellBounds);
         if (index < 0)
+        {
+            _lastClickIndex = -1;
             return;
+        }
 
         if (this.CheckBoxes && this.IsInCheckGlyph(e.X, e.Y, cellBounds))
         {
+            _lastClickIndex = -1;
             this.RequestItemCheckAt(index, this.Items[index], !this.Items[index].Checked);
             return;
         }
@@ -1203,6 +1240,17 @@ public class ListView : OwnerDrawnControl
 
         _anchorIndex = index;
         this.FinishSelectionGesture(this.MultiSelect && e.Control ? this.ToggleCore(index) : this.SelectOnlyCore(index));
+
+        var now = Environment.TickCount64;
+        if (index == _lastClickIndex && now - _lastClickTicks <= _DoubleClickMs)
+        {
+            _lastClickIndex = -1;
+            this.OnItemActivate(EventArgs.Empty);
+            return;
+        }
+
+        _lastClickIndex = index;
+        _lastClickTicks = now;
     }
 
     /// <inheritdoc/>
@@ -1233,6 +1281,17 @@ public class ListView : OwnerDrawnControl
         }
 
         var count = this.Items.Count;
+        if (e.KeyCode == Keys.Enter)
+        {
+            if (_focusedIndex >= 0 && _focusedIndex < count)
+            {
+                this.OnItemActivate(EventArgs.Empty);
+                e.Handled = true;
+            }
+
+            return;
+        }
+
         if (e.KeyCode == Keys.Space)
         {
             if (this.CheckBoxes)
@@ -1523,6 +1582,63 @@ public class ListView : OwnerDrawnControl
 
         if (this.CheckBoxes)
             GlyphRenderer.DrawCheckBox(g, theme, new(cellX + _CellPad, y + _CellPad, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+    }
+
+    /// <summary>A live, sorted view of the indices whose item is checked.</summary>
+    private sealed class CheckedIndexList(ListView owner) : IReadOnlyList<int>
+    {
+        public int Count
+        {
+            get
+            {
+                var count = 0;
+                var items = owner.Items;
+                for (var i = 0; i < items.Count; ++i)
+                    if (items[i].Checked)
+                        ++count;
+
+                return count;
+            }
+        }
+
+        public int this[int index]
+        {
+            get
+            {
+                var items = owner.Items;
+                for (var i = 0; i < items.Count; ++i)
+                    if (items[i].Checked && index-- == 0)
+                        return i;
+
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+        }
+
+        public IEnumerator<int> GetEnumerator()
+        {
+            for (var i = 0; i < owner.Items.Count; ++i)
+                if (owner.Items[i].Checked)
+                    yield return i;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+    }
+
+    /// <summary>A live view of the checked items, in index order.</summary>
+    private sealed class CheckedItemList(ListView owner) : IReadOnlyList<ListViewItem>
+    {
+        public int Count => owner.CheckedIndices.Count;
+
+        public ListViewItem this[int index] => owner.Items[owner.CheckedIndices[index]];
+
+        public IEnumerator<ListViewItem> GetEnumerator()
+        {
+            for (var i = 0; i < owner.Items.Count; ++i)
+                if (owner.Items[i].Checked)
+                    yield return owner.Items[i];
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
     }
 
     /// <summary>A live, allocation-free mapping of the selected indices onto their items.</summary>

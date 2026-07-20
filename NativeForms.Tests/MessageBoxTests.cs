@@ -13,10 +13,15 @@ internal sealed class MessageBoxTests
 
         MessageBox.Show(backend, "Save changes?", "Editor", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
 
-        Assert.That(backend.MessageBoxes, Is.EqualTo(new[]
+        var call = backend.MessageBoxes.Single();
+        Assert.Multiple(() =>
         {
-            ("Save changes?", "Editor", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question),
-        }));
+            Assert.That(call.Text, Is.EqualTo("Save changes?"));
+            Assert.That(call.Caption, Is.EqualTo("Editor"));
+            Assert.That(call.Buttons, Is.EqualTo(MessageBoxButtons.YesNoCancel));
+            Assert.That(call.Icon, Is.EqualTo(MessageBoxIcon.Question));
+            Assert.That(call.Owner, Is.Null, "the ownerless overload passes no owner");
+        });
     }
 
     [Test]
@@ -31,6 +36,7 @@ internal sealed class MessageBoxTests
 
     [TestCase(MessageBoxButtons.OK)]
     [TestCase(MessageBoxButtons.OKCancel)]
+    [TestCase(MessageBoxButtons.AbortRetryIgnore)]
     [TestCase(MessageBoxButtons.YesNo)]
     [TestCase(MessageBoxButtons.YesNoCancel)]
     [TestCase(MessageBoxButtons.RetryCancel)]
@@ -46,4 +52,26 @@ internal sealed class MessageBoxTests
     [Test]
     public void Show_without_a_running_backend_throws()
         => Assert.Throws<InvalidOperationException>(() => MessageBox.Show("boom"));
+
+    [Test]
+    public void Show_with_an_owner_forwards_the_owner_window_peer()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        Application.Run(form, backend);
+
+        var result = MessageBox.Show(form, "Sure?", "App", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
+
+        var call = backend.MessageBoxes.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(backend.MessageBoxResult));
+            Assert.That(call.Owner, Is.SameAs(form.WindowPeer), "the box is owned by the form's window");
+            Assert.That(call.Buttons, Is.EqualTo(MessageBoxButtons.OKCancel));
+        });
+    }
+
+    [Test]
+    public void AbortRetryIgnore_carries_the_windows_forms_value()
+        => Assert.That((int)MessageBoxButtons.AbortRetryIgnore, Is.EqualTo(2));
 }

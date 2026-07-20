@@ -251,4 +251,24 @@ internal sealed class DateTimePickerTests
         picker.Value = new(2030, 1, 1);
         Assert.That(picker.Value, Is.EqualTo(new DateTime(2026, 8, 15)), "assignments clamp to MaxDate");
     }
+
+    [Test]
+    public void DropDown_and_CloseUp_fire_at_open_and_close()
+    {
+        var picker = CreatePicker(out _, out var backend);
+        var drops = 0;
+        var closes = 0;
+        picker.DropDown += (_, _) => ++drops;
+        picker.CloseUp += (_, _) => ++closes;
+
+        picker.OpenDropDown();
+        Assert.That((drops, closes), Is.EqualTo((1, 0)));
+
+        picker.CloseDropDown();
+        Assert.That((drops, closes), Is.EqualTo((1, 1)));
+
+        picker.OpenDropDown();
+        PopupOf(backend).FireDismiss(); // light dismissal closes up too
+        Assert.That((drops, closes), Is.EqualTo((2, 2)));
+    }
 }

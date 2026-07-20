@@ -473,4 +473,63 @@ internal sealed class TreeViewTests
 
         Assert.That(tree.SelectedNode, Is.Null);
     }
+
+    [Test]
+    public void BeforeSelect_cancel_keeps_the_previous_selection_on_every_path()
+    {
+        var tree = MakeTree();
+        var canvas = Realize(tree);
+        tree.SelectedNode = tree.Nodes[0];
+
+        var after = 0;
+        tree.AfterSelect += (_, _) => ++after;
+        tree.BeforeSelect += (_, e) => e.Cancel = ReferenceEquals(e.Node, tree.Nodes[1]);
+
+        tree.SelectedNode = tree.Nodes[1]; // assignment path
+        Assert.That(tree.SelectedNode, Is.SameAs(tree.Nodes[0]));
+
+        canvas.RaiseMouseDown(150, 33); // mouse path: row 1 = root1
+        Assert.That(tree.SelectedNode, Is.SameAs(tree.Nodes[0]));
+
+        canvas.RaiseKeyDown(Keys.Down); // keyboard path
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.SelectedNode, Is.SameAs(tree.Nodes[0]));
+            Assert.That(after, Is.Zero, "vetoed selections raise no AfterSelect");
+        });
+    }
+
+    [Test]
+    public void BeforeCheck_cancel_keeps_the_check_state_and_suppresses_AfterCheck()
+    {
+        var tree = MakeTree();
+        tree.CheckBoxes = true;
+        var after = 0;
+        tree.BeforeCheck += (_, e) => e.Cancel = true;
+        tree.AfterCheck += (_, _) => ++after;
+
+        tree.Nodes[0].Checked = true;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.Nodes[0].Checked, Is.False);
+            Assert.That(after, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void ExpandAll_and_CollapseAll_walk_the_whole_tree()
+    {
+        var tree = MakeTree();
+
+        tree.ExpandAll();
+        Assert.That(tree.VisibleNodeCount, Is.EqualTo(5), "every node is visible");
+
+        tree.CollapseAll();
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.VisibleNodeCount, Is.EqualTo(2), "only roots remain");
+            Assert.That(tree.Nodes[0].Nodes[0].IsExpanded, Is.False, "descendants folded too");
+        });
+    }
 }

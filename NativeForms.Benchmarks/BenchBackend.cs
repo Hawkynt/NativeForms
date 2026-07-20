@@ -42,7 +42,7 @@ internal sealed class BenchBackend : IPlatformBackend
     public INotifyIconPeer CreateNotifyIcon() => new BenchNotifyIconPeer();
     public Size GetScreenSize() => new(1920, 1080);
     public Size MeasureText(string text, Font font) => BenchGraphics.Measure(text);
-    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon) => DialogResult.OK;
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null) => DialogResult.OK;
     public string[]? ShowFileDialog(in FileDialogOptions options) => null;
     public Color? ShowColorDialog(Color color) => null;
     public Font? ShowFontDialog(Font font) => null;

@@ -150,6 +150,32 @@ public class ListBox : OwnerDrawnControl
     /// <summary>Whether the row at the given index is selected.</summary>
     public bool GetSelected(int index) => _selectedIndices.BinarySearch(index) >= 0;
 
+    /// <summary>
+    /// Selects or deselects the row at the given index without touching the rest of the selection —
+    /// the programmatic sibling of the multi-selection gestures, raising
+    /// <see cref="SelectedIndexChanged"/> at most once per call. In <see cref="SelectionMode.One"/>
+    /// selecting a row replaces the previous selection.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The index is out of range.</exception>
+    /// <exception cref="ArgumentException"><see cref="SelectionMode"/> is <see cref="SelectionMode.None"/>.</exception>
+    public void SetSelected(int index, bool value)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.Items.Count);
+        if (this.SelectionMode == SelectionMode.None)
+            throw new ArgumentException("SetSelected cannot be used while SelectionMode is None.");
+
+        var selected = this.GetSelected(index);
+        var changed = value
+            ? this.SelectionMode == SelectionMode.One ? this.SelectOnlyCore(index) : !selected && this.ToggleCore(index)
+            : selected && this.ToggleCore(index);
+        this.FinishSelectionGesture(changed);
+    }
+
+    /// <summary>Deselects every row, raising <see cref="SelectedIndexChanged"/> once when anything
+    /// was selected.</summary>
+    public void ClearSelected() => this.FinishSelectionGesture(this.ClearSelectionCore());
+
     /// <summary>The index of the row at the given client coordinates, or -1 for none.</summary>
     public int IndexFromPoint(int x, int y)
     {

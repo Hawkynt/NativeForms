@@ -11,6 +11,9 @@ public enum MessageBoxButtons
     /// <summary>OK and Cancel.</summary>
     OKCancel = 1,
 
+    /// <summary>Abort, Retry and Ignore.</summary>
+    AbortRetryIgnore = 2,
+
     /// <summary>Yes, No and Cancel.</summary>
     YesNoCancel = 3,
 
@@ -62,12 +65,39 @@ public static class MessageBox
     /// <summary>Shows <paramref name="text"/> under <paramref name="caption"/> with the given buttons and icon.</summary>
     /// <exception cref="InvalidOperationException">No application message loop is running.</exception>
     public static DialogResult Show(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
-        => Show(
-            Application.Current ?? throw new InvalidOperationException(
-                "MessageBox.Show needs a running backend — call it from inside Application.Run."),
-            text, caption, buttons, icon);
+        => Show(RequireBackend(), null, text, caption, buttons, icon);
+
+    /// <summary>Shows <paramref name="text"/> owned by <paramref name="owner"/> with an OK button and no caption or icon.</summary>
+    public static DialogResult Show(Form owner, string text)
+        => Show(owner, text, string.Empty);
+
+    /// <summary>Shows <paramref name="text"/> owned by <paramref name="owner"/> under <paramref name="caption"/> with an OK button.</summary>
+    public static DialogResult Show(Form owner, string text, string caption)
+        => Show(owner, text, caption, MessageBoxButtons.OK);
+
+    /// <summary>Shows <paramref name="text"/> owned by <paramref name="owner"/> under <paramref name="caption"/> with the given button set.</summary>
+    public static DialogResult Show(Form owner, string text, string caption, MessageBoxButtons buttons)
+        => Show(owner, text, caption, buttons, MessageBoxIcon.None);
+
+    /// <summary>
+    /// Shows <paramref name="text"/> owned by (transient to) <paramref name="owner"/> under
+    /// <paramref name="caption"/> with the given buttons and icon. The owner must be realized; an
+    /// unrealized owner falls back to the running application backend without ownership.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The owner is unrealized and no application message loop is running.</exception>
+    public static DialogResult Show(Form owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+        => Show(owner?.Backend ?? RequireBackend(), owner, text, caption, buttons, icon);
 
     /// <summary>Shows the message box on an explicit backend. Intended for tests.</summary>
     internal static DialogResult Show(IPlatformBackend backend, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
-        => backend.ShowMessageBox(text ?? string.Empty, caption ?? string.Empty, buttons, icon);
+        => Show(backend, null, text, caption, buttons, icon);
+
+    /// <summary>The single funnel every overload ends in: resolve the owner's window peer and forward.</summary>
+    internal static DialogResult Show(IPlatformBackend backend, Form? owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+        => backend.ShowMessageBox(text ?? string.Empty, caption ?? string.Empty, buttons, icon, owner?.WindowPeer);
+
+    /// <summary>The running application backend, or the classic "no message loop" complaint.</summary>
+    private static IPlatformBackend RequireBackend()
+        => Application.Current ?? throw new InvalidOperationException(
+            "MessageBox.Show needs a running backend — call it from inside Application.Run.");
 }

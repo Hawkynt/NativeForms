@@ -1,6 +1,7 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.ComponentModel;
+using CancelEventArgs = System.ComponentModel.CancelEventArgs;
 
 namespace Hawkynt.NativeForms;
 
@@ -29,8 +30,16 @@ public class ContextMenuStrip : Component
     /// <summary>Whether the menu is currently open.</summary>
     public bool IsOpen => _dropDown is { IsOpen: true };
 
+    /// <summary>Raised before the menu opens — on the right-click path through
+    /// <see cref="Control.ContextMenuStrip"/> and on explicit <see cref="Show"/> alike; set
+    /// <see cref="CancelEventArgs.Cancel"/> to keep it closed.</summary>
+    public event EventHandler<CancelEventArgs>? Opening;
+
     /// <summary>Raised after the menu (and its whole cascade) has closed.</summary>
     public event EventHandler? Closed;
+
+    /// <summary>Raises <see cref="Opening"/>.</summary>
+    protected virtual void OnOpening(CancelEventArgs e) => this.Opening?.Invoke(this, e);
 
     /// <summary>
     /// Opens the menu at a position given in <paramref name="control"/>'s client space. The control
@@ -46,9 +55,18 @@ public class ContextMenuStrip : Component
         this.ShowAt(backend, control.PointToScreen(clientLocation));
     }
 
-    /// <summary>Opens the menu at an absolute screen position on the given backend.</summary>
+    /// <summary>Opens the menu at an absolute screen position on the given backend, unless a
+    /// <see cref="Opening"/> handler vetoes it.</summary>
     internal void ShowAt(IPlatformBackend backend, Point screenLocation)
     {
+        if (this.Opening is not null)
+        {
+            var pending = new CancelEventArgs();
+            this.OnOpening(pending);
+            if (pending.Cancel)
+                return;
+        }
+
         var engine = _dropDown;
         if (engine is null || !ReferenceEquals(_backend, backend))
         {

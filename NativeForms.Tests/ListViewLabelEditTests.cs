@@ -202,4 +202,27 @@ internal sealed class ListViewLabelEditTests
             Assert.That(backend.Created.OfType<HeadlessTextBoxPeer>().Single().Text, Is.EqualTo("File3"));
         });
     }
+
+    [Test]
+    public void BeforeLabelEdit_cancel_keeps_the_editor_closed()
+    {
+        var list = MakeEditable();
+        var backend = Realize(list, out _);
+        LabelEditEventArgs? before = null;
+        list.BeforeLabelEdit += (_, e) =>
+        {
+            before = e;
+            e.CancelEdit = true;
+        };
+
+        list.BeginEdit(1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(list.IsEditing, Is.False);
+            Assert.That(before!.Item, Is.EqualTo(1));
+            Assert.That(before.Label, Is.EqualTo("File2"), "carries the current text");
+            Assert.That(backend.Created.OfType<HeadlessTextBoxPeer>(), Is.Empty, "no editor was hosted");
+        });
+    }
 }

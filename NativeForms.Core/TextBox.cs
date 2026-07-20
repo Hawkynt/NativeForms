@@ -131,10 +131,14 @@ public class TextBox : Control
         }
     }
 
-    /// <summary>Whether Enter inserts a newline in a multiline box instead of activating the default button.</summary>
+    /// <summary>Whether Enter inserts a newline in a multiline box instead of activating the default
+    /// button. Stored only for now: keys typed inside the hosted native editor are not observable
+    /// from the core, so the flag cannot steer them until the peers expose a key seam.</summary>
     public bool AcceptsReturn { get; set; }
 
-    /// <summary>Whether Tab inserts a tab character in a multiline box instead of moving focus.</summary>
+    /// <summary>Whether Tab inserts a tab character in a multiline box instead of moving focus.
+    /// Stored only for now: keys typed inside the hosted native editor are not observable from the
+    /// core, so the flag cannot steer them until the peers expose a key seam.</summary>
     public bool AcceptsTab { get; set; }
 
     /// <summary>
@@ -200,6 +204,33 @@ public class TextBox : Control
             this.SelectionStart = start + ApplyCasing(this.CharacterCasing, value).Length;
             this.SelectionLength = 0;
         }
+    }
+
+    /// <summary>Selects the given run of text (the caret moves to its start); negative values clamp
+    /// to zero. Buffered until realization and forwarded to the live widget like the
+    /// <see cref="SelectionStart"/>/<see cref="SelectionLength"/> setters.</summary>
+    public void Select(int start, int length)
+    {
+        _selectionStart = Math.Max(0, start);
+        _selectionLength = Math.Max(0, length);
+        _peer?.SetSelection(_selectionStart, _selectionLength);
+    }
+
+    /// <summary>Selects the whole content.</summary>
+    public void SelectAll() => this.Select(0, _text.Length);
+
+    /// <summary>Empties the box, raising <see cref="Control.TextChanged"/> when it held text.</summary>
+    public void Clear() => this.Text = string.Empty;
+
+    /// <summary>Appends <paramref name="text"/> to the content and parks the caret at the end —
+    /// the classic log-window helper.</summary>
+    public void AppendText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        this.Text = _text + text;
+        this.Select(_text.Length, 0);
     }
 
     /// <summary>The mask character actually pushed to the peer, honoring <see cref="UseSystemPasswordChar"/>.</summary>

@@ -63,6 +63,14 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
             if (value is not null && !ReferenceEquals(value.Host, this))
                 throw new ArgumentException("The node is not attached to this control.", nameof(value));
 
+            if (value is not null)
+            {
+                var pending = new TreeViewCancelEventArgs(value);
+                this.OnBeforeSelect(pending);
+                if (pending.Cancel)
+                    return;
+            }
+
             _selectedNode = value;
             if (value is not null)
                 this.ScrollNodeIntoView(value);
@@ -132,6 +140,11 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>The number of rows the expanded part of the tree currently occupies.</summary>
     public int VisibleNodeCount => _rows.Count;
 
+    /// <summary>Raised before <see cref="SelectedNode"/> changes to a node — on every selection path,
+    /// mouse, keyboard and assignment alike; set <see cref="TreeViewCancelEventArgs.Cancel"/> to keep
+    /// the current selection.</summary>
+    public event EventHandler<TreeViewCancelEventArgs>? BeforeSelect;
+
     /// <summary>Raised after <see cref="SelectedNode"/> changes to a node.</summary>
     public event EventHandler<TreeViewEventArgs>? AfterSelect;
 
@@ -147,8 +160,26 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>Raised after a node collapsed.</summary>
     public event EventHandler<TreeViewEventArgs>? AfterCollapse;
 
+    /// <summary>Raised before a node's <see cref="TreeNode.Checked"/> state changes; set
+    /// <see cref="TreeViewCancelEventArgs.Cancel"/> to keep the current state.</summary>
+    public event EventHandler<TreeViewCancelEventArgs>? BeforeCheck;
+
     /// <summary>Raised after a node's <see cref="TreeNode.Checked"/> state changed.</summary>
     public event EventHandler<TreeViewEventArgs>? AfterCheck;
+
+    /// <summary>Expands every node of the tree.</summary>
+    public void ExpandAll()
+    {
+        for (var i = 0; i < this.Nodes.Count; ++i)
+            this.Nodes[i].ExpandAll();
+    }
+
+    /// <summary>Collapses every node of the tree, descendants included.</summary>
+    public void CollapseAll()
+    {
+        for (var i = 0; i < this.Nodes.Count; ++i)
+            this.Nodes[i].Collapse(ignoreChildren: false);
+    }
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
@@ -161,6 +192,9 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 
     /// <summary>The number of fully visible rows in the item area.</summary>
     protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.ItemHeight);
+
+    /// <summary>Raises <see cref="BeforeSelect"/>.</summary>
+    protected virtual void OnBeforeSelect(TreeViewCancelEventArgs e) => this.BeforeSelect?.Invoke(this, e);
 
     /// <summary>Raises <see cref="AfterSelect"/>.</summary>
     protected virtual void OnAfterSelect(TreeViewEventArgs e) => this.AfterSelect?.Invoke(this, e);
@@ -177,9 +211,13 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>Raises <see cref="AfterCollapse"/>.</summary>
     protected virtual void OnAfterCollapse(TreeViewEventArgs e) => this.AfterCollapse?.Invoke(this, e);
 
+    /// <summary>Raises <see cref="BeforeCheck"/>.</summary>
+    protected virtual void OnBeforeCheck(TreeViewCancelEventArgs e) => this.BeforeCheck?.Invoke(this, e);
+
     /// <summary>Raises <see cref="AfterCheck"/>.</summary>
     protected virtual void OnAfterCheck(TreeViewEventArgs e) => this.AfterCheck?.Invoke(this, e);
 
+    void ITreeNodeHost.OnBeforeCheck(TreeViewCancelEventArgs e) => this.OnBeforeCheck(e);
     void ITreeNodeHost.OnBeforeExpand(TreeViewCancelEventArgs e) => this.OnBeforeExpand(e);
     void ITreeNodeHost.OnAfterExpand(TreeViewEventArgs e) => this.OnAfterExpand(e);
     void ITreeNodeHost.OnBeforeCollapse(TreeViewCancelEventArgs e) => this.OnBeforeCollapse(e);

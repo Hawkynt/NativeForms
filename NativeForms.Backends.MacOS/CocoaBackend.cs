@@ -67,7 +67,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public ITextBoxPeer CreateTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
-    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
         => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>

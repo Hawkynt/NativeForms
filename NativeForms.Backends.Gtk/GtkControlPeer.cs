@@ -22,6 +22,9 @@ internal abstract class GtkControlPeer : IControlPeer
     /// <summary>The native widget handle, or 0 before the widget is created.</summary>
     protected nint _widget;
 
+    /// <summary>The native widget handle for backend-side consumers (dialog transient parents).</summary>
+    internal nint WidgetHandle => _widget;
+
     /// <summary>The parent <c>GtkFixed</c> this widget lives in, or 0 while unparented.</summary>
     protected nint _parentFixed;
 

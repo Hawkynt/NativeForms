@@ -17,6 +17,9 @@ internal interface ITreeNodeHost
     /// <summary>Called after any structural change so the visible rows re-flatten and repaint.</summary>
     void OnStructureChanged();
 
+    /// <summary>Raises the control's cancelable BeforeCheck event.</summary>
+    void OnBeforeCheck(TreeViewCancelEventArgs e);
+
     /// <summary>Called after a node's check state changed.</summary>
     void OnNodeChecked(TreeNode node);
 

@@ -22,6 +22,11 @@ public abstract class OwnerDrawnControl : Control
     /// <summary>Owner-drawn surfaces take no focus by default; interactive controls override.</summary>
     protected override bool Focusable => false;
 
+    /// <summary>Whether a mouse-button press on this control is in flight. Set by the input pipeline
+    /// before click-to-focus transfers focus and cleared on release, so focus-arrival handlers can
+    /// distinguish a click from keyboard navigation.</summary>
+    private protected bool IsMousePressInFlight { get; private set; }
+
     /// <summary>Requests a full repaint of the canvas surface.</summary>
     public override void Invalidate() => _canvas?.InvalidateAll();
 
@@ -88,6 +93,11 @@ public abstract class OwnerDrawnControl : Control
             if (!this.Enabled)
                 return;
 
+            // The press is recorded before click-to-focus transfers focus, so focus-arrival logic
+            // (the radio auto-check) can tell a click apart from keyboard arrival — the same signal
+            // Windows Forms reads from the static MouseButtons state during WM_SETFOCUS.
+            this.IsMousePressInFlight = true;
+
             // Clicking a focusable control focuses it before the handler runs, like WM_MOUSEACTIVATE.
             if (this.Focusable)
                 this.Focus();
@@ -99,6 +109,9 @@ public abstract class OwnerDrawnControl : Control
         };
         canvas.MouseUp += (_, e) =>
         {
+            // The physical press ended no matter how the event routes below.
+            this.IsMousePressInFlight = false;
+
             // A drag in flight consumes the source's mouse stream — matching how an OS drag steals
             // the pointer from the source window.
             if (DragDropSession.RouteMouseUp(this, e))

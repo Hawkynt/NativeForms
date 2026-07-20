@@ -270,4 +270,70 @@ internal sealed class TextBoxTests
             Assert.That(box.AcceptsTab, Is.True);
         });
     }
+
+    [Test]
+    public void Select_buffers_before_realization_and_forwards_live()
+    {
+        var box = new TextBox { Text = "hello world" };
+        box.Select(6, 5);
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.SelectionStart, Is.EqualTo(6));
+            Assert.That(box.SelectionLength, Is.EqualTo(5));
+        });
+
+        var peer = PeerOf(Realize(box));
+        Assert.That((peer.SelectionStart, peer.SelectionLength), Is.EqualTo((6, 5)), "buffered selection flushes");
+
+        box.Select(0, 5);
+        Assert.That((peer.SelectionStart, peer.SelectionLength), Is.EqualTo((0, 5)), "live writes forward");
+    }
+
+    [Test]
+    public void SelectAll_spans_the_whole_content()
+    {
+        var box = new TextBox { Text = "hello" };
+
+        box.SelectAll();
+
+        Assert.That((box.SelectionStart, box.SelectionLength), Is.EqualTo((0, 5)));
+    }
+
+    [Test]
+    public void Clear_empties_the_text_and_raises_TextChanged_once()
+    {
+        var box = new TextBox { Text = "hello" };
+        var changes = 0;
+        box.TextChanged += (_, _) => ++changes;
+
+        box.Clear();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.Text, Is.Empty);
+            Assert.That(changes, Is.EqualTo(1));
+        });
+
+        box.Clear(); // already empty: no further event
+        Assert.That(changes, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void AppendText_appends_and_parks_the_caret_at_the_end()
+    {
+        var box = new TextBox { Text = "log" };
+
+        box.AppendText(":entry");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.Text, Is.EqualTo("log:entry"));
+            Assert.That((box.SelectionStart, box.SelectionLength), Is.EqualTo((9, 0)));
+        });
+
+        var changes = 0;
+        box.TextChanged += (_, _) => ++changes;
+        box.AppendText(string.Empty);
+        Assert.That(changes, Is.Zero, "appending nothing is a no-op");
+    }
 }

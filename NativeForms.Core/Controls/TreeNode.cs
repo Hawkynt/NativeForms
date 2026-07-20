@@ -64,8 +64,9 @@ public sealed class TreeNode
     } = -1;
 
     /// <summary>
-    /// Whether the node's check box is ticked. Changing it raises <see cref="TreeView.AfterCheck"/>
-    /// on an attached control.
+    /// Whether the node's check box is ticked. On an attached control changing it raises the
+    /// cancelable <see cref="TreeView.BeforeCheck"/> first — a veto keeps the current state — and
+    /// <see cref="TreeView.AfterCheck"/> afterwards; detached nodes just flip the state.
     /// </summary>
     public bool Checked
     {
@@ -75,8 +76,17 @@ public sealed class TreeNode
             if (field == value)
                 return;
 
+            var host = _host;
+            if (host is not null)
+            {
+                var e = new TreeViewCancelEventArgs(this);
+                host.OnBeforeCheck(e);
+                if (e.Cancel)
+                    return;
+            }
+
             field = value;
-            _host?.OnNodeChecked(this);
+            host?.OnNodeChecked(this);
         }
     }
 
@@ -188,6 +198,21 @@ public sealed class TreeNode
             host.SelectedNode = this;
 
         host.OnAfterCollapse(new TreeViewEventArgs(this));
+    }
+
+    /// <summary>
+    /// Hides the node's children like <see cref="Collapse()"/>; when
+    /// <paramref name="ignoreChildren"/> is <see langword="false"/> every descendant collapses
+    /// first, so re-expanding the node reveals a fully folded subtree.
+    /// </summary>
+    /// <param name="ignoreChildren">Whether the descendants keep their own expansion state.</param>
+    public void Collapse(bool ignoreChildren)
+    {
+        if (!ignoreChildren && _nodes is not null)
+            for (var i = 0; i < _nodes.Count; ++i)
+                _nodes[i].Collapse(false);
+
+        this.Collapse();
     }
 
     /// <summary>Expands a collapsed node and collapses an expanded one.</summary>

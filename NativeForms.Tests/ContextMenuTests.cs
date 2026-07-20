@@ -125,4 +125,26 @@ internal sealed class ContextMenuTests
 
         Assert.That(menu.IsOpen, Is.False);
     }
+
+    [Test]
+    public void Opening_cancel_keeps_the_menu_closed_on_both_paths()
+    {
+        var panel = CreatePanel(out var menu, out _, out var canvas, out var backend);
+        var openings = 0;
+        menu.Opening += (_, e) =>
+        {
+            ++openings;
+            e.Cancel = true;
+        };
+
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right); // the Control.ContextMenuStrip path
+        menu.Show(panel, new Point(5, 5));                 // the explicit path
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(openings, Is.EqualTo(2));
+            Assert.That(menu.IsOpen, Is.False);
+            Assert.That(backend.Created.OfType<HeadlessPopupPeer>(), Is.Empty, "no popup was ever created");
+        });
+    }
 }

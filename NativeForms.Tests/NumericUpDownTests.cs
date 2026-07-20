@@ -248,4 +248,20 @@ internal sealed class NumericUpDownTests
             Assert.That(g.Operations.Exists(o => o.StartsWith("line ")), Is.True, "draws the arrows");
         });
     }
+
+    [Test]
+    public void ThousandsSeparator_formats_with_groups_and_parses_them_back()
+    {
+        var upDown = new NumericUpDown { Maximum = 10000, DecimalPlaces = 1, ThousandsSeparator = true, Value = 1234.5m };
+        var editor = EditorOf(Realize(upDown));
+
+        Assert.That(editor.Text, Is.EqualTo(1234.5m.ToString("N1")), "the editor groups digits");
+
+        editor.SimulateUserInput(9876.5m.ToString("N1"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(upDown.Value, Is.EqualTo(9876.5m), "grouped input parses");
+            Assert.That(editor.Text, Is.EqualTo(9876.5m.ToString("N1")), "the commit re-renders the grouping");
+        });
+    }
 }

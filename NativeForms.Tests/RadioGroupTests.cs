@@ -71,16 +71,23 @@ internal sealed class RadioGroupTests
     [Test]
     public void RadioButton_space_key_release_selects()
     {
-        var radio = new RadioButton { Bounds = new(0, 0, 120, 20) };
-        var canvas = Realize(radio);
+        // Two radios: initial focus lands on the first and auto-checks it, leaving the second — the
+        // Space target — observably unchecked until the key path selects it.
+        var first = new RadioButton { Bounds = new(0, 0, 120, 20) };
+        var second = new RadioButton { Bounds = new(0, 20, 120, 20) };
+        var canvases = RealizeAll(first, second);
 
         // Like the WinForms button base, Space acts on key-up — a held key must not auto-repeat.
-        canvas.RaiseKeyDown(Keys.Space);
-        Assert.That(radio.Checked, Is.False, "key-down alone must not select");
+        canvases[1].RaiseKeyDown(Keys.Space);
+        Assert.That(second.Checked, Is.False, "key-down alone must not select");
 
-        canvas.RaiseKeyUp(Keys.Space);
+        canvases[1].RaiseKeyUp(Keys.Space);
 
-        Assert.That(radio.Checked, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.Checked, Is.True);
+            Assert.That(first.Checked, Is.False, "the group follows the key selection");
+        });
     }
 
     [Test]
@@ -137,5 +144,43 @@ internal sealed class RadioGroupTests
 
         // Accent fill covers half of the 100px track: 50px wide, inset at (1, 1), 18px tall.
         Assert.That(g.Operations, Does.Contain("fill #FF0078D4 1,1,50,18"));
+    }
+
+    [Test]
+    public void RadioButton_focus_arrival_without_a_mouse_press_checks_it()
+    {
+        var first = new RadioButton { Bounds = new(0, 0, 120, 20) };
+        var second = new RadioButton { Bounds = new(0, 20, 120, 20) };
+        var canvases = RealizeAll(first, second);
+
+        Assert.That(first.Checked, Is.True, "initial focus lands on the first radio and checks it");
+
+        canvases[1].RaiseGotFocus(); // tab-like focus arrival
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.Checked, Is.True);
+            Assert.That(first.Checked, Is.False);
+        });
+    }
+
+    [Test]
+    public void RadioButton_mouse_press_in_flight_defers_selection_to_the_click()
+    {
+        var first = new RadioButton { Bounds = new(0, 0, 120, 20) };
+        var second = new RadioButton { Bounds = new(0, 20, 120, 20) };
+        var canvases = RealizeAll(first, second);
+        var clicks = 0;
+        second.Click += (_, _) => ++clicks;
+
+        canvases[1].RaiseMouseDown(5, 10);
+        canvases[1].RaiseGotFocus(); // click-to-focus arrives while the press is held
+        Assert.That(second.Checked, Is.False, "no auto-check while the press is in flight");
+
+        canvases[1].RaiseMouseUp(5, 10);
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.Checked, Is.True);
+            Assert.That(clicks, Is.EqualTo(1), "the click path selects exactly once");
+        });
     }
 }

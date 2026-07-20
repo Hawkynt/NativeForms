@@ -19,6 +19,10 @@ public class SplitContainer : OwnerDrawnControl
     private bool _dragging;
     private int _dragOffset;
 
+    /// <summary>The split-axis extent at the previous layout; the reference the
+    /// <see cref="FixedPanel"/> resize policies work against.</summary>
+    private int _lastExtent;
+
     /// <summary>Creates a split container with its two panels already parented.</summary>
     public SplitContainer()
     {
@@ -46,10 +50,64 @@ public class SplitContainer : OwnerDrawnControl
                 return;
 
             field = value;
+            _lastExtent = value == Orientation.Vertical ? this.Width : this.Height;
             this.LayoutPanels();
             this.Invalidate();
         }
     } = Orientation.Vertical;
+
+    /// <summary>
+    /// Which panel keeps its size when the container resizes. The default
+    /// <see cref="Hawkynt.NativeForms.FixedPanel.None"/> scales <see cref="SplitterDistance"/>
+    /// proportionally — the Windows Forms default behavior.
+    /// </summary>
+    public FixedPanel FixedPanel { get; set; }
+
+    /// <summary>
+    /// Whether <see cref="Panel1"/> is collapsed: its peer hides and <see cref="Panel2"/> takes the
+    /// whole area, with no splitter to drag. Collapsing it un-collapses <see cref="Panel2"/> — only
+    /// one panel can be collapsed at a time, like the classic control.
+    /// </summary>
+    public bool Panel1Collapsed
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            if (value && this.Panel2Collapsed)
+                this.Panel2Collapsed = false;
+
+            this.Panel1.PushPeerVisible();
+            this.LayoutPanels();
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Whether <see cref="Panel2"/> is collapsed: its peer hides and <see cref="Panel1"/> takes the
+    /// whole area, with no splitter to drag. Collapsing it un-collapses <see cref="Panel1"/> — only
+    /// one panel can be collapsed at a time, like the classic control.
+    /// </summary>
+    public bool Panel2Collapsed
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            if (value && this.Panel1Collapsed)
+                this.Panel1Collapsed = false;
+
+            this.Panel2.PushPeerVisible();
+            this.LayoutPanels();
+            this.Invalidate();
+        }
+    }
 
     /// <summary>
     /// The pixel size of <see cref="Panel1"/> along the split axis. Assignments clamp to
@@ -108,14 +166,35 @@ public class SplitContainer : OwnerDrawnControl
     /// <summary>Raises <see cref="SplitterMoved"/>.</summary>
     protected virtual void OnSplitterMoved(EventArgs e) => this.SplitterMoved?.Invoke(this, e);
 
-    /// <summary>Re-clamps the distance and re-applies both panels' bounds — the split container owns
-    /// its panels' bounds, so the base Anchor/Dock engine is replaced wholesale. Each panel then
-    /// lays out its own children per their Anchor/Dock like any plain container. A no-op while the
-    /// control has no size yet, so constructing it never clamps the default distance away.</summary>
+    /// <summary>A collapsed panel's peer hides while its logical <see cref="Control.Visible"/> stays
+    /// untouched, so un-collapsing restores exactly what was there — the Expander pattern.</summary>
+    private protected override bool GetChildPeerVisible(Control child)
+        => child.Visible
+           && !(this.Panel1Collapsed && ReferenceEquals(child, this.Panel1))
+           && !(this.Panel2Collapsed && ReferenceEquals(child, this.Panel2));
+
+    /// <summary>Re-applies the resize policy and both panels' bounds — the split container owns its
+    /// panels' bounds, so the base Anchor/Dock engine is replaced wholesale. Each panel then lays
+    /// out its own children per their Anchor/Dock like any plain container. When the split-axis
+    /// extent changed, <see cref="FixedPanel"/> decides who absorbs it: the default scales
+    /// <see cref="SplitterDistance"/> proportionally, a pinned panel keeps its own size. A no-op
+    /// while the control has no size yet, so constructing it never clamps the default distance
+    /// away.</summary>
     private protected override void OnLayout()
     {
         if (this.Width == 0 && this.Height == 0)
             return;
+
+        var extent = this.Orientation == Orientation.Vertical ? this.Width : this.Height;
+        var previous = _lastExtent;
+        _lastExtent = extent;
+        if (previous > 0 && extent != previous)
+            _splitterDistance = this.FixedPanel switch
+            {
+                FixedPanel.Panel1 => _splitterDistance,
+                FixedPanel.Panel2 => _splitterDistance + extent - previous,
+                _ => (int)((long)_splitterDistance * extent / previous),
+            };
 
         this.ApplyDistance(_splitterDistance);
         this.LayoutPanels();
@@ -140,9 +219,22 @@ public class SplitContainer : OwnerDrawnControl
         return true;
     }
 
-    /// <summary>Recomputes both panels' bounds from the current distance, orientation and size.</summary>
+    /// <summary>Recomputes both panels' bounds from the current distance, orientation and size; a
+    /// collapsed panel leaves the whole area to the other one.</summary>
     private void LayoutPanels()
     {
+        if (this.Panel1Collapsed)
+        {
+            this.Panel2.Bounds = new(0, 0, this.Width, this.Height);
+            return;
+        }
+
+        if (this.Panel2Collapsed)
+        {
+            this.Panel1.Bounds = new(0, 0, this.Width, this.Height);
+            return;
+        }
+
         var distance = _splitterDistance;
         var splitterWidth = this.SplitterWidth;
         if (this.Orientation == Orientation.Vertical)
@@ -157,11 +249,14 @@ public class SplitContainer : OwnerDrawnControl
         }
     }
 
-    /// <summary>The strip of the control's own surface occupied by the splitter bar.</summary>
+    /// <summary>The strip of the control's own surface occupied by the splitter bar; empty (nothing
+    /// to grab) while a panel is collapsed.</summary>
     private Rectangle GetSplitterBounds()
-        => this.Orientation == Orientation.Vertical
-            ? new(_splitterDistance, 0, this.SplitterWidth, this.Height)
-            : new(0, _splitterDistance, this.Width, this.SplitterWidth);
+        => this.Panel1Collapsed || this.Panel2Collapsed
+            ? Rectangle.Empty
+            : this.Orientation == Orientation.Vertical
+                ? new(_splitterDistance, 0, this.SplitterWidth, this.Height)
+                : new(0, _splitterDistance, this.Width, this.SplitterWidth);
 
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
@@ -196,6 +291,9 @@ public class SplitContainer : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (this.Panel1Collapsed || this.Panel2Collapsed)
+            return; // no splitter to nudge
+
         var vertical = this.Orientation == Orientation.Vertical;
         var handled = true;
         var moved = false;
@@ -226,8 +324,11 @@ public class SplitContainer : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
 
-        // A subtle grip: three dots centered on the bar.
+        // A subtle grip: three dots centered on the bar — none while a panel is collapsed.
         var splitter = this.GetSplitterBounds();
+        if (splitter.IsEmpty)
+            return;
+
         var centerX = splitter.X + (splitter.Width / 2);
         var centerY = splitter.Y + (splitter.Height / 2);
         for (var i = 0; i < _GripDotCount; ++i)

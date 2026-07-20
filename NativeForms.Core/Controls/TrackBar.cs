@@ -125,11 +125,33 @@ public class TrackBar : OwnerDrawnControl
         }
     }
 
+    /// <summary>Raised for every user gesture that moves the value — thumb drag, arrow and page
+    /// keys, Home/End and track clicks — but never for programmatic <see cref="Value"/> writes,
+    /// mirroring the <see cref="ScrollBar.Scroll"/>/<see cref="ScrollBar.ValueChanged"/> split.</summary>
+    public event EventHandler? Scroll;
+
     /// <summary>Raised when <see cref="Value"/> changes — live while the thumb is dragged.</summary>
     public event EventHandler? ValueChanged;
 
+    /// <summary>Raises <see cref="Scroll"/>.</summary>
+    protected virtual void OnScroll(EventArgs e) => this.Scroll?.Invoke(this, e);
+
     /// <summary>Raises <see cref="ValueChanged"/>.</summary>
     protected virtual void OnValueChanged(EventArgs e) => this.ValueChanged?.Invoke(this, e);
+
+    /// <summary>Applies a user-gestured value: clamps, repaints, and raises <see cref="Scroll"/>
+    /// then <see cref="ValueChanged"/> — only when the value actually moved.</summary>
+    private void SetValueFromGesture(int value)
+    {
+        var clamped = Math.Clamp(value, _minimum, _maximum);
+        if (_value == clamped)
+            return;
+
+        _value = clamped;
+        this.Invalidate();
+        this.OnScroll(EventArgs.Empty);
+        this.OnValueChanged(EventArgs.Empty);
+    }
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
@@ -254,7 +276,7 @@ public class TrackBar : OwnerDrawnControl
         }
 
         // A click on the track pages toward the click, like the native control.
-        this.Value += position > this.ThumbCenter ? this.LargeChange : -this.LargeChange;
+        this.SetValueFromGesture(_value + (position > this.ThumbCenter ? this.LargeChange : -this.LargeChange));
     }
 
     /// <inheritdoc/>
@@ -264,7 +286,7 @@ public class TrackBar : OwnerDrawnControl
             return;
 
         var position = this.IsVertical ? e.Y : e.X;
-        this.Value = this.ValueAt(position - _dragOffset);
+        this.SetValueFromGesture(this.ValueAt(position - _dragOffset));
     }
 
     /// <inheritdoc/>
@@ -277,28 +299,28 @@ public class TrackBar : OwnerDrawnControl
         {
             case Keys.Left:
             case Keys.Up:
-                this.Value -= this.SmallChange;
+                this.SetValueFromGesture(_value - this.SmallChange);
                 break;
 
             case Keys.Right:
             case Keys.Down:
-                this.Value += this.SmallChange;
+                this.SetValueFromGesture(_value + this.SmallChange);
                 break;
 
             case Keys.PageUp:
-                this.Value -= this.LargeChange;
+                this.SetValueFromGesture(_value - this.LargeChange);
                 break;
 
             case Keys.PageDown:
-                this.Value += this.LargeChange;
+                this.SetValueFromGesture(_value + this.LargeChange);
                 break;
 
             case Keys.Home:
-                this.Value = _minimum;
+                this.SetValueFromGesture(_minimum);
                 break;
 
             case Keys.End:
-                this.Value = _maximum;
+                this.SetValueFromGesture(_maximum);
                 break;
 
             default:

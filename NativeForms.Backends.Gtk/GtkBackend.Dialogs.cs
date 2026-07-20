@@ -15,7 +15,7 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 public sealed partial class GtkBackend
 {
     /// <inheritdoc/>
-    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
     {
         EnsureInitialized();
 
@@ -32,6 +32,9 @@ public sealed partial class GtkBackend
             0, NativeMethods.GTK_DIALOG_MODAL, type, NativeMethods.GTK_BUTTONS_NONE, 0);
         try
         {
+            if (owner is GtkControlPeer ownerPeer && ownerPeer.WidgetHandle != 0)
+                NativeMethods.gtk_window_set_transient_for(dialog, ownerPeer.WidgetHandle);
+
             NativeMethods.g_object_set_string(dialog, "text", text, 0);
             NativeMethods.gtk_window_set_title(dialog, caption);
 
@@ -41,6 +44,11 @@ public sealed partial class GtkBackend
                 case MessageBoxButtons.OKCancel:
                     AddButton(dialog, "_Cancel", DialogResult.Cancel);
                     AddButton(dialog, "_OK", DialogResult.OK);
+                    break;
+                case MessageBoxButtons.AbortRetryIgnore:
+                    AddButton(dialog, "_Ignore", DialogResult.Ignore);
+                    AddButton(dialog, "_Retry", DialogResult.Retry);
+                    AddButton(dialog, "_Abort", DialogResult.Abort);
                     break;
                 case MessageBoxButtons.YesNoCancel:
                     AddButton(dialog, "_Cancel", DialogResult.Cancel);
@@ -65,11 +73,13 @@ public sealed partial class GtkBackend
                 return (DialogResult)response;
 
             // Closed via the window manager: OK-only reports OK (as Win32 does), Yes/No has no
-            // escape hatch and reports No, everything else means Cancel.
+            // escape hatch and reports No, Abort/Retry/Ignore reports the mild Ignore (Win32
+            // disables the close box outright there), everything else means Cancel.
             return buttons switch
             {
                 MessageBoxButtons.OK => DialogResult.OK,
                 MessageBoxButtons.YesNo => DialogResult.No,
+                MessageBoxButtons.AbortRetryIgnore => DialogResult.Ignore,
                 _ => DialogResult.Cancel,
             };
         }

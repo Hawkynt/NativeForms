@@ -575,4 +575,44 @@ internal sealed class TreeListViewTests
 
         Assert.That(tree.SelectedNode, Is.Null);
     }
+
+    [Test]
+    public void BeforeSelect_and_BeforeCheck_cancel_keep_the_state()
+    {
+        var tree = MakeTree();
+        tree.CheckBoxes = true;
+        var afterSelects = 0;
+        var afterChecks = 0;
+        tree.BeforeSelect += (_, e) => e.Cancel = true;
+        tree.BeforeCheck += (_, e) => e.Cancel = true;
+        tree.AfterSelect += (_, _) => ++afterSelects;
+        tree.AfterCheck += (_, _) => ++afterChecks;
+
+        tree.SelectedNode = tree.Nodes[0];
+        tree.Nodes[0].Checked = true;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.SelectedNode, Is.Null);
+            Assert.That(tree.Nodes[0].Checked, Is.False);
+            Assert.That(afterSelects, Is.Zero);
+            Assert.That(afterChecks, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void ExpandAll_and_CollapseAll_walk_the_whole_tree()
+    {
+        var tree = MakeTree();
+
+        tree.ExpandAll();
+        Assert.That(tree.VisibleNodeCount, Is.EqualTo(5));
+
+        tree.CollapseAll();
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.VisibleNodeCount, Is.EqualTo(2));
+            Assert.That(tree.Nodes[0].Nodes[0].IsExpanded, Is.False);
+        });
+    }
 }

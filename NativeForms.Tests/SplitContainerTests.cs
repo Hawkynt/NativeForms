@@ -104,7 +104,7 @@ internal sealed class SplitContainerTests
     }
 
     [Test]
-    public void Resizing_the_container_relayouts_the_panels()
+    public void Resizing_the_container_scales_the_distance_proportionally_by_default()
     {
         var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100 };
         Realize(split, out _);
@@ -113,8 +113,9 @@ internal sealed class SplitContainerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(split.Panel1.Bounds, Is.EqualTo(new Rectangle(0, 0, 100, 120)));
-            Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(104, 0, 296, 120)));
+            Assert.That(split.SplitterDistance, Is.EqualTo(133), "FixedPanel.None keeps 100/300 of the axis");
+            Assert.That(split.Panel1.Bounds, Is.EqualTo(new Rectangle(0, 0, 133, 120)));
+            Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(137, 0, 263, 120)));
         });
     }
 
@@ -135,5 +136,91 @@ internal sealed class SplitContainerTests
 
         canvas.RaiseKeyDown(Keys.Left);
         Assert.That(split.SplitterDistance, Is.EqualTo(100));
+    }
+
+    [Test]
+    public void FixedPanel1_keeps_panel1_size_on_resize()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, FixedPanel = FixedPanel.Panel1 };
+        Realize(split, out _);
+
+        split.Bounds = new(0, 0, 400, 100);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(split.SplitterDistance, Is.EqualTo(100));
+            Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(104, 0, 296, 100)), "panel2 absorbs the growth");
+        });
+    }
+
+    [Test]
+    public void FixedPanel2_keeps_panel2_size_on_resize()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, FixedPanel = FixedPanel.Panel2 };
+        Realize(split, out _);
+
+        split.Bounds = new(0, 0, 400, 100);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(split.SplitterDistance, Is.EqualTo(200), "panel1 absorbs the growth");
+            Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(204, 0, 196, 100)), "panel2 keeps its 196px");
+        });
+    }
+
+    [Test]
+    public void Collapsing_panel1_hides_its_peer_and_gives_panel2_the_whole_area()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100 };
+        Realize(split, out var backend);
+        var panelCanvases = backend.Created.OfType<HeadlessCanvasPeer>().Skip(1).ToArray();
+
+        split.Panel1Collapsed = true;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(panelCanvases[0].Visible, Is.False, "panel1's peer hides");
+            Assert.That(split.Panel1.Visible, Is.True, "its logical visibility stays untouched");
+            Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(0, 0, 300, 100)));
+        });
+
+        split.Panel1Collapsed = false;
+        Assert.Multiple(() =>
+        {
+            Assert.That(panelCanvases[0].Visible, Is.True, "un-collapsing restores the peer");
+            Assert.That(split.Panel1.Bounds, Is.EqualTo(new Rectangle(0, 0, 100, 100)));
+            Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(104, 0, 196, 100)));
+        });
+    }
+
+    [Test]
+    public void Collapsing_panel2_gives_panel1_the_whole_area()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100 };
+        Realize(split, out var backend);
+        var panelCanvases = backend.Created.OfType<HeadlessCanvasPeer>().Skip(1).ToArray();
+
+        split.Panel2Collapsed = true;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(panelCanvases[1].Visible, Is.False);
+            Assert.That(split.Panel1.Bounds, Is.EqualTo(new Rectangle(0, 0, 300, 100)));
+        });
+    }
+
+    [Test]
+    public void Collapsing_one_panel_uncollapses_the_other()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100) };
+
+        split.Panel1Collapsed = true;
+        split.Panel2Collapsed = true;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(split.Panel1Collapsed, Is.False, "collapsing panel2 releases panel1");
+            Assert.That(split.Panel2Collapsed, Is.True);
+        });
     }
 }

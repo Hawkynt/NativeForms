@@ -15,17 +15,20 @@ public sealed class ItemCheckedEventArgs(ListViewItem item) : EventArgs
 }
 
 /// <summary>
-/// Describes a finished label edit; see <see cref="ListView.AfterLabelEdit"/>. A handler vetoes the
-/// new text by setting <see cref="CancelEdit"/>, leaving the item's original text in place.
+/// Describes a label edit at both ends of its life. For <see cref="ListView.BeforeLabelEdit"/> it
+/// carries the item's current text and <see cref="CancelEdit"/> vetoes the edit before it starts;
+/// for <see cref="ListView.AfterLabelEdit"/> it carries the entered text and <see cref="CancelEdit"/>
+/// discards it, leaving the item's original text in place.
 /// </summary>
 public sealed class LabelEditEventArgs(int item, string? label) : EventArgs
 {
     /// <summary>The index of the edited item.</summary>
     public int Item { get; } = item;
 
-    /// <summary>The text the user entered, or <see langword="null"/> when the edit was cancelled.</summary>
+    /// <summary>The label text: the current text before an edit, the text the user entered after
+    /// one — or <see langword="null"/> when the edit was cancelled.</summary>
     public string? Label { get; } = label;
 
-    /// <summary>Set by a handler to discard the entered text and keep the item's current text.</summary>
+    /// <summary>Set by a handler to veto the pending edit (before) or discard the entered text (after).</summary>
     public bool CancelEdit { get; set; }
 }

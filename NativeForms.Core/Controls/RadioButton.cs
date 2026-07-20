@@ -82,6 +82,19 @@ public class RadioButton : OwnerDrawnControl
                 sibling.Checked = false;
     }
 
+    /// <summary>
+    /// Focus arriving while no mouse press is in flight checks the button, like tabbing onto a
+    /// Windows Forms radio selects it. The pipeline records the press before click-to-focus runs,
+    /// so <see cref="OwnerDrawnControl.IsMousePressInFlight"/> is the honest keyboard gate — a
+    /// click defers selection to the click path and selects exactly once.
+    /// </summary>
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (!this.IsMousePressInFlight && !this.Checked)
+            this.Checked = true;
+    }
+
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {

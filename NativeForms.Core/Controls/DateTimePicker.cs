@@ -150,6 +150,12 @@ public class DateTimePicker : OwnerDrawnControl
     /// <summary>Raised when <see cref="Value"/> changes, by user gesture or assignment.</summary>
     public event EventHandler? ValueChanged;
 
+    /// <summary>Raised when the calendar popup opens.</summary>
+    public event EventHandler? DropDown;
+
+    /// <summary>Raised when the calendar popup closes — by pick, cancel or light dismissal alike.</summary>
+    public event EventHandler? CloseUp;
+
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
@@ -165,6 +171,12 @@ public class DateTimePicker : OwnerDrawnControl
 
     /// <summary>Raises <see cref="ValueChanged"/>.</summary>
     protected virtual void OnValueChanged(EventArgs e) => this.ValueChanged?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="DropDown"/>.</summary>
+    protected virtual void OnDropDown(EventArgs e) => this.DropDown?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="CloseUp"/>.</summary>
+    protected virtual void OnCloseUp(EventArgs e) => this.CloseUp?.Invoke(this, e);
 
     private protected override void OnUnrealized()
     {
@@ -340,6 +352,7 @@ public class DateTimePicker : OwnerDrawnControl
         _droppedDown = true;
         popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), _popupSize);
         this.Invalidate();
+        this.OnDropDown(EventArgs.Empty);
     }
 
     /// <summary>Closes the calendar popup without committing. A no-op while closed.</summary>
@@ -351,6 +364,7 @@ public class DateTimePicker : OwnerDrawnControl
         _droppedDown = false;
         _popup?.Hide();
         this.Invalidate();
+        this.OnCloseUp(EventArgs.Empty);
     }
 
     private IPopupPeer CreatePopup(IPlatformBackend backend)
@@ -386,7 +400,11 @@ public class DateTimePicker : OwnerDrawnControl
     /// hidden, so only the open flag and the field's arrow state need resetting.</summary>
     private void OnPopupDismissed()
     {
+        if (!_droppedDown)
+            return;
+
         _droppedDown = false;
         this.Invalidate();
+        this.OnCloseUp(EventArgs.Empty);
     }
 }

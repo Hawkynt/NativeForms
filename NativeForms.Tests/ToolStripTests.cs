@@ -232,4 +232,25 @@ internal sealed class ToolStripTests
             Assert.That(popup.IsShown, Is.False);
         });
     }
+
+    [Test]
+    public void Item_width_cache_refreshes_when_an_item_changes()
+    {
+        var strip = CreateStrip(out var canvas, out _);
+        var first = new ToolStripButton("Run");   // 29px wide
+        var second = new ToolStripButton("Stop"); // spans x = 29..65
+        var clicks = new List<string>();
+        first.Click += (_, _) => clicks.Add("first");
+        second.Click += (_, _) => clicks.Add("second");
+        strip.Items.AddRange(first, second);
+
+        canvas.RaiseMouseDown(35, 10);
+        canvas.RaiseMouseUp(35, 10);
+        Assert.That(clicks, Is.EqualTo(new[] { "second" }), "x=35 hits the second button while the first is 29px wide");
+
+        first.Text = "RunAll"; // grows the first button to 50px
+        canvas.RaiseMouseDown(35, 10);
+        canvas.RaiseMouseUp(35, 10);
+        Assert.That(clicks, Is.EqualTo(new[] { "second", "first" }), "the refreshed width routes x=35 to the first button");
+    }
 }

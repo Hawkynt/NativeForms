@@ -100,6 +100,21 @@ public class NumericUpDown : UpDownBase
         }
     }
 
+    /// <summary>Whether the editor groups digits with the culture's thousands separator. Typed input
+    /// parses with or without separators either way. Defaults to <see langword="false"/>.</summary>
+    public bool ThousandsSeparator
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.UpdateEditText();
+        }
+    }
+
     /// <summary>Raised when <see cref="Value"/> changes, by stepping, typing or assignment.</summary>
     public event EventHandler? ValueChanged;
 
@@ -122,12 +137,12 @@ public class NumericUpDown : UpDownBase
 
     /// <inheritdoc/>
     protected override void UpdateEditText()
-        => this.SetEditorText(_value.ToString("F" + this.DecimalPlaces, CultureInfo.CurrentCulture));
+        => this.SetEditorText(_value.ToString((this.ThousandsSeparator ? "N" : "F") + this.DecimalPlaces, CultureInfo.CurrentCulture));
 
     /// <inheritdoc/>
     protected override void ValidateEditText()
     {
-        if (decimal.TryParse(this.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed))
+        if (decimal.TryParse(this.Text, NumberStyles.Number | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out var parsed))
             this.SetValue(parsed);
         else
             this.UpdateEditText(); // unparsable input reverts to the current value

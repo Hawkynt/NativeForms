@@ -230,4 +230,24 @@ internal sealed class ListViewSelectionTests
             Assert.That(fills.Exists(static o => o.EndsWith(" 0,44,300,22")), Is.True, "row 2 highlighted");
         });
     }
+
+    [Test]
+    public void Double_click_and_Enter_raise_ItemActivate()
+    {
+        var list = MakeList(out var canvas);
+        var activations = 0;
+        list.ItemActivate += (_, _) => ++activations;
+
+        canvas.RaiseMouseDown(10, 5); // the first click only selects row 0
+        Assert.That(activations, Is.Zero);
+
+        canvas.RaiseMouseDown(10, 5); // the quick second click activates
+        Assert.That(activations, Is.EqualTo(1));
+
+        canvas.RaiseKeyDown(Keys.Enter); // Enter on the caret item
+        Assert.That(activations, Is.EqualTo(2));
+
+        canvas.RaiseMouseDown(10, 27); // a click on another row starts a fresh pair
+        Assert.That(activations, Is.EqualTo(2));
+    }
 }

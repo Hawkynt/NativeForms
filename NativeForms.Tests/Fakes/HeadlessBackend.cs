@@ -26,8 +26,9 @@ internal sealed class HeadlessBackend : IPlatformBackend
     /// for the nested modal loop — tests use it to click buttons or close the dialog.</summary>
     public Action<HeadlessWindowPeer>? ModalAction { get; set; }
 
-    /// <summary>Every <see cref="ShowMessageBox"/> call, in the order it arrived.</summary>
-    public List<(string Text, string Caption, MessageBoxButtons Buttons, MessageBoxIcon Icon)> MessageBoxes { get; } = [];
+    /// <summary>Every <see cref="ShowMessageBox"/> call, in the order it arrived — including the
+    /// owner window peer (or <see langword="null"/> for the ownerless overloads).</summary>
+    public List<(string Text, string Caption, MessageBoxButtons Buttons, MessageBoxIcon Icon, IWindowPeer? Owner)> MessageBoxes { get; } = [];
 
     /// <summary>The scripted verdict <see cref="ShowMessageBox"/> returns.</summary>
     public DialogResult MessageBoxResult { get; set; } = DialogResult.OK;
@@ -100,9 +101,9 @@ internal sealed class HeadlessBackend : IPlatformBackend
 
     public Size GetScreenSize() => this.ScreenSize;
 
-    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
     {
-        this.MessageBoxes.Add((text, caption, buttons, icon));
+        this.MessageBoxes.Add((text, caption, buttons, icon, owner));
         return this.MessageBoxResult;
     }
 

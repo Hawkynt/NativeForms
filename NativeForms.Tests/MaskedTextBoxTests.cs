@@ -232,4 +232,49 @@ internal sealed class MaskedTextBoxTests
 
         Assert.That(box.Text, Is.EqualTo("123"));
     }
+
+    [Test]
+    public void MaskInputRejected_reports_position_and_hint_for_a_misfit_character()
+    {
+        var box = new MaskedTextBox { Mask = "00-00" };
+        var backend = Realize(box);
+        MaskInputRejectedEventArgs? rejected = null;
+        box.MaskInputRejected += (_, e) => rejected = e;
+
+        PeerOf(backend).SimulateUserInput("1a");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rejected, Is.Not.Null);
+            Assert.That(rejected!.Position, Is.EqualTo(1), "the slot the character did not fit");
+            Assert.That(rejected.RejectionHint, Is.EqualTo(MaskedTextResultHint.InvalidInput));
+            Assert.That(box.Text, Is.EqualTo("__-__"), "the transactional revert restored the last valid rendering");
+            Assert.That(PeerOf(backend).Text, Is.EqualTo("__-__"), "and pushed it back to the widget");
+        });
+    }
+
+    [Test]
+    public void MaskInputRejected_reports_the_end_position_for_overflowing_input()
+    {
+        var box = new MaskedTextBox { Mask = "00" };
+        MaskInputRejectedEventArgs? rejected = null;
+        box.MaskInputRejected += (_, e) => rejected = e;
+
+        box.Text = "123";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rejected!.Position, Is.EqualTo(2));
+            Assert.That(rejected.RejectionHint, Is.EqualTo(MaskedTextResultHint.UnavailableEditPosition));
+            Assert.That(box.Text, Is.EqualTo("__"));
+        });
+
+        rejected = null;
+        box.Text = "42"; // a fitting value raises nothing
+        Assert.Multiple(() =>
+        {
+            Assert.That(rejected, Is.Null);
+            Assert.That(box.Text, Is.EqualTo("42"));
+        });
+    }
 }

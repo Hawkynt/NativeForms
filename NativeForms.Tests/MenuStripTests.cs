@@ -470,4 +470,18 @@ internal sealed class MenuStripTests
 
         Assert.That(clicks, Is.EqualTo(1));
     }
+
+    [Test]
+    public void Item_width_cache_refreshes_when_an_item_changes()
+    {
+        var strip = CreateFileMenu(out _, out _, out var canvas, out _);
+
+        canvas.RaiseMouseDown(50, 10); // x=50 is inside "Edit" while "File" is 44px wide
+        Assert.That(strip.OpenIndex, Is.EqualTo(1));
+        strip.CloseDropDown();
+
+        strip.Items[0].Text = "&Filesystem"; // grows the first item to 86px
+        canvas.RaiseMouseDown(50, 10);
+        Assert.That(strip.OpenIndex, Is.Zero, "the refreshed width routes x=50 to the first item");
+    }
 }

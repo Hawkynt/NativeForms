@@ -1,5 +1,26 @@
 namespace Hawkynt.NativeForms;
 
+/// <summary>Why a candidate value was rejected by a <see cref="MaskedTextBox"/> mask; the member
+/// names match their <c>System.ComponentModel.MaskedTextResultHint</c> namesakes.</summary>
+public enum MaskedTextResultHint
+{
+    /// <summary>A character did not fit the mask slot at the reported position.</summary>
+    InvalidInput,
+
+    /// <summary>Input remained after the last mask position.</summary>
+    UnavailableEditPosition,
+}
+
+/// <summary>Describes a rejected <see cref="MaskedTextBox"/> input; see <see cref="MaskedTextBox.MaskInputRejected"/>.</summary>
+public sealed class MaskInputRejectedEventArgs(int position, MaskedTextResultHint rejectionHint) : EventArgs
+{
+    /// <summary>The mask position the rejection happened at.</summary>
+    public int Position { get; } = position;
+
+    /// <summary>Why the input was rejected.</summary>
+    public MaskedTextResultHint RejectionHint { get; } = rejectionHint;
+}
+
 /// <summary>
 /// A <see cref="TextBox"/> whose content is forced through an input mask — phone numbers, dates,
 /// license keys. The mask engine lives entirely in the core: the control uses the plain native text
@@ -95,6 +116,10 @@ public class MaskedTextBox : TextBox
     /// <summary>Raised after a candidate value was successfully applied through the mask and changed the text.</summary>
     public event EventHandler? MaskedTextChanged;
 
+    /// <summary>Raised when a candidate value does not fit the mask and the transactional revert
+    /// restores the last valid rendering, carrying the offending position and a reason.</summary>
+    public event EventHandler<MaskInputRejectedEventArgs>? MaskInputRejected;
+
     /// <summary>
     /// The input mask. Setting it re-maps the current content into the new mask; content that no
     /// longer fits is discarded and the box falls back to the empty rendering (all prompts). An
@@ -175,12 +200,20 @@ public class MaskedTextBox : TextBox
         if (_slots.Length == 0)
             return value;
 
-        if (!this.TryApply(value, out var display))
+        if (!this.TryApply(value, out var display, out var position, out var hint))
+        {
+            if (this.MaskInputRejected is not null)
+                this.OnMaskInputRejected(new(position, hint));
+
             return _lastValid;
+        }
 
         _lastValid = display;
         return display;
     }
+
+    /// <summary>Raises <see cref="MaskInputRejected"/>.</summary>
+    protected virtual void OnMaskInputRejected(MaskInputRejectedEventArgs e) => this.MaskInputRejected?.Invoke(this, e);
 
     /// <summary>Raises <see cref="Control.TextChanged"/> and, while a mask is active, <see cref="MaskedTextChanged"/>.</summary>
     protected override void OnTextChanged(EventArgs e)
@@ -194,14 +227,17 @@ public class MaskedTextBox : TextBox
     /// Maps <paramref name="input"/> into the mask. Literal positions render themselves and consume
     /// a matching input character when one is next; slot positions consume the next input character
     /// (the prompt char leaves the slot empty), rejecting the whole candidate when it does not fit
-    /// or when input remains after the last mask position.
+    /// or when input remains after the last mask position — the rejected mask position and reason
+    /// come back through <paramref name="rejectPosition"/>/<paramref name="rejectHint"/>.
     /// </summary>
-    private bool TryApply(string input, out string display)
+    private bool TryApply(string input, out string display, out int rejectPosition, out MaskedTextResultHint rejectHint)
     {
         var slots = _slots;
         var prompt = this.PromptChar;
         var result = new char[slots.Length];
         var next = 0;
+        rejectPosition = -1;
+        rejectHint = MaskedTextResultHint.InvalidInput;
         for (var i = 0; i < slots.Length; ++i)
         {
             var slot = slots[i];
@@ -231,6 +267,7 @@ public class MaskedTextBox : TextBox
             if (!slot.Accepts(c))
             {
                 display = string.Empty;
+                rejectPosition = i;
                 return false;
             }
 
@@ -241,6 +278,8 @@ public class MaskedTextBox : TextBox
         if (next < input.Length)
         {
             display = string.Empty;
+            rejectPosition = slots.Length;
+            rejectHint = MaskedTextResultHint.UnavailableEditPosition;
             return false;
         }
 
@@ -250,7 +289,7 @@ public class MaskedTextBox : TextBox
 
     /// <summary>Renders <paramref name="raw"/> through the mask, falling back to the empty rendering.</summary>
     private string Render(string raw)
-        => this.TryApply(raw, out var display) ? display : this.RenderEmpty();
+        => this.TryApply(raw, out var display, out _, out _) ? display : this.RenderEmpty();
 
     /// <summary>The rendering of a mask with every slot empty: literals plus prompt characters.</summary>
     private string RenderEmpty()

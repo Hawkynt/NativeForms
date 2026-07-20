@@ -227,6 +227,12 @@ public class ComboBox : OwnerDrawnControl
     /// <summary>Raised when <see cref="SelectedIndex"/> changes, by user gesture or assignment.</summary>
     public event EventHandler? SelectedIndexChanged;
 
+    /// <summary>Raised when the drop-down list opens.</summary>
+    public event EventHandler? DropDown;
+
+    /// <summary>Raised when the drop-down list closes — by commit, cancel or light dismissal alike.</summary>
+    public event EventHandler? DropDownClosed;
+
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
@@ -239,6 +245,12 @@ public class ComboBox : OwnerDrawnControl
 
     /// <summary>Raises <see cref="SelectedIndexChanged"/>.</summary>
     protected virtual void OnSelectedIndexChanged(EventArgs e) => this.SelectedIndexChanged?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="DropDown"/>.</summary>
+    protected virtual void OnDropDown(EventArgs e) => this.DropDown?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="DropDownClosed"/>.</summary>
+    protected virtual void OnDropDownClosed(EventArgs e) => this.DropDownClosed?.Invoke(this, e);
 
     private protected override void OnRealized(IControlPeer peer)
     {
@@ -427,6 +439,7 @@ public class ComboBox : OwnerDrawnControl
         _droppedDown = true;
         popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), _popupSize);
         this.Invalidate();
+        this.OnDropDown(EventArgs.Empty);
     }
 
     /// <summary>Closes the drop-down without changing the selection. A no-op while closed.</summary>
@@ -438,6 +451,7 @@ public class ComboBox : OwnerDrawnControl
         _droppedDown = false;
         _popup?.Hide();
         this.Invalidate();
+        this.OnDropDownClosed(EventArgs.Empty);
     }
 
     private IPopupPeer CreatePopup(IPlatformBackend backend)
@@ -518,8 +532,12 @@ public class ComboBox : OwnerDrawnControl
     /// hidden, so only the open flag and the field's arrow state need resetting.</summary>
     private void OnPopupDismissed()
     {
+        if (!_droppedDown)
+            return;
+
         _droppedDown = false;
         this.Invalidate();
+        this.OnDropDownClosed(EventArgs.Empty);
     }
 
     /// <summary>Commits the given row as the selection and closes the drop-down.</summary>

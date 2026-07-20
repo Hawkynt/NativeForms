@@ -267,4 +267,78 @@ internal sealed class ListBoxSelectionTests
             Assert.That(fills.Exists(o => o.EndsWith(" 0,44,120,22")), Is.True, "row 2 highlighted");
         });
     }
+
+    [Test]
+    public void SetSelected_builds_a_multi_selection_with_one_event_per_call()
+    {
+        var list = CreateList(SelectionMode.MultiExtended, out _);
+        var selections = 0;
+        list.SelectedIndexChanged += (_, _) => ++selections;
+
+        list.SetSelected(0, true);
+        list.SetSelected(2, true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(list.SelectedIndices, Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(selections, Is.EqualTo(2));
+        });
+
+        list.SetSelected(0, false);
+        Assert.Multiple(() =>
+        {
+            Assert.That(list.SelectedIndices, Is.EqualTo(new[] { 2 }));
+            Assert.That(selections, Is.EqualTo(3));
+        });
+
+        list.SetSelected(2, true); // already selected: no change, no event
+        Assert.That(selections, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void SetSelected_in_one_mode_replaces_the_selection()
+    {
+        var list = CreateList(SelectionMode.One, out _);
+
+        list.SetSelected(1, true);
+        list.SetSelected(3, true);
+
+        Assert.That(list.SelectedIndices, Is.EqualTo(new[] { 3 }));
+    }
+
+    [Test]
+    public void SetSelected_rejects_none_mode_and_bad_indices()
+    {
+        var list = CreateList(SelectionMode.MultiExtended, out _);
+
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.SetSelected(-1, true));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.SetSelected(5, true));
+        });
+
+        list.SelectionMode = SelectionMode.None;
+        Assert.Throws<ArgumentException>(() => list.SetSelected(0, true));
+    }
+
+    [Test]
+    public void ClearSelected_empties_the_selection_with_one_event()
+    {
+        var list = CreateList(SelectionMode.MultiExtended, out _);
+        list.SetSelected(0, true);
+        list.SetSelected(2, true);
+        var selections = 0;
+        list.SelectedIndexChanged += (_, _) => ++selections;
+
+        list.ClearSelected();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(list.SelectedIndices, Is.Empty);
+            Assert.That(selections, Is.EqualTo(1));
+        });
+
+        list.ClearSelected(); // already empty: no further event
+        Assert.That(selections, Is.EqualTo(1));
+    }
 }

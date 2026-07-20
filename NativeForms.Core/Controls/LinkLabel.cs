@@ -6,9 +6,9 @@ namespace Hawkynt.NativeForms;
 /// <summary>
 /// An owner-drawn hyperlink label: its whole text paints in the theme's accent color with an
 /// underline, shifts subtly while hovered, and raises <see cref="LinkClicked"/> on a click inside the
-/// text or on Space when focused. <see cref="Visited"/> blends the color toward the theme's grey.
-/// Per-character link ranges (WinForms <c>LinkArea</c>) are not modeled yet — the entire text is the
-/// link.
+/// text or on Space or Enter when focused. <see cref="LinkVisited"/> blends the color toward the
+/// theme's grey. Per-character link ranges (WinForms <c>LinkArea</c>) are not modeled yet — the
+/// entire text is the link.
 /// </summary>
 public class LinkLabel : OwnerDrawnControl
 {
@@ -16,7 +16,7 @@ public class LinkLabel : OwnerDrawnControl
     private bool _focused;
 
     /// <summary>Whether the link has been followed; shifts the paint color toward the theme's grey.</summary>
-    public bool Visited
+    public bool LinkVisited
     {
         get => field;
         set
@@ -29,11 +29,22 @@ public class LinkLabel : OwnerDrawnControl
         }
     }
 
-    /// <summary>Raised when the link is activated (click inside the text, or Space while focused).</summary>
+    /// <summary>The pre-rename spelling of <see cref="LinkVisited"/>, kept until every caller has
+    /// moved to the Windows Forms name.</summary>
+    public bool Visited
+    {
+        get => this.LinkVisited;
+        set => this.LinkVisited = value;
+    }
+
+    /// <summary>Raised when the link is activated (click inside the text, or Space/Enter while focused).</summary>
     public event EventHandler? LinkClicked;
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    /// <summary>Enter activates the link, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
 
     /// <summary>Raises <see cref="LinkClicked"/>.</summary>
     protected virtual void OnLinkClicked(EventArgs e) => this.LinkClicked?.Invoke(this, e);
@@ -41,8 +52,12 @@ public class LinkLabel : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Left && this.TextExtentRectangle().Contains(e.Location))
-            this.OnLinkClicked(EventArgs.Empty);
+        if (e.Button != MouseButtons.Left || !this.TextExtentRectangle().Contains(e.Location))
+            return;
+
+        // Windows Forms raises both: the generic Click and the link-specific LinkClicked.
+        this.OnClick(EventArgs.Empty);
+        this.OnLinkClicked(EventArgs.Empty);
     }
 
     /// <inheritdoc/>
@@ -55,7 +70,7 @@ public class LinkLabel : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (e.KeyCode is not Keys.Space)
+        if (e.KeyCode is not Keys.Space and not Keys.Enter)
             return;
 
         this.OnLinkClicked(EventArgs.Empty);
@@ -139,7 +154,7 @@ public class LinkLabel : OwnerDrawnControl
     /// <summary>The current link color: theme accent, greyed when visited, shifted while hovered.</summary>
     private Color LinkColor(ITheme theme)
     {
-        var color = this.Visited ? Blend(theme.Accent, theme.DisabledText, 50) : theme.Accent;
+        var color = this.LinkVisited ? Blend(theme.Accent, theme.DisabledText, 50) : theme.Accent;
         return _hovered ? Blend(color, theme.ControlText, 30) : color;
     }
 

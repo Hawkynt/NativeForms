@@ -32,11 +32,23 @@ public class ToolStrip : OwnerDrawnControl
     private int _pressedIndex = -1;
     private List<ToolStripItem>? _overflow;
 
+    /// <summary>Cached per-item pixel widths, index-aligned with <see cref="Items"/>; 0 marks an
+    /// unmeasured slot. Invalidated by the Items.Changed hook, by (un)realization and by a theme
+    /// font swap, so per-event hit-testing stops re-measuring text natively on every mouse move.</summary>
+    private int[]? _itemWidths;
+
+    /// <summary>The theme font the cache was measured with; a different snapshot voids it.</summary>
+    private Font _measuredFont;
+
     /// <summary>Creates an empty toolbar.</summary>
     public ToolStrip()
     {
         this.Items = new();
-        this.Items.Changed += (_, _) => this.Invalidate();
+        this.Items.Changed += (_, _) =>
+        {
+            _itemWidths = null;
+            this.Invalidate();
+        };
     }
 
     /// <summary>The toolbar items. Mutating the collection (or any item in it) repaints the bar.</summary>
@@ -45,11 +57,18 @@ public class ToolStrip : OwnerDrawnControl
     /// <summary>Whether the bar currently needs the overflow chevron.</summary>
     public bool HasOverflow => this.FirstOverflowIndex() < this.Items.Count;
 
+    private protected override void OnRealized(IControlPeer peer)
+    {
+        base.OnRealized(peer);
+        _itemWidths = null; // measurements now come from the live backend
+    }
+
     private protected override void OnUnrealized()
     {
         base.OnUnrealized();
         _dropDown?.CloseAll();
         _dropDown = null;
+        _itemWidths = null;
     }
 
     /// <summary>The lazily created drop-down engine shared by drop-down buttons and the chevron.</summary>
@@ -71,7 +90,7 @@ public class ToolStrip : OwnerDrawnControl
             if (!item.Visible)
                 continue;
 
-            var width = this.ItemWidth(item);
+            var width = this.ItemWidth(i, item);
             this.PaintItem(g, item, i, new(x, 0, width, height));
             x += width;
         }
@@ -108,7 +127,7 @@ public class ToolStrip : OwnerDrawnControl
 
         switch (item)
         {
-            case ToolStripSplitButton split when e.X >= left + this.ItemWidth(split) - ArrowZoneWidth:
+            case ToolStripSplitButton split when e.X >= left + this.ItemWidth(index, split) - ArrowZoneWidth:
             case ToolStripDropDownButton:
                 this.OpenItemDropDown((ToolStripDropDownItem)item, left);
                 return;
@@ -245,7 +264,7 @@ public class ToolStrip : OwnerDrawnControl
         var count = this.Items.Count;
         for (var i = 0; i < count; ++i)
             if (this.Items[i].Visible)
-                total += this.ItemWidth(this.Items[i]);
+                total += this.ItemWidth(i, this.Items[i]);
 
         if (total <= this.Width)
             return count;
@@ -258,7 +277,7 @@ public class ToolStrip : OwnerDrawnControl
             if (!item.Visible)
                 continue;
 
-            x += this.ItemWidth(item);
+            x += this.ItemWidth(i, item);
             if (x > limit)
                 return i;
         }
@@ -279,7 +298,7 @@ public class ToolStrip : OwnerDrawnControl
             if (!item.Visible)
                 continue;
 
-            var width = this.ItemWidth(item);
+            var width = this.ItemWidth(i, item);
             if (x >= position && x < position + width)
             {
                 left = position;
@@ -292,8 +311,27 @@ public class ToolStrip : OwnerDrawnControl
         return -1;
     }
 
-    /// <summary>The pixel width of one item: padding, icon, caption and arrow zone as applicable.</summary>
-    private int ItemWidth(ToolStripItem item)
+    /// <summary>The pixel width of the item at <paramref name="index"/>, from the cache when it is
+    /// warm, measured (and cached) otherwise.</summary>
+    private int ItemWidth(int index, ToolStripItem item)
+    {
+        var font = this.Theme.DefaultFont;
+        var cache = _itemWidths;
+        if (cache is null || cache.Length != this.Items.Count || _measuredFont != font)
+        {
+            _itemWidths = cache = new int[this.Items.Count];
+            _measuredFont = font;
+        }
+
+        var width = cache[index];
+        if (width == 0)
+            cache[index] = width = this.MeasureItemWidth(item);
+
+        return width;
+    }
+
+    /// <summary>Measures one item: padding, icon, caption and arrow zone as applicable.</summary>
+    private int MeasureItemWidth(ToolStripItem item)
     {
         if (item is ToolStripSeparator)
             return SeparatorWidth;

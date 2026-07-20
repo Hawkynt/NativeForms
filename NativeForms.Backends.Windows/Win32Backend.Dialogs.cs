@@ -17,9 +17,10 @@ public sealed partial class Win32Backend
     /// <see cref="MessageBoxButtons"/> and <see cref="MessageBoxIcon"/> reuse the <c>MB_*</c> flag
     /// values and <see cref="DialogResult"/> the <c>ID*</c> return ids, so both directions map by cast.
     /// </remarks>
-    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+    public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
     {
-        var pressed = NativeMethods.MessageBoxW(0, text, caption, (uint)buttons | (uint)icon);
+        var ownerHandle = (owner as Win32ControlPeer)?.Handle ?? 0;
+        var pressed = NativeMethods.MessageBoxW(ownerHandle, text, caption, (uint)buttons | (uint)icon);
         return pressed <= 0 ? DialogResult.None : (DialogResult)pressed;
     }
 

@@ -41,15 +41,18 @@ public class FlowLayoutPanel : Panel
 
     /// <summary>
     /// Repositions every child along the flow in a single pass. Runs automatically whenever the
-    /// panel resizes, a child joins, leaves or resizes, or a flow property changes. The flow owns
-    /// every child's position, so <see cref="Control.Anchor"/>/<see cref="Control.Dock"/> are
-    /// ignored — the Windows Forms flow-panel contract.
+    /// panel resizes, a child joins, leaves or resizes, or a flow property changes. The flow runs
+    /// inside <see cref="Control.DisplayRectangle"/>, so <see cref="Control.Padding"/> insets it on
+    /// every side. The flow owns every child's position, so
+    /// <see cref="Control.Anchor"/>/<see cref="Control.Dock"/> are ignored — the Windows Forms
+    /// flow-panel contract.
     /// </summary>
     private protected override void OnLayout()
     {
         var direction = this.FlowDirection;
         var horizontal = direction is FlowDirection.LeftToRight or FlowDirection.RightToLeft;
-        var lineExtent = horizontal ? this.Width : this.Height;
+        var display = this.DisplayRectangle;
+        var lineExtent = horizontal ? display.Width : display.Height;
         var main = 0;
         var cross = 0;
         var lineSize = 0;
@@ -69,10 +72,10 @@ public class FlowLayoutPanel : Panel
 
             var location = direction switch
             {
-                FlowDirection.LeftToRight => new Point(main + margin.Left, cross + margin.Top),
-                FlowDirection.RightToLeft => new Point(this.Width - main - margin.Right - size.Width, cross + margin.Top),
-                FlowDirection.TopDown => new Point(cross + margin.Left, main + margin.Top),
-                _ => new Point(cross + margin.Left, this.Height - main - margin.Bottom - size.Height),
+                FlowDirection.LeftToRight => new Point(display.X + main + margin.Left, display.Y + cross + margin.Top),
+                FlowDirection.RightToLeft => new Point(display.Right - main - margin.Right - size.Width, display.Y + cross + margin.Top),
+                FlowDirection.TopDown => new Point(display.X + cross + margin.Left, display.Y + main + margin.Top),
+                _ => new Point(display.X + cross + margin.Left, display.Bottom - main - margin.Bottom - size.Height),
             };
             child.Bounds = new(location, size);
             main += mainConsumed;

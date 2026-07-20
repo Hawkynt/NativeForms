@@ -29,11 +29,23 @@ public class MenuStrip : OwnerDrawnControl
     private int _hoverIndex = -1;
     private int _openIndex = -1;
 
+    /// <summary>Cached per-item pixel widths, index-aligned with <see cref="Items"/>; 0 marks an
+    /// unmeasured slot. Invalidated by the Items.Changed hook, by (un)realization and by a theme
+    /// font swap, so per-event hit-testing stops re-measuring text natively on every mouse move.</summary>
+    private int[]? _itemWidths;
+
+    /// <summary>The theme font the cache was measured with; a different snapshot voids it.</summary>
+    private Font _measuredFont;
+
     /// <summary>Creates an empty menu bar.</summary>
     public MenuStrip()
     {
         this.Items = new();
-        this.Items.Changed += (_, _) => this.Invalidate();
+        this.Items.Changed += (_, _) =>
+        {
+            _itemWidths = null;
+            this.Invalidate();
+        };
     }
 
     /// <summary>The top-level items. Mutating the collection (or any item in it) repaints the bar.</summary>
@@ -104,12 +116,19 @@ public class MenuStrip : OwnerDrawnControl
     /// <summary>Closes the open drop-down cascade, if any.</summary>
     public void CloseDropDown() => _dropDown?.CloseAll();
 
+    private protected override void OnRealized(IControlPeer peer)
+    {
+        base.OnRealized(peer);
+        _itemWidths = null; // measurements now come from the live backend
+    }
+
     private protected override void OnUnrealized()
     {
         base.OnUnrealized();
         _dropDown?.CloseAll();
         _dropDown = null;
         _openIndex = -1;
+        _itemWidths = null;
     }
 
     /// <summary>The lazily created drop-down engine, wired to reset the bar state on close.</summary>
@@ -146,7 +165,7 @@ public class MenuStrip : OwnerDrawnControl
             if (!item.Visible)
                 continue;
 
-            var width = this.ItemWidth(item);
+            var width = this.ItemWidth(i, item);
             var rect = new Rectangle(x, 0, width, this.Height);
             var active = i == _openIndex || (i == _hoverIndex && item.Enabled);
             if (active)
@@ -314,8 +333,27 @@ public class MenuStrip : OwnerDrawnControl
         return start;
     }
 
-    /// <summary>The pixel width of one top-level item: padded caption plus an optional icon.</summary>
-    private int ItemWidth(ToolStripItem item)
+    /// <summary>The pixel width of the top-level item at <paramref name="index"/>, from the cache
+    /// when it is warm, measured (and cached) otherwise.</summary>
+    private int ItemWidth(int index, ToolStripItem item)
+    {
+        var font = this.Theme.DefaultFont;
+        var cache = _itemWidths;
+        if (cache is null || cache.Length != this.Items.Count || _measuredFont != font)
+        {
+            _itemWidths = cache = new int[this.Items.Count];
+            _measuredFont = font;
+        }
+
+        var width = cache[index];
+        if (width == 0)
+            cache[index] = width = this.MeasureItemWidth(item);
+
+        return width;
+    }
+
+    /// <summary>Measures one top-level item: padded caption plus an optional icon.</summary>
+    private int MeasureItemWidth(ToolStripItem item)
     {
         var width = (2 * ItemPadding) + this.MeasureItemText(item);
         if (item.Image is not null || (item.ImageList is not null && item.ImageIndex >= 0))
@@ -332,7 +370,7 @@ public class MenuStrip : OwnerDrawnControl
         {
             var item = this.Items[i];
             if (item.Visible)
-                x += this.ItemWidth(item);
+                x += this.ItemWidth(i, item);
         }
 
         return x;
@@ -348,7 +386,7 @@ public class MenuStrip : OwnerDrawnControl
             if (!item.Visible)
                 continue;
 
-            var width = this.ItemWidth(item);
+            var width = this.ItemWidth(i, item);
             if (x >= left && x < left + width)
                 return i;
 

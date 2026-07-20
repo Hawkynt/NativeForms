@@ -418,7 +418,7 @@ public class DataGridView : OwnerDrawnControl
 
     /// <summary>Raised when <see cref="IsCurrentCellDirty"/> flips — on the first editor change after
     /// the edit begins, and again when the edit ends.</summary>
-    public event EventHandler? CellDirtyStateChanged;
+    public event EventHandler? CurrentCellDirtyStateChanged;
 
     /// <summary>Raised before the current row is left for another one, carrying the row being left;
     /// setting <see cref="DataGridViewCellCancelEventArgs.Cancel"/> keeps the selection where it is.</summary>
@@ -570,8 +570,8 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>Raises <see cref="CellEndEdit"/>.</summary>
     protected virtual void OnCellEndEdit(DataGridViewCellEventArgs e) => this.CellEndEdit?.Invoke(this, e);
 
-    /// <summary>Raises <see cref="CellDirtyStateChanged"/>.</summary>
-    protected virtual void OnCellDirtyStateChanged(EventArgs e) => this.CellDirtyStateChanged?.Invoke(this, e);
+    /// <summary>Raises <see cref="CurrentCellDirtyStateChanged"/>.</summary>
+    protected virtual void OnCurrentCellDirtyStateChanged(EventArgs e) => this.CurrentCellDirtyStateChanged?.Invoke(this, e);
 
     /// <summary>Raises <see cref="RowValidating"/>.</summary>
     protected virtual void OnRowValidating(DataGridViewCellCancelEventArgs e) => this.RowValidating?.Invoke(this, e);
@@ -818,7 +818,10 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>
     /// Applies a mouse row-selection gesture. Without <see cref="MultiSelect"/> this is a plain
     /// single selection; with it, Ctrl toggles the row in the set, Shift selects the display-order
-    /// range from the anchor, and a plain click collapses the set to the clicked row.
+    /// range from the anchor, and a plain click collapses the set to the clicked row. A gesture that
+    /// moves the current row runs the same <see cref="RowValidating"/>/<see cref="RowValidated"/>
+    /// pipeline as the <see cref="SelectedRowIndex"/> setter — a veto keeps the current row and the
+    /// selection untouched.
     /// </summary>
     private void SelectRowWithModifiers(int modelIndex, KeyModifiers modifiers)
     {
@@ -827,6 +830,9 @@ public class DataGridView : OwnerDrawnControl
             this.SelectedRowIndex = modelIndex;
             return;
         }
+
+        if (modelIndex != _selectedRowIndex && !this.ValidateRowChange())
+            return;
 
         var multi = _multiSelection ??= [];
         if ((modifiers & KeyModifiers.Control) != 0)
@@ -1288,6 +1294,10 @@ public class DataGridView : OwnerDrawnControl
         var modelIndex = this.ToModelIndex(target);
         if (extend && this.MultiSelect && _anchorRowIndex >= 0)
         {
+            // The extending move changes the current row, so it validates like every other leave.
+            if (modelIndex != _selectedRowIndex && !this.ValidateRowChange())
+                return;
+
             this.SelectDisplayRange(_anchorRowIndex, modelIndex);
             this.ApplyMultiSelection(modelIndex);
         }
@@ -2369,7 +2379,7 @@ public class DataGridView : OwnerDrawnControl
         if (_editDirty)
         {
             _editDirty = false;
-            this.OnCellDirtyStateChanged(EventArgs.Empty);
+            this.OnCurrentCellDirtyStateChanged(EventArgs.Empty);
         }
 
         this.Invalidate();
@@ -2387,7 +2397,7 @@ public class DataGridView : OwnerDrawnControl
             return;
 
         _editDirty = true;
-        this.OnCellDirtyStateChanged(EventArgs.Empty);
+        this.OnCurrentCellDirtyStateChanged(EventArgs.Empty);
     }
 
     /// <summary>Handles a key while a cell edits: Enter commits and Escape cancels everywhere; the

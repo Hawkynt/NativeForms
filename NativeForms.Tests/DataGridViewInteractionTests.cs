@@ -577,4 +577,38 @@ internal sealed class DataGridViewInteractionTests
 
         Assert.That(grid.Columns[0].Width, Is.EqualTo(50));
     }
+
+    [Test]
+    public void MultiSelect_gestures_run_the_row_validation_pipeline()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+        canvas.RaiseMouseDown(10, 30); // row 0 becomes the current row
+
+        var veto = true;
+        var validated = 0;
+        grid.RowValidating += (_, e) => e.Cancel = veto;
+        grid.RowValidated += (_, _) => ++validated;
+
+        canvas.RaiseMouseDown(10, 52, MouseButtons.Left, KeyModifiers.Control); // Ctrl-click row 1
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.Zero, "the veto kept the current row");
+            Assert.That(grid.SelectedItems.Count(), Is.EqualTo(1), "and the selection");
+            Assert.That(validated, Is.Zero);
+        });
+
+        canvas.RaiseKeyDown(Keys.Down, KeyModifiers.Shift); // the extending move validates too
+        Assert.That(grid.SelectedRowIndex, Is.Zero);
+
+        veto = false;
+        canvas.RaiseMouseDown(10, 52, MouseButtons.Left, KeyModifiers.Control);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(1));
+            Assert.That(grid.SelectedItems.Count(), Is.EqualTo(2));
+            Assert.That(validated, Is.EqualTo(1));
+        });
+    }
 }

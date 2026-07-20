@@ -84,7 +84,8 @@ internal sealed class LinkLabelTests
 
         Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True);
 
-        link.Visited = true;
+        link.Visited = true; // the legacy alias forwards to LinkVisited
+        Assert.That(link.LinkVisited, Is.True);
 
         var g = canvas.RaisePaint();
         Assert.Multiple(() =>
@@ -124,5 +125,37 @@ internal sealed class LinkLabelTests
 
         canvas.RaiseLostFocus();
         Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "blur removes the ring");
+    }
+
+    [Test]
+    public void Enter_raises_LinkClicked_when_focused()
+    {
+        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+        var clicks = 0;
+        link.LinkClicked += (_, _) => ++clicks;
+        var canvas = Realize(link);
+
+        canvas.RaiseKeyDown(Keys.Enter);
+
+        Assert.That(clicks, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void MouseUp_inside_the_link_raises_Click_and_LinkClicked()
+    {
+        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+        var clicks = 0;
+        var linkClicks = 0;
+        link.Click += (_, _) => ++clicks;
+        link.LinkClicked += (_, _) => ++linkClicks;
+        var canvas = Realize(link);
+
+        canvas.RaiseMouseUp(10, 15);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(clicks, Is.EqualTo(1), "Windows Forms raises the generic Click too");
+            Assert.That(linkClicks, Is.EqualTo(1));
+        });
     }
 }

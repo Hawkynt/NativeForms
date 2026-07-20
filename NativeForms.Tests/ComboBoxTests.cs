@@ -361,4 +361,24 @@ internal sealed class ComboBoxTests
     }
 
     private sealed record Fruit(int Id, string Name);
+
+    [Test]
+    public void DropDown_and_DropDownClosed_fire_at_open_and_close()
+    {
+        var combo = CreateCombo(out _, out var backend, "a", "b");
+        var opens = 0;
+        var closes = 0;
+        combo.DropDown += (_, _) => ++opens;
+        combo.DropDownClosed += (_, _) => ++closes;
+
+        combo.OpenDropDown();
+        Assert.That((opens, closes), Is.EqualTo((1, 0)));
+
+        combo.CloseDropDown();
+        Assert.That((opens, closes), Is.EqualTo((1, 1)));
+
+        combo.OpenDropDown();
+        PopupOf(backend).FireDismiss(); // light dismissal closes too
+        Assert.That((opens, closes), Is.EqualTo((2, 2)));
+    }
 }

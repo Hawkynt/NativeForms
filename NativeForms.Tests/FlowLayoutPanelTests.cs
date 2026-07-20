@@ -202,4 +202,19 @@ internal sealed class FlowLayoutPanelTests
             Assert.That(firstPeer.Bounds, Is.EqualTo(new Rectangle(0, -40, 60, 30)), "peer moves by the clamped wheel step");
         });
     }
+
+    [Test]
+    public void Padding_insets_the_flow_and_wraps_at_the_padded_edge()
+    {
+        var panel = new FlowLayoutPanel { Bounds = new(0, 0, 150, 100), Padding = new(10) };
+        panel.Controls.AddRange(MakeChild(60, 20), MakeChild(60, 20), MakeChild(60, 20));
+        Realize(panel, out _);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(panel.Controls[0].Bounds, Is.EqualTo(new Rectangle(10, 10, 60, 20)));
+            Assert.That(panel.Controls[1].Bounds, Is.EqualTo(new Rectangle(70, 10, 60, 20)));
+            Assert.That(panel.Controls[2].Bounds, Is.EqualTo(new Rectangle(10, 30, 60, 20)), "wraps at the 130px padded line");
+        });
+    }
 }

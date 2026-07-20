@@ -171,4 +171,23 @@ internal sealed class ListViewCheckBoxTests
 
         Assert.That(item.Checked, Is.True);
     }
+
+    [Test]
+    public void CheckedIndices_and_CheckedItems_are_live_views_over_the_check_states()
+    {
+        var list = MakeChecked();
+
+        Assert.That(list.CheckedIndices, Is.Empty);
+
+        list.Items[0].Checked = true;
+        list.Items[2].Checked = true;
+        Assert.Multiple(() =>
+        {
+            Assert.That(list.CheckedIndices, Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(list.CheckedItems.Select(static i => i.Text), Is.EqualTo(new[] { "a", "c" }));
+        });
+
+        list.Items[0].Checked = false;
+        Assert.That(list.CheckedIndices, Is.EqualTo(new[] { 2 }), "the views track live state");
+    }
 }

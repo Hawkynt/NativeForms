@@ -176,4 +176,36 @@ internal sealed class TrackBarTests
         canvas.RaiseMouseMove(15, 78);
         Assert.That(bar.Value, Is.EqualTo(7));
     }
+
+    [Test]
+    public void Scroll_fires_for_user_gestures_but_not_for_programmatic_writes()
+    {
+        var bar = CreateHundredPixelTrack();
+        bar.Value = 5;
+        var scrolls = 0;
+        bar.Scroll += (_, _) => ++scrolls;
+        var canvas = Realize(bar);
+
+        bar.Value = 8; // programmatic write: ValueChanged only
+        Assert.That(scrolls, Is.Zero);
+
+        canvas.RaiseKeyDown(Keys.Right); // key step
+        Assert.That(scrolls, Is.EqualTo(1));
+
+        canvas.RaiseKeyDown(Keys.PageUp); // page step
+        Assert.That(scrolls, Is.EqualTo(2));
+
+        canvas.RaiseMouseDown(20, 15); // track click pages toward the click (value 4 -> thumb at 48)
+        Assert.That(scrolls, Is.EqualTo(3));
+        canvas.RaiseMouseUp(20, 15);
+
+        var value = bar.Value;
+        canvas.RaiseMouseDown(8 + (value * 10), 15); // grab the thumb at its center
+        canvas.RaiseMouseMove(8 + (value * 10) + 20, 15); // drag 2 units
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.Value, Is.EqualTo(value + 2));
+            Assert.That(scrolls, Is.EqualTo(4), "one Scroll per drag position change");
+        });
+    }
 }

@@ -88,9 +88,10 @@ public interface IPlatformBackend
 
     /// <summary>
     /// Shows the platform's native message box, application-modal, and blocks until the user picks a
-    /// button. Returns which button was pressed.
+    /// button. With an <paramref name="owner"/> the box is owned by (transient to) that window.
+    /// Returns which button was pressed.
     /// </summary>
-    DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon);
+    DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null);
 
     /// <summary>
     /// Shows the platform's native file, save or folder dialog, application-modal. Returns the chosen
