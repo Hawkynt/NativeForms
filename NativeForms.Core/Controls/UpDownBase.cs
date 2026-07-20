@@ -11,8 +11,9 @@ namespace Hawkynt.NativeForms;
 /// autorepeats (500 ms initial delay, then every 50 ms); the Up/Down keys step as well.
 /// </summary>
 /// <remarks>
-/// There is no toolkit-wide focus model yet, so a typed edit has no Enter-key moment to commit at.
-/// Instead, a pending edit is committed — parsed by <see cref="ValidateEditText"/>, which clamps or
+/// Keys typed inside the hosted native editor are not observable from the core (the peer exposes
+/// text changes, not key events), so a typed edit has no Enter-key moment to commit at. Instead, a
+/// pending edit is committed — parsed by <see cref="ValidateEditText"/>, which clamps or
 /// reverts — at the honest points available: before any step (buttons, keys, autorepeat, exactly
 /// like the classic control validates before stepping) and when the surface loses focus. Subclasses
 /// may add further commit points, as <see cref="NumericUpDown"/> does on <c>Value</c> reads.
@@ -30,7 +31,7 @@ public abstract class UpDownBase : OwnerDrawnControl
     /// <summary>Creates the spinner shell and its hosted editor.</summary>
     protected UpDownBase()
     {
-        _editor = new();
+        _editor = new() { TabStop = false };
         _editor.TextChanged += this.OnEditorTextChanged;
         this.Controls.Add(_editor);
     }
@@ -171,7 +172,11 @@ public abstract class UpDownBase : OwnerDrawnControl
     }
 
     /// <inheritdoc/>
-    protected override void OnLostFocus(EventArgs e) => this.CommitEdit();
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        this.CommitEdit();
+    }
 
     /// <summary>Presses a spinner button: steps once and arms the autorepeat.</summary>
     private void PressButton(int direction)

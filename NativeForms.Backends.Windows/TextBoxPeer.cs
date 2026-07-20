@@ -142,8 +142,20 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     /// <inheritdoc/>
     internal override void OnCommand(int notifyCode)
     {
-        if (notifyCode == NativeMethods.EN_CHANGE)
-            TextChangedByUser?.Invoke(this, EventArgs.Empty);
+        switch (notifyCode)
+        {
+            case NativeMethods.EN_CHANGE:
+                TextChangedByUser?.Invoke(this, EventArgs.Empty);
+                break;
+
+            case NativeMethods.EN_SETFOCUS:
+                RaiseGotFocus();
+                break;
+
+            case NativeMethods.EN_KILLFOCUS:
+                RaiseLostFocus();
+                break;
+        }
     }
 
     /// <summary>Pushes the edit-specific buffered state onto a freshly created HWND.</summary>

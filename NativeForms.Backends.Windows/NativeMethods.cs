@@ -202,6 +202,18 @@ internal static partial class NativeMethods
     /// <summary>The button was clicked.</summary>
     internal const int BN_CLICKED = 0;
 
+    /// <summary>The button gained keyboard focus.</summary>
+    internal const int BN_SETFOCUS = 6;
+
+    /// <summary>The button lost keyboard focus.</summary>
+    internal const int BN_KILLFOCUS = 7;
+
+    /// <summary>The edit control gained keyboard focus.</summary>
+    internal const int EN_SETFOCUS = 0x0100;
+
+    /// <summary>The edit control lost keyboard focus.</summary>
+    internal const int EN_KILLFOCUS = 0x0200;
+
     /// <summary>The edit control's text changed (sent after the screen was updated).</summary>
     internal const int EN_CHANGE = 0x0300;
 

@@ -25,6 +25,22 @@ public interface IControlPeer : IDisposable
 
     /// <summary>Maps a point in this widget's client space to screen coordinates.</summary>
     Point PointToScreen(Point clientPoint);
+
+    /// <summary>
+    /// Moves keyboard focus to the widget (<c>SetFocus</c> on Win32, <c>gtk_widget_grab_focus</c> on
+    /// GTK). A no-op before the native widget exists — the core guards with
+    /// <see cref="Control.CanFocus"/>, so peers never buffer a focus wish.
+    /// </summary>
+    void Focus();
+
+    /// <summary>
+    /// Raised when the widget gains keyboard focus — <c>WM_SETFOCUS</c> (or the <c>BN_</c>/<c>EN_</c>
+    /// notification pair for native children) on Win32, the <c>focus-in-event</c> signal on GTK.
+    /// </summary>
+    event EventHandler? GotFocus;
+
+    /// <summary>Raised when the widget loses keyboard focus — the counterpart of <see cref="GotFocus"/>.</summary>
+    event EventHandler? LostFocus;
 }
 
 /// <summary>

@@ -65,12 +65,6 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     public event EventHandler<KeyPressEventArgs>? KeyPress;
 
     /// <inheritdoc/>
-    public event EventHandler? GotFocus;
-
-    /// <inheritdoc/>
-    public event EventHandler? LostFocus;
-
-    /// <inheritdoc/>
     protected override string WindowClass => ClassName;
 
     /// <inheritdoc/>
@@ -135,13 +129,6 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     {
         if (this.Handle != 0)
             NativeMethods.InvalidateRect(this.Handle, null, false);
-    }
-
-    /// <inheritdoc/>
-    public void Focus()
-    {
-        if (this.Handle != 0)
-            NativeMethods.SetFocus(this.Handle);
     }
 
     /// <inheritdoc/>
@@ -349,10 +336,13 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                     return 0;
 
                 case NativeMethods.WM_KEYDOWN:
+                case NativeMethods.WM_SYSKEYDOWN:
+                    // WM_SYSKEYDOWN carries Alt-held keys — the form's mnemonic chain needs them.
                     peer.RaiseKey(peer.KeyDown, wParam);
                     return 0;
 
                 case NativeMethods.WM_KEYUP:
+                case NativeMethods.WM_SYSKEYUP:
                     peer.RaiseKey(peer.KeyUp, wParam);
                     return 0;
 
@@ -361,11 +351,11 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                     return 0;
 
                 case NativeMethods.WM_SETFOCUS:
-                    peer.GotFocus?.Invoke(peer, EventArgs.Empty);
+                    peer.RaiseGotFocus();
                     return 0;
 
                 case NativeMethods.WM_KILLFOCUS:
-                    peer.LostFocus?.Invoke(peer, EventArgs.Empty);
+                    peer.RaiseLostFocus();
                     return 0;
             }
         }

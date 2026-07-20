@@ -18,17 +18,14 @@ public abstract class OwnerDrawnControl : Control
     /// <summary>The native theme to paint with; the fallback until the control is realized.</summary>
     protected ITheme Theme { get; private set; } = DefaultTheme.Instance;
 
-    /// <summary>Whether the control can take keyboard focus. Overridden by interactive controls.</summary>
-    protected virtual bool Focusable => false;
+    /// <summary>Owner-drawn surfaces take no focus by default; interactive controls override.</summary>
+    protected override bool Focusable => false;
 
     /// <summary>Requests a full repaint.</summary>
     public void Invalidate() => _canvas?.InvalidateAll();
 
     /// <summary>Requests a repaint of a sub-region.</summary>
     public void Invalidate(Rectangle region) => _canvas?.Invalidate(region);
-
-    /// <summary>Moves keyboard focus to this control.</summary>
-    public void Focus() => _canvas?.Focus();
 
     private protected override IControlPeer CreatePeer(IPlatformBackend backend)
     {
@@ -77,11 +74,20 @@ public abstract class OwnerDrawnControl : Control
             this.OnMouseLeave(EventArgs.Empty);
             this.CanvasMouseLeave?.Invoke(this, EventArgs.Empty);
         };
-        canvas.KeyDown += (_, e) => this.OnKeyDown(e);
+        canvas.KeyDown += (_, e) =>
+        {
+            // The form's dialog-key chain previews every key ahead of the control — Tab navigation,
+            // Enter/Escape routing, menu shortcuts and Alt+mnemonics — unless IsInputKey claims it.
+            if (this.FindForm() is { } form && form.ProcessDialogKey(this, e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            this.OnKeyDown(e);
+        };
         canvas.KeyUp += (_, e) => this.OnKeyUp(e);
         canvas.KeyPress += (_, e) => this.OnKeyPress(e);
-        canvas.GotFocus += (_, _) => this.OnGotFocus(EventArgs.Empty);
-        canvas.LostFocus += (_, _) => this.OnLostFocus(EventArgs.Empty);
     }
 
     /// <inheritdoc/>
@@ -117,10 +123,4 @@ public abstract class OwnerDrawnControl : Control
 
     /// <summary>Handles a typed character.</summary>
     protected virtual void OnKeyPress(KeyPressEventArgs e) { }
-
-    /// <summary>Handles gaining focus.</summary>
-    protected virtual void OnGotFocus(EventArgs e) { }
-
-    /// <summary>Handles losing focus.</summary>
-    protected virtual void OnLostFocus(EventArgs e) { }
 }

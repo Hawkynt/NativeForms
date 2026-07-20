@@ -12,6 +12,9 @@ public class Label : Control
 {
     private ILabelPeer? _labelPeer;
 
+    /// <summary>Static text never takes keyboard focus (and so never joins the tab order).</summary>
+    protected override bool Focusable => false;
+
     /// <summary>
     /// When <see langword="true"/>, the label sizes itself to fit its text in the theme's default
     /// font. The size is computed through the backend's text measurement on realization and again on
@@ -68,9 +71,10 @@ public class Label : Control
 
     /// <summary>
     /// Whether <c>&amp;</c> in <see cref="Control.Text"/> marks the following character as a mnemonic
-    /// and renders it underlined (<c>&amp;&amp;</c> escapes a literal ampersand). Rendering only for
-    /// now: forwarding activation focus to the next control arrives with the focus model
-    /// (see <c>docs/PRD.md</c> §7.1). Defaults to <see langword="true"/>.
+    /// and renders it underlined (<c>&amp;&amp;</c> escapes a literal ampersand). Alt+mnemonic
+    /// focuses the next tab stop after the label through the owning form's dialog-key chain — fed by
+    /// owner-drawn surfaces; keys held inside native widgets cannot trigger it yet. Defaults to
+    /// <see langword="true"/>.
     /// </summary>
     public bool UseMnemonic
     {
@@ -121,6 +125,37 @@ public class Label : Control
             _labelPeer?.SetImage(this.Image, value);
         }
     } = ContentAlignment.MiddleCenter;
+
+    /// <summary>
+    /// The label's uppercased mnemonic character — the one after a single <c>&amp;</c> in
+    /// <see cref="Control.Text"/> (<c>&amp;&amp;</c> escapes) — or <c>'\0'</c> when there is none or
+    /// <see cref="UseMnemonic"/> is off.
+    /// </summary>
+    internal char Mnemonic
+    {
+        get
+        {
+            if (!this.UseMnemonic)
+                return '\0';
+
+            var text = this.Text;
+            for (var i = 0; i < text.Length - 1; ++i)
+            {
+                if (text[i] != '&')
+                    continue;
+
+                if (text[i + 1] == '&')
+                {
+                    ++i;
+                    continue;
+                }
+
+                return char.ToUpperInvariant(text[i + 1]);
+            }
+
+            return '\0';
+        }
+    }
 
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateLabel();
 

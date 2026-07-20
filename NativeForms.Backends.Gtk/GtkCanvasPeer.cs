@@ -65,12 +65,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     public event EventHandler<KeyPressEventArgs>? KeyPress;
 
     /// <inheritdoc />
-    public event EventHandler? GotFocus;
-
-    /// <inheritdoc />
-    public event EventHandler? LostFocus;
-
-    /// <inheritdoc />
     protected override nint CreateWidget()
     {
         // A GtkFixed rather than a GtkDrawingArea: same "draw" signal, but it can also host native
@@ -105,8 +99,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             Connect("leave-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnLeave, data);
             Connect("key-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyPress, data);
             Connect("key-release-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyRelease, data);
-            Connect("focus-in-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusIn, data);
-            Connect("focus-out-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusOut, data);
         }
     }
 
@@ -137,13 +129,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     {
         if (_widget != 0)
             NativeMethods.gtk_widget_queue_draw(_widget);
-    }
-
-    /// <inheritdoc />
-    public void Focus()
-    {
-        if (_widget != 0)
-            NativeMethods.gtk_widget_grab_focus(_widget);
     }
 
     /// <inheritdoc />
@@ -186,10 +171,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         => KeyUp?.Invoke(this, new KeyEventArgs(key, modifiers));
 
     private void RaiseKeyPress(char keyChar) => KeyPress?.Invoke(this, new KeyPressEventArgs(keyChar));
-
-    private void RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
-
-    private void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
 
     // --- Mapping helpers ------------------------------------------------------------------------
 
@@ -376,22 +357,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             }
         }
 
-        return 0;
-    }
-
-    /// <summary>Native "focus-in-event" handler.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnFocusIn(nint widget, nint eventPtr, nint userData)
-    {
-        FromData(userData)?.RaiseGotFocus();
-        return 0;
-    }
-
-    /// <summary>Native "focus-out-event" handler.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnFocusOut(nint widget, nint eventPtr, nint userData)
-    {
-        FromData(userData)?.RaiseLostFocus();
         return 0;
     }
 }

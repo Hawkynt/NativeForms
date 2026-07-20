@@ -33,7 +33,7 @@ public class SearchBox : OwnerDrawnControl
     /// <summary>Creates the search field and its hosted editor.</summary>
     public SearchBox()
     {
-        _editor = new() { PlaceholderText = "Search" };
+        _editor = new() { PlaceholderText = "Search", TabStop = false };
         _editor.TextChanged += (_, _) => this.OnTextChanged(EventArgs.Empty);
         this.Controls.Add(_editor);
     }
@@ -60,6 +60,9 @@ public class SearchBox : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    /// <summary>Enter commits the search, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
 
     /// <summary>Raises <see cref="SearchCleared"/>.</summary>
     protected virtual void OnSearchCleared(EventArgs e) => this.SearchCleared?.Invoke(this, e);

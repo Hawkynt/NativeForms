@@ -34,6 +34,7 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         // child path never runs for a popup.
         _widget = CreateWidget();
         OnWidgetRealized();
+        ConnectFocusSignals();
         NativeMethods.gtk_container_add(_window, _widget);
 
         // Dismissal watches the top-level: canvas signals return FALSE, so presses and keys bubble

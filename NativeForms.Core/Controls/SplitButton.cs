@@ -56,6 +56,9 @@ public class SplitButton : DropDownButtonBase
             this.PerformMainClick();
     }
 
+    /// <summary>Enter runs the main action, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter && this.Enabled;
+
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {

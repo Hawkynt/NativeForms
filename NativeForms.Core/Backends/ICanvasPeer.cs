@@ -39,20 +39,11 @@ public interface ICanvasPeer : IContainerPeer
     /// <summary>Raised when a character is typed while focused.</summary>
     event EventHandler<KeyPressEventArgs>? KeyPress;
 
-    /// <summary>Raised when the surface gains keyboard focus.</summary>
-    event EventHandler? GotFocus;
-
-    /// <summary>Raised when the surface loses keyboard focus.</summary>
-    event EventHandler? LostFocus;
-
     /// <summary>Requests a repaint of the given client-space region.</summary>
     void Invalidate(Rectangle bounds);
 
     /// <summary>Requests a repaint of the whole surface.</summary>
     void InvalidateAll();
-
-    /// <summary>Moves keyboard focus to this surface.</summary>
-    void Focus();
 
     /// <summary>Sets whether the surface can receive keyboard focus.</summary>
     void SetFocusable(bool focusable);

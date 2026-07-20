@@ -32,8 +32,8 @@ namespace Hawkynt.NativeForms;
 /// mutation, call <see cref="Sort"/> again.
 /// </para>
 /// <para>
-/// There is no toolkit-wide focus model yet, so a label edit has no reliable native Enter moment
-/// once the hosted editor holds focus. Edits therefore commit at the honest points available:
+/// Keys typed inside the hosted native editor are not observable from the core, so a label edit has
+/// no reliable native Enter moment once the hosted editor holds focus. Edits therefore commit at the honest points available:
 /// Enter/Escape while the list surface has focus, any click on the list, <see cref="EndEdit"/>, and
 /// starting another edit — mirroring how <see cref="UpDownBase"/> commits its hosted editor.
 /// </para>
@@ -366,6 +366,10 @@ public class ListView : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    /// <summary>A running label edit claims Enter (commit) and Escape (cancel) ahead of the form.</summary>
+    protected override bool IsInputKey(Keys keyData)
+        => this.IsEditing && keyData is Keys.Enter or Keys.Escape;
 
     /// <summary>The pixel height reserved for the header row (0 unless Details with headers shown).</summary>
     protected int HeaderHeight => this.View == ListViewView.Details && this.ShowColumnHeaders ? this.ItemHeight : 0;
@@ -1027,7 +1031,7 @@ public class ListView : OwnerDrawnControl
         var editor = _labelEditor;
         if (editor is null)
         {
-            _labelEditor = editor = new() { Visible = false };
+            _labelEditor = editor = new() { Visible = false, TabStop = false };
             this.Controls.Add(editor);
         }
 

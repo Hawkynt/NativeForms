@@ -60,8 +60,20 @@ internal sealed class ButtonPeer : Win32ChildPeer, IButtonPeer
     /// <inheritdoc/>
     internal override void OnCommand(int notifyCode)
     {
-        if (notifyCode == NativeMethods.BN_CLICKED)
-            Clicked?.Invoke(this, EventArgs.Empty);
+        switch (notifyCode)
+        {
+            case NativeMethods.BN_CLICKED:
+                Clicked?.Invoke(this, EventArgs.Empty);
+                break;
+
+            case NativeMethods.BN_SETFOCUS:
+                RaiseGotFocus();
+                break;
+
+            case NativeMethods.BN_KILLFOCUS:
+                RaiseLostFocus();
+                break;
+        }
     }
 
     /// <summary>Rebuilds the HWND with the current style bits; buffered state is re-flushed by creation.</summary>

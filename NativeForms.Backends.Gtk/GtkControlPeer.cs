@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
 
@@ -40,6 +41,26 @@ internal abstract class GtkControlPeer : IControlPeer
 
     /// <summary>Converts a managed bool to the 1/0 GLib expects for a <c>gboolean</c>.</summary>
     protected static int Bool(bool value) => value ? 1 : 0;
+
+    /// <inheritdoc />
+    public event EventHandler? GotFocus;
+
+    /// <inheritdoc />
+    public event EventHandler? LostFocus;
+
+    /// <summary>
+    /// The widget that actually takes keyboard focus: the widget itself unless a composite peer (a
+    /// multiline text box's scrolled window) hosts an inner editor and overrides this.
+    /// </summary>
+    private protected virtual nint FocusWidget => _widget;
+
+    /// <inheritdoc />
+    public void Focus()
+    {
+        var widget = FocusWidget;
+        if (widget != 0)
+            NativeMethods.gtk_widget_grab_focus(widget);
+    }
 
     /// <inheritdoc />
     public virtual void SetBounds(Rectangle bounds)
@@ -120,6 +141,7 @@ internal abstract class GtkControlPeer : IControlPeer
         {
             _widget = CreateWidget();
             OnWidgetRealized();
+            ConnectFocusSignals();
         }
 
         _parentFixed = parentFixed;
@@ -128,6 +150,51 @@ internal abstract class GtkControlPeer : IControlPeer
         NativeMethods.gtk_widget_set_sensitive(_widget, Bool(_enabled));
         NativeMethods.gtk_widget_set_visible(_widget, Bool(_visible));
         return _widget;
+    }
+
+    /// <summary>
+    /// Wires the shared focus-in/out signals on the focus-taking widget. Called once per widget
+    /// creation — a peer that recreates its widget (the multiline flip) re-enters through
+    /// <see cref="Realize"/> and rewires the fresh widget; the eagerly built popup surface calls it
+    /// from its constructor.
+    /// </summary>
+    private protected void ConnectFocusSignals()
+    {
+        var widget = FocusWidget;
+        if (widget == 0)
+            return;
+
+        if (!_selfHandle.IsAllocated)
+            _selfHandle = GCHandle.Alloc(this);
+
+        unsafe
+        {
+            var data = GCHandle.ToIntPtr(_selfHandle);
+            NativeMethods.g_signal_connect_data(
+                widget, "focus-in-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusInSignal, data, 0, 0);
+            NativeMethods.g_signal_connect_data(
+                widget, "focus-out-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusOutSignal, data, 0, 0);
+        }
+    }
+
+    /// <summary>Native "focus-in-event" handler shared by every GTK peer.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnFocusInSignal(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkControlPeer peer)
+            peer.GotFocus?.Invoke(peer, EventArgs.Empty);
+
+        return 0;
+    }
+
+    /// <summary>Native "focus-out-event" handler shared by every GTK peer.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnFocusOutSignal(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkControlPeer peer)
+            peer.LostFocus?.Invoke(peer, EventArgs.Empty);
+
+        return 0;
     }
 
     /// <inheritdoc />

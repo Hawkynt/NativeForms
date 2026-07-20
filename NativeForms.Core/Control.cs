@@ -17,9 +17,25 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public abstract class Control
 {
+    /// <summary>Packed boolean state, kept in one byte so the focus model costs no per-flag fields.</summary>
+    [Flags]
+    private enum State : byte
+    {
+        /// <summary><see cref="TabStop"/> was assigned explicitly and overrides the per-kind default.</summary>
+        TabStopAssigned = 1,
+
+        /// <summary>The explicitly assigned <see cref="TabStop"/> value.</summary>
+        TabStop = 2,
+
+        /// <summary>The peer currently holds keyboard focus.</summary>
+        Focused = 4,
+    }
+
     private IControlPeer? _peer;
     private IPlatformBackend? _backend;
     private Rectangle _bounds;
+    private int _tabIndex;
+    private State _state;
 
     /// <summary>Initializes the control and its (initially empty) child collection.</summary>
     protected Control() => this.Controls = new(this);
@@ -144,6 +160,90 @@ public abstract class Control
         }
     }
 
+    /// <summary>
+    /// The position of this control in its container's tab order. Siblings are visited in ascending
+    /// <see cref="TabIndex"/> (ties keep the <see cref="Controls"/> insertion order), depth-first
+    /// through nested containers — the Windows Forms traversal. Defaults to 0.
+    /// </summary>
+    public int TabIndex
+    {
+        get => _tabIndex;
+        set => _tabIndex = value;
+    }
+
+    /// <summary>
+    /// Whether Tab stops on this control. Until assigned it follows the per-kind default: focusable
+    /// controls are tab stops, static and container kinds (labels, panels, group boxes, picture
+    /// boxes, progress bars, scroll bars, strips) are not, and the menu bar opts out because Alt —
+    /// not Tab — reaches it, matching Windows Forms.
+    /// </summary>
+    public bool TabStop
+    {
+        get => (_state & State.TabStopAssigned) != 0 ? (_state & State.TabStop) != 0 : this.DefaultTabStop;
+        set => _state = (_state | State.TabStopAssigned) & ~State.TabStop | (value ? State.TabStop : 0);
+    }
+
+    /// <summary>Whether the peer currently holds keyboard focus, tracked from its focus events.</summary>
+    public bool Focused => (_state & State.Focused) != 0;
+
+    /// <summary>
+    /// Whether <see cref="Focus"/> would succeed right now: the control kind takes focus at all, the
+    /// control is visible and enabled, and a native peer exists to receive it.
+    /// </summary>
+    public bool CanFocus => _peer is not null && this.Focusable && this.Visible && this.Enabled;
+
+    /// <summary>
+    /// Whether this kind of control can take keyboard focus at all. Interactive native widgets
+    /// (buttons, text boxes) can; static kinds (<see cref="Label"/>) and non-interactive owner-drawn
+    /// surfaces override to <see langword="false"/>.
+    /// </summary>
+    protected virtual bool Focusable => true;
+
+    /// <summary>Whether Tab stops here until <see cref="TabStop"/> is assigned. Follows <see cref="Focusable"/>.</summary>
+    private protected virtual bool DefaultTabStop => this.Focusable;
+
+    /// <summary>
+    /// Moves keyboard focus to this control by asking the peer (<c>SetFocus</c> on Win32,
+    /// <c>gtk_widget_grab_focus</c> on GTK). A no-op while <see cref="CanFocus"/> is
+    /// <see langword="false"/>; <see cref="Focused"/> flips when the platform reports the change.
+    /// </summary>
+    public void Focus()
+    {
+        if (this.CanFocus)
+            _peer!.Focus();
+    }
+
+    /// <summary>The form this control sits on — itself for a form — or <see langword="null"/> while unparented.</summary>
+    public Form? FindForm()
+    {
+        for (Control? control = this; control is not null; control = control.Parent)
+            if (control is Form form)
+                return form;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the control claims <paramref name="keyData"/> for its own input, exempting the key
+    /// from the owning form's dialog handling (Tab navigation, Enter → <see cref="Form.AcceptButton"/>,
+    /// Escape → <see cref="Form.CancelButton"/>). The base claims nothing; controls that consume
+    /// Enter or Escape themselves — an open drop-down, a grid edit — override this.
+    /// </summary>
+    protected virtual bool IsInputKey(Keys keyData) => false;
+
+    /// <summary>Routes the form's dialog-key chain to the protected <see cref="IsInputKey"/> hook.</summary>
+    internal bool WantsInputKey(Keys keyData) => this.IsInputKey(keyData);
+
+    /// <summary>Whether this control is an ancestor of <paramref name="descendant"/>.</summary>
+    internal bool IsAncestorOf(Control? descendant)
+    {
+        for (var control = descendant?.Parent; control is not null; control = control.Parent)
+            if (ReferenceEquals(control, this))
+                return true;
+
+        return false;
+    }
+
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
 
@@ -163,11 +263,77 @@ public abstract class Control
     /// <summary>Raised after <see cref="Text"/> changes.</summary>
     public event EventHandler? TextChanged;
 
+    /// <summary>Raised after the control gains keyboard focus, following <see cref="Enter"/>.</summary>
+    public event EventHandler? GotFocus;
+
+    /// <summary>Raised when the control loses keyboard focus, before <see cref="Leave"/>.</summary>
+    public event EventHandler? LostFocus;
+
+    /// <summary>
+    /// Raised when focus enters the control — and, on the containers along the way, when focus
+    /// enters their subtree from outside. On the focused control itself it precedes
+    /// <see cref="GotFocus"/>, the Windows Forms order.
+    /// </summary>
+    public event EventHandler? Enter;
+
+    /// <summary>
+    /// Raised when focus leaves the control — and, on containers, when focus leaves their subtree
+    /// entirely. On the control itself it follows <see cref="LostFocus"/>.
+    /// </summary>
+    public event EventHandler? Leave;
+
     /// <summary>Raises <see cref="Click"/>.</summary>
     protected virtual void OnClick(EventArgs e) => this.Click?.Invoke(this, e);
 
     /// <summary>Raises <see cref="TextChanged"/>.</summary>
     protected virtual void OnTextChanged(EventArgs e) => this.TextChanged?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="GotFocus"/>.</summary>
+    protected virtual void OnGotFocus(EventArgs e) => this.GotFocus?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="LostFocus"/>.</summary>
+    protected virtual void OnLostFocus(EventArgs e) => this.LostFocus?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="Enter"/>.</summary>
+    protected virtual void OnEnter(EventArgs e) => this.Enter?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="Leave"/>.</summary>
+    protected virtual void OnLeave(EventArgs e) => this.Leave?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="Enter"/> on a container crossed by a focus change (called by the form).</summary>
+    internal void RaiseEnter() => this.OnEnter(EventArgs.Empty);
+
+    /// <summary>Raises <see cref="Leave"/> on a container abandoned by a focus change (called by the form).</summary>
+    internal void RaiseLeave() => this.OnLeave(EventArgs.Empty);
+
+    /// <summary>
+    /// Adopts a focus gain the peer reports: marks the control focused, lets the owning form update
+    /// <see cref="Form.ActiveControl"/> and walk Enter/Leave across the container chain, then raises
+    /// <see cref="Enter"/> followed by <see cref="GotFocus"/>.
+    /// </summary>
+    private void OnPeerGotFocus(object? sender, EventArgs e)
+    {
+        if ((_state & State.Focused) != 0)
+            return;
+
+        _state |= State.Focused;
+        this.FindForm()?.NotifyFocusGained(this);
+        this.OnEnter(EventArgs.Empty);
+        this.OnGotFocus(EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Adopts a focus loss the peer reports: clears the flag and raises <see cref="LostFocus"/>
+    /// followed by <see cref="Leave"/>. Deliberately not guarded by <see cref="Focused"/> — some
+    /// platforms report a loss for a widget that never announced its gain, and controls (spin boxes
+    /// committing an edit) rely on hearing it.
+    /// </summary>
+    private void OnPeerLostFocus(object? sender, EventArgs e)
+    {
+        _state &= ~State.Focused;
+        this.OnLostFocus(EventArgs.Empty);
+        this.OnLeave(EventArgs.Empty);
+    }
 
     /// <summary>Programmatically triggers the <see cref="Click"/> event.</summary>
     public void PerformClick() => this.OnClick(EventArgs.Empty);
@@ -265,6 +431,8 @@ public abstract class Control
         var peer = this.CreatePeer(backend);
         _peer = peer;
         _backend = backend;
+        peer.GotFocus += this.OnPeerGotFocus;
+        peer.LostFocus += this.OnPeerLostFocus;
         this.PushPeerBounds();
         peer.SetText(this.Text);
         peer.SetEnabled(this.Enabled);
@@ -303,6 +471,9 @@ public abstract class Control
         if (_peer is null)
             return;
 
+        _peer.GotFocus -= this.OnPeerGotFocus;
+        _peer.LostFocus -= this.OnPeerLostFocus;
+        _state &= ~State.Focused;
         _peer.Dispose();
         _peer = null;
         _backend = null;

@@ -21,6 +21,7 @@ namespace Hawkynt.NativeForms;
 public class Form : Control
 {
     private IWindowPeer? _window;
+    private Control? _activeControl;
     private bool _modal;
     private FormWindowState _windowState;
     private Size _lastSize;
@@ -57,16 +58,18 @@ public class Form : Control
     }
 
     /// <summary>
-    /// The button that should act on Enter. Stored for the pending §7.1 focus/key model — nothing
-    /// routes the Enter key yet, so today the button only acts when actually clicked (honoring its
-    /// <see cref="Button.DialogResult"/>).
+    /// The button Enter clicks through the form's dialog-key chain (honoring its
+    /// <see cref="Button.DialogResult"/>), unless the focused control claims Enter for itself — an
+    /// open drop-down, a grid edit. The chain sees keys from owner-drawn surfaces; a focused native
+    /// text widget consumes its keys inside the widget, where no preview exists yet.
     /// </summary>
     public Button? AcceptButton { get; set; }
 
     /// <summary>
-    /// The button that should act on Escape. As in WinForms, assigning it gives the button a
-    /// <see cref="DialogResult.Cancel"/> result when it still has none; Escape routing itself waits
-    /// on the pending §7.1 focus/key model, so today the button only acts when actually clicked.
+    /// The button Escape clicks through the form's dialog-key chain. As in WinForms, assigning it
+    /// gives the button a <see cref="DialogResult.Cancel"/> result when it still has none. Like
+    /// <see cref="AcceptButton"/>, the routing sees keys from owner-drawn surfaces only, and a
+    /// focused control may claim Escape (to close its own drop-down or cancel its edit) first.
     /// </summary>
     public Button? CancelButton
     {
@@ -237,6 +240,257 @@ public class Form : Control
         _window?.SetIcon(width, height, _iconPixels);
     }
 
+    /// <summary>
+    /// The child control that holds keyboard focus, tracked from peer focus events. Assigning
+    /// focuses the control when it can take focus; assigned before the form is shown, it becomes
+    /// the initial focus instead of the first control in tab order — the WinForms contract.
+    /// </summary>
+    public Control? ActiveControl
+    {
+        get => _activeControl;
+        set
+        {
+            _activeControl = value;
+            value?.Focus();
+        }
+    }
+
+    /// <summary>
+    /// Adopts a focus gain reported by a child's peer: records it as <see cref="ActiveControl"/> and
+    /// fires the container-chain crossings — <see cref="Control.Leave"/> on containers that no longer
+    /// host focus (innermost first), then <see cref="Control.Enter"/> on the newly entered ones
+    /// (outermost first, the WinForms order). The gaining control raises its own Enter/GotFocus pair
+    /// afterwards; the losing control already raised LostFocus/Leave from its own peer event.
+    /// </summary>
+    internal void NotifyFocusGained(Control gained)
+    {
+        if (ReferenceEquals(gained, this))
+            return; // window-level focus is activation, not a child focus change
+
+        var previous = _activeControl;
+        _activeControl = gained;
+        if (previous is null || ReferenceEquals(previous, gained))
+            return;
+
+        for (var parent = previous.Parent; parent is not null && !ReferenceEquals(parent, this); parent = parent.Parent)
+            if (!parent.IsAncestorOf(gained))
+                parent.RaiseLeave();
+
+        EnterContainerChain(gained.Parent, previous);
+
+        void EnterContainerChain(Control? container, Control left)
+        {
+            if (container is null || ReferenceEquals(container, this))
+                return;
+
+            EnterContainerChain(container.Parent, left);
+            if (!container.IsAncestorOf(left))
+                container.RaiseEnter();
+        }
+    }
+
+    /// <summary>
+    /// The form-level dialog-key chain, run by a focused owner-drawn control before its own key
+    /// handling: registered menu shortcuts, Alt+mnemonics, Tab/Shift+Tab navigation, Enter →
+    /// <see cref="AcceptButton"/> and Escape → <see cref="CancelButton"/>. Returns whether the key
+    /// was consumed. A control that needs one of these keys claims it via
+    /// <see cref="Control.IsInputKey"/> and handles it itself. Native widgets (text boxes) consume
+    /// their keys inside the widget, so their keystrokes never reach this chain — a documented
+    /// platform limit until peer key previews exist.
+    /// </summary>
+    internal bool ProcessDialogKey(Control source, KeyEventArgs e)
+    {
+        var keyData = e.KeyData;
+        if (source.WantsInputKey(keyData))
+            return false;
+
+        if (DispatchMenuShortcut(this, keyData))
+            return true;
+
+        if ((keyData & Keys.Modifiers) == Keys.Alt && this.ProcessMnemonic(keyData & Keys.KeyCode))
+            return true;
+
+        switch (keyData)
+        {
+            case Keys.Tab:
+            case Keys.Tab | Keys.Shift:
+                this.MoveFocus(source, forward: (keyData & Keys.Shift) == 0);
+                return true;
+
+            case Keys.Enter:
+                return PerformDialogClick(this.AcceptButton);
+
+            case Keys.Escape:
+                return PerformDialogClick(this.CancelButton);
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Clicks a dialog button when it is present, visible and enabled.</summary>
+    private static bool PerformDialogClick(Button? button)
+    {
+        if (button is not { Visible: true, Enabled: true })
+            return false;
+
+        button.PerformClick();
+        return true;
+    }
+
+    /// <summary>Depth-first dispatch of a shortcut chord to every <see cref="MenuStrip"/> hosted on the form.</summary>
+    private static bool DispatchMenuShortcut(Control parent, Keys keyData)
+    {
+        for (var i = 0; i < parent.Controls.Count; ++i)
+        {
+            var child = parent.Controls[i];
+            if (child is MenuStrip strip && strip.ProcessShortcut(keyData))
+                return true;
+
+            if (DispatchMenuShortcut(child, keyData))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Alt+letter/digit handling: opens the matching <see cref="MenuStrip"/> top-level menu, or — for
+    /// a <see cref="Label"/> mnemonic — focuses the next tab stop after the label, the WinForms label
+    /// contract. Owner-drawn surfaces feed this; button mnemonics stay with the native widgets.
+    /// </summary>
+    private bool ProcessMnemonic(Keys keyCode)
+    {
+        if (keyCode is not ((>= Keys.A and <= Keys.Z) or (>= Keys.D0 and <= Keys.D9)))
+            return false;
+
+        var mnemonic = (char)keyCode;
+        return OpenMenuMnemonic(this, mnemonic) || this.FocusLabelMnemonic(mnemonic);
+    }
+
+    /// <summary>Finds the first <see cref="MenuStrip"/> whose top-level mnemonic matches and opens that menu.</summary>
+    private static bool OpenMenuMnemonic(Control parent, char mnemonic)
+    {
+        for (var i = 0; i < parent.Controls.Count; ++i)
+        {
+            var child = parent.Controls[i];
+            if (child is MenuStrip strip && strip.OpenMnemonic(mnemonic))
+                return true;
+
+            if (OpenMenuMnemonic(child, mnemonic))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Finds the label carrying <paramref name="mnemonic"/> and focuses the next tab stop after it.</summary>
+    private bool FocusLabelMnemonic(char mnemonic)
+    {
+        var order = new List<Control>();
+        AppendInTabOrder(this, order);
+        for (var i = 0; i < order.Count; ++i)
+        {
+            if (order[i] is not Label label || label.Mnemonic != mnemonic)
+                continue;
+
+            // The label itself never takes focus: move on to the next tab stop, wrapping around.
+            for (var j = 1; j < order.Count; ++j)
+            {
+                var candidate = order[(i + j) % order.Count];
+                if (candidate.TabStop && candidate.CanFocus)
+                {
+                    candidate.Focus();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Moves focus to the next (or previous) tab stop relative to <paramref name="from"/>, wrapping
+    /// around the form. <see langword="null"/> starts from the top — the initial-focus walk.
+    /// </summary>
+    internal void MoveFocus(Control? from, bool forward)
+    {
+        var order = new List<Control>();
+        AppendInTabOrder(this, order);
+        var count = order.Count;
+        if (count == 0)
+            return;
+
+        var start = from is null ? forward ? -1 : count : order.IndexOf(from);
+        var step = forward ? 1 : -1;
+        for (var i = 1; i <= count; ++i)
+        {
+            var candidate = order[(((start + (step * i)) % count) + count) % count];
+            if (!candidate.TabStop || !candidate.CanFocus)
+                continue;
+
+            candidate.Focus();
+            return;
+        }
+    }
+
+    /// <summary>
+    /// Flattens <paramref name="parent"/>'s subtree depth-first in tab order: siblings ascend by
+    /// <see cref="Control.TabIndex"/> (a stable sort, so ties keep insertion order) and every child
+    /// is followed immediately by its own subtree — the WinForms traversal. Invisible or disabled
+    /// subtrees are skipped wholesale: their children cannot receive focus either.
+    /// </summary>
+    private static void AppendInTabOrder(Control parent, List<Control> order)
+    {
+        var children = parent.Controls;
+        var count = children.Count;
+        if (count == 0)
+            return;
+
+        Span<int> indices = count <= 64 ? stackalloc int[count] : new int[count];
+        for (var i = 0; i < count; ++i)
+            indices[i] = i;
+
+        // Stable insertion sort by TabIndex; sibling lists are small.
+        for (var i = 1; i < count; ++i)
+        {
+            var current = indices[i];
+            var key = children[current].TabIndex;
+            var j = i - 1;
+            for (; j >= 0 && children[indices[j]].TabIndex > key; --j)
+                indices[j + 1] = indices[j];
+
+            indices[j + 1] = current;
+        }
+
+        for (var i = 0; i < count; ++i)
+        {
+            var child = children[indices[i]];
+            if (!child.Visible || !child.Enabled)
+                continue;
+
+            order.Add(child);
+            AppendInTabOrder(child, order);
+        }
+    }
+
+    /// <summary>
+    /// Gives a freshly shown form its initial focus, exactly like WinForms: the buffered
+    /// <see cref="ActiveControl"/> wish when it can take focus, otherwise the first tab stop.
+    /// </summary>
+    private void ApplyInitialFocus()
+    {
+        if (_activeControl is { CanFocus: true } wish)
+        {
+            wish.Focus();
+            return;
+        }
+
+        this.MoveFocus(null, forward: true);
+    }
+
     private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateWindow();
 
     /// <summary>Raises <see cref="FormClosed"/>.</summary>
@@ -280,6 +534,7 @@ public class Form : Control
         window.BoundsChangedByUser -= this.OnPeerBoundsChanged;
         window.WindowStateChanged -= this.OnPeerWindowStateChanged;
         _window = null;
+        _activeControl = null;
     }
 
     /// <summary>Raises <see cref="Resize"/> and <see cref="SizeChanged"/> whenever the size part of the bounds changes.</summary>
@@ -320,6 +575,7 @@ public class Form : Control
         this.DialogResult = DialogResult.None;
         this.ApplyStartPosition(backend, owner);
         var window = this.RealizeAsWindow(backend);
+        this.ApplyInitialFocus();
         _modal = true;
         try
         {
@@ -348,6 +604,7 @@ public class Form : Control
         this.ApplyStartPosition(backend, owner: null);
         var window = this.RealizeAsWindow(backend);
         window.Show();
+        this.ApplyInitialFocus();
         return window;
     }
 

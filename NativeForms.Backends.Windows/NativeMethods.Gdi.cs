@@ -61,6 +61,12 @@ internal static unsafe partial class NativeMethods
     /// <summary>A character was produced by a key press.</summary>
     internal const uint WM_CHAR = 0x0102;
 
+    /// <summary>A key was pressed while Alt is held (or F10) — the mnemonic path.</summary>
+    internal const uint WM_SYSKEYDOWN = 0x0104;
+
+    /// <summary>A key was released while Alt is held.</summary>
+    internal const uint WM_SYSKEYUP = 0x0105;
+
     /// <summary>The window gained keyboard focus.</summary>
     internal const uint WM_SETFOCUS = 0x0007;
 

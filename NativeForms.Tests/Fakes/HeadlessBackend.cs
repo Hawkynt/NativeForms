@@ -57,6 +57,22 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public bool IsSupported => true;
     public ITheme Theme => DefaultTheme.Instance;
 
+    /// <summary>The peer holding the simulated keyboard focus, or null while nothing is focused.</summary>
+    public HeadlessPeer? FocusedPeer { get; private set; }
+
+    /// <summary>Moves the simulated focus like a real windowing system: the previous peer raises
+    /// LostFocus first, then the new one raises GotFocus.</summary>
+    internal void SetSimulatedFocus(HeadlessPeer peer)
+    {
+        if (ReferenceEquals(this.FocusedPeer, peer))
+            return;
+
+        var previous = this.FocusedPeer;
+        this.FocusedPeer = peer;
+        previous?.RaiseLostFocus();
+        peer.RaiseGotFocus();
+    }
+
     /// <summary>The fake screen size <see cref="GetScreenSize"/> reports; settable so tests can
     /// assert the core's centering math against a known geometry.</summary>
     public Size ScreenSize { get; set; } = new(1920, 1080);
@@ -123,6 +139,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
 
     private T Track<T>(T peer) where T : HeadlessPeer
     {
+        peer.Owner = this;
         this.Created.Add(peer);
         return peer;
     }
@@ -141,11 +158,36 @@ internal abstract class HeadlessPeer : IControlPeer
     /// assert client-to-screen placement math without a windowing system.</summary>
     public Point ScreenOrigin { get; set; }
 
+    /// <summary>The owning backend, wired by tracking — lets <see cref="Focus"/> drive the
+    /// backend-wide focus simulation.</summary>
+    internal HeadlessBackend? Owner { get; set; }
+
+    /// <summary>Whether <see cref="Focus"/> was called on this peer.</summary>
+    public bool FocusRequested { get; private set; }
+
+    public event EventHandler? GotFocus;
+    public event EventHandler? LostFocus;
+
     public void SetBounds(Rectangle bounds) => this.Bounds = bounds;
     public void SetText(string text) => this.Text = text;
     public void SetVisible(bool visible) => this.Visible = visible;
     public void SetEnabled(bool enabled) => this.Enabled = enabled;
     public Point PointToScreen(Point clientPoint) => new(this.ScreenOrigin.X + clientPoint.X, this.ScreenOrigin.Y + clientPoint.Y);
+
+    /// <summary>Records the request and moves the backend's simulated focus here, so the previous
+    /// peer loses focus before this one gains it — exactly like a real windowing system.</summary>
+    public void Focus()
+    {
+        this.FocusRequested = true;
+        this.Owner?.SetSimulatedFocus(this);
+    }
+
+    /// <summary>Raises <see cref="GotFocus"/> as the platform would.</summary>
+    public void RaiseGotFocus() => this.GotFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raises <see cref="LostFocus"/> as the platform would.</summary>
+    public void RaiseLostFocus() => this.LostFocus?.Invoke(this, EventArgs.Empty);
+
     public void Dispose() => this.Disposed = true;
 }
 
@@ -510,7 +552,6 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
 {
     public List<IControlPeer> Children { get; } = [];
     public bool Focusable { get; private set; }
-    public bool FocusRequested { get; private set; }
     public int InvalidateCount { get; private set; }
 
     public void AddChild(IControlPeer child) => this.Children.Add(child);
@@ -524,12 +565,9 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public event EventHandler<KeyEventArgs>? KeyDown;
     public event EventHandler<KeyEventArgs>? KeyUp;
     public event EventHandler<KeyPressEventArgs>? KeyPress;
-    public event EventHandler? GotFocus;
-    public event EventHandler? LostFocus;
 
     public void Invalidate(Rectangle bounds) => ++this.InvalidateCount;
     public void InvalidateAll() => ++this.InvalidateCount;
-    public void Focus() => this.FocusRequested = true;
     public void SetFocusable(bool focusable) => this.Focusable = focusable;
 
     // Test helpers — drive the control as the native surface would.
@@ -561,9 +599,6 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public void RaiseKeyPress(char c) => this.KeyPress?.Invoke(this, new KeyPressEventArgs(c));
 
     public void RaiseMouseLeave() => this.MouseLeave?.Invoke(this, EventArgs.Empty);
-
-    public void RaiseGotFocus() => this.GotFocus?.Invoke(this, EventArgs.Empty);
-    public void RaiseLostFocus() => this.LostFocus?.Invoke(this, EventArgs.Empty);
 }
 
 /// <summary>A popup peer that records every ShowAt/Hide and lets tests trigger light dismissal.</summary>

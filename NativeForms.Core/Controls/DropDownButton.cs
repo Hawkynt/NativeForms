@@ -18,6 +18,9 @@ public class DropDownButton : DropDownButtonBase
         this.ShowDropDown();
     }
 
+    /// <summary>Enter opens the drop-down, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter && this.Enabled;
+
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {

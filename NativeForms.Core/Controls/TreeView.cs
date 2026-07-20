@@ -172,6 +172,9 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
+    /// <summary>Enter toggles the selected node, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
+
     /// <summary>The number of fully visible rows in the client area.</summary>
     protected int VisibleRowCount => Math.Max(1, this.Height / this.ItemHeight);
 

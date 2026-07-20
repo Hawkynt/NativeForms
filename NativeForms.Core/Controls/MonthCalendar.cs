@@ -140,6 +140,9 @@ public class MonthCalendar : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
+    /// <summary>Enter picks the highlighted date, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
+
     /// <summary>Selects the given range in one call, swapping reversed ends and capping the span at
     /// <see cref="MaxSelectionCount"/> days.</summary>
     public void SetSelectionRange(DateTime start, DateTime end)
@@ -186,6 +189,7 @@ public class MonthCalendar : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnGotFocus(EventArgs e)
     {
+        base.OnGotFocus(e);
         _focused = true;
         this.Invalidate();
     }
@@ -193,6 +197,7 @@ public class MonthCalendar : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnLostFocus(EventArgs e)
     {
+        base.OnLostFocus(e);
         _focused = false;
         this.Invalidate();
     }

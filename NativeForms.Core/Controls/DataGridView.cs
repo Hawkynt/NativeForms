@@ -28,8 +28,8 @@ namespace Hawkynt.NativeForms;
 /// sort map is the one O(n) allocation and exists only while a sort is active.
 /// </para>
 /// <para>
-/// There is no toolkit-wide focus model yet, so a hosted editor has no guaranteed Enter-key moment to
-/// commit at. Like <see cref="UpDownBase"/>, edits are committed at the honest points available:
+/// Keys typed inside a hosted native editor are not observable from the core, so a hosted editor has
+/// no guaranteed Enter-key moment to commit at. Like <see cref="UpDownBase"/>, edits are committed at the honest points available:
 /// Enter/Escape when the key reaches the grid surface (backends that route popup/canvas keys), a
 /// press on the grid outside the editor, the edited row scrolling out of the visible window (commit,
 /// matching the classic grid), and the explicit <see cref="CommitEdit"/>/<see cref="CancelEdit"/>
@@ -364,6 +364,10 @@ public class DataGridView : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    /// <summary>The grid claims Enter (activate/commit) always and Escape while a cell edit runs.</summary>
+    protected override bool IsInputKey(Keys keyData)
+        => keyData == Keys.Enter || (keyData == Keys.Escape && this.IsEditing);
 
     /// <summary>The pixel height of the column-header row, or 0 when hidden.</summary>
     protected int HeaderHeight => this.ShowColumnHeaders ? this.ColumnHeaderHeight : 0;
@@ -1641,7 +1645,7 @@ public class DataGridView : OwnerDrawnControl
         {
             case DataGridViewColumnKind.Text:
             {
-                var editor = new TextBox { Text = GetDisplayText(column, item), Bounds = cellBounds };
+                var editor = new TextBox { Text = GetDisplayText(column, item), Bounds = cellBounds, TabStop = false };
                 _textEditor = editor;
                 this.Controls.Add(editor);
                 break;
@@ -1657,6 +1661,7 @@ public class DataGridView : OwnerDrawnControl
                     DecimalPlaces = column.DecimalPlaces,
                     Value = column.NumberSelector!(item),
                     Bounds = cellBounds,
+                    TabStop = false,
                 };
                 _numericEditor = editor;
                 this.Controls.Add(editor);

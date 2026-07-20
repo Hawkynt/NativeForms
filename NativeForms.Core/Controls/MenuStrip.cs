@@ -13,10 +13,11 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 /// <remarks>
 /// The bar is owner-drawn on every backend for now; the native menu bar mapping (Win32 <c>HMENU</c>,
-/// <c>GtkMenuBar</c>, <c>NSMenu</c>) is tracked in <c>docs/PRD.md</c> §7.6. Shortcuts are dispatched
-/// from this control's own key pipeline, so they fire while the bar itself has focus and no
-/// drop-down is open; form-wide dispatch needs the toolkit's focus/key-preview model, also
-/// tracked there.
+/// <c>GtkMenuBar</c>, <c>NSMenu</c>) is tracked in <c>docs/PRD.md</c> §7.6. Shortcuts and
+/// Alt+mnemonics are dispatched form-wide through the owning form's dialog-key chain, which every
+/// focused owner-drawn surface feeds — the form finds its menu strips and routes chords into
+/// <see cref="ProcessShortcut"/> and Alt+letter into <see cref="OpenMnemonic"/>. Keys held inside
+/// native widgets (text boxes) cannot be previewed yet, so shortcuts don't fire from there.
 /// </remarks>
 public class MenuStrip : OwnerDrawnControl
 {
@@ -43,12 +44,46 @@ public class MenuStrip : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
+    /// <summary>The bar is reached with Alt, not Tab — matching Windows Forms.</summary>
+    private protected override bool DefaultTabStop => false;
+
+    /// <summary>
+    /// Claims the keys an open menu (or a keyboard-hovered bar) consumes, keeping the form's
+    /// dialog-key handling — Enter → AcceptButton, Escape → CancelButton, Tab navigation — out of a
+    /// running menu interaction.
+    /// </summary>
+    protected override bool IsInputKey(Keys keyData)
+        => _dropDown is { IsOpen: true }
+            ? keyData is Keys.Enter or Keys.Escape or Keys.Tab
+            : keyData == Keys.Enter && _hoverIndex >= 0;
+
     /// <summary>
     /// Dispatches a shortcut chord (for example <c>Keys.Control | Keys.S</c>) to the first enabled,
     /// visible menu item registered for it, searching the whole item tree. Returns whether one fired.
     /// </summary>
     internal bool ProcessShortcut(Keys keyData)
         => keyData != Keys.None && (keyData & Keys.KeyCode) != Keys.None && DispatchShortcut(this.Items, keyData);
+
+    /// <summary>
+    /// Opens the top-level menu whose mnemonic matches <paramref name="mnemonic"/> (uppercased) —
+    /// the form-wide Alt+letter activation. Focuses the bar first so the open menu keeps receiving
+    /// keys. Returns whether a menu matched.
+    /// </summary>
+    internal bool OpenMnemonic(char mnemonic)
+    {
+        for (var i = 0; i < this.Items.Count; ++i)
+        {
+            var item = this.Items[i];
+            if (!item.Visible || item.MnemonicIndex < 0 || char.ToUpperInvariant(item.DisplayText[item.MnemonicIndex]) != mnemonic)
+                continue;
+
+            this.Focus();
+            this.OpenDropDown(i);
+            return true;
+        }
+
+        return false;
+    }
 
     /// <summary>Opens the drop-down of the item at <paramref name="index"/> below the bar.</summary>
     public void OpenDropDown(int index)

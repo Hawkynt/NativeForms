@@ -53,6 +53,25 @@ internal abstract class Win32ControlPeer : IControlPeer
     }
 
     /// <inheritdoc/>
+    public event EventHandler? GotFocus;
+
+    /// <inheritdoc/>
+    public event EventHandler? LostFocus;
+
+    /// <inheritdoc/>
+    public void Focus()
+    {
+        if (Handle != 0)
+            NativeMethods.SetFocus(Handle);
+    }
+
+    /// <summary>Raises <see cref="GotFocus"/>; called by subclasses translating their native focus notification.</summary>
+    protected void RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raises <see cref="LostFocus"/>; called by subclasses translating their native focus notification.</summary>
+    protected void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc/>
     public Point PointToScreen(Point clientPoint)
     {
         if (Handle == 0)

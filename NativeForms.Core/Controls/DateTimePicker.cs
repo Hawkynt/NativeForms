@@ -156,6 +156,10 @@ public class DateTimePicker : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
+    /// <summary>An open calendar claims Enter (pick) and Escape (close) ahead of the form's dialog keys.</summary>
+    protected override bool IsInputKey(Keys keyData)
+        => this.DroppedDown && keyData is Keys.Enter or Keys.Escape;
+
     /// <summary>The width of the arrow-button zone at the right edge of the field.</summary>
     private int ButtonWidth => this.Theme.ScrollBarSize + 1;
 
@@ -268,6 +272,7 @@ public class DateTimePicker : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnGotFocus(EventArgs e)
     {
+        base.OnGotFocus(e);
         _focused = true;
         this.Invalidate();
     }
@@ -275,6 +280,7 @@ public class DateTimePicker : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnLostFocus(EventArgs e)
     {
+        base.OnLostFocus(e);
         _focused = false;
         this.CloseDropDown();
         this.Invalidate();

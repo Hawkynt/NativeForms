@@ -35,6 +35,9 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     /// <summary>The multiline view's <c>GtkTextBuffer</c> (owned by the view).</summary>
     private nint Buffer => NativeMethods.gtk_text_view_get_buffer(_textView);
 
+    /// <summary>Focus goes to the inner <c>GtkTextView</c> while multiline — the scrolled window never takes it.</summary>
+    private protected override nint FocusWidget => _multiline ? _textView : _widget;
+
     /// <inheritdoc />
     protected override nint CreateWidget()
     {

@@ -154,6 +154,9 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
+    /// <summary>Enter toggles the selected node, so it stays out of the form's AcceptButton routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
+
     /// <summary>The pixel height reserved for the header row (0 while headers are hidden).</summary>
     protected int HeaderHeight => this.ShowColumnHeaders ? this.ItemHeight : 0;
 

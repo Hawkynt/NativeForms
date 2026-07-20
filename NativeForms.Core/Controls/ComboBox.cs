@@ -233,6 +233,10 @@ public class ComboBox : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
+    /// <summary>An open list claims Enter (commit) and Escape (close) ahead of the form's dialog keys.</summary>
+    protected override bool IsInputKey(Keys keyData)
+        => this.DroppedDown && keyData is Keys.Enter or Keys.Escape;
+
     /// <summary>The width of the arrow-button zone at the right edge of the field.</summary>
     private int ButtonWidth => this.Theme.ScrollBarSize + 1;
 
@@ -390,6 +394,7 @@ public class ComboBox : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnGotFocus(EventArgs e)
     {
+        base.OnGotFocus(e);
         _focused = true;
         this.Invalidate();
     }
@@ -397,6 +402,7 @@ public class ComboBox : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnLostFocus(EventArgs e)
     {
+        base.OnLostFocus(e);
         _focused = false;
         this.CloseDropDown();
         this.Invalidate();
@@ -645,7 +651,7 @@ public class ComboBox : OwnerDrawnControl
     /// <see cref="Text"/>; the nested-realization machinery realizes it onto the canvas.</summary>
     private void CreateEditor()
     {
-        var editor = new TextBox { PlaceholderText = this.PlaceholderText };
+        var editor = new TextBox { PlaceholderText = this.PlaceholderText, TabStop = false };
         this.SyncEditorBounds(editor);
         if (_selectedIndex >= 0)
             editor.Text = this.DisplaySelector(this.Items[_selectedIndex]);
