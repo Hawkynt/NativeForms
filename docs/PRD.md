@@ -77,7 +77,7 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 
 | Pattern | How NativeForms supports it |
 |---|---|
-| **MVVM** | `ObservableObject` view-models, `RelayCommand`/`RelayCommand<T>` (`ICommand`), and `PropertyBinding<T>` two-way binding between VM properties and control properties. `[ ]` lambda binding sugar layer. |
+| **MVVM** | `ObservableObject` view-models, `RelayCommand`/`RelayCommand<T>` (`ICommand`), and `PropertyBinding<T>` two-way binding between VM properties and control properties, `BindingExtensions.Bind` lambda sugar, converters, fallbacks, chained paths. |
 | **MVC** | Controls raise events; a controller mediates model↔view. Provided by the plain event surface + one-way `PropertyBinding` from model to view. |
 | **MVP** | Views expose interfaces (`interface IFooView`); a presenter drives them. NativeForms controls are interface-friendly (events + properties); `[ ]` ship a small `IView`/passive-view sample. |
 
@@ -85,17 +85,16 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 - [x] `RelayCommand`, `RelayCommand<T>`
 - [x] `PropertyBinding<T>` (OneWay / TwoWay / OneWayToSource / OneTime), reflection-free
 - [x] `BindingList<T>` replacement: `ObservableList<T>` (IList<T> + granular `ListChanged`), reflection-free
-- [ ] Lambda binding sugar over `PropertyBinding<T>` — string-free, reflection-free:
-      `label.Bind(vm, nameof(vm.Count), v => v.Display, (c, text) => c.Text = text)` plus two-way
-      overloads. The WinForms string API (`DataBindings.Add("Text", vm, "Name")`) is a **non-goal**:
-      it needs reflection. Plain `Func<,>`/`Action<,>` delegates only — no `Expression<>` trees
-      (interpreted under NativeAOT)
-- [~] `ICommand` wiring: `ToolStripItem.Command` (menu items, toolbar buttons — `Enabled` follows
-      `CanExecute`) and `SplitButton.Command` done; plain `Button.Command` pending
+- [x] Lambda binding sugar over `PropertyBinding<T>` (`BindingExtensions.Bind`, exact PRD shape,
+      discard-safe lifetime rooted in the source's `PropertyChanged` list). The WinForms string
+      API (`DataBindings.Add("Text", vm, "Name")`) stays a **non-goal** (reflection); plain
+      delegates only, no `Expression<>` trees
+- [x] `ICommand` wiring: `ToolStripItem.Command`, `SplitButton.Command` and `Button.Command`
+      (+ `CommandParameter`) — `Enabled` follows `CanExecute`/`CanExecuteChanged`
 - [~] List/selection binding: `ListBox.DataSource` + reflection-free `DisplaySelector`/`ImageSelector`
       done; `DataGridView.DataSource`/`Columns` + reflection-free `ValueSelector`/`ImageSelector`
       (cell-level, now with setter-based editing) done; `ComboBox.ValueSelector`/`SelectedValue`
-      done; `ListView` value binding pending
+      done; `ListView.SetDataSource` (snapshot + row factory) done
 
 ---
 
@@ -157,11 +156,13 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe).
 - [~] `ObservableList<T>` with granular change events (add/remove/replace/reset) for virtualized
       list controls done; `Move` change type + `IReadOnlyObservableList<T>` pending.
-- [ ] Format/parse converters (`IValueConverter`-style, as delegate pairs) for two-way text↔value.
-- [ ] Binding fallbacks: default value when the source is unset, null-replace value when the
-      source yields `null` (per binding, reflection-free).
-- [ ] Validation hooks (`INotifyDataErrorInfo`-style), error surfacing on controls.
-- [ ] Binding to nested paths (`a.b.c`) via chained typed selectors.
+- [x] Format/parse converters: `PropertyBinding<TSource, TTarget>` delegate pairs, two-way.
+- [x] Binding fallbacks (`BindingFallback<T>`): default value when the source read throws,
+      null-replacement when it yields `null` — source→target path, per binding, reflection-free.
+- [~] Validation hooks: `ObservableObject.SetError`/`GetError`/`ErrorsChanged` + per-binding
+      `onError` callback done; full `INotifyDataErrorInfo` + built-in control error visuals
+      deliberately out (display is the app's callback)
+- [x] Binding to nested paths via chained typed selectors (`BindingPath.Chain`, re-subscribes on middle-object swap; one-way).
 
 ---
 

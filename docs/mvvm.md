@@ -134,7 +134,7 @@ Semantics:
 - An internal guard suppresses re-entrancy, so a two-way binding cannot ping-pong.
 - `Dispose()` detaches both endpoints and is idempotent.
 
-**Lifetime:** nothing keeps a binding alive except your reference to it — it subscribes to the
+**Lifetime:** the source object itself keeps the binding alive through its PropertyChanged subscription — keep the reference only if you want to dispose the binding early — it subscribes to the
 source, not the other way round. Hold it in a field for as long as the view lives (as the demo's
 `MainForm` does), and dispose it to disconnect early.
 
