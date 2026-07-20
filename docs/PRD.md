@@ -132,12 +132,20 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] `ICanvasPeer` + `OwnerDrawnControl`: one paintable/focusable native surface per backend, so
       every custom control is written once and runs on any backend. Mouse/key/focus + paint plumbed.
 - [x] Decoder-free `IImage` (32-bit ARGB) so controls show icons without an image library.
-- [ ] Light/dark mode + high-contrast follow-the-OS, with change notifications.
-- [ ] Per-monitor DPI awareness; logical↔device pixel mapping.
-- [ ] Double-buffered canvas peer; invalidation regions; hit-testing helpers.
-- [x] `DrawEllipse`/`FillEllipse` (GDI `Ellipse`, Cairo unit-circle) — [ ] rounded rects/pills still pending.
-- [ ] Native-style primitives drawn via theme: push button, radio, combo arrow, header cell,
-      grid line, scrollbar (or reuse native scrollbars where possible), selection highlight.
+- [x] Light/dark mode + high-contrast follow-the-OS: `IPlatformBackend.ThemeChanged`
+      (WM_THEMECHANGED family / GtkSettings notify), theme-cache invalidation, realized
+      owner-drawn controls repaint, `ITheme.IsHighContrast`.
+- [~] DPI: `GetDpiScale` + `Control.LogicalToDevice` groundwork done; per-monitor
+      rescale-on-move pending.
+- [x] Double-buffered Win32 canvas (memory-DC blit; GTK cairo-buffered by design),
+      invalidation regions honored end-to-end, `HitTest` helper; steady-state repaint allocates
+      0 bytes (asserted) after de-allocating the GDI/Pango paint paths (cached brushes/pens/
+      fonts/layouts, reused graphics + event args).
+- [x] `DrawEllipse`/`FillEllipse` and `Draw`/`FillRoundedRectangle` (GDI `RoundRect`,
+      Cairo arc paths) — ToggleSwitch pill is one rounded rect.
+- [x] Native-style primitives drawn via theme (`GlyphRenderer`): push button face, check/radio,
+      progress fill, sort arrow, row marker, combo arrow, header cell, focus ring, selection
+      highlight — adopted across the owner-drawn controls; scrollbars via the shared renderers.
 - [~] Shared icon+text content layout helper (`ContentLayout` + `TextImageRelation`): pure
       geometry, matrix-tested; adopted by CheckBox/RadioButton/GroupBox caption/PictureBox and
       the native Button/Label peers (platform limits documented: Win32 button/label and GTK label
@@ -182,8 +190,8 @@ strategy (may differ per platform; note exceptions inline).
 - [x] Popup surface (`IPopupPeer : ICanvasPeer`: WS_POPUP + capture light-dismiss on Win32,
       `GTK_WINDOW_POPUP` + seat/GTK grabs; `ShowAt`/`Hide`/`Dismissed`; `Control.PointToScreen`)
       — hosts ComboBox drop-downs, menus, tooltips, calendar fly-outs
-- [ ] `Component`/`IContainer` + designer-free component model
-- [ ] `Cursor`, `Cursors`; `Control.Cursor`
+- [x] `Component`/`IContainer` designer-free model (Timer/ToolTip/NotifyIcon/ContextMenuStrip are components; `Container` disposes in reverse order)
+- [x] `Cursor`/`Cursors` + ambient `Control.Cursor` (WM_SETCURSOR / gdk named cursors; LinkLabel hand)
 - [x] Focus model — `Focus()`/`Focused`/`CanFocus`, `TabIndex`/`TabStop` (defaults follow the
       control kind), WinForms event order (Enter→GotFocus / LostFocus→Leave with container-chain
       crossing), `Form.ActiveControl` + initial focus, Tab/Shift+Tab navigation through nested
@@ -192,8 +200,9 @@ strategy (may differ per platform; note exceptions inline).
       via the form dialog-key chain done; native-widget key preview (peer key seam: Enter inside
       a native TextBox → AcceptButton, native Tab handling, button-mnemonic clicks) pending
 - [ ] Mouse (`MouseDown`/`Up`/`Move`/`Enter`/`Leave`/`Wheel`, `DoubleClick`)
-- [~] `Font`, `ForeColor`, `BackColor`, `Padding`, `Anchor`, `Dock` pending; `Margin`
-      (`Padding` struct, consumed by the layout panels) done
+- [~] `Font`/`ForeColor`/`BackColor` (ambient chain, one lazy `AppearanceState`, peer forwarding
+      + owner-drawn adoption), `Padding` (+`DisplayRectangle`), `Margin` done; `Anchor`, `Dock`
+      pending
 - [ ] Layout engine: anchoring, docking, `AutoSize`, `TableLayoutPanel`/`FlowLayoutPanel` semantics
 
 ### 7.2 Top-level & containers
@@ -423,15 +432,20 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] DPI awareness & scaling (per-monitor v2 on Windows, GDK scale, backing-scale on macOS)
 - [ ] Dark mode / high contrast, live theme-change notifications
 - [ ] Accessibility (UIA on Windows, ATK/AT-SPI on GTK, NSAccessibility on macOS)
-- [ ] Right-to-left layout
-- [ ] Localization of built-in strings (dialog buttons etc.)
-- [ ] Drag & drop, clipboard
-- [ ] `ImageList`/icon decoding without heavy image libs (small PNG/ICO decoder or native)
+- [~] Right-to-left: ambient `Control.RightToLeft` + mirrored owner-drawn painting done; container layout mirroring pending
+- [x] Localization: `NativeForms.Strings` providers cover every built-in string (OS dialogs localize themselves)
+- [~] Drag & drop: in-process `DoDragDrop`/`AllowDrop`/`Drag*` events (mouse-capture session,
+      all backends incl. headless) done; OS-level OLE/GTK DnD pending (COM vtables excluded by
+      the interop rules). Clipboard: text set/get seams done (DGV copy/paste)
+- [x] `ImageDecoder`: pure-managed PNG subset (8-bit, all filters, non-interlaced) + ICO
+      (PNG/32-bit/24-bit+mask entries) with `ImageList.AddPng`/`AddIco` (nearest-neighbor resample);
+      encoder lives only in the test project
 - [ ] **Uniform image API across all controls**: either a direct `Image` property (Button, Label,
       CheckBox, RadioButton, GroupBox, PictureBox) or `ImageList` + `ImageIndex`/`ImageKey`
       (ComboBox, ListBox, ListView, TreeView, TreeListView, TabControl, toolbars) — same pattern,
       same rendering path (§5 shared icon+text layout), everywhere
-- [ ] Threading: UI-thread affinity, `Control.Invoke`/`BeginInvoke`, `SynchronizationContext`
+- [x] Threading: loop-thread affinity, `Control.Invoke`/`BeginInvoke` (PostMessage dispatcher /
+      `g_idle_add`), `NativeFormsSynchronizationContext` installed by `Run`
 
 ---
 
