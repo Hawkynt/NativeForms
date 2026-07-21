@@ -9,6 +9,10 @@
     <!-- The demo is the AOT proof: it must publish clean with PublishAot=true on each platform. -->
     <IsAotCompatible>true</IsAotCompatible>
     <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- The autopilot walkthrough writes GdkEvent fields through pointers, which the LibraryImport
+         generator and Unsafe.AsRef both need an unsafe context for. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

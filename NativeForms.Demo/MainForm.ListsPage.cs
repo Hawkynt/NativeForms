@@ -205,6 +205,17 @@ internal sealed partial class MainForm
             Caption("TreeListView (SetDataSource, 3 columns)", 664, 268),
             treeList);
 
+        this.Publish("lists.page", page);
+        this.Publish("lists.listBox", listBox);
+        this.Publish("lists.checkedList", checkedList);
+        this.Publish("lists.comboList", comboList);
+        this.Publish("lists.comboEdit", comboEdit);
+        this.Publish("lists.details", details);
+        this.Publish("lists.smallIcons", smallIcons);
+        this.Publish("lists.tree", tree);
+        this.Publish("lists.treeCore", core);
+        this.Publish("lists.treeList", treeList);
+
         return page;
     }
 }

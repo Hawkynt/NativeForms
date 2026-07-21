@@ -78,9 +78,37 @@ internal sealed partial class MainForm : Form
             this.BuildLayoutPage());
 
         this.Controls.AddRange(_menu, _tools, _tabs, _status);
+        this.Publish("chrome.tabs", _tabs);
+        this.Publish("chrome.menu", _menu);
+        this.Publish("chrome.tools", _tools);
+        this.Publish("chrome.statusLabel", _statusLabel);
+        this.Publish("chrome.toolTip", _toolTip);
         this.LayoutChrome();
         this.Resize += (_, _) => this.LayoutChrome();
     }
+
+    /// <summary>
+    /// The controls the autopilot walkthrough drives, keyed by a stable name. The dictionary is only
+    /// created when <c>--autopilot</c> was passed, so an ordinary launch carries neither the map nor
+    /// the entries.
+    /// </summary>
+    private Dictionary<string, object>? _parts;
+
+    /// <summary>Publishes a control under a name <see cref="Autopilot"/> can look it up by.</summary>
+    private T Publish<T>(string name, T part)
+        where T : notnull
+    {
+        if (Autopilot.Enabled)
+            (_parts ??= new(StringComparer.Ordinal))[name] = part;
+
+        return part;
+    }
+
+    /// <summary>Resolves a published control; only the autopilot ever calls this.</summary>
+    internal T Part<T>(string name)
+        => _parts is not null && _parts.TryGetValue(name, out var part) && part is T typed
+            ? typed
+            : throw new KeyNotFoundException($"nothing is published under \"{name}\"");
 
     /// <summary>Re-docks the chrome rows and the tab control to the current window size.</summary>
     private void LayoutChrome()
@@ -151,6 +179,10 @@ internal sealed partial class MainForm : Form
         help.DropDownItems.Add(about);
 
         strip.Items.AddRange(file, help);
+        this.Publish("menu.file", file);
+        this.Publish("menu.new", newItem);
+        this.Publish("menu.autosave", autosave);
+        this.Publish("menu.exit", exit);
         return strip;
     }
 
@@ -187,6 +219,10 @@ internal sealed partial class MainForm : Form
         run.DropDownItems.Add(runProfiled);
 
         strip.Items.AddRange(newButton, openButton, saveButton, new ToolStripSeparator(), pin, new ToolStripSeparator(), run);
+        this.Publish("tool.new", newButton);
+        this.Publish("tool.pin", pin);
+        this.Publish("tool.run", run);
+        this.Publish("tool.runTests", runTests);
         return strip;
     }
 

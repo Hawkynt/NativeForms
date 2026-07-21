@@ -107,6 +107,13 @@ internal sealed partial class MainForm
             Caption("Panel (AutoScroll, 464×200 content)", 500, 198),
             scrollPanel);
 
+        this.Publish("layout.page", page);
+        this.Publish("layout.flow", flow);
+        this.Publish("layout.table", table);
+        this.Publish("layout.split", split);
+        this.Publish("layout.expander", expander);
+        this.Publish("layout.scrollPanel", scrollPanel);
+
         return page;
     }
 }

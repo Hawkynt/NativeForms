@@ -126,6 +126,9 @@ internal sealed partial class MainForm
             grid,
             Caption("Check and Hours cells write back into the bound items.", 16, 544));
 
+        this.Publish("grid.page", page);
+        this.Publish("grid.grid", grid);
+
         return page;
     }
 

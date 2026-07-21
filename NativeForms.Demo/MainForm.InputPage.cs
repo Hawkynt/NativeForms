@@ -135,6 +135,23 @@ internal sealed partial class MainForm
             Caption("MonthCalendar (week selections)", 664, 100),
             calendar);
 
+        this.Publish("input.page", page);
+        this.Publish("input.single", single);
+        this.Publish("input.placeholder", placeholder);
+        this.Publish("input.password", password);
+        this.Publish("input.multiline", multiline);
+        this.Publish("input.masked", masked);
+        this.Publish("input.rich", rich);
+        this.Publish("input.numeric", numeric);
+        this.Publish("input.domain", domain);
+        this.Publish("input.search", search);
+        this.Publish("input.track", track);
+        this.Publish("input.trackValue", trackValue);
+        this.Publish("input.hscroll", horizontal);
+        this.Publish("input.vscroll", vertical);
+        this.Publish("input.picker", shortPicker);
+        this.Publish("input.calendar", calendar);
+
         return page;
     }
 }

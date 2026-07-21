@@ -170,6 +170,24 @@ internal sealed partial class MainForm
             Caption("PictureBox (generated gradient)", 664, 272),
             picture);
 
+        this.Publish("basics.page", page);
+        this.Publish("basics.counterLabel", counterLabel);
+        this.Publish("basics.counterBar", counterBar);
+        this.Publish("basics.click", clickButton);
+        this.Publish("basics.disabled", disabledButton);
+        this.Publish("basics.dialog", dialogButton);
+        this.Publish("basics.dialogResult", dialogResultLabel);
+        this.Publish("basics.link", link);
+        this.Publish("basics.check", plainCheck);
+        this.Publish("basics.checkDisabled", disabledCheck);
+        this.Publish("basics.toggle", toggle);
+        this.Publish("basics.radioSmall", small);
+        this.Publish("basics.radioMedium", medium);
+        this.Publish("basics.radioLarge", large);
+        this.Publish("basics.picture", picture);
+        this.Publish("basics.pictureMenu", pictureMenu);
+        this.Publish("basics.viewModel", _viewModel);
+
         return page;
     }
 }
