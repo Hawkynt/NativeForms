@@ -41,7 +41,10 @@ internal sealed class ExpanderTests
             Assert.That(expander.Height, Is.EqualTo(_HeaderHeight));
             Assert.That(canvas.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, _HeaderHeight)));
             Assert.That(buttonPeer.Visible, Is.False);
-            Assert.That(button.Visible, Is.True, "logical visibility stays untouched");
+            Assert.That(
+                button.Visible,
+                Is.False,
+                "Visible is effective: a child the collapsed expander vetoed is not on screen");
             Assert.That(changes, Is.EqualTo(1));
         });
     }

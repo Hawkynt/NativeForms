@@ -218,6 +218,27 @@ internal abstract class HeadlessPeer : IControlPeer
         }
     }
 
+    /// <inheritdoc/>
+    public event EventHandler<MouseEventArgs>? PointerMove;
+
+    /// <inheritdoc/>
+    public event EventHandler? PointerLeave;
+
+    /// <summary>Simulates the pointer moving over this peer — the fake's stand-in for a native
+    /// motion event, so hover-driven behavior is assertable without a display.</summary>
+    public void RaisePointerMove(int x, int y)
+        => this.PointerMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+
+    /// <summary>Simulates the pointer leaving this peer.</summary>
+    public void RaisePointerLeave() => this.PointerLeave?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The platform tip text last asked for, or null while no tip is up — the fake's record
+    /// of <see cref="IControlPeer.ShowToolTip"/>.</summary>
+    public string? ToolTipText { get; private set; }
+
+    /// <inheritdoc/>
+    public void ShowToolTip(string? text) => this.ToolTipText = string.IsNullOrEmpty(text) ? null : text;
+
     /// <summary>Records the container that adopted this peer — the chain that
     /// <see cref="PointToScreen"/>, input routing and effective visibility all walk.</summary>
     internal void AttachTo(HeadlessPeer parent) => this.ParentPeer = parent;

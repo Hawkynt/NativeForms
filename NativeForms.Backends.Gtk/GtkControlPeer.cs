@@ -424,6 +424,7 @@ internal abstract class GtkControlPeer : IControlPeer
             ConnectFocusSignals();
             ConnectAllocationClamp();
             SelectScrollEvents();
+            ConnectPointerSignals();
         }
 
         _parentFixed = parentFixed;
@@ -462,6 +463,98 @@ internal abstract class GtkControlPeer : IControlPeer
             NativeMethods.g_signal_connect_data(
                 widget, "focus-out-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnFocusOutSignal, data, 0, 0);
         }
+    }
+
+    /// <summary>
+    /// Whether this peer needs its own native motion/leave connection to report hover. A peer that
+    /// already owns a full mouse pipeline — the canvas — overrides this to <see langword="false"/>
+    /// and forwards its existing events instead; connecting a second pair of handlers on the same
+    /// widget would double-deliver its input.
+    /// </summary>
+    private protected virtual bool NeedsPointerSignals => true;
+
+    /// <summary>
+    /// Wires pointer motion and leave on the widget so every native peer — not just the canvas —
+    /// reports hover. Both handlers return 0 (unhandled) so the widget's own motion and crossing
+    /// behavior, prelight included, is left completely intact; they only observe.
+    /// </summary>
+    private void ConnectPointerSignals()
+    {
+        if (_widget == 0 || !this.NeedsPointerSignals)
+            return;
+
+        NativeMethods.gtk_widget_add_events(
+            _widget, NativeMethods.GDK_POINTER_MOTION_MASK | NativeMethods.GDK_LEAVE_NOTIFY_MASK);
+
+        var data = this.PinSelf();
+        unsafe
+        {
+            NativeMethods.g_signal_connect_data(
+                _widget, "motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnPointerMotionSignal, data, 0, 0);
+            NativeMethods.g_signal_connect_data(
+                _widget, "leave-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnPointerLeaveSignal, data, 0, 0);
+        }
+    }
+
+    /// <inheritdoc/>
+    public event EventHandler<MouseEventArgs>? PointerMove;
+
+    /// <inheritdoc/>
+    public event EventHandler? PointerLeave;
+
+    /// <summary>Raises <see cref="PointerMove"/>; used by peers that feed the channel from a mouse
+    /// pipeline they already own rather than from a connection of their own.</summary>
+    private protected void RaisePointerMove(int x, int y)
+        => this.PointerMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+
+    /// <summary>Raises <see cref="PointerLeave"/>; the counterpart of <see cref="RaisePointerMove"/>.</summary>
+    private protected void RaisePointerLeave() => this.PointerLeave?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc/>
+    public void ShowToolTip(string? text)
+    {
+        if (_widget == 0)
+            return;
+
+        if (string.IsNullOrEmpty(text))
+        {
+            NativeMethods.gtk_widget_set_has_tooltip(_widget, 0);
+            return;
+        }
+
+        NativeMethods.gtk_widget_set_tooltip_text(_widget, text);
+        NativeMethods.gtk_widget_trigger_tooltip_query(_widget);
+    }
+
+    /// <summary>Native "motion-notify-event" handler shared by every GTK peer.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnPointerMotionSignal(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkControlPeer peer)
+            return 0;
+
+        // The args are built only once someone is listening: motion arrives at pointer rate, and an
+        // unsubscribed peer must not allocate for every step across it.
+        if (peer.PointerMove is not { } handler)
+            return 0;
+
+        unsafe
+        {
+            ref var e = ref Unsafe.AsRef<GdkEventMotion>((void*)eventPtr);
+            handler(peer, new MouseEventArgs(MouseButtons.None, (int)e.X, (int)e.Y, 0));
+        }
+
+        return 0;
+    }
+
+    /// <summary>Native "leave-notify-event" handler shared by every GTK peer.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnPointerLeaveSignal(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkControlPeer peer)
+            peer.PointerLeave?.Invoke(peer, EventArgs.Empty);
+
+        return 0;
     }
 
     /// <summary>Native "focus-in-event" handler shared by every GTK peer.</summary>

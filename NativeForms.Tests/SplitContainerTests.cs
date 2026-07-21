@@ -180,7 +180,10 @@ internal sealed class SplitContainerTests
         Assert.Multiple(() =>
         {
             Assert.That(panelCanvases[0].Visible, Is.False, "panel1's peer hides");
-            Assert.That(split.Panel1.Visible, Is.True, "its logical visibility stays untouched");
+            Assert.That(
+                split.Panel1.Visible,
+                Is.False,
+                "Visible is effective: a collapsed panel is not on screen");
             Assert.That(split.Panel2.Bounds, Is.EqualTo(new Rectangle(0, 0, 300, 100)));
         });
 

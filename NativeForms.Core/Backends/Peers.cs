@@ -63,6 +63,28 @@ public interface IControlPeer : IDisposable
 
     /// <summary>Raised when the widget loses keyboard focus — the counterpart of <see cref="GotFocus"/>.</summary>
     event EventHandler? LostFocus;
+
+    /// <summary>
+    /// Raised while the pointer moves over the widget, with the location in the widget's own client
+    /// space — the <c>motion-notify-event</c> signal on GTK, the subclassed <c>WM_MOUSEMOVE</c> on
+    /// Win32. Every peer delivers this, native children included, so hover-driven features
+    /// (<see cref="ToolTip"/>) work uniformly rather than only on owner-drawn surfaces.
+    /// </summary>
+    event EventHandler<MouseEventArgs>? PointerMove;
+
+    /// <summary>Raised when the pointer leaves the widget — the counterpart of <see cref="PointerMove"/>.</summary>
+    event EventHandler? PointerLeave;
+
+    /// <summary>
+    /// Shows the platform's own tooltip on the widget, or hides it when <paramref name="text"/> is
+    /// <see langword="null"/> or empty.
+    ///
+    /// Native widgets use the platform tooltip rather than the toolkit's popup surface on purpose: a
+    /// popup arms light dismiss and takes a pointer grab, which is right for a menu and quietly
+    /// destructive for a tip, because the grab swallows the very clicks the user is aiming at the
+    /// control underneath. The platform tip never takes input, and it is themed by the OS for free.
+    /// </summary>
+    void ShowToolTip(string? text);
 }
 
 /// <summary>

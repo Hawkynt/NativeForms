@@ -84,6 +84,8 @@ internal abstract class BenchPeer : IControlPeer
 
     public event EventHandler? GotFocus { add { } remove { } }
     public event EventHandler? LostFocus { add { } remove { } }
+    public event EventHandler<MouseEventArgs>? PointerMove { add { } remove { } }
+    public event EventHandler? PointerLeave { add { } remove { } }
 
     public void SetBounds(Rectangle bounds) => this.BoundsField = bounds;
     public virtual void SetText(string text) { }
@@ -94,6 +96,7 @@ internal abstract class BenchPeer : IControlPeer
     public void SetCursor(Cursor cursor) { }
     public Point PointToScreen(Point clientPoint) => clientPoint;
     public void Focus() { }
+    public void ShowToolTip(string? text) { }
     public void Dispose() { }
 }
 

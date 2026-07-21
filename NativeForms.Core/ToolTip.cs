@@ -7,14 +7,19 @@ namespace Hawkynt.NativeForms;
 
 /// <summary>
 /// Per-control hover text, the moral equivalent of <c>System.Windows.Forms.ToolTip</c>. Register a
-/// text per control via <see cref="SetToolTip"/>; when the pointer rests on an owner-drawn control
-/// for <see cref="InitialDelay"/> milliseconds a small themed popup appears near the cursor, and it
+/// text per control via <see cref="SetToolTip"/>; when the pointer rests on a control for
+/// <see cref="InitialDelay"/> milliseconds a small themed popup appears near the cursor, and it
 /// hides again when the pointer leaves, a button goes down, or <see cref="AutoPopDelay"/> elapses.
 /// </summary>
 /// <remarks>
-/// Owner-drawn controls are observed through their canvas mouse pipeline. Native-widget controls
-/// (Button, TextBox …) register their text, but showing it needs either hover events on their peers
-/// or the platform tooltip API — tracked in <c>docs/PRD.md</c> §7.6.
+/// Every control is observed the same way, so the tip, its delays and <see cref="Active"/> behave
+/// identically whether the target owns a native widget or paints itself. Owner-drawn controls are
+/// watched through their canvas mouse pipeline, which also lets a press dismiss the tip; native
+/// widgets are watched through their peer's pointer channel
+/// (<see cref="Backends.IControlPeer.PointerMove"/>), which every backend delivers — GTK via
+/// <c>motion-notify-event</c>, Win32 via a subclassed <c>WM_MOUSEMOVE</c>. Registering a tip on a
+/// control therefore always has an effect; the one behavioral difference is that a native widget's
+/// tip is dismissed by the pointer leaving rather than by a button press.
 /// </remarks>
 public sealed class ToolTip : Component
 {
@@ -30,7 +35,7 @@ public sealed class ToolTip : Component
     private IPopupPeer? _popup;
     private IPlatformBackend? _backend;
 
-    private OwnerDrawnControl? _hoverControl;
+    private Control? _hoverControl;
     private Point _hoverPoint;
     private string _shownText = string.Empty;
     private bool _shown;
@@ -50,13 +55,19 @@ public sealed class ToolTip : Component
         set => field = Math.Max(1, value);
     } = 5000;
 
-    /// <summary>Whether the tip popup is currently visible.</summary>
+    /// <summary>
+    /// Whether a tip is currently up. For an owner-drawn control this is the toolkit popup's own
+    /// visibility. For a native widget it means the platform tooltip has been raised for it and not
+    /// yet taken down — the final say on painting the tip belongs to the platform, so treat this as
+    /// "a tip was raised" rather than a promise about pixels.
+    /// </summary>
     public bool Active => _shown;
 
     /// <summary>
-    /// Registers (or, with an empty text, removes) the hover text for a control. Owner-drawn
-    /// controls are hooked immediately; the registration itself is backend-free and may happen long
-    /// before the control is realized.
+    /// Registers (or, with an empty text, removes) the hover text for a control. Every control is
+    /// hooked immediately — owner-drawn ones through their canvas, native-widget ones through their
+    /// peer's pointer channel — so a registration never silently does nothing. The registration
+    /// itself is backend-free and may happen long before the control is realized.
     /// </summary>
     public void SetToolTip(Control control, string? text)
     {
@@ -68,19 +79,24 @@ public sealed class ToolTip : Component
                 return;
 
             _texts.Remove(control);
-            if (control is OwnerDrawnControl ownerDrawn)
-                this.Unhook(ownerDrawn);
-
+            this.Unhook(control);
             return;
         }
 
         _texts[control] = text;
-        if (hooked || control is not OwnerDrawnControl target)
+        if (hooked)
             return;
 
-        target.CanvasMouseMove += this.OnControlMouseMove;
-        target.CanvasMouseLeave += this.OnControlMouseLeave;
-        target.CanvasMouseDown += this.OnControlMouseDown;
+        if (control is OwnerDrawnControl target)
+        {
+            target.CanvasMouseMove += this.OnControlMouseMove;
+            target.CanvasMouseLeave += this.OnControlMouseLeave;
+            target.CanvasMouseDown += this.OnControlMouseDown;
+            return;
+        }
+
+        control.PointerMove += this.OnControlMouseMove;
+        control.PointerLeave += this.OnControlMouseLeave;
     }
 
     /// <summary>The registered hover text for <paramref name="control"/>, or an empty string.</summary>
@@ -94,11 +110,15 @@ public sealed class ToolTip : Component
     public void Hide()
     {
         _timer?.Stop();
+        var control = _hoverControl;
         _hoverControl = null;
         if (!_shown)
             return;
 
         _shown = false;
+        if (control is not null and not OwnerDrawnControl)
+            control.Peer?.ShowToolTip(null);
+
         _popup?.Hide();
     }
 
@@ -112,8 +132,7 @@ public sealed class ToolTip : Component
         _popup = null;
         _backend = null;
         foreach (var control in _texts.Keys)
-            if (control is OwnerDrawnControl ownerDrawn)
-                this.Unhook(ownerDrawn);
+            this.Unhook(control);
 
         _texts.Clear();
     }
@@ -121,7 +140,7 @@ public sealed class ToolTip : Component
     /// <summary>Pointer movement over a registered control: (re)arms the show delay, or re-anchors nothing while shown.</summary>
     private void OnControlMouseMove(object? sender, MouseEventArgs e)
     {
-        if (sender is not OwnerDrawnControl control || control.Backend is null)
+        if (sender is not Control control || control.Backend is null)
             return;
 
         _hoverControl = control;
@@ -156,12 +175,33 @@ public sealed class ToolTip : Component
         if (control?.Backend is not { } backend || !_texts.TryGetValue(control, out var text))
             return;
 
-        this.ShowPopup(backend, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + control.LogicalToDevice(CursorOffset))), text);
+        // A native widget gets the platform's own tip; only an owner-drawn surface, which has no
+        // platform tip of its own, is worth floating a toolkit popup for. See ShowNativeTip.
+        if (control is OwnerDrawnControl)
+            this.ShowPopup(backend, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + control.LogicalToDevice(CursorOffset))), text);
+        else if (!this.ShowNativeTip(control, text))
+            return;
 
         _autoPopPhase = true;
         var timer = this.TimerFor(backend);
         timer.Interval = this.AutoPopDelay;
         timer.Start();
+    }
+
+    /// <summary>
+    /// Asks a native widget's peer to raise the platform tooltip, reporting whether a peer was there
+    /// to ask. Deliberately not the toolkit popup: that surface arms light dismiss and takes a
+    /// pointer grab, which would swallow the next click aimed at the control underneath.
+    /// </summary>
+    private bool ShowNativeTip(Control control, string text)
+    {
+        if (control.Peer is not { } peer)
+            return false;
+
+        peer.ShowToolTip(text);
+        _shownText = text;
+        _shown = true;
+        return true;
     }
 
     /// <summary>Shows (creating on first use) the popup with the given text at a screen position.</summary>
@@ -224,12 +264,22 @@ public sealed class ToolTip : Component
         return timer;
     }
 
-    /// <summary>Detaches the mouse observers from a control whose registration was removed.</summary>
-    private void Unhook(OwnerDrawnControl control)
+    /// <summary>Detaches the pointer observers from a control whose registration was removed,
+    /// mirroring whichever channel <see cref="SetToolTip"/> hooked it through.</summary>
+    private void Unhook(Control control)
     {
-        control.CanvasMouseMove -= this.OnControlMouseMove;
-        control.CanvasMouseLeave -= this.OnControlMouseLeave;
-        control.CanvasMouseDown -= this.OnControlMouseDown;
+        if (control is OwnerDrawnControl ownerDrawn)
+        {
+            ownerDrawn.CanvasMouseMove -= this.OnControlMouseMove;
+            ownerDrawn.CanvasMouseLeave -= this.OnControlMouseLeave;
+            ownerDrawn.CanvasMouseDown -= this.OnControlMouseDown;
+        }
+        else
+        {
+            control.PointerMove -= this.OnControlMouseMove;
+            control.PointerLeave -= this.OnControlMouseLeave;
+        }
+
         if (ReferenceEquals(_hoverControl, control))
             this.Hide();
     }

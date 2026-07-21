@@ -77,13 +77,55 @@ public class Panel : OwnerDrawnControl
         set => this.ScrollTo(Math.Abs(value.X), Math.Abs(value.Y));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// The client rectangle available to content, with the band a visible scrollbar occupies taken
+    /// out — exactly like Windows Forms, where showing a scrollbar shrinks the client area so docked
+    /// and anchored children are never laid out underneath one.
+    /// </summary>
+    public override Rectangle DisplayRectangle
+    {
+        get
+        {
+            var display = base.DisplayRectangle;
+            if (!this.AutoScroll)
+                return display;
+
+            this.GetScrollState(out _, out var verticalBar, out var horizontalBar, out _);
+            var barSize = this.Theme.ScrollBarSize;
+            return new(
+                display.X,
+                display.Y,
+                Math.Max(0, display.Width - (verticalBar ? barSize : 0)),
+                Math.Max(0, display.Height - (horizontalBar ? barSize : 0)));
+        }
+    }
+
+    /// <summary>
+    /// The scroll offset applied to a child's peer, with any edge that would reach into a visible
+    /// scrollbar's band pulled back to the viewport.
+    ///
+    /// Only an edge facing a bar that is actually shown is touched, and only the trailing one: the
+    /// leading edges must stay free to go negative — that is what scrolling a child up and out of
+    /// view means — and a panel without a horizontal bar must not have its children's heights
+    /// trimmed at its own bottom edge, which is the parent window's clipping job, not this method's.
+    ///
+    /// The band itself has to be kept clear because a native child peer sits <em>above</em> the
+    /// container's own surface. A child the Anchor/Dock engine never touched — one placed at
+    /// absolute coordinates, so <see cref="DisplayRectangle"/> never constrained it — would
+    /// otherwise overhang the strip and swallow every press aimed at the thumb.
+    /// </summary>
     private protected override Rectangle GetChildPeerBounds(Control child)
     {
         var bounds = child.Bounds;
-        return this.AutoScroll
-            ? new(bounds.X - _scroll.X, bounds.Y - _scroll.Y, bounds.Width, bounds.Height)
-            : bounds;
+        if (!this.AutoScroll)
+            return bounds;
+
+        this.GetScrollState(out _, out var verticalBar, out var horizontalBar, out var viewport);
+        var x = bounds.X - _scroll.X;
+        var y = bounds.Y - _scroll.Y;
+        var width = verticalBar ? Math.Max(0, Math.Min(bounds.Width, viewport.Width - x)) : bounds.Width;
+        var height = horizontalBar ? Math.Max(0, Math.Min(bounds.Height, viewport.Height - y)) : bounds.Height;
+        return new(x, y, width, height);
     }
 
     /// <summary>
@@ -95,12 +137,17 @@ public class Panel : OwnerDrawnControl
     {
         var width = 0;
         var height = 0;
-        for (var i = 0; i < this.Controls.Count; ++i)
-        {
-            var bounds = this.Controls[i].Bounds;
-            width = Math.Max(width, bounds.Right);
-            height = Math.Max(height, bounds.Bottom);
-        }
+
+        // ChildrenOrNull, not Controls: the extent is now read on every layout pass through
+        // DisplayRectangle, and the public getter would materialize a collection a childless panel
+        // never needed — straight off the per-instance allocation budget.
+        if (this.ChildrenOrNull is { } children)
+            for (var i = 0; i < children.Count; ++i)
+            {
+                var bounds = children[i].Bounds;
+                width = Math.Max(width, bounds.Right);
+                height = Math.Max(height, bounds.Bottom);
+            }
 
         if (width == 0 && height == 0)
             return Size.Empty;
@@ -112,14 +159,15 @@ public class Panel : OwnerDrawnControl
     /// <summary>Determines which scrollbars are needed; each bar steals room from the other's axis.</summary>
     private void GetScrollState(out Size extent, out bool verticalBar, out bool horizontalBar, out Size viewport)
     {
-        extent = this.GetContentExtent();
         if (!this.AutoScroll)
         {
+            extent = this.GetContentExtent();
             verticalBar = horizontalBar = false;
             viewport = this.Size;
             return;
         }
 
+        extent = this.GetContentExtent();
         var barSize = this.Theme.ScrollBarSize;
         verticalBar = extent.Height > this.Height;
         horizontalBar = extent.Width > this.Width - (verticalBar ? barSize : 0);

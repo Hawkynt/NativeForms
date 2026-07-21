@@ -490,6 +490,65 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial short GetKeyState(int nVirtKey);
 
+    /// <summary>
+    /// Installs a subclass procedure on a window — the documented way to observe a stock control's
+    /// messages without owning its window class. <paramref name="dwRefData"/> carries the peer's
+    /// <c>GCHandle</c> back to the callback, so no managed delegate is ever pinned.
+    /// </summary>
+    [LibraryImport("comctl32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetWindowSubclass(nint hWnd, nint pfnSubclass, nuint uIdSubclass, nint dwRefData);
+
+    /// <summary>Removes a subclass procedure installed by <see cref="SetWindowSubclass"/>.</summary>
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool RemoveWindowSubclass(nint hWnd, nint pfnSubclass, nuint uIdSubclass);
+
+    /// <summary>Passes a message down the subclass chain to the control's own procedure.</summary>
+    [LibraryImport("comctl32.dll")]
+    internal static partial nint DefSubclassProc(nint hWnd, uint uMsg, nint wParam, nint lParam);
+
+    // --- Standard tooltip control ---
+
+    /// <summary>The system tooltip window class.</summary>
+    internal const string TOOLTIPS_CLASS = "tooltips_class32";
+
+    /// <summary>Show the tip even when the owning window is inactive.</summary>
+    internal const uint TTS_ALWAYSTIP = 0x01;
+
+    /// <summary>The tool is identified by an HWND rather than a rectangle.</summary>
+    internal const uint TTF_IDISHWND = 0x0001;
+
+    /// <summary>The tooltip control subclasses the tool so hovering shows the tip on its own.</summary>
+    internal const uint TTF_SUBCLASS = 0x0010;
+
+    /// <summary>Registers a tool with the tooltip control (Unicode).</summary>
+    internal const uint TTM_ADDTOOLW = 0x0432;
+
+    /// <summary>Replaces the text of an already registered tool (Unicode).</summary>
+    internal const uint TTM_UPDATETIPTEXTW = 0x0439;
+
+    /// <summary>Turns the tooltip control on or off.</summary>
+    internal const uint TTM_ACTIVATE = 0x0401;
+
+    /// <summary>Describes one tool registered with a tooltip control.</summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct TOOLINFOW
+    {
+        public uint cbSize;
+        public uint uFlags;
+        public nint hwnd;
+        public nuint uId;
+        public RECT rect;
+        public nint hinst;
+        public nint lpszText;
+        public nint lParam;
+    }
+
+    /// <summary>Sends a message carrying a <see cref="TOOLINFOW"/> to a tooltip control.</summary>
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+    internal static partial nint SendToolInfo(nint hWnd, uint msg, nint wParam, ref TOOLINFOW lParam);
+
     /// <summary>Queries or sets a system-wide parameter, here the non-client metrics.</summary>
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

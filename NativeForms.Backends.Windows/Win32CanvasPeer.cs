@@ -316,7 +316,12 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
         NativeMethods.TrackMouseEvent(ref track);
 
         this.MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, LoWord(lParam), HiWord(lParam), 0));
+        this.RaisePointerMove(LoWord(lParam), HiWord(lParam));
     }
+
+    /// <summary>The canvas owns its window class and already tracks pointer messages, so it feeds the
+    /// pointer channel directly rather than being subclassed a second time.</summary>
+    private protected override bool NeedsPointerSubclass => false;
 
     /// <summary>Raises <see cref="MouseWheel"/>, extracting the signed notch delta from the high word
     /// and the modifier keys from the low-word key-state flags.</summary>
@@ -475,6 +480,7 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
 
                 case NativeMethods.WM_MOUSELEAVE:
                     peer.MouseLeave?.Invoke(peer, EventArgs.Empty);
+                    peer.RaisePointerLeave();
                     return 0;
 
                 case NativeMethods.WM_KEYDOWN:

@@ -34,6 +34,10 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 
     private bool _focusable = true;
 
+    /// <summary>The canvas already connects motion and leave for its own mouse pipeline and feeds the
+    /// pointer channel from there, so the base must not connect a second pair on the same widget.</summary>
+    private protected override bool NeedsPointerSignals => false;
+
     /// <summary>Child peers hosted by this surface. Created on first use so leaf canvases (the
     /// overwhelming majority) pay nothing for the container role.</summary>
     private List<GtkControlPeer>? _children;
@@ -212,7 +216,10 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         => MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
     private void RaiseMouseMove(int x, int y)
-        => MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+    {
+        MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+        this.RaisePointerMove(x, y);
+    }
 
     private void RaiseMouseWheel(int delta, int x, int y, KeyModifiers modifiers)
         => MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta, modifiers));
@@ -237,7 +244,11 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         }
     }
 
-    private void RaiseMouseLeave() => MouseLeave?.Invoke(this, EventArgs.Empty);
+    private void RaiseMouseLeave()
+    {
+        MouseLeave?.Invoke(this, EventArgs.Empty);
+        this.RaisePointerLeave();
+    }
 
     /// <summary>Raises KeyDown and reports whether a handler consumed the key.</summary>
     private bool RaiseKeyDown(Keys key, KeyModifiers modifiers)

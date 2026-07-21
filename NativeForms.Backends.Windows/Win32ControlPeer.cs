@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -78,6 +79,103 @@ internal abstract class Win32ControlPeer : IControlPeer
 
     /// <summary>Raises <see cref="LostFocus"/>; called by subclasses translating their native focus notification.</summary>
     protected void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc/>
+    public event EventHandler<MouseEventArgs>? PointerMove;
+
+    /// <inheritdoc/>
+    public event EventHandler? PointerLeave;
+
+    /// <summary>Whether anything is listening for hover — the subclass proc checks this before
+    /// allocating args for a message that arrives at pointer rate.</summary>
+    private protected bool HasPointerListener => PointerMove is not null;
+
+    /// <summary>Raises <see cref="PointerMove"/> from a decoded client-space position.</summary>
+    private protected void RaisePointerMove(int x, int y)
+        => PointerMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+
+    /// <summary>Raises <see cref="PointerLeave"/>.</summary>
+    private protected void RaisePointerLeave() => PointerLeave?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The standard tooltip control owning this widget's tip, created on first use.</summary>
+    private nint _toolTipWindow;
+
+    /// <summary>The unmanaged copy of the current tip text — COMCTL32 reads it lazily, so it has to
+    /// outlive the call that registered it.</summary>
+    private nint _toolTipText;
+
+    /// <inheritdoc/>
+    public unsafe void ShowToolTip(string? text)
+    {
+        if (Handle == 0)
+            return;
+
+        if (string.IsNullOrEmpty(text))
+        {
+            if (_toolTipWindow != 0)
+                NativeMethods.SendMessageW(_toolTipWindow, NativeMethods.TTM_ACTIVATE, 0, 0);
+
+            return;
+        }
+
+        var existing = _toolTipWindow != 0;
+        if (!existing)
+            _toolTipWindow = NativeMethods.CreateWindowExW(
+                0,
+                NativeMethods.TOOLTIPS_CLASS,
+                string.Empty,
+                NativeMethods.WS_POPUP | NativeMethods.TTS_ALWAYSTIP,
+                0,
+                0,
+                0,
+                0,
+                Handle,
+                0,
+                NativeMethods.GetModuleHandleW(null),
+                0);
+
+        if (_toolTipWindow == 0)
+            return;
+
+        if (_toolTipText != 0)
+            Marshal.FreeHGlobal(_toolTipText);
+
+        _toolTipText = Marshal.StringToHGlobalUni(text);
+
+        var info = new NativeMethods.TOOLINFOW
+        {
+            cbSize = (uint)sizeof(NativeMethods.TOOLINFOW),
+            uFlags = NativeMethods.TTF_IDISHWND | NativeMethods.TTF_SUBCLASS,
+            hwnd = Handle,
+            uId = (nuint)Handle,
+            lpszText = _toolTipText,
+        };
+
+        // TTF_SUBCLASS lets the tooltip control drive its own hover timing, so the tip behaves
+        // exactly like every other Windows tooltip once the tool is registered.
+        NativeMethods.SendToolInfo(
+            _toolTipWindow,
+            existing ? NativeMethods.TTM_UPDATETIPTEXTW : NativeMethods.TTM_ADDTOOLW,
+            0,
+            ref info);
+        NativeMethods.SendMessageW(_toolTipWindow, NativeMethods.TTM_ACTIVATE, 1, 0);
+    }
+
+    /// <summary>Releases the tooltip control and its unmanaged text, if either was created.</summary>
+    private protected void DisposeToolTip()
+    {
+        if (_toolTipWindow != 0)
+        {
+            NativeMethods.DestroyWindow(_toolTipWindow);
+            _toolTipWindow = 0;
+        }
+
+        if (_toolTipText == 0)
+            return;
+
+        Marshal.FreeHGlobal(_toolTipText);
+        _toolTipText = 0;
+    }
 
     /// <inheritdoc/>
     public void SetFont(Font font)
@@ -209,6 +307,7 @@ internal abstract class Win32ControlPeer : IControlPeer
     /// <inheritdoc/>
     public virtual void Dispose()
     {
+        this.DisposeToolTip();
         if (_backBrush != 0)
         {
             NativeMethods.DeleteObject(_backBrush);

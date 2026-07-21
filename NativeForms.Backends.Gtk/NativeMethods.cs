@@ -362,6 +362,18 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial nint gtk_entry_get_text(nint entry);
 
+    /// <summary>Sets the widget's platform tooltip text (UTF-8), enabling its tooltip handling.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_widget_set_tooltip_text(nint widget, string? text);
+
+    /// <summary>Turns the widget's tooltip handling on (1) or off (0).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_set_has_tooltip(nint widget, int hasTooltip);
+
+    /// <summary>Asks GTK to re-evaluate the widget's tooltip now, showing it if one applies.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_trigger_tooltip_query(nint widget);
+
     /// <summary>Sets the greyed hint shown while the entry is empty and unfocused (UTF-8).</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void gtk_entry_set_placeholder_text(nint entry, string text);

@@ -23,6 +23,7 @@ namespace Hawkynt.NativeForms.Tests;
 public sealed partial class GtkNativeSizingTests
 {
     private const int _GdkScroll = 31;
+    private const int _GdkMotionNotify = 3;
     private const int _GdkScrollDown = 1;
     private const int _GdkScrollSmooth = 4;
     private const int _GdkScrollMask = 1 << 21;
@@ -46,6 +47,16 @@ public sealed partial class GtkNativeSizingTests
         public int SmoothWheelOverChild;
         public int SmoothWheelOverPanel;
         public int ChildEventMask;
+
+        /// <summary>The GTK allocation of a child whose logical bounds overhang the vertical scrollbar.</summary>
+        public Rectangle OverhangingChild;
+
+        /// <summary>The x the panel's scrollbar band starts at — everything right of it must stay clear.</summary>
+        public int StripLeft;
+
+        /// <summary>The platform tooltip GTK reports on a native button after its tip was raised.</summary>
+        public string? NativeToolTipText;
+
         public string? Failure;
     }
 
@@ -84,7 +95,17 @@ public sealed partial class GtkNativeSizingTests
         var inner = new Button { Text = "Inner", Bounds = new Rectangle(10, 10, 90, 30) };
         panel.Controls.Add(inner);
         panel.Controls.Add(new Button { Text = "Tall bottom", Bounds = new Rectangle(10, 500, 120, 30) });
+
+        // Placed at absolute coordinates so the layout engine never touches it: its logical right
+        // edge (300) reaches past the panel's viewport and into the vertical scrollbar's band.
+        panel.Controls.Add(new Button { Text = "Overhang", Bounds = new Rectangle(200, 60, 100, 30) });
         form.Controls.Add(panel);
+
+        // A native button carrying a tip, to prove the platform tooltip is what gets raised.
+        var tipped = new Button { Text = "Tipped", Bounds = new Rectangle(10, 160, 90, 28) };
+        form.Controls.Add(tipped);
+        var toolTip = new ToolTip { InitialDelay = 40 };
+        toolTip.SetToolTip(tipped, "a native tip");
 
         var timer = new Timer { Interval = 400 };
         timer.Tick += (_, _) =>
@@ -168,6 +189,53 @@ public sealed partial class GtkNativeSizingTests
         measurements.DiscreteWheelOverChild = WheelAndRead(panel, childWindow, _GdkScrollDown, 0);
         measurements.SmoothWheelOverChild = WheelAndRead(panel, childWindow, _GdkScrollSmooth, 1.0);
         measurements.SmoothWheelOverPanel = WheelAndRead(panel, canvasWindow, _GdkScrollSmooth, 1.0);
+
+        panel.AutoScrollPosition = Point.Empty;
+        Pump();
+        gtk_widget_get_allocation(ButtonLabelled("Overhang"), out var overhang);
+        measurements.OverhangingChild = new Rectangle(overhang.X, overhang.Y, overhang.Width, overhang.Height);
+
+        // The band starts where the client area ends; the allocation above must not reach into it.
+        measurements.StripLeft = panel.DisplayRectangle.Right;
+
+        var tipped = ButtonLabelled("Tipped");
+        var tippedWindow = EventWindowOf(tipped, gtk_widget_get_window(gtk_widget_get_parent(tipped)));
+        Assert.That(tippedWindow, Is.Not.Zero, "the tipped button has no GdkWindow of its own");
+        InjectMotion(tippedWindow, 20, 12);
+
+        // The tip is raised by the toolkit's own delay timer, so the loop has to actually run.
+        for (var i = 0; i < 60 && measurements.NativeToolTipText is null; ++i)
+        {
+            Thread.Sleep(20);
+            Pump();
+            var text = gtk_widget_get_tooltip_text(tipped);
+            if (text == 0)
+                continue;
+
+            measurements.NativeToolTipText = Marshal.PtrToStringUTF8(text);
+            g_free(text);
+        }
+    }
+
+    /// <summary>Injects one genuine motion event into <paramref name="window"/>.</summary>
+    private static void InjectMotion(nint window, double x, double y)
+    {
+        var pointer = gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default()));
+        var e = gdk_event_new(_GdkMotionNotify);
+        unsafe
+        {
+            ref var motion = ref *(GdkMotionEvent*)e;
+            motion.Window = g_object_ref(window);
+            motion.SendEvent = 1;
+            motion.Time = 9000;
+            motion.X = x;
+            motion.Y = y;
+            motion.Device = pointer;
+        }
+
+        gtk_main_do_event(e);
+        gdk_event_free(e);
+        Pump();
     }
 
     /// <summary>Injects three wheel-down events into <paramref name="window"/> and reports the panel's
@@ -286,6 +354,33 @@ public sealed partial class GtkNativeSizingTests
     public void Smooth_wheel_over_the_panel_itself_scrolls_it()
         => Assert.That(Result().SmoothWheelOverPanel, Is.LessThan(0));
 
+    // --- Defect: the AutoScroll band belongs to the scrollbar ------------------------------------
+    //
+    // A native child peer is a real GdkWindow stacked above the container's own surface, so X11
+    // delivers a press to the child and the panel's button-press-event never fires for that point.
+    // A child overhanging the strip therefore ate every press aimed at the thumb, which no headless
+    // assertion can express: the fake has no z-order and hands the peer whatever bounds it is given.
+
+    [Test]
+    public void A_child_overhanging_the_scrollbar_is_allocated_clear_of_the_band()
+    {
+        var measured = Result();
+        Assert.That(
+            measured.OverhangingChild.Right,
+            Is.LessThanOrEqualTo(measured.StripLeft),
+            $"the child was allocated {measured.OverhangingChild}, reaching into the band at x={measured.StripLeft}");
+    }
+
+    // --- Defect: a tip on a native-peer control ---------------------------------------------------
+    //
+    // SetToolTip used to hook OwnerDrawnControl only, so a Button's registration was accepted and
+    // then ignored. The tip now rides the peer's pointer channel and is raised through the platform
+    // tooltip — GTK's own, which unlike the toolkit popup never takes a pointer grab.
+
+    [Test]
+    public void A_native_peer_control_raises_the_platform_tooltip()
+        => Assert.That(Result().NativeToolTipText, Is.EqualTo("a native tip"));
+
     // --- GTK plumbing the fixture needs ----------------------------------------------------------
 
     private static void Pump()
@@ -369,6 +464,24 @@ public sealed partial class GtkNativeSizingTests
         public double DeltaY;
     }
 
+    /// <summary><c>GdkEventMotion</c> — the layout the injected hover is written into.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GdkMotionEvent
+    {
+        public int Type;
+        public nint Window;
+        public sbyte SendEvent;
+        public uint Time;
+        public double X;
+        public double Y;
+        public nint Axes;
+        public uint State;
+        public short IsHint;
+        public nint Device;
+        public double XRoot;
+        public double YRoot;
+    }
+
     private const string Gtk = "libgtk-3.so.0";
     private const string Gdk = "libgdk-3.so.0";
     private const string GLib = "libglib-2.0.so.0";
@@ -398,6 +511,8 @@ public sealed partial class GtkNativeSizingTests
     [LibraryImport(GLib)] private static partial uint g_list_length(nint list);
     [LibraryImport(GLib)] private static partial nint g_list_nth_data(nint list, uint n);
     [LibraryImport(GLib)] private static partial void g_list_free(nint list);
+    [LibraryImport(GLib)] private static partial void g_free(nint mem);
+    [LibraryImport(Gtk)] private static partial nint gtk_widget_get_tooltip_text(nint widget);
     [LibraryImport(GObject)] private static partial nint g_object_ref(nint instance);
     [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)] private static partial nuint g_type_from_name(string name);
     [LibraryImport(GObject)] private static partial int g_type_check_instance_is_a(nint instance, nuint type);

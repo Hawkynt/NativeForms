@@ -170,9 +170,10 @@ public class SplitContainer : OwnerDrawnControl
     /// <summary>Raises <see cref="SplitterMoved"/>.</summary>
     protected virtual void OnSplitterMoved(EventArgs e) => this.SplitterMoved?.Invoke(this, e);
 
-    /// <summary>A collapsed panel's peer hides while its logical <see cref="Control.Visible"/> stays
-    /// untouched, so un-collapsing restores exactly what was there — the Expander pattern, including
-    /// combining with the child's own flag rather than the ancestor-walking effective getter.</summary>
+    /// <summary>A collapsed panel's peer hides while its <em>own</em> visibility flag stays untouched,
+    /// so un-collapsing restores exactly what was there — the Expander pattern, including combining
+    /// with that own flag rather than the ancestor-walking effective getter. The effective
+    /// <see cref="Control.Visible"/> does report <see langword="false"/> while collapsed.</summary>
     private protected override bool GetChildPeerVisible(Control child)
         => child.IsVisibleLocal
            && !(this.Panel1Collapsed && ReferenceEquals(child, this.Panel1))

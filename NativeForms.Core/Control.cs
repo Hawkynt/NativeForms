@@ -170,16 +170,27 @@ public abstract class Control
     /// <summary>
     /// Whether the widget is shown. The getter is <em>effective</em>, exactly like Windows Forms: a
     /// control inside a hidden ancestor reports <see langword="false"/> even while its own flag is
-    /// still set. The setter only writes this control's own flag; the peer receives the local value —
-    /// native widget nesting already hides children with their parent.
+    /// still set. A container that hides its content wholesale without touching the children's flags
+    /// — a collapsed <see cref="Expander"/>, a collapsed <see cref="SplitContainer"/> panel — counts
+    /// as such an ancestor: its veto (<see cref="GetChildPeerVisible"/>) is what the peer obeys, so
+    /// reporting anything else here would contradict the pixels. The setter only writes this
+    /// control's own flag; the peer receives the local value — native widget nesting already hides
+    /// children with their parent.
     /// </summary>
     public bool Visible
     {
         get
         {
             for (var control = this; control is not null; control = control.Parent)
+            {
                 if (!control._visible)
                     return false;
+
+                // The veto is asked per level and combines with the child's *own* flag, never with
+                // this effective getter — so consulting it here cannot recurse.
+                if (control.Parent is { } parent && !parent.GetChildPeerVisible(control))
+                    return false;
+            }
 
             return true;
         }
@@ -882,6 +893,71 @@ public abstract class Control
     /// <summary>The backend this control is realized on, or <see langword="null"/> before realization.</summary>
     internal IPlatformBackend? Backend => _backend;
 
+    /// <summary>
+    /// The peer's pointer events, relayed to core listeners. Lazily allocated, so a control nothing
+    /// ever hovers pays a single null reference rather than two delegate slots — the same shape the
+    /// appearance state uses.
+    /// </summary>
+    private sealed class PointerRelay
+    {
+        public EventHandler<MouseEventArgs>? Move;
+        public EventHandler? Leave;
+        public bool Hooked;
+    }
+
+    private PointerRelay? _pointer;
+
+    /// <summary>
+    /// Raised while the pointer moves over this control, wherever the control is realized — the
+    /// peer's own hover channel, so this works for native widgets and owner-drawn surfaces alike.
+    /// Subscribing before realization is fine: the peer is hooked as soon as it exists.
+    /// </summary>
+    internal event EventHandler<MouseEventArgs>? PointerMove
+    {
+        add
+        {
+            (_pointer ??= new()).Move += value;
+            this.HookPeerPointer();
+        }
+
+        remove
+        {
+            if (_pointer is { } relay)
+                relay.Move -= value;
+        }
+    }
+
+    /// <summary>Raised when the pointer leaves this control — the counterpart of <see cref="PointerMove"/>.</summary>
+    internal event EventHandler? PointerLeave
+    {
+        add
+        {
+            (_pointer ??= new()).Leave += value;
+            this.HookPeerPointer();
+        }
+
+        remove
+        {
+            if (_pointer is { } relay)
+                relay.Leave -= value;
+        }
+    }
+
+    /// <summary>Subscribes to the peer's pointer events once, as soon as both a listener and a peer exist.</summary>
+    private void HookPeerPointer()
+    {
+        if (_pointer is not { Hooked: false } relay || _peer is not { } peer)
+            return;
+
+        relay.Hooked = true;
+        peer.PointerMove += this.OnPeerPointerMove;
+        peer.PointerLeave += this.OnPeerPointerLeave;
+    }
+
+    private void OnPeerPointerMove(object? sender, MouseEventArgs e) => _pointer?.Move?.Invoke(this, e);
+
+    private void OnPeerPointerLeave(object? sender, EventArgs e) => _pointer?.Leave?.Invoke(this, e);
+
     /// <summary>Creates the backend peer specific to this control kind (button, label, window …).</summary>
     private protected abstract IControlPeer CreatePeer(IPlatformBackend backend);
 
@@ -1300,6 +1376,7 @@ public abstract class Control
         if (this.GetAmbientCursor() is { } cursor)
             peer.SetCursor(cursor);
 
+        this.HookPeerPointer();
         this.OnRealized(peer);
 
         if (peer is IContainerPeer container && _controls is { } children)

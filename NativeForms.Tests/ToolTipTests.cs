@@ -168,4 +168,86 @@ internal sealed class ToolTipTests
         canvas.RaiseMouseMove(20, 30); // detached: nothing restarts
         Assert.That(backend.Timers, Has.Count.EqualTo(1));
     }
+
+    /// <summary>Realizes a native-peer control (a <see cref="Button"/>) carrying a registered tip.</summary>
+    private static Button CreateNativeButton(out ToolTip toolTip, out HeadlessButtonPeer peer, out HeadlessBackend backend)
+    {
+        var button = new Button { Bounds = new(10, 10, 80, 24), Text = "Go" };
+        backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(button);
+        Application.Run(form, backend);
+        peer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+
+        toolTip = new();
+        toolTip.SetToolTip(button, "native hint");
+        return button;
+    }
+
+    /// <summary>
+    /// A tip registered on a native-widget control must actually fire. Before, only
+    /// <see cref="OwnerDrawnControl"/> was hooked and the registration was accepted and then
+    /// silently ignored — the worst outcome, since the caller had no signal.
+    /// </summary>
+    [Test]
+    public void A_native_peer_control_raises_its_tip_on_hover()
+    {
+        CreateNativeButton(out var toolTip, out var peer, out var backend);
+
+        peer.RaisePointerMove(20, 12);
+        Assert.That(backend.Timers.Single().StartedIntervals, Is.EqualTo(new[] { 500 }), "the delay is armed");
+
+        backend.Timers[0].FireTick();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolTip.Active, Is.True, "the tip is up");
+            Assert.That(peer.ToolTipText, Is.EqualTo("native hint"), "shown through the platform tip");
+        });
+    }
+
+    /// <summary>
+    /// The native tip goes through the platform's own tooltip, never the toolkit popup: that surface
+    /// arms light dismiss and takes a pointer grab, which would swallow the next click aimed at the
+    /// control underneath. No popup peer may be created for a native-peer tip.
+    /// </summary>
+    [Test]
+    public void A_native_peer_tip_never_creates_a_grabbing_popup()
+    {
+        CreateNativeButton(out _, out var peer, out var backend);
+
+        peer.RaisePointerMove(20, 12);
+        backend.Timers[0].FireTick();
+
+        Assert.That(backend.Created.OfType<HeadlessPopupPeer>(), Is.Empty);
+    }
+
+    /// <summary>The pointer leaving a native control takes its tip down again.</summary>
+    [Test]
+    public void Leaving_a_native_peer_control_hides_its_tip()
+    {
+        CreateNativeButton(out var toolTip, out var peer, out var backend);
+        peer.RaisePointerMove(20, 12);
+        backend.Timers[0].FireTick();
+
+        peer.RaisePointerLeave();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolTip.Active, Is.False);
+            Assert.That(peer.ToolTipText, Is.Null, "the platform tip was taken down too");
+        });
+    }
+
+    /// <summary>Clearing the registration detaches the pointer observers from a native control.</summary>
+    [Test]
+    public void Clearing_a_native_peer_registration_detaches_its_observers()
+    {
+        var button = CreateNativeButton(out var toolTip, out var peer, out var backend);
+
+        toolTip.SetToolTip(button, null);
+        peer.RaisePointerMove(20, 12);
+
+        Assert.That(backend.Timers, Is.Empty, "nothing armed a delay");
+    }
 }

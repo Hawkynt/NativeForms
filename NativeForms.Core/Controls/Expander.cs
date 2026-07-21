@@ -6,9 +6,10 @@ namespace Hawkynt.NativeForms;
 /// <summary>
 /// A collapsible container (§7.9): a themed header row — triangle glyph plus <see cref="Control.Text"/> —
 /// over a content area of ordinary child controls. Collapsing shrinks the control to the header row,
-/// remembers the expanded height and hides the child peers; the children's logical
-/// <see cref="Control.Visible"/> stays untouched, so expanding restores exactly what was there.
-/// A header click or the Space key toggles.
+/// remembers the expanded height and hides the child peers; the children's <em>own</em> visibility
+/// flags stay untouched, so expanding restores exactly what was there — while collapsed they read
+/// <see cref="Control.Visible"/> as <see langword="false"/>, because that getter is effective and the
+/// content genuinely is not on screen. A header click or the Space key toggles.
 /// </summary>
 public class Expander : OwnerDrawnControl
 {

@@ -159,4 +159,87 @@ internal sealed class PanelScrollTests
             Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(10, 150, 60, 30)));
         });
     }
+
+    /// <summary>
+    /// Showing a scrollbar has to shrink the client area, exactly like Windows Forms: otherwise the
+    /// Anchor/Dock engine lays children out across the whole width and a docked child ends up
+    /// underneath the bar, where — its peer being a native window stacked above the container's own
+    /// surface — it swallows every press aimed at the thumb.
+    /// </summary>
+    [Test]
+    public void Display_rectangle_reserves_the_band_of_each_visible_scrollbar()
+    {
+        var panel = new Panel { Bounds = new(0, 0, 100, 100), AutoScroll = true };
+        var tall = new Button { Bounds = new(0, 0, 10, 400) };
+        panel.Controls.Add(tall);
+
+        Assert.That(
+            panel.DisplayRectangle,
+            Is.EqualTo(new Rectangle(0, 0, 100 - _ScrollBarSize, 100)),
+            "the vertical bar alone takes width, never height");
+
+        // Now the content also overflows horizontally, so both bars show and both bands are reserved.
+        panel.Controls.Add(new Button { Bounds = new(0, 0, 400, 10) });
+
+        Assert.That(
+            panel.DisplayRectangle,
+            Is.EqualTo(new Rectangle(0, 0, 100 - _ScrollBarSize, 100 - _ScrollBarSize)),
+            "each bar takes its own band");
+    }
+
+    /// <summary>A panel that scrolls nothing keeps the plain padded client area.</summary>
+    [Test]
+    public void Display_rectangle_reserves_nothing_while_no_scrollbar_shows()
+    {
+        var panel = new Panel { Bounds = new(0, 0, 100, 100), AutoScroll = true };
+        panel.Controls.Add(new Button { Bounds = new(10, 10, 60, 30) });
+
+        Assert.That(panel.DisplayRectangle, Is.EqualTo(new Rectangle(0, 0, 100, 100)));
+    }
+
+    /// <summary>
+    /// A child placed at absolute coordinates is never touched by the layout engine, so
+    /// <see cref="Control.DisplayRectangle"/> alone cannot keep it off the strip — its peer
+    /// rectangle has to be pulled back to the viewport as well.
+    /// </summary>
+    [Test]
+    public void A_child_overhanging_the_vertical_bar_has_its_peer_pulled_off_the_band()
+    {
+        var panel = new Panel { Bounds = new(0, 0, 100, 100), AutoScroll = true };
+        panel.Controls.Add(new Button { Bounds = new(0, 0, 10, 400) });
+        var wide = new Button { Bounds = new(0, 200, 98, 20) };
+        panel.Controls.Add(wide);
+        Realize(panel, out var backend);
+        var widePeer = backend.Created.OfType<HeadlessButtonPeer>().Last();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                widePeer.Bounds.Right,
+                Is.EqualTo(100 - _ScrollBarSize),
+                "the peer stops at the viewport, leaving the strip clear");
+            Assert.That(
+                wide.Bounds,
+                Is.EqualTo(new Rectangle(0, 200, 98, 20)),
+                "the child's logical bounds are untouched");
+        });
+    }
+
+    /// <summary>
+    /// The pull-back applies only to an edge facing a bar that is actually shown. Without a
+    /// horizontal bar a child must keep its full height while it scrolls past the bottom edge —
+    /// clipping there is the parent window's job, and trimming instead would visibly shrink the
+    /// widget.
+    /// </summary>
+    [Test]
+    public void A_child_below_the_viewport_keeps_its_height_while_no_horizontal_bar_shows()
+    {
+        var panel = new Panel { Bounds = new(0, 0, 100, 100), AutoScroll = true };
+        var low = new Button { Bounds = new(10, 90, 60, 30) };
+        panel.Controls.Add(low);
+        Realize(panel, out var backend);
+        var lowPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+
+        Assert.That(lowPeer.Bounds, Is.EqualTo(new Rectangle(10, 90, 60, 30)));
+    }
 }

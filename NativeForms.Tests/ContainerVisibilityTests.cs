@@ -53,7 +53,10 @@ internal sealed class ContainerVisibilityTests
             Assert.That(directPeer.EffectivelyVisible, Is.False);
             Assert.That(grandchildPeer.EffectivelyVisible, Is.False);
             Assert.That(greatGrandchildPeer.EffectivelyVisible, Is.False);
-            Assert.That(greatGrandchild.Visible, Is.True, "logical visibility stays untouched");
+            Assert.That(
+                greatGrandchild.Visible,
+                Is.False,
+                "Visible is effective, and a collapsed expander's whole subtree is off screen");
         });
 
         expander.Expanded = true;
@@ -215,5 +218,63 @@ internal sealed class ContainerVisibilityTests
             grandchildPeer.EffectivelyVisible,
             Is.True,
             "un-collapsing re-pushes the panel's whole subtree, not just the panel");
+    }
+
+    /// <summary>
+    /// <see cref="Control.Visible"/> is the <em>effective</em> state, so a container's veto counts
+    /// just like a hidden ancestor: while the expander is collapsed its whole subtree is off screen
+    /// and must say so, and re-expanding must restore every reading — proving the veto was never
+    /// written into the children's own flags.
+    /// </summary>
+    [Test]
+    public void A_collapsed_expanders_subtree_reports_itself_invisible_and_recovers()
+    {
+        var expander = new Expander { Bounds = new(0, 0, 200, 150) };
+        var child = new Button { Bounds = new(4, 30, 60, 20) };
+        var nested = new Panel { Bounds = new(4, 60, 180, 60) };
+        var grandchild = new Label { Bounds = new(2, 2, 60, 20) };
+        nested.Controls.Add(grandchild);
+        expander.Controls.Add(child);
+        expander.Controls.Add(nested);
+        Realize(expander);
+
+        Assert.That(child.Visible, Is.True, "everything starts visible");
+
+        expander.Expanded = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(child.Visible, Is.False, "the direct child is off screen");
+            Assert.That(grandchild.Visible, Is.False, "and so is a grandchild");
+            Assert.That(expander.Visible, Is.True, "the expander itself is still on screen");
+        });
+
+        expander.Expanded = true;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(child.Visible, Is.True, "the child's own flag was never clobbered");
+            Assert.That(grandchild.Visible, Is.True, "nor the grandchild's");
+        });
+    }
+
+    /// <summary>
+    /// The veto combines with the child's <em>own</em> flag, never with the effective getter: a
+    /// child hidden by hand stays hidden after the expander reopens, which is what distinguishes the
+    /// two states and is exactly what folding the getter into the veto would destroy.
+    /// </summary>
+    [Test]
+    public void A_child_hidden_by_hand_stays_hidden_when_the_expander_reopens()
+    {
+        var expander = new Expander { Bounds = new(0, 0, 200, 150) };
+        var child = new Button { Bounds = new(4, 30, 60, 20) };
+        expander.Controls.Add(child);
+        Realize(expander);
+
+        child.Visible = false;
+        expander.Expanded = false;
+        expander.Expanded = true;
+
+        Assert.That(child.Visible, Is.False);
     }
 }
