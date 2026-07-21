@@ -90,7 +90,13 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         var data = this.PinSelf();
         unsafe
         {
+            // The "draw" pair brackets our own painting with a cairo clip so no OnPaint can bleed
+            // past the control's rectangle; "size-allocate" keeps the widget itself at exactly the
+            // size the toolkit asked for, which is what confines the native children (see
+            // ClampAllocation).
             Connect("draw", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDraw, data);
+            ConnectAfter("draw", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDrawAfter, data);
+            ConnectAfter("size-allocate", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSizeAllocate, data);
             Connect("button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonPress, data);
             Connect("button-release-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonRelease, data);
             Connect("motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnMotion, data);
@@ -104,6 +110,22 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     /// <summary>Connects one native signal to a Cdecl function pointer with this peer as user data.</summary>
     private void Connect(string signal, nint handler, nint data)
         => NativeMethods.g_signal_connect_data(_widget, signal, handler, data, 0, 0);
+
+    /// <summary>Connects a handler that runs <em>after</em> the class closure — for "draw", after
+    /// GTK has drawn the container's children.</summary>
+    private void ConnectAfter(string signal, nint handler, nint data)
+        => NativeMethods.g_signal_connect_data(_widget, signal, handler, data, 0, NativeMethods.G_CONNECT_AFTER);
+
+    /// <inheritdoc />
+    public override void SetBounds(Rectangle bounds)
+    {
+        base.SetBounds(bounds);
+
+        // A resize re-runs GTK's allocation, which re-grows the widget to fit its children; clamp it
+        // back so the new client rectangle bounds them immediately rather than one frame later.
+        // Harmless before realization — there is no widget to clamp yet.
+        this.ClampAllocation();
+    }
 
     /// <inheritdoc />
     public void AddChild(IControlPeer child)
@@ -145,6 +167,77 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     // managed wrappers are cached and reused so a steady-state repaint allocates nothing.
     private GtkGraphics? _graphics;
     private PaintEventArgs? _paintArgs;
+
+    /// <summary>
+    /// Saves the cairo state and clips it to the control's client rectangle, so our own
+    /// <see cref="Paint"/> cannot leave it.
+    ///
+    /// The clip comes from <see cref="GtkControlPeer._bounds"/> — the size the toolkit asked for —
+    /// and deliberately not from the widget's allocation: <c>gtk_widget_set_size_request</c> only
+    /// sets a <em>minimum</em>, so a GtkFixed hands this canvas the bounding box of its children
+    /// whenever they overflow, and clipping to that would be clipping to the spill itself.
+    /// This bounds our own drawing only — the native children are confined by
+    /// <see cref="ClampAllocation"/>, because GTK 3's draw marshaller wraps every handler in
+    /// <c>cairo_save</c>/<c>cairo_restore</c> and so discards this clip before the children draw.
+    /// </summary>
+    private void ClipToClientRectangle(nint cr)
+    {
+        NativeMethods.cairo_save(cr);
+        NativeMethods.cairo_rectangle(cr, 0, 0, _bounds.Width, _bounds.Height);
+        NativeMethods.cairo_clip(cr);
+    }
+
+    /// <summary>Guards the re-entrant <c>gtk_widget_size_allocate</c> in <see cref="ClampAllocation"/>.</summary>
+    private bool _clamping;
+
+    /// <summary>
+    /// Forces this canvas's allocation back to the control's client rectangle after GTK has sized it.
+    ///
+    /// This is what confines the native children. A <c>GtkFixed</c> asks each child for its preferred
+    /// size and allocates that, and <c>gtk_widget_set_size_request</c> only sets a <em>minimum</em> —
+    /// so a panel whose content is larger than itself is allocated the content's bounding box
+    /// (measured: 464x206 for a panel the toolkit sized 300x180). Its GDK window grows to match and
+    /// the children draw across the whole of it, straight over the neighbouring controls.
+    ///
+    /// Clipping cairo in the "draw" handler cannot fix this: GTK 3 installs a draw marshaller that
+    /// wraps every handler in <c>cairo_save</c>/<c>cairo_restore</c>, so a clip taken there is
+    /// discarded before the container draws its children (measured: the clip is back to the damage
+    /// region by the time the after-handler runs). Correcting the allocation is both the actual
+    /// repair — the toolkit owns these bounds outright — and the one that also keeps the GDK window,
+    /// the widget clip and hit-testing consistent with them.
+    /// </summary>
+    private void ClampAllocation()
+    {
+        if (_clamping || _widget == 0)
+            return;
+
+        // An empty rectangle means the toolkit has not sized this surface yet — there is nothing
+        // authoritative to clamp to, and forcing 0x0 would blank the widget.
+        if (_bounds.Width <= 0 || _bounds.Height <= 0)
+            return;
+
+        NativeMethods.gtk_widget_get_allocation(_widget, out var current);
+        if (current.Width == _bounds.Width && current.Height == _bounds.Height)
+            return;
+
+        var corrected = new GdkRectangle
+        {
+            X = current.X,
+            Y = current.Y,
+            Width = _bounds.Width,
+            Height = _bounds.Height,
+        };
+
+        _clamping = true;
+        try
+        {
+            NativeMethods.gtk_widget_size_allocate(_widget, ref corrected);
+        }
+        finally
+        {
+            _clamping = false;
+        }
+    }
 
     /// <summary>Wraps the Cairo context and raises <see cref="Paint"/> for the invalidated region
     /// (the context's clip, which GDK set from the queued draw areas), falling back to the whole
@@ -298,11 +391,35 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     // Key events stop only once a managed handler has set Handled, which keeps unconsumed keys
     // bubbling to the form's dialog-key chain and to the popup surface's Escape dismissal.
 
-    /// <summary>Native "draw" handler: <c>gboolean (GtkWidget*, cairo_t*, gpointer)</c>.</summary>
+    /// <summary>Native "draw" handler: <c>gboolean (GtkWidget*, cairo_t*, gpointer)</c>. Clips the
+    /// context to the client rectangle for the duration of our own painting; the children are
+    /// bounded by <see cref="ClampAllocation"/>, not by this clip.</summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int OnDraw(nint widget, nint cr, nint userData)
     {
-        FromData(userData)?.RaisePaint(cr);
+        if (FromData(userData) is not { } peer)
+            return 0;
+
+        peer.ClipToClientRectangle(cr);
+        peer.RaisePaint(cr);
+        return 0;
+    }
+
+    /// <summary>Native "size-allocate" handler: <c>void (GtkWidget*, GdkRectangle*, gpointer)</c>.
+    /// GTK has just sized the widget; put the allocation back to the control's own rectangle so the
+    /// native children stay inside it.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static void OnSizeAllocate(nint widget, nint allocation, nint userData)
+        => FromData(userData)?.ClampAllocation();
+
+    /// <summary>Native "draw" handler connected with <c>G_CONNECT_AFTER</c>: balances the
+    /// <c>cairo_save</c> that <see cref="OnDraw"/> took, once the children have been drawn.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnDrawAfter(nint widget, nint cr, nint userData)
+    {
+        if (FromData(userData) is not null)
+            NativeMethods.cairo_restore(cr);
+
         return 0;
     }
 

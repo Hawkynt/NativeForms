@@ -186,7 +186,11 @@ public abstract class Control
                 return;
 
             _visible = value;
-            this.PushPeerVisible();
+
+            // The whole subtree, not just this peer: a container between here and a descendant may
+            // veto that descendant's visibility (a collapsed Expander), and showing an ancestor has
+            // to give every such container its say again.
+            this.PushPeerVisibleTree();
         }
     }
 
@@ -1210,6 +1214,27 @@ public abstract class Control
     /// <summary>Re-applies this control's local visibility to its peer through the parent's veto.</summary>
     internal void PushPeerVisible()
         => _peer?.SetVisible(this.Parent is { } parent ? parent.GetChildPeerVisible(this) : _visible);
+
+    /// <summary>
+    /// Re-applies visibility to this control's peer and, depth-first, to every descendant's — each
+    /// through its own parent's veto.
+    ///
+    /// Pushing only the direct children is not enough: a veto is asked per level
+    /// (<see cref="GetChildPeerVisible"/>), so a grandchild inside a collapsed
+    /// <see cref="Expander"/> — or inside a collapsed <see cref="SplitContainer"/> panel — has an
+    /// answer of its own that nothing else recomputes. The native backends hide a widget subtree
+    /// along with its parent and so happen to paper over a missed descendant; that is exactly why
+    /// the whole subtree has to be re-pushed here rather than relying on it.
+    /// </summary>
+    internal void PushPeerVisibleTree()
+    {
+        this.PushPeerVisible();
+        if (_controls is not { } children)
+            return;
+
+        for (var i = 0; i < children.Count; ++i)
+            children[i].PushPeerVisibleTree();
+    }
 
     /// <summary>
     /// Creates this control's peer and pushes its buffered state into it. When the peer can host

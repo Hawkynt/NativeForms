@@ -28,6 +28,10 @@ public class Expander : OwnerDrawnControl
                 return;
 
             field = value;
+
+            // Height first, visibility second: the children's peers are moved into their restored
+            // places before they are shown again, so expanding never flashes them at the collapsed
+            // geometry.
             if (value)
                 this.Height = Math.Max(_expandedHeight, this.HeaderHeight);
             else
@@ -36,8 +40,11 @@ public class Expander : OwnerDrawnControl
                 this.Height = this.HeaderHeight;
             }
 
-            for (var i = 0; i < this.Controls.Count; ++i)
-                this.Controls[i].PushPeerVisible();
+            // The whole subtree, not just the direct children: a grandchild's peer is vetoed by its
+            // own parent, and nothing else recomputes that when the expander reopens.
+            if (this.ChildrenOrNull is { } children)
+                for (var i = 0; i < children.Count; ++i)
+                    children[i].PushPeerVisibleTree();
 
             this.Invalidate();
             this.OnExpandedChanged(EventArgs.Empty);
@@ -56,8 +63,14 @@ public class Expander : OwnerDrawnControl
     /// <summary>Raises <see cref="ExpandedChanged"/>.</summary>
     protected virtual void OnExpandedChanged(EventArgs e) => this.ExpandedChanged?.Invoke(this, e);
 
-    /// <inheritdoc/>
-    private protected override bool GetChildPeerVisible(Control child) => this.Expanded && child.Visible;
+    /// <summary>
+    /// A collapsed expander hides its content wholesale. The child's <em>own</em> flag is what the
+    /// veto combines with, never the effective <see cref="Control.Visible"/>: that getter walks the
+    /// ancestor chain, so folding it in here would let a hidden ancestor latch a child's peer off
+    /// and leave it off once the ancestor came back — the chain is the native nesting's job, not
+    /// this veto's.
+    /// </summary>
+    private protected override bool GetChildPeerVisible(Control child) => this.Expanded && child.IsVisibleLocal;
 
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e) => this.Focus();

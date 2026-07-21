@@ -218,12 +218,9 @@ internal abstract class HeadlessPeer : IControlPeer
         }
     }
 
-    /// <summary>The container surface this peer was added to, or null while it is a root.</summary>
-    public HeadlessPeer? Parent { get; private set; }
-
     /// <summary>Records the container that adopted this peer — the chain that
-    /// <see cref="PointToScreen"/> and input routing walk.</summary>
-    internal void AttachTo(HeadlessPeer parent) => this.Parent = parent;
+    /// <see cref="PointToScreen"/>, input routing and effective visibility all walk.</summary>
+    internal void AttachTo(HeadlessPeer parent) => this.ParentPeer = parent;
 
     /// <summary>The child surfaces this peer hosts; empty for a leaf.</summary>
     internal virtual IReadOnlyList<IControlPeer> ChildPeers => [];
@@ -231,6 +228,37 @@ internal abstract class HeadlessPeer : IControlPeer
     /// <summary>The owning backend, wired by tracking — lets <see cref="Focus"/> drive the
     /// backend-wide focus simulation.</summary>
     internal HeadlessBackend? Owner { get; set; }
+
+    /// <summary>
+    /// The peer this one was parented into, recorded by <see cref="IContainerPeer.AddChild"/>.
+    /// Deliberately modelled: the real backends nest native widgets, so hiding a container hides its
+    /// subtree implicitly and masks a core that forgets to re-push a descendant's visibility. The
+    /// fake refuses to mask it — it keeps <see cref="Visible"/> as the value the core actually
+    /// pushed and exposes the composed truth separately as <see cref="EffectivelyVisible"/>.
+    /// </summary>
+    public HeadlessPeer? ParentPeer { get; internal set; }
+
+    /// <summary>
+    /// Whether this peer would really be on screen: its own pushed visibility AND every ancestor's.
+    /// A descendant the core never re-showed reports <see langword="false"/> here even though its
+    /// own <see cref="Visible"/> flag says otherwise, which is what makes "expanding restores every
+    /// descendant" assertable.
+    /// </summary>
+    public bool EffectivelyVisible
+    {
+        get
+        {
+            for (var peer = this; peer is not null; peer = peer.ParentPeer)
+                if (!peer.Visible)
+                    return false;
+
+            return true;
+        }
+    }
+
+    /// <summary>Every value the core pushed through <see cref="SetVisible"/>, in order — so a test
+    /// can tell "never re-pushed" apart from "re-pushed with the same value".</summary>
+    public List<bool> VisiblePushes { get; } = [];
 
     /// <summary>Whether <see cref="Focus"/> was called on this peer.</summary>
     public bool FocusRequested { get; private set; }
@@ -240,7 +268,13 @@ internal abstract class HeadlessPeer : IControlPeer
 
     public void SetBounds(Rectangle bounds) => this.Bounds = bounds;
     public void SetText(string text) => this.Text = text;
-    public void SetVisible(bool visible) => this.Visible = visible;
+
+    public void SetVisible(bool visible)
+    {
+        this.Visible = visible;
+        this.VisiblePushes.Add(visible);
+    }
+
     public void SetEnabled(bool enabled) => this.Enabled = enabled;
     public void SetFont(Font font) => this.Font = font;
 
@@ -263,9 +297,9 @@ internal abstract class HeadlessPeer : IControlPeer
     {
         var x = clientPoint.X;
         var y = clientPoint.Y;
-        for (var peer = this; peer is not null; peer = peer.Parent)
+        for (var peer = this; peer is not null; peer = peer.ParentPeer)
         {
-            if (peer._screenOriginPinned || peer.Parent is null)
+            if (peer._screenOriginPinned || peer.ParentPeer is null)
             {
                 x += peer._screenOrigin.X;
                 y += peer._screenOrigin.Y;
@@ -767,13 +801,39 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public void InvalidateAll() => ++this.InvalidateCount;
     public void SetFocusable(bool focusable) => this.Focusable = focusable;
 
+    /// <summary>
+    /// The visible child peers whose bounds leave this surface's client rectangle — the ones a
+    /// backend has to cut off at the edge. A scrolling container moves its children's peers rather
+    /// than their logical bounds, so the ones scrolled out of view land here; the real backends must
+    /// clip them instead of letting them paint over the container's neighbours.
+    /// </summary>
+    public List<IControlPeer> ChildrenOutsideClientRectangle
+    {
+        get
+        {
+            var client = new Rectangle(Point.Empty, this.Bounds.Size);
+            var result = new List<IControlPeer>();
+            foreach (var child in this.Children)
+                if (child is HeadlessPeer peer && peer.Visible && !client.Contains(peer.Bounds))
+                    result.Add(child);
+
+            return result;
+        }
+    }
+
     private PaintEventArgs? _paintArgs;
 
     // Test helpers — drive the control as the native surface would.
+
+    /// <summary>Raises <see cref="Paint"/> over a fresh recorder whose surface is the control's
+    /// client rectangle, so anything drawn past it lands in
+    /// <see cref="RecordingGraphics.OutOfBoundsOperations"/> — a real backend's window would clip it
+    /// away, and the fake must not pretend otherwise.</summary>
     public RecordingGraphics RaisePaint()
     {
-        var graphics = new RecordingGraphics();
-        this.Paint?.Invoke(this, new PaintEventArgs(graphics, new Rectangle(Point.Empty, this.Bounds.Size)));
+        var client = new Rectangle(Point.Empty, this.Bounds.Size);
+        var graphics = new RecordingGraphics { Surface = client };
+        this.Paint?.Invoke(this, new PaintEventArgs(graphics, client));
         return graphics;
     }
 
@@ -843,41 +903,93 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
     }
 }
 
-/// <summary>An <see cref="IGraphics"/> that records draw calls for assertions and measures text deterministically.</summary>
+/// <summary>
+/// An <see cref="IGraphics"/> that records draw calls for assertions and measures text
+/// deterministically.
+///
+/// It models the clip region for real rather than just logging the push/pop: every draw is
+/// intersected with the current clip, so a control that paints outside its client rectangle is
+/// detectable instead of silently recorded. <see cref="Operations"/> keeps listing what the control
+/// asked for (assertions about intent keep working), while <see cref="ClippedOperations"/> lists
+/// only what would actually reach the surface and <see cref="OutOfBoundsOperations"/> lists the ops
+/// that fell wholly or partly outside — the assertion hook for "a control's paint is clipped to its
+/// client rectangle".
+/// </summary>
 internal sealed class RecordingGraphics : IGraphics
 {
     private const int _CharWidth = 7;
     private const int _LineHeight = 16;
 
+    private readonly Stack<Rectangle> _clips = new();
+
+    /// <summary>Every draw call the control issued, clipped or not — the record of intent.</summary>
     public List<string> Operations { get; } = [];
+
+    /// <summary>Only the draws that survive the current clip region, in order.</summary>
+    public List<string> ClippedOperations { get; } = [];
+
+    /// <summary>Every draw whose bounds left the clip region, as <c>op | bounds</c>.</summary>
+    public List<string> OutOfBoundsOperations { get; } = [];
 
     /// <summary>Every text draw with the font it used, so tests can assert font adoption.</summary>
     public List<(string Text, Font Font)> TextDraws { get; } = [];
 
+    /// <summary>
+    /// The clip the surface starts with — the control's client rectangle. Unbounded by default so
+    /// the many tests that only assert draw calls stay unaffected; the canvas peer sets it to the
+    /// control's size when it raises a paint.
+    /// </summary>
+    public Rectangle Surface { get; set; } = new(int.MinValue / 2, int.MinValue / 2, int.MaxValue, int.MaxValue);
+
+    /// <summary>The clip currently in force: the surface intersected with every pushed rectangle.</summary>
+    public Rectangle CurrentClip => _clips.Count > 0 ? _clips.Peek() : this.Surface;
+
+    /// <summary>Whether every draw so far stayed inside the clip region.</summary>
+    public bool StayedInBounds => this.OutOfBoundsOperations.Count == 0;
+
+    private void Record(string op, Rectangle bounds)
+    {
+        this.Operations.Add(op);
+
+        var clip = this.CurrentClip;
+        if (!clip.IntersectsWith(bounds))
+        {
+            this.OutOfBoundsOperations.Add($"{op} | {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+            return;
+        }
+
+        if (!clip.Contains(bounds))
+            this.OutOfBoundsOperations.Add($"{op} | {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+
+        this.ClippedOperations.Add(op);
+    }
+
     public void FillRectangle(Color color, Rectangle bounds)
-        => this.Operations.Add($"fill {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+        => this.Record($"fill {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
 
     public void DrawRectangle(Color color, Rectangle bounds, int thickness = 1)
-        => this.Operations.Add($"rect {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+        => this.Record($"rect {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
 
     public void FillEllipse(Color color, Rectangle bounds)
-        => this.Operations.Add($"fillellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+        => this.Record($"fillellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
 
     public void DrawEllipse(Color color, Rectangle bounds, int thickness = 1)
-        => this.Operations.Add($"ellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+        => this.Record($"ellipse {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
 
     public void FillRoundedRectangle(Color color, Rectangle bounds, int radius)
-        => this.Operations.Add($"fillround {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height} r{radius}");
+        => this.Record($"fillround {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height} r{radius}", bounds);
 
     public void DrawRoundedRectangle(Color color, Rectangle bounds, int radius, int thickness = 1)
-        => this.Operations.Add($"round {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height} r{radius}");
+        => this.Record($"round {Hex(color)} {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height} r{radius}", bounds);
 
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
-        => this.Operations.Add($"line {Hex(color)} {x1},{y1}-{x2},{y2}");
+        => this.Record(
+            $"line {Hex(color)} {x1},{y1}-{x2},{y2}",
+            Rectangle.FromLTRB(Math.Min(x1, x2), Math.Min(y1, y2), Math.Max(x1, x2) + 1, Math.Max(y1, y2) + 1));
 
     public void DrawText(string text, Font font, Color color, Rectangle bounds, ContentAlignment alignment = ContentAlignment.TopLeft)
     {
-        this.Operations.Add($"text \"{text}\" {Hex(color)} {alignment} @{bounds.X},{bounds.Y}");
+        this.Record($"text \"{text}\" {Hex(color)} {alignment} @{bounds.X},{bounds.Y}", bounds);
         this.TextDraws.Add((text, font));
     }
 
@@ -887,14 +999,32 @@ internal sealed class RecordingGraphics : IGraphics
     internal static Size Measure(string text) => new((text?.Length ?? 0) * _CharWidth, _LineHeight);
 
     public void DrawImage(IImage image, Rectangle bounds)
-        => this.Operations.Add($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+        => this.Record($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
 
-    public void PushClip(Rectangle bounds) => this.Operations.Add($"clip {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
+    public void PushClip(Rectangle bounds)
+    {
+        this.Operations.Add($"clip {bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}");
 
-    public void PopClip() => this.Operations.Add("unclip");
+        // A push narrows the region; it can never widen it, exactly like cairo_clip and GDI's
+        // IntersectClipRect.
+        var clip = this.CurrentClip;
+        clip.Intersect(bounds);
+        _clips.Push(clip);
+    }
+
+    public void PopClip()
+    {
+        this.Operations.Add("unclip");
+        if (_clips.Count > 0)
+            _clips.Pop();
+    }
 
     /// <summary>Whether any recorded draw-text op contains the given substring.</summary>
     public bool DrewText(string substring) => this.Operations.Exists(o => o.StartsWith("text ") && o.Contains(substring));
+
+    /// <summary>Whether text containing the given substring survived the clip region.</summary>
+    public bool DrewTextClipped(string substring)
+        => this.ClippedOperations.Exists(o => o.StartsWith("text ") && o.Contains(substring));
 
     /// <summary>Whether any text containing the given substring was drawn in the given font.</summary>
     public bool DrewTextWithFont(string substring, Font font)

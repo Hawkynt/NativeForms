@@ -56,6 +56,11 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     public void ShowAt(Point screenLocation, Size size)
     {
         NativeMethods.gtk_window_move(_window, screenLocation.X, screenLocation.Y);
+
+        // A popup is sized here rather than through SetBounds, so record the size as this peer's
+        // bounds too: that is the rectangle the canvas clamps its allocation and clips its painting
+        // to, and leaving it stale would shrink the popup to whatever it last measured.
+        _bounds = new Rectangle(_bounds.Location, size);
         NativeMethods.gtk_widget_set_size_request(_widget, size.Width, size.Height);
         NativeMethods.gtk_widget_show_all(_window);
         _shown = true;

@@ -247,6 +247,12 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_get_allocation(nint widget, out GdkRectangle allocation);
 
+    /// <summary>Assigns a widget's size and position. <c>gtk_widget_set_size_request</c> only sets a
+    /// <em>minimum</em>, so a container is free to hand a widget more room than the toolkit asked
+    /// for; this is the seam that puts it back.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_size_allocate(nint widget, ref GdkRectangle allocation);
+
     /// <summary>Makes <paramref name="widget"/> the target of all the application's events (a GTK grab).</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_grab_add(nint widget);
@@ -540,6 +546,9 @@ internal static partial class NativeMethods
     internal static partial uint g_idle_add_full(int priority, nint function, nint data, nint notify);
 
     // --- Signals --------------------------------------------------------------------------------
+
+    /// <summary>The <c>GConnectFlags</c> bit that runs a handler after the signal's class closure.</summary>
+    internal const int G_CONNECT_AFTER = 1;
 
     /// <summary>
     /// Connects <paramref name="cHandler"/> (a C function pointer) to the named signal on

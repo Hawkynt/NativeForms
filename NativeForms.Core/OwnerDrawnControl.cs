@@ -87,7 +87,25 @@ public abstract class OwnerDrawnControl : Control
         // disabled ancestor) receives no mouse or key input at all, the Windows Forms contract, so
         // no subclass needs its own Enabled guard.
         canvas.SetFocusable(this.Focusable);
-        canvas.Paint += (_, e) => this.OnPaint(e);
+
+        // Painting is clipped to the client rectangle before the subclass gets a say, so no
+        // OnPaint can bleed past Width/Height onto a sibling — the Windows Forms contract, and the
+        // one guarantee that holds on every backend rather than depending on whether the native
+        // surface happens to clip. Pushing the clip here rather than in each OnPaint keeps it
+        // impossible to forget, and costs no per-frame allocation (both rectangles are structs).
+        canvas.Paint += (_, e) =>
+        {
+            var graphics = e.Graphics;
+            graphics.PushClip(new Rectangle(0, 0, this.Width, this.Height));
+            try
+            {
+                this.OnPaint(e);
+            }
+            finally
+            {
+                graphics.PopClip();
+            }
+        };
         canvas.MouseDown += (_, e) =>
         {
             if (!this.Enabled)

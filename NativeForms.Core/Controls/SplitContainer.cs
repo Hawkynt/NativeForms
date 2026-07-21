@@ -84,7 +84,7 @@ public class SplitContainer : OwnerDrawnControl
             if (value && this.Panel2Collapsed)
                 this.Panel2Collapsed = false;
 
-            this.Panel1.PushPeerVisible();
+            this.Panel1.PushPeerVisibleTree();
             this.LayoutPanels();
             this.Invalidate();
         }
@@ -107,7 +107,7 @@ public class SplitContainer : OwnerDrawnControl
             if (value && this.Panel1Collapsed)
                 this.Panel1Collapsed = false;
 
-            this.Panel2.PushPeerVisible();
+            this.Panel2.PushPeerVisibleTree();
             this.LayoutPanels();
             this.Invalidate();
         }
@@ -171,9 +171,10 @@ public class SplitContainer : OwnerDrawnControl
     protected virtual void OnSplitterMoved(EventArgs e) => this.SplitterMoved?.Invoke(this, e);
 
     /// <summary>A collapsed panel's peer hides while its logical <see cref="Control.Visible"/> stays
-    /// untouched, so un-collapsing restores exactly what was there — the Expander pattern.</summary>
+    /// untouched, so un-collapsing restores exactly what was there — the Expander pattern, including
+    /// combining with the child's own flag rather than the ancestor-walking effective getter.</summary>
     private protected override bool GetChildPeerVisible(Control child)
-        => child.Visible
+        => child.IsVisibleLocal
            && !(this.Panel1Collapsed && ReferenceEquals(child, this.Panel1))
            && !(this.Panel2Collapsed && ReferenceEquals(child, this.Panel2));
 
