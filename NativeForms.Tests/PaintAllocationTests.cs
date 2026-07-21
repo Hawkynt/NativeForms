@@ -84,6 +84,56 @@ internal sealed class PaintAllocationTests
     }
 
     [Test]
+    public void IconLabel_steady_state_repaint_allocates_nothing()
+    {
+        var label = new IconLabel
+        {
+            Text = "Documents",
+            Image = new HeadlessImage(16, 16),
+            Bounds = new(0, 0, 200, 24),
+        };
+
+        Assert.That(MeasureSteadyStatePaint(label), Is.Zero);
+    }
+
+    [Test]
+    public void ProgressTile_steady_state_repaint_allocates_nothing()
+    {
+        // Both captions are stored strings, so a repaint may not format, concatenate or box anything
+        // — the reason SecondaryText is a plain string rather than a value plus a formatter.
+        var tile = new ProgressTile
+        {
+            Text = "Windows (C:)",
+            SecondaryText = "45.2 GB free of 128 GB",
+            Image = new HeadlessImage(24, 24),
+            Bounds = new(0, 0, 220, 64),
+            Maximum = 128,
+            Value = 118,
+            WarningThreshold = 115,
+        };
+
+        Assert.That(MeasureSteadyStatePaint(tile), Is.Zero);
+    }
+
+    [Test]
+    public void FilePicker_steady_state_repaint_allocates_nothing()
+    {
+        // The existence check must sit on the commit path, not the paint path: a repaint that stat'ed
+        // the filesystem would both allocate and block.
+        var picker = new FilePicker { Bounds = new(0, 0, 240, 26), SelectedPath = "/tmp/missing.txt" };
+
+        Assert.That(MeasureSteadyStatePaint(picker), Is.Zero);
+    }
+
+    [Test]
+    public void FolderPicker_steady_state_repaint_allocates_nothing()
+    {
+        var picker = new FolderPicker { Bounds = new(0, 0, 240, 26), SelectedPath = "/tmp" };
+
+        Assert.That(MeasureSteadyStatePaint(picker), Is.Zero);
+    }
+
+    [Test]
     public void PictureBox_steady_state_repaint_allocates_nothing()
     {
         var picture = new PictureBox { Bounds = new(0, 0, 100, 100), Image = new HeadlessImage(16, 16) };

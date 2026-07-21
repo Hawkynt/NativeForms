@@ -35,6 +35,9 @@ each control page carries its own "Differences from WinForms" section where beha
 | `MaskedTextBox` | native + core mask engine | [maskedtextbox.md](controls/maskedtextbox.md) |
 | `RichTextBox` | native | [richtextbox.md](controls/richtextbox.md) |
 | `SearchBox` | owner-drawn + hosted editor | [searchbox.md](controls/searchbox.md) |
+| `FilePicker` | owner-drawn + hosted editor | [filepicker.md](controls/filepicker.md) |
+| `FolderPicker` | owner-drawn + hosted editor | [folderpicker.md](controls/folderpicker.md) |
+| `IconLabel` | owner-drawn | [iconlabel.md](controls/iconlabel.md) |
 | `CheckBox` | owner-drawn | [checkbox.md](controls/checkbox.md) |
 | `RadioButton` | owner-drawn | [radiobutton.md](controls/radiobutton.md) |
 | `ToggleSwitch` | owner-drawn | [toggleswitch.md](controls/toggleswitch.md) |
@@ -44,6 +47,7 @@ each control page carries its own "Differences from WinForms" section where beha
 | `TrackBar` | owner-drawn | [trackbar.md](controls/trackbar.md) |
 | `HScrollBar` / `VScrollBar` | owner-drawn | [scrollbar.md](controls/scrollbar.md) |
 | `ProgressBar` | owner-drawn | [progressbar.md](controls/progressbar.md) |
+| `ProgressTile` | owner-drawn | [progresstile.md](controls/progresstile.md) |
 | `DateTimePicker` | owner-drawn + popup calendar | [datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
 | `TimePicker` | owner-drawn | [timepicker.md](controls/timepicker.md) |

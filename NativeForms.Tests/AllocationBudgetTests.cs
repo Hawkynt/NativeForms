@@ -51,6 +51,68 @@ internal sealed class AllocationBudgetTests
         Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
     }
 
+    /// <summary>Measures the per-instance construction cost of one control class.</summary>
+    private static double PerInstance(Func<Control> factory)
+    {
+        var sink = new Control[_Count];
+        var bytes = Measure(() =>
+        {
+            for (var i = 0; i < _Count; ++i)
+                sink[i] = factory();
+        });
+
+        return (double)bytes / _Count;
+    }
+
+    [Test]
+    public void IconLabel_construction_stays_within_the_owner_drawn_budget()
+    {
+        var perControl = PerInstance(static () => new IconLabel());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void ProgressTile_construction_stays_within_the_owner_drawn_budget()
+    {
+        var perControl = PerInstance(static () => new ProgressTile());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    /// <summary>
+    /// §4's second tier. A control that hosts a native editor inside an owner-drawn shell pays for
+    /// three things a plain owner-drawn control does not: the child <see cref="TextBox"/> (~296 B on
+    /// its own), the child collection that holds it, and the delegates wiring the editor's text and
+    /// key events back to the shell. That lands the whole family — <see cref="SearchBox"/>,
+    /// <see cref="NumericUpDown"/>, <see cref="DomainUpDown"/>, <see cref="FilePicker"/>,
+    /// <see cref="FolderPicker"/> — above the 768 B single-surface budget by construction, so they
+    /// get their own ceiling rather than a blanket claim none of them ever met.
+    /// </summary>
+    private const int _HostedEditorCompositeBudget = 1024;
+
+    [TestCase("SearchBox")]
+    [TestCase("NumericUpDown")]
+    [TestCase("DomainUpDown")]
+    [TestCase("FilePicker")]
+    [TestCase("FolderPicker")]
+    public void Hosted_editor_composites_stay_within_their_budget(string which)
+    {
+        Func<Control> factory = which switch
+        {
+            "SearchBox" => static () => new SearchBox(),
+            "NumericUpDown" => static () => new NumericUpDown(),
+            "DomainUpDown" => static () => new DomainUpDown(),
+            "FilePicker" => static () => new FilePicker(),
+            "FolderPicker" => static () => new FolderPicker(),
+            _ => throw new ArgumentOutOfRangeException(nameof(which), which, null),
+        };
+
+        var perControl = PerInstance(factory);
+
+        Assert.That(perControl, Is.LessThan(_HostedEditorCompositeBudget), $"{which}: ~{perControl:F0} bytes/control");
+    }
+
     [Test]
     public void TimePicker_construction_stays_within_the_owner_drawn_budget()
     {

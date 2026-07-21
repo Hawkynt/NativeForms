@@ -103,7 +103,16 @@ Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeh
 Targets (measured by the `NativeForms.Benchmarks` project; treat as CI-guarded goals):
 
 - [x] `Control` instance overhead budget enforced by an allocation test (`AllocationBudgetTests`,
-      `GC.GetAllocatedBytesForCurrentThread`): unrealized control **< 512 B**, owner-drawn **< 768 B**.
+      `GC.GetAllocatedBytesForCurrentThread`), in three tiers: unrealized control **< 512 B**,
+      owner-drawn single surface **< 768 B**, hosted-editor composite **< 1024 B**. The third tier is
+      not a relaxation but a measurement: a shell that hosts a native `TextBox` pays for the editor
+      (~296 B alone), the child collection holding it and the delegates wiring its text/key events
+      back, so `SearchBox` (864 B), `NumericUpDown` (936 B), `DomainUpDown` (952 B), `FolderPicker`
+      (936 B) and `FilePicker` (984 B) all sit above 768 B by construction. The blanket 768 B claim
+      was never true for that family and never asserted for it; all five are now pinned. `FilePicker`
+      is the family's ceiling with ~40 B of headroom — it subscribes to three editor events
+      (text, key, focus-loss) where `SearchBox` needs two — so the next field added to a picker
+      needs a re-measure, not a nudge to the limit.
 - [x] **Trim/AOT can't regress**: per-platform NativeAOT publish in CI runs with
       `-p:TreatWarningsAsErrors=true`, so any IL2xxx/IL3xxx warning fails the build. Demo AOT binary is
       **~1.6 MB** self-contained (whole app + runtime); size reported in CI every run.
@@ -457,6 +466,23 @@ strategy (may differ per platform; note exceptions inline).
       content whose child peers hide while collapsed; height restores on expand
 - [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
+- [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`
+      over the existing common dialogs: `SelectedPath`, `PathChanged`, `ReadOnlyText`, `PlaceholderText`,
+      `PerformBrowse()`, and a `PathExists` evaluated only at commit points (Enter via
+      `ITextBoxPeer.KeyDown`, focus loss, dialog result, assignment) so the paint path never stats the
+      filesystem; a broken path is framed in the warning colour. `FilePicker` adds `Mode` (Open/Save),
+      WinForms `Filter`/`FilterIndex`, `Multiselect` + `SelectedPaths`, `InitialDirectory`, `Title` —
+      and asks for the *folder* rather than the file in Save mode, since naming a file that does not
+      exist yet is the point of saving
+- [x] `IconLabel` (owner) — image **and** text in one caption through the shared `ContentLayout`
+      (`TextImageRelation`, `TextAlign`, `ImageAlign`, `AutoSize`, ambient font/fore colour, RTL
+      mirroring). Exists because no platform static widget renders both: Win32 `SS_BITMAP` is
+      image-only and GTK swaps in a `GtkImage`, so a captioned `Label` drops its image (§7.3)
+- [x] `ProgressTile` (owner) — Explorer-style tile: icon, caption, optional `SecondaryText` and a
+      usage bar reusing `GlyphRenderer.DrawProgressBar`, switching to `WarningColor` past
+      `WarningThreshold`; `Clickable` gates focus/hover/`Click`, `Selected` paints the selection face.
+      Named for its shape, not for drives: Core is platform-agnostic and the paint path may not touch
+      the filesystem, so both captions are caller-supplied strings and nothing is `DriveInfo`-bound
 
 ---
 
@@ -485,7 +511,7 @@ strategy (may differ per platform; note exceptions inline).
 ## 9. Quality gates
 - [x] Unit tests (NUnit 4) for platform-agnostic behavior — model, realization, registry, binding,
       focus/keyboard, layout, appearance, threading, decoding, and every control's paint/input
-      (1141 tests); grows with each control.
+      (1302 tests); grows with each control.
 - [x] Headless backend for tests (`HeadlessBackend` + recording `ICanvasPeer`/`RecordingGraphics`) so
       control paint and input are testable without a display.
 - [x] Trim + AOT publish of the demo in CI on each OS with trim warnings as errors (headline goal).
@@ -594,6 +620,8 @@ same commit. `—` = not applicable.
 | `MaskedTextBox` | ✔ | ✔ | [controls/maskedtextbox.md](controls/maskedtextbox.md) |
 | `RichTextBox` (+ RTF subset) | ✔ | ✔ | [controls/richtextbox.md](controls/richtextbox.md) |
 | `SearchBox` | ✔ | ✔ | [controls/searchbox.md](controls/searchbox.md) |
+| `FilePicker` / `FolderPicker` | ✔ | ✔ | [controls/filepicker.md](controls/filepicker.md) · [folderpicker.md](controls/folderpicker.md) |
+| `IconLabel` (image **and** text) | ✔ | ✔ | [controls/iconlabel.md](controls/iconlabel.md) |
 | `CheckBox` / `RadioButton` (images) | ✔ | ✔ | [controls/checkbox.md](controls/checkbox.md) · [radiobutton.md](controls/radiobutton.md) |
 | `ToggleSwitch` | ✔ | ✔ | [controls/toggleswitch.md](controls/toggleswitch.md) |
 | `SplitButton` / `DropDownButton` | ✔ | ✔ | [controls/splitbutton.md](controls/splitbutton.md) |
@@ -601,6 +629,7 @@ same commit. `—` = not applicable.
 | `TrackBar` | ✔ | ✔ | [controls/trackbar.md](controls/trackbar.md) |
 | `HScrollBar` / `VScrollBar` | ✔ | ✔ | [controls/scrollbar.md](controls/scrollbar.md) |
 | `ProgressBar` (incl. marquee) | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
+| `ProgressTile` (Explorer-style drive tile) | ✔ | ✔ | [controls/progresstile.md](controls/progresstile.md) |
 | `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` (title drill-down) | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
 | `TimePicker` | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
@@ -630,5 +659,9 @@ same commit. `—` = not applicable.
 | Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
 
 `NotifyIcon` has no gallery section (a tray icon in a demo is intrusive; Win32-only today).
-File/folder/color/font dialogs are demoed indirectly through the modal `MessageBox` round-trip —
-opening blocking native dialogs from a gallery is deliberate friction we skip.
+Colour and font dialogs are demoed indirectly through the modal `MessageBox` round-trip. The file
+dialog is no longer indirect: the `FilePicker`'s browse button opens the platform's real chooser and
+the autopilot drives it — posting the click rather than awaiting it, then dismissing with Escape,
+exactly as the `MessageBox` check does. That check runs **last**, with the modal one: a native
+chooser is a toplevel that takes the keyboard focus with it and does not reliably hand it back, so
+placed mid-script it strands every later typing check.

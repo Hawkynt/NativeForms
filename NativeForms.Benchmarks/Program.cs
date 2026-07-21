@@ -21,6 +21,9 @@ internal static class Program
     /// <summary>2× the §4 owner-drawn construction budget (768 B).</summary>
     private const int _OwnerDrawnConstructionBudget = 1536;
 
+    /// <summary>2× the §4 hosted-editor composite budget (1024 B) — a shell plus a native editor.</summary>
+    private const int _CompositeConstructionBudget = 2048;
+
     /// <summary>2× the §4 empty-form realization budget (8 KB).</summary>
     private const int _EmptyFormRealizeBudget = 16384;
 
@@ -48,6 +51,10 @@ internal static class Program
         Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
         Construct("TimePicker", static () => new TimePicker(), _OwnerDrawnConstructionBudget);
         Construct("MonthCalendar", static () => new MonthCalendar(), _OwnerDrawnConstructionBudget);
+        Construct("IconLabel", static () => new IconLabel(), _OwnerDrawnConstructionBudget);
+        Construct("ProgressTile", static () => new ProgressTile(), _OwnerDrawnConstructionBudget);
+        Construct("FilePicker", static () => new FilePicker(), _CompositeConstructionBudget);
+        Construct("FolderPicker", static () => new FolderPicker(), _CompositeConstructionBudget);
 
         RealizeEmptyForm();
         RealizeHundredControlForm();
@@ -60,6 +67,9 @@ internal static class Program
         PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
         PaintThroughput("TimePicker", MakeTimePicker());
         PaintThroughput("MonthCalendar", MakeMonthCalendar());
+        PaintThroughput("IconLabel", MakeIconLabel());
+        PaintThroughput("ProgressTile", MakeProgressTile());
+        PaintThroughput("FilePicker", MakeFilePicker());
 
         // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
         ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
@@ -294,6 +304,22 @@ internal static class Program
         grid.SelectedRowIndex = 0;
         return grid;
     }
+    private static IconLabel MakeIconLabel()
+        => new() { Text = "Documents", Image = new BenchImage(16, 16), Bounds = new(0, 0, 200, 24) };
+
+    private static ProgressTile MakeProgressTile() => new()
+    {
+        Text = "Windows (C:)",
+        SecondaryText = "45.2 GB free of 128 GB",
+        Image = new BenchImage(24, 24),
+        Bounds = new(0, 0, 220, 64),
+        Maximum = 128,
+        Value = 118,
+        WarningThreshold = 115,
+    };
+
+    private static FilePicker MakeFilePicker()
+        => new() { Bounds = new(0, 0, 240, 26), SelectedPath = "/tmp/missing.txt" };
 
     // ---- Plumbing ----
 

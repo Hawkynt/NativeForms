@@ -7,7 +7,7 @@ namespace Hawkynt.NativeForms.Demo;
 
 /// <summary>
 /// The demo window: a tabbed gallery with one page per control family — basics, input, lists, the
-/// data grid and layout containers — under a full set of window chrome (menu, tool and status
+/// data grid, layout containers and the path pickers/tiles — under a full set of window chrome (menu, tool and status
 /// strips). Every shipped control appears with representative non-default property values, and the
 /// original MVVM click counter lives on the Basics page: a <see cref="RelayCommand"/> drives the
 /// view-model while two <see cref="PropertyBinding{T}"/>s push its state onto a label and a
@@ -75,7 +75,8 @@ internal sealed partial class MainForm : Form
             this.BuildInputPage(),
             this.BuildListsPage(),
             this.BuildGridPage(),
-            this.BuildLayoutPage());
+            this.BuildLayoutPage(),
+            this.BuildPickersPage());
 
         // Building the pages set initial selections, and those raised the same change events a user
         // click does — so the status line already carried a grid message before anyone touched

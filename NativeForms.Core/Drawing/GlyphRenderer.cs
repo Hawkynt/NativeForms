@@ -13,6 +13,14 @@ internal static class GlyphRenderer
     /// <summary>The standard edge length of the themed check glyph in pixels.</summary>
     public const int CheckBoxSize = 14;
 
+    /// <summary>
+    /// The alert red shared by the controls that flag a problem — a path that names nothing, a drive
+    /// that is nearly full. Deliberately not an <see cref="ITheme"/> member: no desktop exposes an
+    /// "error" colour to query, so inventing a themed one would be a fiction. Controls that paint it
+    /// expose it as a property so an application can match its own palette.
+    /// </summary>
+    public static readonly Color Warning = Color.FromArgb(0xFF, 0xE8, 0x11, 0x23);
+
     /// <summary>Draws a themed check box (field-colored box, themed border, accent checkmark when
     /// checked) scaled into <paramref name="box"/>.</summary>
     public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, bool isChecked)
@@ -34,6 +42,11 @@ internal static class GlyphRenderer
     /// <paramref name="value"/> within [<paramref name="minimum"/>, <paramref name="maximum"/>],
     /// themed border) into <paramref name="bounds"/>.</summary>
     public static void DrawProgressBar(IGraphics g, ITheme theme, Rectangle bounds, int value, int minimum, int maximum)
+        => DrawProgressBar(g, theme, bounds, value, minimum, maximum, theme.Accent);
+
+    /// <summary>Draws the themed progress bar with an explicit fill colour — the seam a tile needs to
+    /// turn its bar red past a threshold without restating the track, the clamp or the border.</summary>
+    public static void DrawProgressBar(IGraphics g, ITheme theme, Rectangle bounds, int value, int minimum, int maximum, Color fill)
     {
         g.FillRectangle(theme.FieldBackground, bounds);
 
@@ -43,7 +56,7 @@ internal static class GlyphRenderer
             var track = bounds.Width - 2;
             var filled = (int)((long)track * (Math.Clamp(value, minimum, maximum) - minimum) / range);
             if (filled > 0)
-                g.FillRectangle(theme.Accent, new(bounds.X + 1, bounds.Y + 1, filled, bounds.Height - 2));
+                g.FillRectangle(fill, new(bounds.X + 1, bounds.Y + 1, filled, bounds.Height - 2));
         }
 
         g.DrawRectangle(theme.Border, new(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
