@@ -286,7 +286,10 @@ strategy (may differ per platform; note exceptions inline).
         GtkTextView has no native limit, documented), `CharacterCasing` (core-side, all backends)
   - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live
   - [ ] Owner-drawn grey placeholder for multiline (no native support in EDIT or GtkTextView)
-  - [ ] `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, undo API
+  - [~] `ITextBoxPeer.KeyDown` seam now exists (Win32 EDIT subclass, GTK pre-connected
+        `key-press-event`, headless fake) — wired for `SearchBox`; it unblocks
+        `AcceptsReturn`/`AcceptsTab`, `NumericUpDown`/`DomainUpDown` Enter commits and grid-editor
+        Enter/Escape, none of which are wired yet. Word-wrap control and undo API still pending.
 - [x] `MaskedTextBox` (core mask engine over the native TextBox: 0/9/L/?/A/a/&/C + literals +
       escapes, `PromptChar`, transactional whole-text validation with revert, `MaskCompleted`,
       `MaskedTextChanged`, raw-text extraction; whole-text transitions documented — no per-key
@@ -486,6 +489,11 @@ strategy (may differ per platform; note exceptions inline).
       XTEST is unusable here (`:1` is Xwayland `-rootless`; the compositor swallows injected
       pointer events), which is why injection happens in-process.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
+- [ ] `TableLayoutPanel` lays its cells out from `Width`/`Height` and never reads
+      `DisplayRectangle`, so cells still sit under a visible `AutoScroll` scrollbar — the same
+      class of defect `Panel` was fixed for.
+- [ ] The Win32 halves of the native-tooltip support (child window subclassing, `TOOLTIPS_CLASS`)
+      are compile-verified only; they have never executed, since the sweep ran on GTK.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
