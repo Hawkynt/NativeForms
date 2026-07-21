@@ -179,8 +179,11 @@ internal abstract class GtkControlPeer : IControlPeer
         // its allocation is, and the clip — not the allocation — is what bounds the children when the
         // hierarchy is drawn into one surface. Left alone, a child scrolled off the top is drawn
         // above the panel, across whatever sits there. Bounds are what the widget occupies, so the
-        // clip has to say so too.
-        NativeMethods.gtk_widget_set_clip(_widget, ref corrected);
+        // clip has to say so too. GTK asserts the widget is visible (a hidden one has no clip to
+        // set — a collapsed ribbon group or accordion pane), so a hidden widget is skipped: it
+        // paints nothing until it is shown again, at which point size-allocate re-pins the clip.
+        if (NativeMethods.gtk_widget_get_visible(_widget) != 0)
+            NativeMethods.gtk_widget_set_clip(_widget, ref corrected);
     }
 
     /// <summary>

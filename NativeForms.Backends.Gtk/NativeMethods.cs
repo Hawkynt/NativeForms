@@ -202,6 +202,10 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_set_visible(nint widget, int visible);
 
+    /// <summary>Whether the widget's own visible flag is set (returns <c>gboolean</c> as 1/0).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_widget_get_visible(nint widget);
+
     /// <summary>Enables or greys out a widget for interaction (<c>gboolean</c> is passed as 1/0).</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_set_sensitive(nint widget, int sensitive);
