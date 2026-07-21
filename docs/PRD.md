@@ -490,9 +490,14 @@ strategy (may differ per platform; note exceptions inline).
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
       CI needs a real X server (XTEST does not land under Xwayland).
-- [ ] `# GtkPopupPeer.IsOutside` compares coordinates from the event window's space during a
-      grab, so a click near the main window's origin can read as "inside" the popup and fail to
-      dismiss it (latent; found during the input-routing fix).
+- [x] `GtkPopupPeer.IsOutside` maps the press through `XRoot`/`YRoot` and the popup's own origin,
+      so a grab-redirected click no longer reads as "inside" (was latent until drop-downs began
+      staying open, which made it reachable).
+- [ ] A drop-down ignores **all** reported focus loss while open — including a genuine
+      window-manager focus change (Alt-Tab away), where WinForms would close it. Telling a
+      grab-shadow focus-out from a real one needs a reason code GTK3's `GdkEventFocus` does not
+      carry, so it means tracking grab state in the peer and reporting the cause across
+      `IControlPeer`.
 - [x] **Demo gallery**: `NativeForms.Demo` is a tabbed showcase of every shipped control with
       representative property settings; every new control lands with a gallery section
       (coverage tracked in §11).
