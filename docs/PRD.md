@@ -465,18 +465,26 @@ strategy (may differ per platform; note exceptions inline).
 ---
 
 ## 9. Quality gates
-- [~] Unit tests (NUnit 4) for platform-agnostic behavior — model, realization, registry, binding,
-      owner-drawn control paint/input (53 tests); grows with each control.
+- [x] Unit tests (NUnit 4) for platform-agnostic behavior — model, realization, registry, binding,
+      focus/keyboard, layout, appearance, threading, decoding, and every control's paint/input
+      (1141 tests); grows with each control.
 - [x] Headless backend for tests (`HeadlessBackend` + recording `ICanvasPeer`/`RecordingGraphics`) so
       control paint and input are testable without a display.
 - [x] Trim + AOT publish of the demo in CI on each OS with trim warnings as errors (headline goal).
-- [x] Footprint regression thresholds via `AllocationBudgetTests` (runs every CI, all OSes).
+- [x] Footprint regression thresholds via `AllocationBudgetTests` + `PaintAllocationTests`
+      (per-instance budgets, empty-Form budget, zero-allocation steady-state repaint for every
+      owner-drawn control) — every CI run, all OSes; benchmark + trim jobs nightly.
+- [x] **WinForms conformance audit**: every control family reviewed against `System.Windows.Forms`
+      semantics (names, defaults, event order, behavioral contracts). Deviations were either fixed
+      (dock order, form lifecycle, input gates, member parity, event pipelines) or documented as
+      deliberate in the control's "Differences from WinForms" section.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
-- [~] **Demo gallery**: `NativeForms.Demo` shows every shipped control with representative property
-      settings; every new control lands with a gallery section (coverage tracked in §11).
-- [~] **Reference documentation**: every shipped control/subsystem has a page under `docs/`
-      (usage example + API tables + notes); the README links into the docs and carries the control
-      index (coverage tracked in §11).
+- [x] **Demo gallery**: `NativeForms.Demo` is a tabbed showcase of every shipped control with
+      representative property settings; every new control lands with a gallery section
+      (coverage tracked in §11).
+- [x] **Reference documentation**: every shipped control/subsystem has a page under `docs/`
+      (usage example + API tables + notes + WinForms deltas); both READMEs link into the docs and
+      carry the control index (coverage tracked in §11).
 
 ---
 
