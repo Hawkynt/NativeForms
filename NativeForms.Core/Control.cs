@@ -934,6 +934,16 @@ public abstract class Control
     }
 
     /// <summary>
+    /// Pushes a cursor for a sub-region of this control's own surface, bypassing the ambient
+    /// <see cref="Cursor"/> bookkeeping: <see cref="Cursor"/> itself keeps its value and nothing is
+    /// forwarded to children, so a control that owns several hot zones — the splitter band inside a
+    /// <see cref="SplitContainer"/> — can swap the shape as the pointer crosses them. Passing
+    /// <see langword="null"/> restores the ambient cursor. Allocation-free, so it is safe to call
+    /// from a mouse-move handler; callers are expected to filter out no-op transitions themselves.
+    /// </summary>
+    private protected void SetRegionCursor(Cursor? cursor) => _peer?.SetCursor(cursor ?? this.Cursor);
+
+    /// <summary>
     /// Forwards a cursor change to this control's peer and to every descendant that inherits it.
     /// </summary>
     private void PushAmbientCursor(Cursor cursor)

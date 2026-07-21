@@ -37,8 +37,10 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         ConnectFocusSignals();
         NativeMethods.gtk_container_add(_window, _widget);
 
-        // Dismissal watches the top-level: canvas signals return FALSE, so presses and keys bubble
-        // up here after the content had its turn.
+        // Dismissal watches the top-level. Presses that land on the popup's own canvas stop there —
+        // they are menu interactions, never dismissals — while presses elsewhere in the application
+        // are redirected here by the GTK grab, and keys the content left unhandled still bubble up,
+        // which is what carries Escape.
         NativeMethods.gtk_widget_add_events(_window, NativeMethods.GDK_BUTTON_PRESS_MASK | NativeMethods.GDK_KEY_PRESS_MASK);
         var data = GCHandle.ToIntPtr(_selfHandle);
         unsafe

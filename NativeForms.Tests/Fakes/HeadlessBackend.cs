@@ -198,9 +198,35 @@ internal abstract class HeadlessPeer : IControlPeer
     /// <summary>The last cursor pushed by the core, or null while the platform default applies.</summary>
     public Cursor? Cursor { get; private set; }
 
-    /// <summary>Where the widget's client origin sits on the fake screen; settable so tests can
-    /// assert client-to-screen placement math without a windowing system.</summary>
-    public Point ScreenOrigin { get; set; }
+    private Point _screenOrigin;
+    private bool _screenOriginPinned;
+
+    /// <summary>
+    /// Pins where this surface's client origin sits on the fake screen. A surface that was never
+    /// pinned has no screen position of its own: it derives one from its bounds plus every ancestor's,
+    /// up to the nearest pinned surface or the top level — exactly like a real widget hierarchy.
+    /// Pinning is therefore a fixture shortcut that says "this surface is known to be here", and
+    /// everything nested below it still resolves through the chain.
+    /// </summary>
+    public Point ScreenOrigin
+    {
+        get => _screenOrigin;
+        set
+        {
+            _screenOrigin = value;
+            _screenOriginPinned = true;
+        }
+    }
+
+    /// <summary>The container surface this peer was added to, or null while it is a root.</summary>
+    public HeadlessPeer? Parent { get; private set; }
+
+    /// <summary>Records the container that adopted this peer — the chain that
+    /// <see cref="PointToScreen"/> and input routing walk.</summary>
+    internal void AttachTo(HeadlessPeer parent) => this.Parent = parent;
+
+    /// <summary>The child surfaces this peer hosts; empty for a leaf.</summary>
+    internal virtual IReadOnlyList<IControlPeer> ChildPeers => [];
 
     /// <summary>The owning backend, wired by tracking — lets <see cref="Focus"/> drive the
     /// backend-wide focus simulation.</summary>
@@ -225,7 +251,96 @@ internal abstract class HeadlessPeer : IControlPeer
     }
 
     public void SetCursor(Cursor cursor) => this.Cursor = cursor;
-    public Point PointToScreen(Point clientPoint) => new(this.ScreenOrigin.X + clientPoint.X, this.ScreenOrigin.Y + clientPoint.Y);
+
+    /// <summary>
+    /// Maps a client point to fake-screen coordinates the way a real backend does: accumulate this
+    /// surface's own origin and every ancestor's on the way up, then add the top-level's
+    /// <see cref="ScreenOrigin"/>. A fake that ignored the ancestor chain would report the same screen
+    /// point for a control and for its deeply nested child, and every placement bug that depends on
+    /// nesting — a context menu or drop-down opening at the wrong spot — would pass unnoticed.
+    /// </summary>
+    public Point PointToScreen(Point clientPoint)
+    {
+        var x = clientPoint.X;
+        var y = clientPoint.Y;
+        for (var peer = this; peer is not null; peer = peer.Parent)
+        {
+            if (peer._screenOriginPinned || peer.Parent is null)
+            {
+                x += peer._screenOrigin.X;
+                y += peer._screenOrigin.Y;
+                break;
+            }
+
+            x += peer.Bounds.X;
+            y += peer.Bounds.Y;
+        }
+
+        return new(x, y);
+    }
+
+    /// <summary>
+    /// Resolves the surface that owns an input point given in this surface's client space: the
+    /// topmost visible descendant whose bounds contain it, with the point re-expressed in that
+    /// surface's own client space.
+    /// </summary>
+    /// <remarks>
+    /// This is the routing contract every real backend implements and the fake used not to model at
+    /// all. A windowing system hands the event to exactly one surface — the innermost one under the
+    /// pointer — and to nobody else; an ancestor never sees a child's event, and above all never sees
+    /// it still carrying the child's untranslated coordinates. Tests that dispatch through
+    /// <see cref="RouteMouseDown"/> and friends can therefore prove input does not leak up the tree.
+    /// </remarks>
+    internal (HeadlessCanvasPeer? Target, Point Location) Route(Point clientPoint)
+    {
+        var container = this;
+        var point = clientPoint;
+        var target = this as HeadlessCanvasPeer;
+        for (var descended = true; descended;)
+        {
+            descended = false;
+            var children = container.ChildPeers;
+
+            // Last added sits on top, so it is the first candidate an event would land on.
+            for (var i = children.Count - 1; i >= 0; --i)
+            {
+                if (children[i] is not HeadlessCanvasPeer child || !child.Visible || !child.Bounds.Contains(point))
+                    continue;
+
+                point = new(point.X - child.Bounds.X, point.Y - child.Bounds.Y);
+                container = child;
+                target = child;
+                descended = true;
+                break;
+            }
+        }
+
+        return (target, point);
+    }
+
+    /// <summary>Delivers a press to the surface that owns the point, and to that surface only.</summary>
+    internal (HeadlessCanvasPeer? Target, Point Location) RouteMouseDown(Point clientPoint, MouseButtons button = MouseButtons.Left)
+    {
+        var route = this.Route(clientPoint);
+        route.Target?.RaiseMouseDown(route.Location.X, route.Location.Y, button);
+        return route;
+    }
+
+    /// <summary>Delivers a release to the surface that owns the point, and to that surface only.</summary>
+    internal (HeadlessCanvasPeer? Target, Point Location) RouteMouseUp(Point clientPoint, MouseButtons button = MouseButtons.Left)
+    {
+        var route = this.Route(clientPoint);
+        route.Target?.RaiseMouseUp(route.Location.X, route.Location.Y, button);
+        return route;
+    }
+
+    /// <summary>Delivers a move to the surface that owns the point, and to that surface only.</summary>
+    internal (HeadlessCanvasPeer? Target, Point Location) RouteMouseMove(Point clientPoint)
+    {
+        var route = this.Route(clientPoint);
+        route.Target?.RaiseMouseMove(route.Location.X, route.Location.Y);
+        return route;
+    }
 
     /// <summary>Records the request and moves the backend's simulated focus here, so the previous
     /// peer loses focus before this one gains it — exactly like a real windowing system.</summary>
@@ -279,7 +394,15 @@ internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : Head
     public event EventHandler<Rectangle>? BoundsChangedByUser;
     public event EventHandler<FormWindowState>? WindowStateChanged;
 
-    public void AddChild(IControlPeer child) => this.Children.Add(child);
+    /// <inheritdoc/>
+    internal override IReadOnlyList<IControlPeer> ChildPeers => this.Children;
+
+    public void AddChild(IControlPeer child)
+    {
+        this.Children.Add(child);
+        (child as HeadlessPeer)?.AttachTo(this);
+    }
+
     public void Show() => this.Shown = true;
 
     public void SetBorderStyle(FormBorderStyle borderStyle)
@@ -621,7 +744,14 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public bool Focusable { get; private set; }
     public int InvalidateCount { get; private set; }
 
-    public void AddChild(IControlPeer child) => this.Children.Add(child);
+    /// <inheritdoc/>
+    internal override IReadOnlyList<IControlPeer> ChildPeers => this.Children;
+
+    public void AddChild(IControlPeer child)
+    {
+        this.Children.Add(child);
+        (child as HeadlessPeer)?.AttachTo(this);
+    }
 
     public event EventHandler<PaintEventArgs>? Paint;
     public event EventHandler<MouseEventArgs>? MouseDown;

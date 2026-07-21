@@ -19,6 +19,10 @@ public class SplitContainer : OwnerDrawnControl
     private bool _dragging;
     private int _dragOffset;
 
+    /// <summary>Whether the sizing cursor is currently pushed, so a move across the band only talks
+    /// to the peer on an actual transition.</summary>
+    private bool _sizingCursor;
+
     /// <summary>The split-axis extent at the previous layout; the reference the
     /// <see cref="FixedPanel"/> resize policies work against.</summary>
     private int _lastExtent;
@@ -258,6 +262,27 @@ public class SplitContainer : OwnerDrawnControl
                 ? new(_splitterDistance, 0, this.SplitterWidth, this.Height)
                 : new(0, _splitterDistance, this.Width, this.SplitterWidth);
 
+    /// <summary>
+    /// The shape the splitter band asks for: west-east arrows for a vertical split, north-south for a
+    /// horizontal one — the Windows Forms feedback that tells the user the bar is draggable.
+    /// </summary>
+    private Cursor SizingCursor => this.Orientation == Orientation.Vertical ? Cursors.SizeWE : Cursors.SizeNS;
+
+    /// <summary>
+    /// Applies (or releases) the sizing cursor for the splitter band. The band is a region of this
+    /// control's own surface rather than a child control, so the shape is pushed as a region cursor
+    /// instead of through <see cref="Control.Cursor"/>, which would tint the whole control and every
+    /// child. Only real transitions reach the peer, keeping the mouse-move path allocation-free.
+    /// </summary>
+    private void UpdateSplitterCursor(bool overSplitter)
+    {
+        if (_sizingCursor == overSplitter)
+            return;
+
+        _sizingCursor = overSplitter;
+        this.SetRegionCursor(overSplitter ? this.SizingCursor : null);
+    }
+
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
     {
@@ -272,8 +297,13 @@ public class SplitContainer : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        // While a drag is in flight the pointer routinely runs ahead of the bar, so the sizing shape
+        // stays up regardless of where it currently is — the same as the classic control.
         if (!_dragging)
+        {
+            this.UpdateSplitterCursor(this.GetSplitterBounds().Contains(e.Location));
             return;
+        }
 
         this.ApplyDistance((this.Orientation == Orientation.Vertical ? e.X : e.Y) - _dragOffset);
     }
@@ -285,7 +315,15 @@ public class SplitContainer : OwnerDrawnControl
             return;
 
         _dragging = false;
+        this.UpdateSplitterCursor(this.GetSplitterBounds().Contains(e.Location));
         this.OnSplitterMoved(EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        if (!_dragging)
+            this.UpdateSplitterCursor(false);
     }
 
     /// <inheritdoc/>

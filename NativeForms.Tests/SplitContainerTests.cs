@@ -223,4 +223,89 @@ internal sealed class SplitContainerTests
             Assert.That(split.Panel2Collapsed, Is.True);
         });
     }
+
+    // --- The splitter band's cursor -----------------------------------------------------------
+    //
+    // The band is a region of the container's own surface, not a child control, so Control.Cursor
+    // cannot express it: setting that would tint the whole control and every child. It is pushed as a
+    // region cursor while the pointer is over the band and released again on the way out.
+
+    [Test]
+    public void The_splitter_band_shows_the_horizontal_sizing_cursor()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, SplitterWidth = 6 };
+        var canvas = Realize(split, out _);
+
+        canvas.RaiseMouseMove(103, 50);
+
+        Assert.That(canvas.Cursor, Is.SameAs(Cursors.SizeWE));
+    }
+
+    [Test]
+    public void A_horizontal_split_shows_the_vertical_sizing_cursor()
+    {
+        var split = new SplitContainer
+        {
+            Bounds = new(0, 0, 100, 300),
+            Orientation = Orientation.Horizontal,
+            SplitterDistance = 100,
+            SplitterWidth = 6,
+        };
+        var canvas = Realize(split, out _);
+
+        canvas.RaiseMouseMove(50, 103);
+
+        Assert.That(canvas.Cursor, Is.SameAs(Cursors.SizeNS));
+    }
+
+    [Test]
+    public void Moving_off_the_splitter_band_restores_the_cursor()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, SplitterWidth = 6 };
+        var canvas = Realize(split, out _);
+
+        canvas.RaiseMouseMove(103, 50);
+        canvas.RaiseMouseMove(40, 50);
+
+        Assert.That(canvas.Cursor, Is.SameAs(Cursors.Arrow));
+    }
+
+    [Test]
+    public void Leaving_the_control_restores_the_cursor()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, SplitterWidth = 6 };
+        var canvas = Realize(split, out _);
+
+        canvas.RaiseMouseMove(103, 50);
+        canvas.RaiseMouseLeave();
+
+        Assert.That(canvas.Cursor, Is.SameAs(Cursors.Arrow));
+    }
+
+    [Test]
+    public void The_sizing_cursor_survives_a_drag_that_runs_past_the_band()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, SplitterWidth = 6 };
+        var canvas = Realize(split, out _);
+
+        canvas.RaiseMouseMove(103, 50);
+        canvas.RaiseMouseDown(103, 50);
+        canvas.RaiseMouseMove(160, 50);
+
+        Assert.That(canvas.Cursor, Is.SameAs(Cursors.SizeWE), "the pointer routinely runs ahead of the bar mid-drag");
+    }
+
+    [Test]
+    public void Releasing_a_drag_away_from_the_band_restores_the_cursor()
+    {
+        var split = new SplitContainer { Bounds = new(0, 0, 300, 100), SplitterDistance = 100, SplitterWidth = 6 };
+        var canvas = Realize(split, out _);
+
+        canvas.RaiseMouseMove(103, 50);
+        canvas.RaiseMouseDown(103, 50);
+        canvas.RaiseMouseMove(160, 50);
+        canvas.RaiseMouseUp(20, 50);
+
+        Assert.That(canvas.Cursor, Is.SameAs(Cursors.Arrow));
+    }
 }

@@ -190,13 +190,38 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 
     private void RaiseMouseLeave() => MouseLeave?.Invoke(this, EventArgs.Empty);
 
-    private void RaiseKeyDown(Keys key, KeyModifiers modifiers)
-        => KeyDown?.Invoke(this, new KeyEventArgs(key, modifiers));
+    /// <summary>Raises KeyDown and reports whether a handler consumed the key.</summary>
+    private bool RaiseKeyDown(Keys key, KeyModifiers modifiers)
+    {
+        if (KeyDown is not { } handler)
+            return false;
 
-    private void RaiseKeyUp(Keys key, KeyModifiers modifiers)
-        => KeyUp?.Invoke(this, new KeyEventArgs(key, modifiers));
+        var args = new KeyEventArgs(key, modifiers);
+        handler(this, args);
+        return args.Handled;
+    }
 
-    private void RaiseKeyPress(char keyChar) => KeyPress?.Invoke(this, new KeyPressEventArgs(keyChar));
+    /// <summary>Raises KeyUp and reports whether a handler consumed the key.</summary>
+    private bool RaiseKeyUp(Keys key, KeyModifiers modifiers)
+    {
+        if (KeyUp is not { } handler)
+            return false;
+
+        var args = new KeyEventArgs(key, modifiers);
+        handler(this, args);
+        return args.Handled;
+    }
+
+    /// <summary>Raises KeyPress and reports whether a handler consumed the character.</summary>
+    private bool RaiseKeyPress(char keyChar)
+    {
+        if (KeyPress is not { } handler)
+            return false;
+
+        var args = new KeyPressEventArgs(keyChar);
+        handler(this, args);
+        return args.Handled;
+    }
 
     // --- Mapping helpers ------------------------------------------------------------------------
 
@@ -256,6 +281,22 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         => userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkCanvasPeer peer ? peer : null;
 
     // --- Native callbacks (Cdecl, gboolean-returning) -------------------------------------------
+    //
+    // Event-routing policy. GTK hands an unhandled event to every ancestor widget in turn
+    // (gtk_propagate_event) WITHOUT retranslating its coordinates, so an ancestor canvas would
+    // re-interpret the child's client point as its own — a press at child-relative (10,5) inside a
+    // TabPage would be hit-tested by the TabControl into its header strip. Pointer events therefore
+    // return GDK_EVENT_STOP: the innermost canvas is the control at that pixel, exactly like a native
+    // GtkButton or GtkEntry, and no ancestor has any business seeing them.
+    //
+    // Two deliberate exceptions keep returning GDK_EVENT_PROPAGATE:
+    //   * "draw", so GtkFixed's default container handler still paints the native children on top of
+    //     the owner-drawn background;
+    //   * "scroll-event", so a control that does not scroll lets a scrollable ancestor take the wheel
+    //     (the Windows Forms contract). This is safe precisely because every wheel handler in the
+    //     toolkit reads only MouseEventArgs.Delta and never the coordinates.
+    // Key events stop only once a managed handler has set Handled, which keeps unconsumed keys
+    // bubbling to the form's dialog-key chain and to the popup surface's Escape dismissal.
 
     /// <summary>Native "draw" handler: <c>gboolean (GtkWidget*, cairo_t*, gpointer)</c>.</summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -279,7 +320,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             }
         }
 
-        return 0;
+        return 1;
     }
 
     /// <summary>Native "button-release-event" handler.</summary>
@@ -296,7 +337,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             }
         }
 
-        return 0;
+        return 1;
     }
 
     /// <summary>Native "motion-notify-event" handler.</summary>
@@ -313,7 +354,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             }
         }
 
-        return 0;
+        return 1;
     }
 
     /// <summary>Native "scroll-event" handler: maps vertical direction to a ±120 wheel delta.</summary>
@@ -344,8 +385,12 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int OnLeave(nint widget, nint eventPtr, nint userData)
     {
-        FromData(userData)?.RaiseMouseLeave();
-        return 0;
+        var peer = FromData(userData);
+        if (peer is null)
+            return 0;
+
+        peer.RaiseMouseLeave();
+        return 1;
     }
 
     /// <summary>Native "key-press-event" handler: raises KeyDown and, for printable keys, KeyPress.</summary>
@@ -353,20 +398,21 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     private static int OnKeyPress(nint widget, nint eventPtr, nint userData)
     {
         var peer = FromData(userData);
-        if (peer is not null)
-        {
-            unsafe
-            {
-                ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-                peer.RaiseKeyDown(ToKey(e.KeyVal), ToModifiers(e.State));
+        if (peer is null)
+            return 0;
 
-                var unicode = NativeMethods.gdk_keyval_to_unicode(e.KeyVal);
-                if (unicode is >= 0x20 and not 0x7F and <= 0xFFFF)
-                    peer.RaiseKeyPress((char)unicode);
-            }
+        bool handled;
+        unsafe
+        {
+            ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+            handled = peer.RaiseKeyDown(ToKey(e.KeyVal), ToModifiers(e.State));
+
+            var unicode = NativeMethods.gdk_keyval_to_unicode(e.KeyVal);
+            if (unicode is >= 0x20 and not 0x7F and <= 0xFFFF)
+                handled |= peer.RaiseKeyPress((char)unicode);
         }
 
-        return 0;
+        return handled ? 1 : 0;
     }
 
     /// <summary>Native "key-release-event" handler.</summary>
@@ -374,15 +420,16 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     private static int OnKeyRelease(nint widget, nint eventPtr, nint userData)
     {
         var peer = FromData(userData);
-        if (peer is not null)
+        if (peer is null)
+            return 0;
+
+        bool handled;
+        unsafe
         {
-            unsafe
-            {
-                ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-                peer.RaiseKeyUp(ToKey(e.KeyVal), ToModifiers(e.State));
-            }
+            ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+            handled = peer.RaiseKeyUp(ToKey(e.KeyVal), ToModifiers(e.State));
         }
 
-        return 0;
+        return handled ? 1 : 0;
     }
 }
