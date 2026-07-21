@@ -5,6 +5,8 @@
     <RootNamespace>Hawkynt.NativeForms.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- GtkNativeSizingTests writes GdkEvent fields through a pointer to inject real input. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +21,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
+    <!-- For GtkNativeSizingTests, which asserts against real GTK widgets; the fixture skips itself
+         on any machine without a display, so the reference costs nothing elsewhere. -->
+    <ProjectReference Include="..\NativeForms.Backends.Gtk\NativeForms.Backends.Gtk.csproj" />
   </ItemGroup>
 
 </Project>

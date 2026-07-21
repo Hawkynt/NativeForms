@@ -26,6 +26,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         | NativeMethods.GDK_BUTTON_RELEASE_MASK
         | NativeMethods.GDK_POINTER_MOTION_MASK
         | NativeMethods.GDK_SCROLL_MASK
+        | NativeMethods.GDK_SMOOTH_SCROLL_MASK
         | NativeMethods.GDK_KEY_PRESS_MASK
         | NativeMethods.GDK_KEY_RELEASE_MASK
         | NativeMethods.GDK_LEAVE_NOTIFY_MASK
@@ -91,12 +92,10 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         unsafe
         {
             // The "draw" pair brackets our own painting with a cairo clip so no OnPaint can bleed
-            // past the control's rectangle; "size-allocate" keeps the widget itself at exactly the
-            // size the toolkit asked for, which is what confines the native children (see
-            // ClampAllocation).
+            // past the control's rectangle. The allocation clamp that confines the native children
+            // is the shared one on GtkControlPeer.
             Connect("draw", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDraw, data);
             ConnectAfter("draw", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDrawAfter, data);
-            ConnectAfter("size-allocate", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSizeAllocate, data);
             Connect("button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonPress, data);
             Connect("button-release-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonRelease, data);
             Connect("motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnMotion, data);
@@ -115,17 +114,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     /// GTK has drawn the container's children.</summary>
     private void ConnectAfter(string signal, nint handler, nint data)
         => NativeMethods.g_signal_connect_data(_widget, signal, handler, data, 0, NativeMethods.G_CONNECT_AFTER);
-
-    /// <inheritdoc />
-    public override void SetBounds(Rectangle bounds)
-    {
-        base.SetBounds(bounds);
-
-        // A resize re-runs GTK's allocation, which re-grows the widget to fit its children; clamp it
-        // back so the new client rectangle bounds them immediately rather than one frame later.
-        // Harmless before realization — there is no widget to clamp yet.
-        this.ClampAllocation();
-    }
 
     /// <inheritdoc />
     public void AddChild(IControlPeer child)
@@ -187,58 +175,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         NativeMethods.cairo_clip(cr);
     }
 
-    /// <summary>Guards the re-entrant <c>gtk_widget_size_allocate</c> in <see cref="ClampAllocation"/>.</summary>
-    private bool _clamping;
-
-    /// <summary>
-    /// Forces this canvas's allocation back to the control's client rectangle after GTK has sized it.
-    ///
-    /// This is what confines the native children. A <c>GtkFixed</c> asks each child for its preferred
-    /// size and allocates that, and <c>gtk_widget_set_size_request</c> only sets a <em>minimum</em> —
-    /// so a panel whose content is larger than itself is allocated the content's bounding box
-    /// (measured: 464x206 for a panel the toolkit sized 300x180). Its GDK window grows to match and
-    /// the children draw across the whole of it, straight over the neighbouring controls.
-    ///
-    /// Clipping cairo in the "draw" handler cannot fix this: GTK 3 installs a draw marshaller that
-    /// wraps every handler in <c>cairo_save</c>/<c>cairo_restore</c>, so a clip taken there is
-    /// discarded before the container draws its children (measured: the clip is back to the damage
-    /// region by the time the after-handler runs). Correcting the allocation is both the actual
-    /// repair — the toolkit owns these bounds outright — and the one that also keeps the GDK window,
-    /// the widget clip and hit-testing consistent with them.
-    /// </summary>
-    private void ClampAllocation()
-    {
-        if (_clamping || _widget == 0)
-            return;
-
-        // An empty rectangle means the toolkit has not sized this surface yet — there is nothing
-        // authoritative to clamp to, and forcing 0x0 would blank the widget.
-        if (_bounds.Width <= 0 || _bounds.Height <= 0)
-            return;
-
-        NativeMethods.gtk_widget_get_allocation(_widget, out var current);
-        if (current.Width == _bounds.Width && current.Height == _bounds.Height)
-            return;
-
-        var corrected = new GdkRectangle
-        {
-            X = current.X,
-            Y = current.Y,
-            Width = _bounds.Width,
-            Height = _bounds.Height,
-        };
-
-        _clamping = true;
-        try
-        {
-            NativeMethods.gtk_widget_size_allocate(_widget, ref corrected);
-        }
-        finally
-        {
-            _clamping = false;
-        }
-    }
-
     /// <summary>Wraps the Cairo context and raises <see cref="Paint"/> for the invalidated region
     /// (the context's clip, which GDK set from the queued draw areas), falling back to the whole
     /// allocation when the clip is unbounded.</summary>
@@ -280,6 +216,26 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 
     private void RaiseMouseWheel(int delta, int x, int y, KeyModifiers modifiers)
         => MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta, modifiers));
+
+    /// <summary>Whole notches still owed from the fractional part of previous smooth-scroll events.</summary>
+    private double _smoothScroll;
+
+    /// <summary>Turns a smooth-scroll amount (positive downwards) into whole ±120 notches.</summary>
+    private void RaiseSmoothScroll(double deltaY, int x, int y, KeyModifiers modifiers)
+    {
+        _smoothScroll -= deltaY;
+        while (_smoothScroll >= 1)
+        {
+            _smoothScroll -= 1;
+            this.RaiseMouseWheel(120, x, y, modifiers);
+        }
+
+        while (_smoothScroll <= -1)
+        {
+            _smoothScroll += 1;
+            this.RaiseMouseWheel(-120, x, y, modifiers);
+        }
+    }
 
     private void RaiseMouseLeave() => MouseLeave?.Invoke(this, EventArgs.Empty);
 
@@ -405,13 +361,6 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         return 0;
     }
 
-    /// <summary>Native "size-allocate" handler: <c>void (GtkWidget*, GdkRectangle*, gpointer)</c>.
-    /// GTK has just sized the widget; put the allocation back to the control's own rectangle so the
-    /// native children stay inside it.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static void OnSizeAllocate(nint widget, nint allocation, nint userData)
-        => FromData(userData)?.ClampAllocation();
-
     /// <summary>Native "draw" handler connected with <c>G_CONNECT_AFTER</c>: balances the
     /// <c>cairo_save</c> that <see cref="OnDraw"/> took, once the children have been drawn.</summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -474,7 +423,15 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         return 1;
     }
 
-    /// <summary>Native "scroll-event" handler: maps vertical direction to a ±120 wheel delta.</summary>
+    /// <summary>
+    /// Native "scroll-event" handler: maps the wheel to the Windows Forms ±120-per-notch delta.
+    ///
+    /// Both GDK forms are honored. The discrete <c>GDK_SCROLL_UP</c>/<c>_DOWN</c> pair is one notch
+    /// each; <c>GDK_SCROLL_SMOOTH</c> — what XI2 and Wayland deliver for a real wheel, and what a
+    /// touchpad delivers exclusively — instead carries a continuous <c>delta_y</c>, positive
+    /// downwards. Its fractions are accumulated so a touchpad's sub-notch steps are neither lost nor
+    /// magnified into a full notch each.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int OnScroll(nint widget, nint eventPtr, nint userData)
     {
@@ -484,14 +441,19 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             unsafe
             {
                 ref var e = ref Unsafe.AsRef<GdkEventScroll>((void*)eventPtr);
-                var delta = e.Direction switch
+                if (e.Direction == NativeMethods.GDK_SCROLL_SMOOTH)
+                    peer.RaiseSmoothScroll(e.DeltaY, (int)e.X, (int)e.Y, ToModifiers(e.State));
+                else
                 {
-                    NativeMethods.GDK_SCROLL_UP => 120,
-                    NativeMethods.GDK_SCROLL_DOWN => -120,
-                    _ => 0,
-                };
-                if (delta != 0)
-                    peer.RaiseMouseWheel(delta, (int)e.X, (int)e.Y, ToModifiers(e.State));
+                    var delta = e.Direction switch
+                    {
+                        NativeMethods.GDK_SCROLL_UP => 120,
+                        NativeMethods.GDK_SCROLL_DOWN => -120,
+                        _ => 0,
+                    };
+                    if (delta != 0)
+                        peer.RaiseMouseWheel(delta, (int)e.X, (int)e.Y, ToModifiers(e.State));
+                }
             }
         }
 

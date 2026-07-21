@@ -103,6 +103,113 @@ internal abstract class GtkControlPeer : IControlPeer
         NativeMethods.gtk_widget_set_size_request(_widget, bounds.Width, bounds.Height);
         if (_parentFixed != 0)
             NativeMethods.gtk_fixed_move(_parentFixed, _widget, bounds.X, bounds.Y);
+
+        // A resize re-runs GTK's allocation, which sizes the widget to its own preference; clamp it
+        // back so the new rectangle applies immediately rather than one frame later.
+        this.ClampAllocation();
+    }
+
+    /// <summary>Guards the re-entrant <c>gtk_widget_size_allocate</c> in <see cref="ClampAllocation"/>.</summary>
+    private bool _clamping;
+
+    /// <summary>
+    /// Whether GTK's allocation of this widget is forced back to <see cref="_bounds"/>. True for every
+    /// widget the toolkit positions inside a container; a top-level window sizes itself against the
+    /// window manager instead and opts out.
+    /// </summary>
+    private protected virtual bool ClampsAllocation => true;
+
+    /// <summary>
+    /// Forces this widget's allocation back to the rectangle the toolkit asked for, after GTK has
+    /// sized it.
+    ///
+    /// A <c>GtkFixed</c> asks each child for its preferred size and allocates exactly that, and
+    /// <c>gtk_widget_set_size_request</c> only raises the <em>minimum</em> — it never caps anything.
+    /// A widget whose natural size exceeds its bounds is therefore allocated the natural size:
+    /// measured on a real display, a <c>GtkButton</c> the toolkit sized 60x26 was allocated 87x34, a
+    /// <c>GtkLabel</c> sized 70x20 got 187x20, a <c>GtkEntry</c> sized 50x18 got 168x34, and a panel
+    /// sized 300x180 got its content's bounding box, 464x206. The children then draw across their
+    /// neighbours. <see cref="Control.Bounds"/> is what the widget occupies, so the allocation is
+    /// corrected rather than merely clipped: that also keeps the GDK window, the widget clip and
+    /// hit-testing consistent with the toolkit's rectangle, which a cairo clip could not — GTK 3's
+    /// draw marshaller brackets every handler in <c>cairo_save</c>/<c>cairo_restore</c> and discards
+    /// a clip taken there before the container draws its children.
+    ///
+    /// Text that no longer fits is elided the way the platform would: the peers that own a caption
+    /// put their <c>GtkLabel</c> into <c>PANGO_ELLIPSIZE_END</c>.
+    /// </summary>
+    private protected void ClampAllocation()
+    {
+        if (_clamping || _widget == 0 || !this.ClampsAllocation)
+            return;
+
+        // An empty rectangle means the toolkit has not sized this widget yet — there is nothing
+        // authoritative to clamp to, and forcing 0x0 would blank it.
+        if (_bounds.Width <= 0 || _bounds.Height <= 0)
+            return;
+
+        NativeMethods.gtk_widget_get_allocation(_widget, out var current);
+        if (current.Width == _bounds.Width && current.Height == _bounds.Height)
+            return;
+
+        var corrected = new GdkRectangle
+        {
+            X = current.X,
+            Y = current.Y,
+            Width = _bounds.Width,
+            Height = _bounds.Height,
+        };
+
+        _clamping = true;
+        try
+        {
+            NativeMethods.gtk_widget_size_allocate(_widget, ref corrected);
+        }
+        finally
+        {
+            _clamping = false;
+        }
+    }
+
+    /// <summary>
+    /// Connects the "size-allocate" handler that re-applies <see cref="ClampAllocation"/> whenever GTK
+    /// re-sizes the widget. Connected <em>after</em> the class closure, so the container has finished
+    /// its own allocation pass before the correction lands.
+    /// </summary>
+    private protected void ConnectAllocationClamp()
+    {
+        if (_widget == 0)
+            return;
+
+        unsafe
+        {
+            var callback = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSizeAllocate;
+            NativeMethods.g_signal_connect_data(
+                _widget, "size-allocate", callback, this.PinSelf(), 0, NativeMethods.G_CONNECT_AFTER);
+        }
+    }
+
+    /// <summary>
+    /// Adds the wheel to this widget's GDK event mask.
+    ///
+    /// Windows Forms delivers the wheel to the control under the pointer and lets it bubble to the
+    /// nearest scrollable ancestor. A native leaf — a <c>GtkButton</c>, <c>GtkEntry</c>, … — selects
+    /// only presses, motion and crossings by default (measured: mask 0x403310 on a button's event
+    /// window, with neither scroll bit set), so the wheel is not among the events GDK asks the display
+    /// for over that child. Selecting both the discrete and the smooth form puts the event on the
+    /// child's own window; GTK then propagates it up the widget chain, because none of these widgets
+    /// handles "scroll-event", until it reaches the hosting canvas — which is the scrollable ancestor.
+    /// </summary>
+    private void SelectScrollEvents()
+        => NativeMethods.gtk_widget_add_events(
+            _widget, NativeMethods.GDK_SCROLL_MASK | NativeMethods.GDK_SMOOTH_SCROLL_MASK);
+
+    /// <summary>Native "size-allocate" handler: <c>void (GtkWidget*, GdkRectangle*, gpointer)</c>.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static void OnSizeAllocate(nint widget, nint allocation, nint userData)
+    {
+        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkControlPeer peer)
+            peer.ClampAllocation();
     }
 
     /// <inheritdoc />
@@ -315,6 +422,8 @@ internal abstract class GtkControlPeer : IControlPeer
             _widget = CreateWidget();
             OnWidgetRealized();
             ConnectFocusSignals();
+            ConnectAllocationClamp();
+            SelectScrollEvents();
         }
 
         _parentFixed = parentFixed;

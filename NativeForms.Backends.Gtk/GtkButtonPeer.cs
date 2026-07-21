@@ -37,6 +37,13 @@ internal sealed class GtkButtonPeer : GtkControlPeer, IButtonPeer
     /// <inheritdoc />
     protected override void OnWidgetRealized()
     {
+        // The toolkit's bounds cap the button (GtkControlPeer.ClampAllocation), so a caption wider
+        // than them has to give way; elide its tail the way GTK itself does rather than let it draw
+        // over the neighbouring controls.
+        var caption = NativeMethods.gtk_bin_get_child(_widget);
+        if (NativeMethods.IsLabel(caption))
+            NativeMethods.gtk_label_set_ellipsize(caption, NativeMethods.PANGO_ELLIPSIZE_END);
+
         var data = this.PinSelf();
         unsafe
         {

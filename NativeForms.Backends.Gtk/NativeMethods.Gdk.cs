@@ -22,10 +22,18 @@ internal static partial class NativeMethods
     internal const int GDK_FOCUS_CHANGE_MASK = 1 << 14;
     internal const int GDK_SCROLL_MASK = 1 << 21;
 
+    /// <summary>Selects the axis-valuator ("smooth") form of the wheel, which is what XI2 and
+    /// Wayland deliver for a real mouse; without it GDK only offers the legacy discrete events.</summary>
+    internal const int GDK_SMOOTH_SCROLL_MASK = 1 << 23;
+
     // --- GdkScrollDirection ---------------------------------------------------------------------
 
     internal const int GDK_SCROLL_UP = 0;
     internal const int GDK_SCROLL_DOWN = 1;
+
+    /// <summary>The wheel reported as a continuous delta rather than a direction; the amount lives in
+    /// <see cref="GdkEventScroll.DeltaY"/> instead.</summary>
+    internal const int GDK_SCROLL_SMOOTH = 4;
 
     // --- GdkModifierType bits -------------------------------------------------------------------
 
@@ -301,6 +309,22 @@ internal struct GdkEventScroll
 
     /// <summary>The scroll direction (<c>GdkScrollDirection</c>).</summary>
     public int Direction;
+
+    /// <summary>The source device (<c>GdkDevice*</c>).</summary>
+    public nint Device;
+
+    /// <summary>Pointer x in root-window (screen) coordinates.</summary>
+    public double XRoot;
+
+    /// <summary>Pointer y in root-window (screen) coordinates.</summary>
+    public double YRoot;
+
+    /// <summary>Horizontal scroll amount; only meaningful for <see cref="NativeMethods.GDK_SCROLL_SMOOTH"/>.</summary>
+    public double DeltaX;
+
+    /// <summary>Vertical scroll amount, positive downwards; only meaningful for
+    /// <see cref="NativeMethods.GDK_SCROLL_SMOOTH"/>.</summary>
+    public double DeltaY;
 }
 
 /// <summary>The fields of <c>GdkEventConfigure</c> — a top-level window's new position and size.</summary>

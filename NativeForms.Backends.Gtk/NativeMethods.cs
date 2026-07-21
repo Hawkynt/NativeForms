@@ -291,6 +291,33 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_label_set_yalign(nint label, float yalign);
 
+    /// <summary>Value of <c>PANGO_ELLIPSIZE_END</c> — elide the tail of a line that does not fit.</summary>
+    internal const int PANGO_ELLIPSIZE_END = 3;
+
+    /// <summary>
+    /// Sets how a label elides text that does not fit its allocation (a <c>PangoEllipsizeMode</c>).
+    /// Also drops the label's minimum width to about one ellipsis, which is what lets a caption
+    /// survive being allocated less room than its natural width.
+    /// </summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_label_set_ellipsize(nint label, int mode);
+
+    /// <summary>Returns the single child of a <c>GtkBin</c> (a button's label or box), or 0.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_bin_get_child(nint bin);
+
+    /// <summary>Looks up a registered <c>GType</c> by name, or 0 when the type is not registered yet.</summary>
+    [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nuint g_type_from_name(string name);
+
+    /// <summary>Whether a <c>GTypeInstance</c> is of the given type or one derived from it.</summary>
+    [LibraryImport(GObject)]
+    internal static partial int g_type_check_instance_is_a(nint instance, nuint type);
+
+    /// <summary>Whether <paramref name="widget"/> is a <c>GtkLabel</c> (or a subclass of one).</summary>
+    internal static bool IsLabel(nint widget)
+        => widget != 0 && g_type_check_instance_is_a(widget, g_type_from_name("GtkLabel")) != 0;
+
     // --- Widget images ---------------------------------------------------------------------------
 
     /// <summary>The image sits left of the button's label (a <c>GtkPositionType</c> value).</summary>

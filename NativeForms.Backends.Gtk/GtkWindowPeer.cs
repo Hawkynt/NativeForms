@@ -69,6 +69,13 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     /// <summary>The window's widget is created eagerly in the constructor; never lazily created.</summary>
     protected override nint CreateWidget() => _widget;
 
+    /// <summary>
+    /// A top-level negotiates its size with the window manager rather than with a parent container,
+    /// so its allocation is not the toolkit's to force — <see cref="SetBounds"/> resizes the window
+    /// and the resulting geometry comes back through "configure-event".
+    /// </summary>
+    private protected override bool ClampsAllocation => false;
+
     /// <inheritdoc />
     protected override void ApplyText(string text) => NativeMethods.gtk_window_set_title(_widget, text);
 

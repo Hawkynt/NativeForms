@@ -35,6 +35,7 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         _widget = CreateWidget();
         OnWidgetRealized();
         ConnectFocusSignals();
+        ConnectAllocationClamp();
         NativeMethods.gtk_container_add(_window, _widget);
 
         // Dismissal watches the top-level. Presses that land on the popup's own canvas stop there —

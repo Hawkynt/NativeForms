@@ -38,6 +38,9 @@ internal sealed class GtkLabelPeer : GtkControlPeer, ILabelPeer
         if (_widgetIsImage)
             return;
 
+        // Bounds narrower than the caption clamp the label (GtkControlPeer.ClampAllocation); elide
+        // the tail rather than paint across whatever sits beside it.
+        NativeMethods.gtk_label_set_ellipsize(_widget, NativeMethods.PANGO_ELLIPSIZE_END);
         this.ApplyText(_text);
         this.ApplyAlignment();
     }
