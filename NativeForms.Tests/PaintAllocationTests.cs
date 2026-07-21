@@ -275,6 +275,47 @@ internal sealed class PaintAllocationTests
         Assert.That(MeasureSteadyStatePaint(grid), Is.Zero);
     }
 
+    [Test]
+    public void DataGridView_list_columns_steady_state_repaint_allocates_nothing()
+    {
+        // The list-shaped kinds are the ones that could quietly re-run a selector per frame: the
+        // single-select list has to map its value through ItemDisplaySelector, and the two set-valued
+        // ones have to re-join a whole item collection into the closed cell's summary. Both may only
+        // ever happen on a cache miss, so a steady repaint of them still allocates nothing.
+        var choices = new object?[] { "Alpha", "Beta", "Gamma", "Delta" };
+        var grid = new DataGridView { Bounds = new(0, 0, 480, 160) };
+        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Person)o!).Name));
+        grid.Columns.Add(new DataGridViewColumn("Pick", static o => ((Person)o!).Name)
+        {
+            Kind = DataGridViewColumnKind.ListBox,
+            Width = 120,
+            ItemsSelector = _ => choices,
+            ItemDisplaySelector = static c => (string)c!,
+            ValueSetter = static (_, _) => { },
+        });
+        grid.Columns.Add(new DataGridViewColumn("Picks", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.ListBox,
+            SelectionMode = SelectionMode.MultiExtended,
+            Width = 120,
+            ItemsSelector = _ => choices,
+            CheckedItemsSelector = _ => choices,
+            CheckedItemsSetter = static (_, _) => { },
+        });
+        grid.Columns.Add(new DataGridViewColumn("Tags", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.CheckedListBox,
+            Width = 120,
+            ItemsSelector = _ => choices,
+            CheckedItemsSelector = _ => choices,
+            CheckedItemsSetter = static (_, _) => { },
+        });
+        grid.Items.AddRange([new Person("Alice", 30), new Person("Bob", 25), new Person("Carol", 40)]);
+        grid.SelectedRowIndex = 1;
+
+        Assert.That(MeasureSteadyStatePaint(grid), Is.Zero);
+    }
+
     // ---- Strips and menus ----
 
     [Test]

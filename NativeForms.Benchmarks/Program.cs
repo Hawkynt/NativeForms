@@ -55,10 +55,12 @@ internal static class Program
         PaintThroughput("ListView", MakeListView(1000));
         PaintThroughput("TreeView", MakeTreeView(1000));
         PaintThroughput("DataGridView", MakeDataGridView(1000));
+        PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
 
         // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
         ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
         ScrollTraversal("DataGridView", MakeDataGridView(_TraversalRows), Keys.PageDown);
+        ScrollTraversal("DataGridViewLists", MakeListColumnGrid(_TraversalRows), Keys.PageDown);
         ScrollTraversal("TreeView", MakeTreeView(_TraversalRows), key: null);
 
         PrintTable();
@@ -234,6 +236,48 @@ internal static class Program
         var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
         grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
         grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
+        for (var i = 0; i < rows; ++i)
+            grid.Items.Add(new Row("Row " + i, i));
+        grid.SelectedRowIndex = 0;
+        return grid;
+    }
+
+    /// <summary>
+    /// A grid carrying the popup-list column kinds: a single-select list mapped through an item
+    /// display selector, plus the two set-valued ones whose closed cells summarise a whole item
+    /// collection. Their per-row work must stay behind the display-text cache, so this grid has to
+    /// paint as cheaply — and as allocation-free — as the plain one above.
+    /// </summary>
+    private static DataGridView MakeListColumnGrid(int rows)
+    {
+        var choices = new object?[] { "Alpha", "Beta", "Gamma", "Delta" };
+        var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
+        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name) { Width = 120 });
+        grid.Columns.Add(new DataGridViewColumn("Pick", static o => ((Row)o!).Name)
+        {
+            Kind = DataGridViewColumnKind.ListBox,
+            Width = 120,
+            ItemsSelector = _ => choices,
+            ItemDisplaySelector = static c => (string)c!,
+            ValueSetter = static (_, _) => { },
+        });
+        grid.Columns.Add(new DataGridViewColumn("Picks", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.ListBox,
+            SelectionMode = SelectionMode.MultiExtended,
+            Width = 120,
+            ItemsSelector = _ => choices,
+            CheckedItemsSelector = _ => choices,
+            CheckedItemsSetter = static (_, _) => { },
+        });
+        grid.Columns.Add(new DataGridViewColumn("Tags", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.CheckedListBox,
+            Width = 120,
+            ItemsSelector = _ => choices,
+            CheckedItemsSelector = _ => choices,
+            CheckedItemsSetter = static (_, _) => { },
+        });
         for (var i = 0; i < rows; ++i)
             grid.Items.Add(new Row("Row " + i, i));
         grid.SelectedRowIndex = 0;

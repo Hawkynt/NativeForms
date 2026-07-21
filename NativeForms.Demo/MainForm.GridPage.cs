@@ -29,13 +29,21 @@ internal sealed partial class MainForm
         /// <summary>The documentation link shown by the link column.</summary>
         public string Docs { get; init; } = string.Empty;
 
+        /// <summary>The single person the task sits with; picked in the list column's popup.</summary>
+        public string Owner { get; set; } = string.Empty;
+
+        /// <summary>The labels attached to the task; ticked as a whole set in the checked-list
+        /// column's popup, which is why the property takes a collection rather than a flag each.</summary>
+        public IReadOnlyList<object?> Labels { get; set; } = [];
+
         /// <summary>Whether this row is a section marker rendered as one merged full-width cell.</summary>
         public bool IsSection { get; init; }
     }
 
     /// <summary>
     /// The Grid page: one large <see cref="DataGridView"/> exercising the column kinds (icon+text,
-    /// check with write-back, progress, numeric with write-back, button, link), alternating rows,
+    /// check with write-back, progress, numeric with write-back, button, link, single-pick popup
+    /// list, and a checked list whose ticks write back a whole set), alternating rows,
     /// row headers, automatic sorting on the frozen first column, multi-select, merged section rows
     /// and a few dozen rows in the grid's bound <see cref="DataGridView.Items"/> list. Selection and
     /// content clicks report into the status strip.
@@ -56,7 +64,7 @@ internal sealed partial class MainForm
 
         grid.Columns.Add(new DataGridViewColumn("Task", static o => ((WorkItem)o!).Name)
         {
-            Width = 220,
+            Width = 200,
             Frozen = true,
             SortMode = DataGridViewColumnSortMode.Automatic,
             ImageSelector = static o => ((WorkItem)o!).Icon,
@@ -64,20 +72,20 @@ internal sealed partial class MainForm
         grid.Columns.Add(new DataGridViewColumn("Done", static o => ((WorkItem)o!).Done)
         {
             Kind = DataGridViewColumnKind.Check,
-            Width = 60,
+            Width = 50,
             CheckedSelector = static o => ((WorkItem)o!).Done,
             CheckedSetter = static (o, value) => ((WorkItem)o!).Done = value,
         });
         grid.Columns.Add(new DataGridViewColumn("Progress", static o => ((WorkItem)o!).Percent)
         {
             Kind = DataGridViewColumnKind.Progress,
-            Width = 140,
+            Width = 110,
             ProgressSelector = static o => ((WorkItem)o!).Percent,
         });
         grid.Columns.Add(new DataGridViewColumn("Hours", static o => ((WorkItem)o!).Hours)
         {
             Kind = DataGridViewColumnKind.NumericUpDown,
-            Width = 90,
+            Width = 70,
             Alignment = ContentAlignment.MiddleRight,
             DecimalPlaces = 1,
             Maximum = 999m,
@@ -90,12 +98,27 @@ internal sealed partial class MainForm
         grid.Columns.Add(new DataGridViewColumn("Open", static _ => "Open…")
         {
             Kind = DataGridViewColumnKind.Button,
-            Width = 90,
+            Width = 70,
         });
         grid.Columns.Add(new DataGridViewColumn("Docs", static o => ((WorkItem)o!).Docs)
         {
             Kind = DataGridViewColumnKind.Link,
-            Width = 180,
+            Width = 110,
+        });
+        grid.Columns.Add(new DataGridViewColumn("Owner", static o => ((WorkItem)o!).Owner)
+        {
+            Kind = DataGridViewColumnKind.ListBox,
+            Width = 110,
+            ItemsSelector = static _ => _Owners,
+            ValueSetter = static (o, value) => ((WorkItem)o!).Owner = (string)value!,
+        });
+        grid.Columns.Add(new DataGridViewColumn("Labels", static o => ((WorkItem)o!).Labels)
+        {
+            Kind = DataGridViewColumnKind.CheckedListBox,
+            Width = 160,
+            ItemsSelector = static _ => _Labels,
+            CheckedItemsSelector = static o => ((WorkItem)o!).Labels,
+            CheckedItemsSetter = static (o, items) => ((WorkItem)o!).Labels = items,
         });
 
         grid.Items.AddRange(BuildWorkItems(this.DiscImage(Color.RoyalBlue), this.DiscImage(Color.MediumSeaGreen), this.DiscImage(Color.Orange)));
@@ -124,7 +147,7 @@ internal sealed partial class MainForm
         page.Controls.AddRange(
             Caption("DataGridView — click the Task header to sort; the column stays frozen.", 16, 12, 540),
             grid,
-            Caption("Check and Hours cells write back into the bound items.", 16, 544, 420));
+            Caption("Check, Hours, Owner and Labels cells write back into the bound items — Labels as a whole set.", 16, 544, 700));
 
         // The walkthrough sorts the grid, widens a column, scrolls both ways and writes back into two
         // bound cells. The column widths and the rows themselves are the authored state; the offsets
@@ -137,10 +160,14 @@ internal sealed partial class MainForm
         grid.Items.CopyTo(authoredRows, 0);
         var doneFlags = new bool[authoredRows.Length];
         var hourValues = new decimal[authoredRows.Length];
+        var owners = new string[authoredRows.Length];
+        var labels = new IReadOnlyList<object?>[authoredRows.Length];
         for (var i = 0; i < authoredRows.Length; ++i)
         {
             doneFlags[i] = authoredRows[i].Done;
             hourValues[i] = authoredRows[i].Hours;
+            owners[i] = authoredRows[i].Owner;
+            labels[i] = authoredRows[i].Labels;
         }
 
         var selectedRow = grid.SelectedRowIndex;
@@ -154,6 +181,8 @@ internal sealed partial class MainForm
             {
                 authoredRows[i].Done = doneFlags[i];
                 authoredRows[i].Hours = hourValues[i];
+                authoredRows[i].Owner = owners[i];
+                authoredRows[i].Labels = labels[i];
             }
 
             grid.HorizontalOffset = 0;
@@ -167,6 +196,12 @@ internal sealed partial class MainForm
 
         return page;
     }
+
+    /// <summary>The people an "Owner" cell picks exactly one of.</summary>
+    private static readonly object?[] _Owners = ["Alice", "Bob", "Carol", "Dave"];
+
+    /// <summary>The labels a "Labels" cell ticks any number of.</summary>
+    private static readonly object?[] _Labels = ["Docs", "UX", "Perf", "Risk"];
 
     /// <summary>Builds three sections of ten deterministic rows each, plus one marker row per section.</summary>
     private static WorkItem[] BuildWorkItems(IImage coreIcon, IImage backendIcon, IImage demoIcon)
@@ -198,6 +233,8 @@ internal sealed partial class MainForm
                     Percent = ordinal * 11 % 101,
                     Hours = 2.5m * (ordinal + 1),
                     Docs = $"docs/{category.ToLowerInvariant()}.md",
+                    Owner = (string)_Owners[ordinal % _Owners.Length]!,
+                    Labels = ordinal % 2 == 0 ? [_Labels[0]] : [_Labels[1], _Labels[2]],
                 };
             }
         }

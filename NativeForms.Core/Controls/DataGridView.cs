@@ -11,8 +11,8 @@ namespace Hawkynt.NativeForms;
 /// An owner-drawn, vertically virtualized data grid painted in the native theme. Rows are arbitrary
 /// objects bound through an <see cref="ObservableList{T}"/>; each <see cref="DataGridViewColumn"/>
 /// maps a row to its cell content via reflection-free selector delegates, so binding stays
-/// trim/AOT-safe. Columns render as text, check, button, link, multi-image, progress or color cells
-/// (<see cref="DataGridViewColumnKind"/>), headers sort through an index indirection that never
+/// trim/AOT-safe. Columns render as text, check, button, link, multi-image, progress, color, list or
+/// checked-list cells (<see cref="DataGridViewColumnKind"/>), headers sort through an index indirection that never
 /// mutates <see cref="Items"/>, and presentation (row colors/heights/visibility, cell styles,
 /// display formatting, cell tooltips) is driven by optional per-row/per-cell selectors. Cells edit
 /// in place through <see cref="BeginEdit"/> — a hosted editor, popup or dialog per
@@ -50,6 +50,12 @@ public class DataGridView : OwnerDrawnControl
     private const int _ComboArrowRows = 5;
     private const int _ComboArrowZone = 16;
     private const int _MaxComboPopupRows = 8;
+    private const int _MaxListPopupRows = 12;
+    private const int _CheckGlyphGap = 4;
+
+    /// <summary>What joins the display texts of a set-valued cell's items into its closed-cell
+    /// summary — and what <see cref="Paste"/> splits such a summary back apart on.</summary>
+    private const string _SetSummarySeparator = ", ";
 
     private readonly List<DataGridViewColumn> _columns = [];
 
@@ -87,6 +93,8 @@ public class DataGridView : OwnerDrawnControl
     private bool _editPopupShown;
     private CalendarCore? _editCalendar;
     private IReadOnlyList<object?>? _editChoices;
+    private bool[]? _editItemStates;
+    private int _editAnchorIndex = -1;
     private int _editHoverIndex;
     private int _editPopupTop;
     private int _editPopupRows;
@@ -416,6 +424,18 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>Raised after a cell leaves edit mode, whether the edit committed or was cancelled.</summary>
     public event EventHandler<DataGridViewCellEventArgs>? CellEndEdit;
 
+    /// <summary>
+    /// Raised before an item's tick flips inside the popup of a
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> cell — the grid-side sibling of
+    /// <see cref="CheckedListBox.ItemCheck"/>, with the same veto shape: a handler resets
+    /// <see cref="ItemCheckEventArgs.NewValue"/> to <see cref="ItemCheckEventArgs.CurrentValue"/> to
+    /// keep the tick as it was. <see cref="ItemCheckEventArgs.Index"/> indexes the popup's item list;
+    /// the cell it belongs to is the one <see cref="SelectedRowIndex"/>/<see cref="CurrentColumnIndex"/>
+    /// report while the popup is open. Only the popup's own ticks raise it — the whole set still commits through
+    /// <see cref="DataGridViewColumn.CheckedItemsSetter"/> afterwards.
+    /// </summary>
+    public event EventHandler<ItemCheckEventArgs>? CellItemCheck;
+
     /// <summary>Raised when <see cref="IsCurrentCellDirty"/> flips — on the first editor change after
     /// the edit begins, and again when the edit ends.</summary>
     public event EventHandler? CurrentCellDirtyStateChanged;
@@ -569,6 +589,9 @@ public class DataGridView : OwnerDrawnControl
 
     /// <summary>Raises <see cref="CellEndEdit"/>.</summary>
     protected virtual void OnCellEndEdit(DataGridViewCellEventArgs e) => this.CellEndEdit?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="CellItemCheck"/>.</summary>
+    protected virtual void OnCellItemCheck(ItemCheckEventArgs e) => this.CellItemCheck?.Invoke(this, e);
 
     /// <summary>Raises <see cref="CurrentCellDirtyStateChanged"/>.</summary>
     protected virtual void OnCurrentCellDirtyStateChanged(EventArgs e) => this.CurrentCellDirtyStateChanged?.Invoke(this, e);
@@ -911,16 +934,57 @@ public class DataGridView : OwnerDrawnControl
             : ComputeDisplayText(column, item);
     }
 
-    /// <summary>Builds the text a cell displays: the display-text override, else the value formatted
-    /// by <see cref="DataGridViewColumn.FormatSelector"/> (the CellFormatting seam), else the value's
+    /// <summary>Builds the text a cell displays: the display-text override, else — for a set-valued
+    /// cell — the joined summary of its items, else the value formatted by
+    /// <see cref="DataGridViewColumn.FormatSelector"/> (the CellFormatting seam), else the value's
     /// <c>ToString()</c>.</summary>
     private static string ComputeDisplayText(DataGridViewColumn column, object? item)
     {
         if (column.DisplayTextSelector?.Invoke(item) is { } overridden)
             return overridden;
 
+        if (IsSetValued(column))
+            return SetSummaryText(column, column.CheckedItemsSelector?.Invoke(item));
+
         var value = column.ValueSelector(item);
+        if (column.Kind == DataGridViewColumnKind.ListBox && column.ItemDisplaySelector is { } display)
+            return display(value);
+
         return (column.FormatSelector is { } format ? format(value) : value?.ToString()) ?? string.Empty;
+    }
+
+    /// <summary>Whether the column's cells hold a whole set of items rather than one value: a
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> cell always, a
+    /// <see cref="DataGridViewColumnKind.ListBox"/> cell once its
+    /// <see cref="DataGridViewColumn.SelectionMode"/> admits more than one pick.</summary>
+    private static bool IsSetValued(DataGridViewColumn column) => column.Kind switch
+    {
+        DataGridViewColumnKind.CheckedListBox => true,
+        DataGridViewColumnKind.ListBox => column.SelectionMode is SelectionMode.MultiSimple or SelectionMode.MultiExtended,
+        _ => false,
+    };
+
+    /// <summary>The closed-cell text of a set-valued cell: the items' display texts joined with
+    /// <see cref="_SetSummarySeparator"/>, empty for an empty set. Runs only when the cell's cached
+    /// text is missing, never per frame.</summary>
+    private static string SetSummaryText(DataGridViewColumn column, IReadOnlyList<object?>? items)
+    {
+        if (items is null || items.Count == 0)
+            return string.Empty;
+
+        if (items.Count == 1)
+            return ChoiceDisplayText(column, items[0]);
+
+        var builder = new StringBuilder();
+        for (var i = 0; i < items.Count; ++i)
+        {
+            if (i > 0)
+                builder.Append(_SetSummarySeparator);
+
+            builder.Append(ChoiceDisplayText(column, items[i]));
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>Drops every column's cached display text — the row set itself changed.</summary>
@@ -1954,7 +2018,10 @@ public class DataGridView : OwnerDrawnControl
                 break;
             }
 
-            case DataGridViewColumnKind.ComboBox:
+            // The three popup-list kinds share one painter: the cell's text (a single value for the
+            // combo and a single-select list, the joined set summary for the set-valued ones) plus the
+            // drop affordance that says a list opens here.
+            case DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.ListBox or DataGridViewColumnKind.CheckedListBox:
             {
                 var arrowZone = Math.Min(_ComboArrowZone, cellRect.Width);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding - arrowZone), cellRect.Height);
@@ -2109,8 +2176,10 @@ public class DataGridView : OwnerDrawnControl
     /// Puts the given cell into edit mode: a hosted <see cref="TextBox"/>
     /// (<see cref="DataGridViewColumnKind.Text"/>) or <see cref="NumericUpDown"/>
     /// (<see cref="DataGridViewColumnKind.NumericUpDown"/>) positioned over the cell, or a popup — the
-    /// choice list of a <see cref="DataGridViewColumnKind.ComboBox"/> cell, the month calendar of a
-    /// <see cref="DataGridViewColumnKind.DateTime"/> cell — below it. Refused (returning
+    /// choice list of a <see cref="DataGridViewColumnKind.ComboBox"/> cell, the taller list of a
+    /// <see cref="DataGridViewColumnKind.ListBox"/> or <see cref="DataGridViewColumnKind.CheckedListBox"/>
+    /// cell, the month calendar of a <see cref="DataGridViewColumnKind.DateTime"/> cell — below it.
+    /// Refused (returning
     /// <see langword="false"/>) for read-only cells, kinds without their edit selectors/setters,
     /// merged or hidden rows, cells outside the visible window, a veto from
     /// <see cref="CellBeginEdit"/>, or popup kinds before realization. An edit already active on
@@ -2135,7 +2204,11 @@ public class DataGridView : OwnerDrawnControl
         if (this.MergedTextOf(item) is not null || this.IsRowHidden(item))
             return false;
 
-        var needsBackend = column.Kind is DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DateTime or DataGridViewColumnKind.Color;
+        var needsBackend = column.Kind is DataGridViewColumnKind.ComboBox
+            or DataGridViewColumnKind.ListBox
+            or DataGridViewColumnKind.CheckedListBox
+            or DataGridViewColumnKind.DateTime
+            or DataGridViewColumnKind.Color;
         var backend = this.Backend;
         if (needsBackend && backend is null)
             return false; // only a live widget knows where to float the popup (or run the dialog)
@@ -2218,6 +2291,10 @@ public class DataGridView : OwnerDrawnControl
                 this.OpenComboPopup(backend!, column, item, cellBounds);
                 break;
 
+            case DataGridViewColumnKind.ListBox or DataGridViewColumnKind.CheckedListBox:
+                this.OpenListPopup(backend!, column, item, cellBounds);
+                break;
+
             default: // DataGridViewColumnKind.DateTime — IsCellEditable admits no other kind here
                 this.OpenCalendarPopup(backend!, column, item, cellBounds);
                 break;
@@ -2234,8 +2311,10 @@ public class DataGridView : OwnerDrawnControl
     /// Commits the active edit: the editor's value runs through <see cref="CellValidating"/> (a veto
     /// returns <see langword="false"/> and keeps the cell in edit mode), is written through the
     /// column's setter, and the cell leaves edit mode raising <see cref="CellEndEdit"/>. For the
-    /// popup kinds — which commit through their own pick gestures — this closes the popup without a
-    /// write. A no-op returning <see langword="true"/> while nothing edits.
+    /// single-value popup kinds — which commit through their own pick gestures — this closes the
+    /// popup without a write; for the set-valued ones it is the commit, writing everything the popup
+    /// has ticked through <see cref="DataGridViewColumn.CheckedItemsSetter"/>. A no-op returning
+    /// <see langword="true"/> while nothing edits.
     /// </summary>
     public bool CommitEdit()
     {
@@ -2288,6 +2367,21 @@ public class DataGridView : OwnerDrawnControl
 
                 break; // no match writes nothing — the cell keeps its value, like the editor's revert
             }
+
+            case DataGridViewColumnKind.ListBox or DataGridViewColumnKind.CheckedListBox:
+            {
+                // A single-select list popup already committed its pick on the click, exactly like the
+                // combo's; only the set-valued kinds carry pending state to write here.
+                if (_editItemStates is not { } states)
+                    break;
+
+                var picked = PickedItems(_editChoices!, states);
+                if (!this.ValidateCell(rowIndex, columnIndex, picked))
+                    return false;
+
+                column.CheckedItemsSetter!(item, picked);
+                break;
+            }
         }
 
         this.InvalidateDisplayText(rowIndex);
@@ -2310,6 +2404,13 @@ public class DataGridView : OwnerDrawnControl
     {
         DataGridViewColumnKind.Text or DataGridViewColumnKind.MaskedText => column.TextSetter is not null,
         DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DomainUpDown => column.ItemsSelector is not null && column.ValueSetter is not null,
+        DataGridViewColumnKind.ListBox => column.ItemsSelector is not null && column.SelectionMode switch
+        {
+            SelectionMode.None => false,
+            SelectionMode.One => column.ValueSetter is not null,
+            _ => column.CheckedItemsSelector is not null && column.CheckedItemsSetter is not null,
+        },
+        DataGridViewColumnKind.CheckedListBox => column.ItemsSelector is not null && column.CheckedItemsSelector is not null && column.CheckedItemsSetter is not null,
         DataGridViewColumnKind.NumericUpDown => column.NumberSelector is not null && column.NumberSetter is not null,
         DataGridViewColumnKind.DateTime => column.DateSelector is not null && column.DateSetter is not null,
         DataGridViewColumnKind.Color => column.ColorSelector is not null && column.ColorSetter is not null,
@@ -2355,6 +2456,8 @@ public class DataGridView : OwnerDrawnControl
         _editRowIndex = -1;
         _editColumnIndex = -1;
         _editChoices = null;
+        _editItemStates = null;
+        _editAnchorIndex = -1;
         if (_textEditor is { } textEditor)
         {
             _textEditor = null;
@@ -2427,6 +2530,46 @@ public class DataGridView : OwnerDrawnControl
                         else
                             this.CancelEdit();
 
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Down:
+                        this.MoveComboHover(+1);
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Up:
+                        this.MoveComboHover(-1);
+                        e.Handled = true;
+                        break;
+                }
+
+                break;
+
+            case DataGridViewColumnKind.ListBox or DataGridViewColumnKind.CheckedListBox:
+                switch (e.KeyCode)
+                {
+                    case Keys.Escape:
+                        this.CancelEdit();
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Enter:
+                        // A set-valued popup commits whatever is ticked; a single-select one behaves
+                        // exactly like the combo and commits the row the caret sits on.
+                        if (_editItemStates is not null)
+                            this.CommitEdit();
+                        else if (_editChoices is { } listChoices && _editHoverIndex >= 0 && _editHoverIndex < listChoices.Count)
+                            this.CommitComboChoice(_editHoverIndex);
+                        else
+                            this.CancelEdit();
+
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Space when _editItemStates is not null && _editHoverIndex >= 0:
+                        this.ToggleEditItem(_editHoverIndex, !_editItemStates[_editHoverIndex]);
+                        _editPopup?.InvalidateAll();
                         e.Handled = true;
                         break;
 
@@ -2731,6 +2874,60 @@ public class DataGridView : OwnerDrawnControl
         popup.ShowAt(this.PointToScreen(new Point(cellBounds.X, cellBounds.Bottom)), _editPopupSize);
     }
 
+    /// <summary>
+    /// Opens the popup list of a <see cref="DataGridViewColumnKind.ListBox"/> or
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> cell below the cell — the combo's popup
+    /// with a taller row budget. A single-select list starts its caret on the cell's current value; a
+    /// set-valued one seeds one pending state per choice from
+    /// <see cref="DataGridViewColumn.CheckedItemsSelector"/> and scrolls the first picked item into
+    /// view.
+    /// </summary>
+    private void OpenListPopup(IPlatformBackend backend, DataGridViewColumn column, object? item, Rectangle cellBounds)
+    {
+        var choices = column.ItemsSelector!(item);
+        _editChoices = choices;
+        _editPopupRows = Math.Max(1, Math.Min(choices.Count, _MaxListPopupRows));
+        _editPopupSize = new Size(cellBounds.Width, _editPopupRows * this.Theme.RowHeight);
+        _editPopupTop = 0;
+        _editHoverIndex = -1;
+        _editAnchorIndex = -1;
+
+        if (IsSetValued(column))
+        {
+            var states = new bool[choices.Count];
+            var current = column.CheckedItemsSelector!(item);
+            for (var i = 0; i < choices.Count; ++i)
+                for (var c = 0; c < current.Count; ++c)
+                    if (Equals(choices[i], current[c]))
+                    {
+                        states[i] = true;
+                        if (_editHoverIndex < 0)
+                            _editHoverIndex = i;
+
+                        break;
+                    }
+
+            _editItemStates = states;
+            _editAnchorIndex = _editHoverIndex;
+        }
+        else
+        {
+            _editItemStates = null;
+            var current = column.ValueSelector(item);
+            for (var i = 0; i < choices.Count; ++i)
+                if (Equals(choices[i], current))
+                {
+                    _editHoverIndex = i;
+                    break;
+                }
+        }
+
+        this.EnsureComboPopupVisible(_editHoverIndex);
+        var popup = this.EnsureEditPopup(backend);
+        _editPopupShown = true;
+        popup.ShowAt(this.PointToScreen(new Point(cellBounds.X, cellBounds.Bottom)), _editPopupSize);
+    }
+
     /// <summary>Opens the month calendar of a <see cref="DataGridViewColumnKind.DateTime"/> cell
     /// below the cell, its page centered on the cell's current date — the same engine and popup
     /// geometry as <see cref="DateTimePicker"/>.</summary>
@@ -2777,8 +2974,12 @@ public class DataGridView : OwnerDrawnControl
         return _editPopup = popup;
     }
 
-    /// <summary>Whether the active edit is the popup calendar (as opposed to the combo list).</summary>
+    /// <summary>Whether the active edit is the popup calendar (as opposed to one of the popup lists).</summary>
     private bool IsCalendarEditing => this.IsEditing && _columns[_editColumnIndex].Kind == DataGridViewColumnKind.DateTime;
+
+    /// <summary>Whether the popup currently open carries a check square in front of every row — the
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> editor.</summary>
+    private bool IsCheckedListEditing => this.IsEditing && _columns[_editColumnIndex].Kind == DataGridViewColumnKind.CheckedListBox;
 
     private void OnEditPopupPaint(PaintEventArgs e)
     {
@@ -2791,7 +2992,7 @@ public class DataGridView : OwnerDrawnControl
             return;
         }
 
-        // The combo choice list, painted exactly like ComboBox drop-down rows.
+        // The combo/list choice rows, painted exactly like ComboBox drop-down and ListBox rows.
         var g = e.Graphics;
         var theme = this.Theme;
         var size = _editPopupSize;
@@ -2799,16 +3000,31 @@ public class DataGridView : OwnerDrawnControl
 
         var column = _columns[_editColumnIndex];
         var choices = _editChoices!;
+        var states = _editItemStates;
+        var checkBoxes = this.IsCheckedListEditing;
         var rowHeight = theme.RowHeight;
         var last = Math.Min(choices.Count, _editPopupTop + _editPopupRows);
         for (var i = _editPopupTop; i < last; ++i)
         {
             var rowRect = new Rectangle(0, (i - _editPopupTop) * rowHeight, size.Width, rowHeight);
-            var hovered = i == _editHoverIndex;
-            if (hovered)
+
+            // A checked list highlights only the caret row — its ticks carry the state; a plain list
+            // highlights every picked row, the caret row included.
+            var highlighted = i == _editHoverIndex || (!checkBoxes && states is not null && states[i]);
+            if (highlighted)
                 GlyphRenderer.FillSelection(g, theme, rowRect);
 
-            ListBox.DrawRowContent(g, theme, rowRect, ChoiceDisplayText(column, choices[i]), null, hovered);
+            var textRect = rowRect;
+            if (checkBoxes)
+            {
+                var boxTop = rowRect.Y + Math.Max(0, (rowRect.Height - GlyphRenderer.CheckBoxSize) / 2);
+                GlyphRenderer.DrawCheckBox(g, theme, new(rowRect.X + 2, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), states![i]);
+
+                var indent = GlyphRenderer.CheckBoxSize + _CheckGlyphGap + 2;
+                textRect = new(rowRect.X + indent, rowRect.Y, Math.Max(0, rowRect.Width - indent), rowRect.Height);
+            }
+
+            ListBox.DrawRowContent(g, theme, textRect, ChoiceDisplayText(column, choices[i]), null, highlighted);
         }
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, size.Width - 1, size.Height - 1));
@@ -2829,8 +3045,81 @@ public class DataGridView : OwnerDrawnControl
             return;
 
         var row = _editPopupTop + (e.Y / this.Theme.RowHeight);
-        if (row < _editChoices!.Count)
+        if (row >= _editChoices!.Count)
+            return;
+
+        // A single-value popup commits on the click; a set-valued one only updates its pending state
+        // and waits for Enter (or the click outside that closes it) to commit the whole set.
+        if (_editItemStates is not { } states)
+        {
             this.CommitComboChoice(row);
+            return;
+        }
+
+        _editHoverIndex = row;
+        if (this.IsCheckedListEditing || _columns[_editColumnIndex].SelectionMode == SelectionMode.MultiSimple || e.Control)
+            this.ToggleEditItem(row, !states[row]);
+        else if (e.Shift && _editAnchorIndex >= 0)
+        {
+            // MultiExtended's Shift+click: the anchor..row run replaces the picked set.
+            Array.Clear(states);
+            var from = Math.Min(_editAnchorIndex, row);
+            var to = Math.Max(_editAnchorIndex, row);
+            for (var i = from; i <= to; ++i)
+                states[i] = true;
+        }
+        else
+        {
+            Array.Clear(states);
+            states[row] = true;
+            _editAnchorIndex = row;
+        }
+
+        _editPopup?.InvalidateAll();
+    }
+
+    /// <summary>
+    /// Flips one popup item's pending state, announcing it through <see cref="CellItemCheck"/> first
+    /// so a handler can veto or redirect it — the grid-side shape of
+    /// <see cref="CheckedListBox.SetItemChecked"/>. Also re-anchors the range gesture on the item.
+    /// </summary>
+    private void ToggleEditItem(int index, bool value)
+    {
+        var states = _editItemStates!;
+        var current = states[index];
+        if (current == value)
+            return;
+
+        if (this.CellItemCheck is not null)
+        {
+            var args = new ItemCheckEventArgs(index, current, value);
+            this.OnCellItemCheck(args);
+            if (args.NewValue == current)
+                return;
+
+            value = args.NewValue;
+        }
+
+        states[index] = value;
+        _editAnchorIndex = index;
+    }
+
+    /// <summary>The picked items of a set-valued popup, in <see cref="DataGridViewColumn.ItemsSelector"/>
+    /// order — one array per commit, handed to the setter and never held on to.</summary>
+    private static object?[] PickedItems(IReadOnlyList<object?> choices, bool[] states)
+    {
+        var count = 0;
+        for (var i = 0; i < states.Length; ++i)
+            if (states[i])
+                ++count;
+
+        var picked = new object?[count];
+        var next = 0;
+        for (var i = 0; i < states.Length; ++i)
+            if (states[i])
+                picked[next++] = choices[i];
+
+        return picked;
     }
 
     private void OnEditPopupMouseMove(MouseEventArgs e)
@@ -2881,8 +3170,18 @@ public class DataGridView : OwnerDrawnControl
         _editPopup?.InvalidateAll();
     }
 
-    /// <summary>Reacts to light dismissal (click outside, grab loss, Escape): the surface is already
-    /// hidden, so the edit just ends without a write — dismissal cancels.</summary>
+    /// <summary>
+    /// Reacts to light dismissal (click outside, grab loss, Escape): the surface is already hidden, so
+    /// the edit just ends without a write — dismissal cancels, for every popup kind including the
+    /// set-valued ones.
+    /// </summary>
+    /// <remarks>
+    /// Committing the ticked set here instead would read better for a mouse-only user, but the
+    /// backends cannot agree on what dismissal means. A popup surface swallows Escape at its own
+    /// top-level on some of them and routes it to the grid on others, so "dismissal commits" would
+    /// make Escape abandon the edit on one backend and save it on the next — the one outcome a user
+    /// must never have to guess at. Dismissal therefore always abandons, and Enter is the commit.
+    /// </remarks>
     private void OnEditPopupDismissed()
     {
         _editPopupShown = false;
@@ -3224,7 +3523,45 @@ public class DataGridView : OwnerDrawnControl
                 return true;
             }
 
-            case DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DomainUpDown:
+            case DataGridViewColumnKind.CheckedListBox or DataGridViewColumnKind.ListBox when IsSetValued(column):
+            {
+                // The mirror image of the cell's own summary: split it back on the separator and map
+                // every piece onto a choice. One unknown piece fails the whole cell, so a partial set
+                // is never written.
+                if (column.ItemsSelector is null || column.CheckedItemsSetter is not { } setter)
+                    return false;
+
+                var choices = column.ItemsSelector(item);
+                var pieces = text.Split(',');
+                var states = new bool[choices.Count];
+                for (var p = 0; p < pieces.Length; ++p)
+                {
+                    var piece = pieces[p].Trim();
+                    if (piece.Length == 0)
+                        continue;
+
+                    var found = false;
+                    for (var i = 0; i < choices.Count; ++i)
+                        if (string.Equals(ChoiceDisplayText(column, choices[i]), piece, StringComparison.Ordinal))
+                        {
+                            states[i] = true;
+                            found = true;
+                            break;
+                        }
+
+                    if (!found)
+                        return false;
+                }
+
+                var picked = PickedItems(choices, states);
+                if (!this.ValidateCell(rowIndex, columnIndex, picked))
+                    return false;
+
+                setter(item, picked);
+                return true;
+            }
+
+            case DataGridViewColumnKind.ComboBox or DataGridViewColumnKind.DomainUpDown or DataGridViewColumnKind.ListBox:
             {
                 if (column.ItemsSelector is null || column.ValueSetter is not { } setter)
                     return false;

@@ -64,4 +64,24 @@ public enum DataGridViewColumnKind
     /// platform's native color dialog and commits the picked color through
     /// <see cref="DataGridViewColumn.ColorSetter"/>.</summary>
     Color,
+
+    /// <summary>
+    /// Text with a drop arrow; editing opens a taller, scrollable popup list of the choices from
+    /// <see cref="DataGridViewColumn.ItemsSelector"/>. Under
+    /// <see cref="Hawkynt.NativeForms.SelectionMode.One"/> (the default) the cell shows the single
+    /// value from <see cref="DataGridViewColumn.ValueSelector"/> and a click commits the picked one
+    /// through <see cref="DataGridViewColumn.ValueSetter"/>; under the multi-select modes the cell
+    /// shows the comma-joined summary of <see cref="DataGridViewColumn.CheckedItemsSelector"/> and
+    /// commits the whole picked set through <see cref="DataGridViewColumn.CheckedItemsSetter"/>.
+    /// </summary>
+    ListBox,
+
+    /// <summary>
+    /// A set-valued cell: it shows the comma-joined summary of the items
+    /// <see cref="DataGridViewColumn.CheckedItemsSelector"/> yields, and editing opens a popup
+    /// checked list over <see cref="DataGridViewColumn.ItemsSelector"/> whose ticks commit as a whole
+    /// set through <see cref="DataGridViewColumn.CheckedItemsSetter"/>. Every tick is announced
+    /// through the vetoable <see cref="DataGridView.CellItemCheck"/> event.
+    /// </summary>
+    CheckedListBox,
 }

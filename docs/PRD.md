@@ -335,14 +335,18 @@ strategy (may differ per platform; note exceptions inline).
       virtualized at 100k nodes, `SetDataSource` with reflection-free children selector +
       cycle-bounding depth guard; column sorting, interactive column resize, label editing pending
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
-  - [~] Column types (single `DataGridViewColumn` + `Kind` enum + per-kind selectors, one
+  - [x] Column types (single `DataGridViewColumn` + `Kind` enum + per-kind selectors, one
         allocation-free paint switch): [x] text, [x] image, [x] image+text, [x] check (toggle via
         setter, read-only-gated), [x] button (per-cell enabled à la
         `DataGridViewDisableButtonColumn`), [x] link, [x] multi-image (per-icon click index),
         [x] progress (shared `GlyphRenderer` fill), [x] combo (popup list),
         [x] numeric up-down (hosted editor), [x] date-time picker (CalendarCore popup),
         [x] masked text (hosted MaskedTextBox + per-column `Mask`), [x] domain up-down,
-        [x] color (swatch + native ColorDialog edit); radio/rating/tree cells deliberately out
+        [x] color (swatch + native ColorDialog edit), [x] list box (taller scrollable popup list,
+        single pick via `ValueSetter` or a whole set via `SelectionMode` +
+        `CheckedItemsSelector`/`CheckedItemsSetter`), [x] checked list box (popup checked list,
+        vetoable `CellItemCheck`, set commit, joined closed-cell summary); radio/rating/tree cells
+        deliberately out
   - [x] Read-only story: grid `ReadOnly`, column `ReadOnly`, per-cell `ReadOnlyCellSelector`
         row predicate — any level wins, WinForms semantics
   - [~] Per-row/cell presentation via lambdas (the `System.Windows.Forms.Extensions` attribute

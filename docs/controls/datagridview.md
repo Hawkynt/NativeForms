@@ -93,8 +93,9 @@ handlers stay stable while the grid is sorted or the columns are reordered.
 | `CellDoubleClick` | Raised when a cell is clicked twice within 500 ms. |
 | `CellContentClick` | Raised when the content of a check, button, link or multi-image cell is clicked; for multi-image cells `ContentIndex` names the icon (`-1` otherwise). |
 | `CellBeginEdit` | Raised before a cell enters edit mode; set `Cancel` to keep it read. |
-| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, the chosen item, or `DateTime`); set `Cancel` to veto the write and keep the cell in edit mode. |
+| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, the chosen item, `DateTime`, or — for the set-valued kinds — the whole `IReadOnlyList<object?>` of picked items); set `Cancel` to veto the write and keep the cell in edit mode. |
 | `CellEndEdit` | Raised after a cell leaves edit mode, whether the edit committed or was cancelled. |
+| `CellItemCheck` | Raised before an item's tick flips inside a `CheckedListBox` cell's popup — the grid-side sibling of `CheckedListBox.ItemCheck`, with the same veto shape (reset `NewValue` to `CurrentValue`). `Index` indexes the popup's item list; the cell is the one `SelectedRowIndex`/`CurrentColumnIndex` report while the popup is open. |
 | `CurrentCellDirtyStateChanged` | Raised when `IsCurrentCellDirty` flips — on the first editor change after the edit begins, and again when the edit ends. |
 | `RowValidating` | Raised before the current row is left for another one, carrying the row being left; set `Cancel` to keep the selection where it is. |
 | `RowValidated` | Raised after the current row was left without a `RowValidating` veto. |
@@ -154,9 +155,12 @@ Kind-specific content and editing members:
 | `ImagesSelector` | `Func<object?, IReadOnlyList<IImage>>?` | `MultiImage` | The icons painted side by side. Return a cached list — the selector runs on the paint path. |
 | `ProgressSelector` | `Func<object?, int>?` | `Progress` | The 0..100 fill; out-of-range values clamp. |
 | `TextSetter` | `Action<object?, string>?` | `Text` | Writes a committed edit back; `null` (the default) keeps the cell display-only. |
-| `ItemsSelector` | `Func<object?, IReadOnlyList<object?>>?` | `ComboBox` | The choices the popup offers. Return a cached list; required (with `ValueSetter`) to enter edit mode. |
-| `ItemDisplaySelector` | `Func<object?, string>?` | `ComboBox` | A choice's display text in the popup; `null` falls back to `ToString()`. |
-| `ValueSetter` | `Action<object?, object?>?` | `ComboBox` | Writes the picked choice back to the row item. |
+| `ItemsSelector` | `Func<object?, IReadOnlyList<object?>>?` | `ComboBox`, `DomainUpDown`, `ListBox`, `CheckedListBox` | The choices the popup (or spinner) offers. Return a cached list; required to enter edit mode. |
+| `ItemDisplaySelector` | `Func<object?, string>?` | `ComboBox`, `DomainUpDown`, `ListBox`, `CheckedListBox` | A choice's display text in the popup. `null` falls back to `ToString()`. For the two list kinds it also shapes the closed cell's text, so writing it drops the cached display text. |
+| `ValueSetter` | `Action<object?, object?>?` | `ComboBox`, `DomainUpDown`, single-select `ListBox` | Writes the picked choice back to the row item. |
+| `SelectionMode` | `SelectionMode` | `ListBox` | `One` (default) makes the cell single-valued; `MultiSimple`/`MultiExtended` make it set-valued; `None` makes it display-only. Ignored by every other kind. |
+| `CheckedItemsSelector` | `Func<object?, IReadOnlyList<object?>>?` | `CheckedListBox`, multi-select `ListBox` | The items currently in the cell's set. Their display texts, joined with `", "`, are the closed cell's text — cached per row, so this never runs on the paint path. |
+| `CheckedItemsSetter` | `Action<object?, IReadOnlyList<object?>>?` | `CheckedListBox`, multi-select `ListBox` | Writes the whole picked set back. The grid hands over a freshly allocated array in `ItemsSelector` order and keeps no reference to it. |
 | `NumberSelector` / `NumberSetter` | `Func<object?, decimal>?` / `Action<object?, decimal>?` | `NumericUpDown` | Seed and write-back of the hosted numeric editor; the written value is already clamped into [`Minimum`, `Maximum`]. |
 | `Minimum` / `Maximum` / `Increment` / `DecimalPlaces` | `decimal` ×3, `int` | `NumericUpDown` | Editor range (0..100), spinner/arrow step (1) and displayed digits (0). |
 | `DateSelector` / `DateSetter` | `Func<object?, DateTime>?` / `Action<object?, DateTime>?` | `DateTime` | Seed and write-back of the popup calendar; the picked day keeps the seed's time of day. |
@@ -179,6 +183,8 @@ Kind-specific content and editing members:
 | `MaskedText` | The value text | Edits in a hosted [`MaskedTextBox`](maskedtextbox.md) forcing the column's `Mask`; commits through `TextSetter`. |
 | `DomainUpDown` | The value as text | Edits in a hosted [`DomainUpDown`](domainupdown.md) over `ItemsSelector`'s choices; commits through `ValueSetter`. |
 | `Color` | A color swatch from `ColorSelector` | Edits through the platform's modal color dialog; the pick commits through `ColorSetter`, cancel writes nothing. |
+| `ListBox` | The picked value — or, when `SelectionMode` admits several, the comma-joined summary of the picked set — plus a drop arrow | Edits in a taller, scrollable popup list. A single-select cell commits the clicked row through `ValueSetter` at once; a multi-select one gathers the picks and commits them as a whole set through `CheckedItemsSetter`. |
+| `CheckedListBox` | The comma-joined summary of `CheckedItemsSelector`'s items, plus a drop arrow | Edits in a popup checked list; every tick runs the vetoable `CellItemCheck`, and the whole set commits through `CheckedItemsSetter`. |
 
 ## Notes
 
@@ -239,7 +245,8 @@ path — return cached values and capture nothing.
 
 `BeginEdit` hosts a `TextBox` (`Text`), `MaskedTextBox` (`MaskedText`), `NumericUpDown` or
 `DomainUpDown` over the cell, floats a popup below it — the choice list of a `ComboBox` cell, the
-month calendar of a `DateTime` cell — or opens the platform's modal color dialog (`Color`). It
+taller list of a `ListBox` or `CheckedListBox` cell, the month calendar of a `DateTime` cell — or
+opens the platform's modal color dialog (`Color`). It
 refuses (returning `false`) for read-only cells, kinds whose edit selectors/setters are unset (a
 `Text` column without `TextSetter` is display-only), merged or hidden rows, cells outside the
 visible window, a `CellBeginEdit` veto, or popup/dialog kinds before realization. An edit already
@@ -259,6 +266,20 @@ Enter on a combo choice, picking a day in the calendar — and light dismissal c
 runs `CellValidating` first; a veto keeps the cell (or popup) editing and writes nothing.
 `CellEndEdit` always closes the cycle. While a cell edits, the keyboard belongs to the edit; the
 hosted editor's bounds follow the cell under scroll and resize.
+
+The two set-valued kinds — `CheckedListBox`, and `ListBox` under `MultiSimple`/`MultiExtended` —
+accumulate their ticks in the popup and write nothing until the edit ends: **Enter commits the whole
+set, and light dismissal (Escape, a click outside) abandons it**, like every other popup kind.
+Committing on dismissal would read better for a mouse-only user, but the backends disagree on what
+dismissal is — a popup surface swallows Escape at its own top-level on some of them and routes it to
+the grid on others — so it would make Escape save the edit on one platform and abandon it on the
+next. Inside the popup a click toggles an item under `CheckedListBox` and `MultiSimple`;
+under `MultiExtended` a plain click replaces the picked set, Ctrl+click toggles and Shift+click
+picks the run from the anchor — the `ListBox` control's own gestures. Space toggles the row under
+the caret, Up/Down move it. The committed value is a freshly allocated `IReadOnlyList<object?>`
+holding the picked items in `ItemsSelector` order; the grid keeps no reference to it, so the setter
+may store it as-is. A single-select `ListBox` cell behaves exactly like a `ComboBox` one: the click
+commits at once and dismissal cancels.
 
 Row-level validation piggybacks on the current row: leaving it for another one raises the vetoable
 `RowValidating` (a `Cancel` keeps the selection where it is), then `RowValidated` once the move
@@ -291,6 +312,10 @@ Up/Down move the selection by one display row, PageUp/PageDown by one visible pa
 edges — always skipping hidden, unselectable and merged rows; Shift extends under `MultiSelect`.
 Space/Enter raise `CellClick` on the current cell, F2 edits it, printable characters start a text or
 numeric edit.
+
+Copy and paste round-trip the set-valued kinds through the same summary the cell shows: `Paste`
+splits the text on commas, trims each piece and maps it onto a choice, writing the whole set at
+once. One unrecognised piece fails the cell, so a partial set is never written.
 
 `GetClipboardContent()` renders the selection as text: one line per selected row in display order,
 the cells in display column order through the usual display selectors, joined with tabs; merged
@@ -328,8 +353,9 @@ data model is deliberately different, in service of trim-safety and constant mem
   `CellValueChanged` (the setter *is* the value change — react there) and no `CellParsing`
   (conversion is the column kind's job); `CellFormatting` exists as the `FormatSelector` lambda,
   not an event.
-- **Selection is full-row only.** No `SelectionMode`, no cell/column selection. `MultiSelect`
-  defaults to `false` (WinForms: `true`), and the selection readout is
+- **Selection is full-row only.** The grid has no `SelectionMode` and no cell/column selection —
+  `DataGridViewColumn.SelectionMode` is unrelated: it governs how a `ListBox` cell's *popup* picks.
+  `MultiSelect` defaults to `false` (WinForms: `true`), and the selection readout is
   `SelectedItem`/`SelectedItems` — no `SelectedRows`/`SelectedCells` collections.
 - **No new-row placeholder.** `AllowUserToAddRows`/`AllowUserToDeleteRows` and the `*` row do not
   exist — mutate `Items` instead.

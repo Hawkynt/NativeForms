@@ -256,6 +256,49 @@ internal sealed class DataGridViewPresentationTests
         Assert.That(textOps, Is.LessThan(32), $"rendered {textOps} text ops for 100000 rows");
     }
 
+    [Test]
+    public void Virtualization_stays_bounded_with_the_list_column_kinds()
+    {
+        // The set-valued kinds build their summary from a whole item collection, so a naive
+        // implementation would touch every row at 100k. The display-text cache is per row and only
+        // filled for the visible window, so the paint still only ever sees a handful of them.
+        var choices = new object?[] { "Alpha", "Beta", "Gamma" };
+        var summarised = 0;
+        var grid = new DataGridView { Bounds = new(0, 0, 320, 110) };
+        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Person)o!).Name));
+        grid.Columns.Add(new DataGridViewColumn("Pick", static o => ((Person)o!).Name)
+        {
+            Kind = DataGridViewColumnKind.ListBox,
+            Width = 80,
+            ItemsSelector = _ => choices,
+            ValueSetter = static (_, _) => { },
+        });
+        grid.Columns.Add(new DataGridViewColumn("Tags", static _ => null)
+        {
+            Kind = DataGridViewColumnKind.CheckedListBox,
+            Width = 80,
+            ItemsSelector = _ => choices,
+            CheckedItemsSelector = _ =>
+            {
+                ++summarised;
+                return choices;
+            },
+            CheckedItemsSetter = static (_, _) => { },
+        });
+        for (var i = 0; i < 100_000; ++i)
+            grid.Items.Add(new Person($"P{i}", i));
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        var textOps = g.Operations.FindAll(static o => o.StartsWith("text ")).Count;
+        Assert.Multiple(() =>
+        {
+            Assert.That(textOps, Is.LessThan(32), $"rendered {textOps} text ops for 100000 rows");
+            Assert.That(summarised, Is.LessThan(16), $"summarised {summarised} of 100000 rows");
+        });
+    }
+
     private static HeadlessBackend RealizeWithBackend(OwnerDrawnControl control)
     {
         var backend = new HeadlessBackend();

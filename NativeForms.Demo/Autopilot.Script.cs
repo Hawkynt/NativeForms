@@ -725,6 +725,79 @@ internal sealed partial class Autopilot
                 this.Read(() => status.Text).Contains("\"Docs\" clicked", StringComparison.Ordinal));
         });
 
+        this.Check("DataGridView: a list cell opens its popup anchored under the cell and a click commits the pick", () =>
+        {
+            var cell = this.Read(() => grid.GetCellBounds(3, 6));
+            var item = this.Read(() => grid.Items[3]);
+            var selector = this.Read(() => grid.Columns[6].ValueSelector);
+            var before = this.Read(() => selector(item));
+
+            var popup = this.OpenCellEditorPopup(grid, 3, 6);
+            if (popup == 0)
+                return;
+
+            var anchor = this.ScreenOf(grid, cell.X, cell.Bottom);
+            var origin = this.Read(() => Injection.WindowBounds(popup)).Location;
+            if (Math.Abs(origin.X - anchor.X) > _AnchorTolerance || Math.Abs(origin.Y - anchor.Y) > _AnchorTolerance)
+                this.Fail($"the list popup opened at {anchor} but its surface sits at {origin}");
+
+            var bounds = this.Read(() => Injection.WindowBounds(popup));
+            var rowHeight = this.Read(() => Theme.RowHeight);
+            this.Screenshot("state-grid-listcolumn-popup");
+            this.ClickAt(new(bounds.X + 20, bounds.Y + (rowHeight / 2))); // the first owner, "Alice"
+            this.ExpectTrue("the list popup stayed open after a row was clicked", !this.Read(() => grid.IsEditing));
+            this.ExpectChanged("the bound item's Owner", before, this.Read(() => selector(item)));
+            this.Expect("the committed owner", this.Read(() => selector(item)), "Alice");
+        });
+
+        this.Check("DataGridView: a checked-list cell ticks several items and commits them as one set", () =>
+        {
+            var item = this.Read(() => grid.Items[3]);
+            var selector = this.Read(() => grid.Columns[7].CheckedItemsSelector!);
+            var before = this.Read(() => Count(selector(item)));
+
+            var popup = this.OpenCellEditorPopup(grid, 3, 7);
+            if (popup == 0)
+                return;
+
+            var bounds = this.Read(() => Injection.WindowBounds(popup));
+            var rowHeight = this.Read(() => Theme.RowHeight);
+            // The row starts on "Docs" alone; ticking "UX" and "Risk" must leave the cell untouched
+            // until the popup closes, and then arrive as one three-item set in ItemsSelector order.
+            this.ClickAt(new(bounds.X + 20, bounds.Y + rowHeight + (rowHeight / 2)));       // tick "UX"
+            this.ClickAt(new(bounds.X + 20, bounds.Y + (rowHeight * 3) + (rowHeight / 2))); // tick "Risk"
+            this.Screenshot("state-grid-checkedlistcolumn-popup");
+            this.Expect("the label count while the popup is still open", this.Read(() => Count(selector(item))), before);
+
+            this.Key(KeySym.Return);
+            this.ExpectTrue("the checked-list popup stayed open after Enter", !this.Read(() => grid.IsEditing));
+            var after = this.Read(() => selector(item));
+            this.Expect("the size of the committed label set", Count(after), 3);
+            this.Expect("the first committed label", this.Read(() => after[0]), "Docs");
+            this.Expect("the last committed label", this.Read(() => after[2]), "Risk");
+        });
+
+        this.Check("DataGridView: Escape abandons a checked-list edit instead of committing its ticks", () =>
+        {
+            // Escape has to reach the grid rather than merely dismissing the popup: for the
+            // set-valued kinds dismissal *commits*, so a backend that swallowed Escape at the popup
+            // top-level would silently turn "abandon" into "save".
+            var item = this.Read(() => grid.Items[5]);
+            var selector = this.Read(() => grid.Columns[7].CheckedItemsSelector!);
+            var before = this.Read(() => Count(selector(item)));
+
+            var popup = this.OpenCellEditorPopup(grid, 5, 7);
+            if (popup == 0)
+                return;
+
+            var bounds = this.Read(() => Injection.WindowBounds(popup));
+            var rowHeight = this.Read(() => Theme.RowHeight);
+            this.ClickAt(new(bounds.X + 20, bounds.Y + (rowHeight * 2) + (rowHeight / 2))); // tick "Perf"
+            this.Key(KeySym.Escape);
+            this.ExpectTrue("the popup stayed open after Escape", !this.Read(() => grid.IsEditing));
+            this.Expect("the label count after Escape", this.Read(() => Count(selector(item))), before);
+        });
+
         this.Check("DataGridView: typing into a numeric cell edits it and Enter commits", () =>
         {
             var cell = this.Read(() => grid.GetCellBounds(4, 3));
@@ -798,7 +871,7 @@ internal sealed partial class Autopilot
             this.ExpectTrue("the grid already scrolls horizontally, so the frozen column cannot be proved", !this.Read(() => grid.IsHorizontalScrollBarVisible));
             this.Drag(grid, new(edge - 1, headerHeight / 2), new(edge + 320, headerHeight / 2));
             this.ExpectTrue(
-                $"widening the last column by 320 px should make the grid scroll horizontally (Docs is now {this.Read(() => grid.Columns[5].Width)} px wide)",
+                $"widening the last column by 320 px should make the grid scroll horizontally (Labels is now {this.Read(() => grid.Columns[7].Width)} px wide)",
                 this.Read(() => grid.IsHorizontalScrollBarVisible));
         });
 
@@ -1220,6 +1293,37 @@ internal sealed partial class Autopilot
         var origin = this.Read(() => Injection.WindowBounds(popups[0])).Location;
         if (Math.Abs(origin.X - anchor.X) > _AnchorTolerance || Math.Abs(origin.Y - anchor.Y) > _AnchorTolerance)
             this.Fail($"{what}: opened at {anchor} but its surface sits at {origin}");
+    }
+
+    /// <summary>
+    /// Opens a grid cell's editor by double-clicking it — the classic grid's own open gesture, and
+    /// the one that works on every backend — and returns the popup toplevel that appeared, or 0
+    /// having already reported the failure. The two popup-list column kinds are driven through this,
+    /// so a cell that refuses to edit at all is told apart from a popup that opened somewhere
+    /// unexpected.
+    /// </summary>
+    private nint OpenCellEditorPopup(DataGridView grid, int rowIndex, int columnIndex)
+    {
+        var cell = this.Read(() => grid.GetCellBounds(rowIndex, columnIndex));
+        var screen = this.ScreenOf(grid, cell.X + (cell.Width / 2), cell.Y + (cell.Height / 2));
+
+        // Two ordinary clicks, never a synthetic GDK double-press on top of them: the grid times the
+        // double-click itself, and a third press inside the gesture would land on the grid while the
+        // editor is already up — which the grid rightly reads as a press outside the editor and closes it.
+        this.ClickAt(screen);
+        var phases = this.ProbeOpen(screen, () => grid.IsEditing);
+        if (!this.Read(() => grid.IsEditing))
+        {
+            this.Fail($"a double-click on cell ({rowIndex},{columnIndex}) did not leave an edit open — {DropDownPhases("editor", phases)}");
+            return 0;
+        }
+
+        var popups = this.Popups();
+        if (popups.Count != 0)
+            return popups[0];
+
+        this.Fail($"cell ({rowIndex},{columnIndex}) edits, but no popup toplevel is on screen for it");
+        return 0;
     }
 
     /// <summary>Names the phase in which a drop-down lost its open state, for the failure line.</summary>

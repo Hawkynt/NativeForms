@@ -178,8 +178,56 @@ public sealed class DataGridViewColumn
     public Func<object?, IReadOnlyList<object?>>? ItemsSelector { get; set; }
 
     /// <summary>Maps a <see cref="ItemsSelector"/> choice to its display text in the popup list;
-    /// <see langword="null"/> falls back to <c>ToString()</c>.</summary>
-    public Func<object?, string>? ItemDisplaySelector { get; set; }
+    /// <see langword="null"/> falls back to <c>ToString()</c>. It also shapes the closed cell's text
+    /// for the <see cref="DataGridViewColumnKind.ListBox"/> and
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> kinds, so writing it drops the cached
+    /// display text.</summary>
+    public Func<object?, string>? ItemDisplaySelector
+    {
+        get => field;
+        set
+        {
+            field = value;
+            this.DisplayTextCache = null;
+        }
+    }
+
+    /// <summary>
+    /// How a <see cref="DataGridViewColumnKind.ListBox"/> cell's popup lets the user pick:
+    /// <see cref="Hawkynt.NativeForms.SelectionMode.One"/> (the default) is a single pick committed
+    /// through <see cref="ValueSetter"/>; <see cref="Hawkynt.NativeForms.SelectionMode.MultiSimple"/>
+    /// and <see cref="Hawkynt.NativeForms.SelectionMode.MultiExtended"/> turn the cell into a
+    /// set-valued one — read through <see cref="CheckedItemsSelector"/>, committed through
+    /// <see cref="CheckedItemsSetter"/> — and
+    /// <see cref="Hawkynt.NativeForms.SelectionMode.None"/> makes it display-only. Ignored by every
+    /// other kind (a <see cref="DataGridViewColumnKind.CheckedListBox"/> cell is always set-valued).
+    /// </summary>
+    public SelectionMode SelectionMode { get; set; } = SelectionMode.One;
+
+    /// <summary>
+    /// Maps a row item to the items currently in the set of a
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> — or multi-select
+    /// <see cref="DataGridViewColumnKind.ListBox"/> — cell. The cell's text is those items' display
+    /// texts joined with <c>", "</c>, cached per row, so the selector never runs on the paint path.
+    /// </summary>
+    public Func<object?, IReadOnlyList<object?>>? CheckedItemsSelector
+    {
+        get => field;
+        set
+        {
+            field = value;
+            this.DisplayTextCache = null;
+        }
+    }
+
+    /// <summary>
+    /// Writes the whole picked set back to the row item when a
+    /// <see cref="DataGridViewColumnKind.CheckedListBox"/> — or multi-select
+    /// <see cref="DataGridViewColumnKind.ListBox"/> — cell commits. The grid hands over a freshly
+    /// allocated array holding the picked items in <see cref="ItemsSelector"/> order and keeps no
+    /// reference to it, so the setter may store it as-is.
+    /// </summary>
+    public Action<object?, IReadOnlyList<object?>>? CheckedItemsSetter { get; set; }
 
     /// <summary>Writes the choice picked in a <see cref="DataGridViewColumnKind.ComboBox"/> editor
     /// back to the row item (row item, chosen value).</summary>
