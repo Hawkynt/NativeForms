@@ -21,8 +21,8 @@ internal sealed class GtkTheme : ITheme
         var widget = NativeMethods.gtk_label_new(string.Empty);
         var context = NativeMethods.gtk_widget_get_style_context(widget);
 
-        var foreground = ReadForeground(context, _fallback.ControlText);
         var background = ReadColor(context, "theme_bg_color", _fallback.ControlBackground);
+        var foreground = ReadForeground(context, background, _fallback.ControlText);
         var baseColor = ReadColor(context, "theme_base_color", _fallback.FieldBackground);
         var selectionBg = ReadColor(context, "theme_selected_bg_color", _fallback.SelectionBackground);
         var selectionFg = ReadColor(context, "theme_selected_fg_color", _fallback.SelectionText);
@@ -102,14 +102,49 @@ internal sealed class GtkTheme : ITheme
     private static Color ReadColor(nint context, string name, Color fallback)
         => NativeMethods.gtk_style_context_lookup_color(context, name, out var rgba) != 0 ? ToColor(rgba) : fallback;
 
-    /// <summary>Reads the style context's foreground (text) color for the normal state.</summary>
-    private static Color ReadForeground(nint context, Color fallback)
+    /// <summary>
+    /// The text color to pair with <paramref name="background"/>, taken from the theme's named
+    /// <c>theme_fg_color</c> first and from the style context's own foreground only as a second
+    /// choice, with a contrast guard behind both.
+    /// </summary>
+    /// <remarks>
+    /// The named color is asked first because it is the exact counterpart of the
+    /// <c>theme_bg_color</c> the background comes from, so the two are guaranteed to be a pair the
+    /// theme intended. <c>gtk_style_context_get_color</c> is not: the context here belongs to an
+    /// unparented widget that never joined a window, and with no CSS node path to resolve against,
+    /// Adwaita hands back plain white — which then painted white captions onto the light grey
+    /// <c>theme_bg_color</c>, leaving every owner-drawn control's text invisible while the native
+    /// widgets beside them (styled by GTK itself) stayed black. The final contrast check catches the
+    /// same class of failure in any theme, whichever source produced the color.
+    /// </remarks>
+    private static Color ReadForeground(nint context, Color background, Color fallback)
     {
-        NativeMethods.gtk_style_context_get_color(context, NativeMethods.GTK_STATE_FLAG_NORMAL, out var rgba);
+        if (HasContrast(ReadColor(context, "theme_fg_color", Color.Empty), background, out var named))
+            return named;
 
-        // A fully transparent result means the context had nothing to offer; use the fallback.
-        return rgba.Alpha <= 0 ? fallback : ToColor(rgba);
+        NativeMethods.gtk_style_context_get_color(context, NativeMethods.GTK_STATE_FLAG_NORMAL, out var rgba);
+        if (rgba.Alpha > 0 && HasContrast(ToColor(rgba), background, out var queried))
+            return queried;
+
+        return fallback;
     }
+
+    /// <summary>The smallest perceived-brightness gap (0..255) a text color must keep from its
+    /// background to count as legible.</summary>
+    private const int _MinBrightnessGap = 48;
+
+    /// <summary>Whether <paramref name="candidate"/> is a real color that stands out from
+    /// <paramref name="background"/>, passing it through when it does.</summary>
+    private static bool HasContrast(Color candidate, Color background, out Color usable)
+    {
+        usable = candidate;
+        return !candidate.IsEmpty
+            && candidate.A > 0
+            && Math.Abs(Brightness(candidate) - Brightness(background)) >= _MinBrightnessGap;
+    }
+
+    /// <summary>Rec. 601 perceived brightness, the cheap luminance stand-in for a contrast test.</summary>
+    private static int Brightness(Color color) => ((color.R * 299) + (color.G * 587) + (color.B * 114)) / 1000;
 
     /// <summary>Converts a GDK 0..1 RGBA to a 0..255 <see cref="Color"/>.</summary>
     private static Color ToColor(GdkRGBA rgba)

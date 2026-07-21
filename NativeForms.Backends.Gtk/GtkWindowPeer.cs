@@ -98,8 +98,21 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
             peer.Realize(_fixed);
     }
 
-    /// <inheritdoc />
-    public void Show() => NativeMethods.gtk_widget_show_all(_widget);
+    /// <summary>
+    /// Maps the window and its content area, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <c>gtk_widget_show_all</c>: that walks the whole descendant tree and shows
+    /// every widget in it, overriding the ones the toolkit hid on purpose — the four unselected
+    /// <c>TabPage</c>s, a collapsed <c>Expander</c>'s children, anything with
+    /// <c>Control.Visible = false</c>. The children do not need the recursion anyway, because every
+    /// child peer applies its own buffered visibility as it is realized into its parent.
+    /// </remarks>
+    public void Show()
+    {
+        NativeMethods.gtk_widget_show(_fixed);
+        NativeMethods.gtk_widget_show(_widget);
+    }
 
     /// <inheritdoc />
     public void SetBorderStyle(FormBorderStyle borderStyle)

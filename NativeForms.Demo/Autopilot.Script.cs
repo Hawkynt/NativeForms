@@ -27,6 +27,9 @@ internal sealed partial class Autopilot
         this.DriveLayout();
         this.DriveChrome();
         this.DriveModalDialog();
+        this.DriveTextEntry();
+        this.RunAudit();
+        this.CaptureGallery();
     }
 
     // --- Tab navigation -------------------------------------------------------------------------
@@ -209,7 +212,7 @@ internal sealed partial class Autopilot
             this.ExpectNear("the menu's top edge against the cursor", bounds.Y, cursor.Y, 4);
         });
 
-        this.Screenshot("basics-context-menu");
+        this.Screenshot("state-basics-context-menu");
 
         this.Check("ContextMenuStrip: clicking an item runs it and closes the cascade", () =>
         {
@@ -427,7 +430,7 @@ internal sealed partial class Autopilot
             this.CheckProgrammaticOpen("the calendar", () => picker.DroppedDown, picker.OpenDropDown);
         });
 
-        this.Screenshot("input-datetimepicker-dropdown");
+        this.Screenshot("state-input-datetimepicker-dropdown");
 
         this.Check("DateTimePicker: picking a day in the drop-down commits it and closes up", () =>
         {
@@ -529,7 +532,7 @@ internal sealed partial class Autopilot
             this.CheckProgrammaticOpen("the list", () => combo.DroppedDown, combo.OpenDropDown);
         });
 
-        this.Screenshot("lists-combobox-dropdown");
+        this.Screenshot("state-lists-combobox-dropdown");
 
         this.Check("ComboBox: clicking a row picks it and closes the drop-down", () =>
         {
@@ -815,7 +818,7 @@ internal sealed partial class Autopilot
                 this.Read(() => grid.GetCellBounds(3, 3)).X < looseBefore.X);
         });
 
-        this.Screenshot("grid-scrolled");
+        this.Screenshot("state-grid-scrolled");
     }
 
     // --- Layout ---------------------------------------------------------------------------------
@@ -904,7 +907,7 @@ internal sealed partial class Autopilot
             this.Expect("the widget a press on the re-expanded Host text box reaches", expandedLanding, "GtkEntry");
         });
 
-        this.Screenshot("layout-expander");
+        this.Screenshot("state-layout-expander");
 
         var panel = _form.Part<Panel>("layout.scrollPanel");
 
@@ -975,7 +978,7 @@ internal sealed partial class Autopilot
             this.ExpectTrue("no popup toplevel appeared for the File menu", this.WaitForPopup() != 0);
         });
 
-        this.Screenshot("chrome-file-menu");
+        this.Screenshot("state-chrome-file-menu");
 
         this.Check("MenuStrip: clicking New runs the item and closes the menu", () =>
         {
@@ -1128,7 +1131,7 @@ internal sealed partial class Autopilot
                 return;
             }
 
-            this.Screenshot("dialog-messagebox");
+            this.Screenshot("state-dialog-messagebox");
             this.KeyInto(dialog, KeySym.Escape);
 
             var deadline = Environment.TickCount64 + 4000;

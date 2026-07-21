@@ -122,9 +122,9 @@ internal sealed partial class MainForm
         grid.SelectedRowIndex = 1;
 
         page.Controls.AddRange(
-            Caption("DataGridView — click the Task header to sort; the column stays frozen.", 16, 12),
+            Caption("DataGridView — click the Task header to sort; the column stays frozen.", 16, 12, 540),
             grid,
-            Caption("Check and Hours cells write back into the bound items.", 16, 544));
+            Caption("Check and Hours cells write back into the bound items.", 16, 544, 420));
 
         this.Publish("grid.page", page);
         this.Publish("grid.grid", grid);

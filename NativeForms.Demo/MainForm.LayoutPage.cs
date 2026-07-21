@@ -23,7 +23,9 @@ internal sealed partial class MainForm
         };
         for (var i = 1; i <= 12; ++i)
         {
-            var button = new Button { Size = new(64, 26), Margin = new(4), Text = $"Flow {i}" };
+            // Wide enough for the two-digit captions once the GtkButton's own frame and padding are
+            // paid for: "Flow 10" in the original 64 px box came out as "Fl…".
+            var button = new Button { Size = new(92, 26), Margin = new(4), Text = $"Flow {i}" };
             flow.Controls.Add(button);
         }
 
@@ -34,7 +36,9 @@ internal sealed partial class MainForm
             RowCount = 3,
             CellBorderStyle = TableLayoutPanelCellBorderStyle.Single,
         };
-        table.ColumnStyles.Add(new(SizeType.Absolute, 120));
+        // 150 rather than 120: the RowSpan button lives in this column and a GtkButton needs its
+        // caption plus its own frame, which 120 px did not cover ("RowSpan …").
+        table.ColumnStyles.Add(new(SizeType.Absolute, 150));
         table.ColumnStyles.Add(new(SizeType.Percent, 40));
         table.ColumnStyles.Add(new(SizeType.Percent, 60));
         table.RowStyles.Add(new(SizeType.Absolute, 40));
@@ -42,7 +46,7 @@ internal sealed partial class MainForm
         table.RowStyles.Add(new(SizeType.Percent, 50));
         var spanWide = new Button { Text = "ColumnSpan = 2", Margin = new(2) };
         var spanTall = new Button { Text = "RowSpan = 2", Margin = new(2) };
-        table.Controls.Add(new Label { Text = "120 px", Margin = new(2), TextAlign = ContentAlignment.MiddleCenter });
+        table.Controls.Add(new Label { Text = "150 px", Margin = new(2), TextAlign = ContentAlignment.MiddleCenter });
         table.Controls.Add(spanWide);
         table.Controls.Add(spanTall);
         table.Controls.Add(new Button { Text = "40 %", Margin = new(2) });
@@ -61,13 +65,13 @@ internal sealed partial class MainForm
         split.Panel1.BorderStyle = BorderStyle.FixedSingle;
         split.Panel2.BorderStyle = BorderStyle.FixedSingle;
         split.Panel1.Controls.Add(new Label { Bounds = new(8, 8, 160, 20), Text = "Panel1 (180 px)" });
-        split.Panel2.Controls.Add(new Label { Bounds = new(8, 8, 200, 20), Text = "Panel2 (drag the splitter)" });
+        split.Panel2.Controls.Add(new Label { Bounds = new(8, 8, 170, 20), Text = "Panel2 (drag the bar)" });
         split.SplitterMoved += (_, _) => this.SetStatus($"SplitContainer: splitter at {split.SplitterDistance} px.");
 
         page.Controls.AddRange(
             Caption("FlowLayoutPanel (12 wrapping buttons)", 16, 12),
             flow,
-            Caption("TableLayoutPanel (3×3, styles + spans + borders)", 16, 158),
+            Caption("TableLayoutPanel (3×3, styles + spans + borders)", 16, 158, 460),
             table,
             Caption("SplitContainer", 16, 364),
             split);

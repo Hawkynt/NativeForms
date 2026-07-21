@@ -77,6 +77,11 @@ internal sealed partial class MainForm : Form
             this.BuildGridPage(),
             this.BuildLayoutPage());
 
+        // Building the pages set initial selections, and those raised the same change events a user
+        // click does — so the status line already carried a grid message before anyone touched
+        // anything. Reset it now that the gallery is assembled.
+        this.SetStatus("Ready.");
+
         this.Controls.AddRange(_menu, _tools, _tabs, _status);
         this.Publish("chrome.tabs", _tabs);
         this.Publish("chrome.menu", _menu);
@@ -125,9 +130,23 @@ internal sealed partial class MainForm : Form
     /// <summary>Reports a one-line message into the status strip.</summary>
     private void SetStatus(string text) => _statusLabel.Text = text;
 
-    /// <summary>Adds a section caption label to a parent at the given position.</summary>
-    private static Label Caption(string text, int x, int y)
-        => new() { Bounds = new(x, y, 300, 18), Text = text };
+    /// <summary>The width a section caption gets when the call does not ask for a wider one. It is
+    /// the column pitch the pages are laid out on, so a caption never reaches into the next column.</summary>
+    private const int _CaptionWidth = 300;
+
+    /// <summary>
+    /// Adds a section caption label to a parent at the given position, <paramref name="width"/> px
+    /// wide.
+    /// </summary>
+    /// <remarks>
+    /// The width is a parameter rather than a constant because a native <c>GtkLabel</c> elides a
+    /// caption that does not fit into "TableLayoutPanel (3×3, styles + spans +…" instead of
+    /// overflowing it, so a box too small for its text silently loses the text. Callers with a long
+    /// caption pass the room it actually needs; the autopilot's layout audit measures every caption
+    /// against its box and fails when one of them is short.
+    /// </remarks>
+    private static Label Caption(string text, int x, int y, int width = _CaptionWidth)
+        => new() { Bounds = new(x, y, width, 18), Text = text };
 
     // --- Chrome -----------------------------------------------------------------------------------
 

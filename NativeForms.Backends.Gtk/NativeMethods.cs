@@ -186,6 +186,10 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_show_all(nint widget);
 
+    /// <summary>Shows <paramref name="widget"/> itself, leaving its descendants' own flags alone.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_show(nint widget);
+
     /// <summary>Shows or hides a widget (<c>gboolean</c> is passed as 1/0).</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_set_visible(nint widget, int visible);

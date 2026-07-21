@@ -53,6 +53,14 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
     /// <summary>The view's <c>GtkTextBuffer</c> (owned by the view).</summary>
     private nint Buffer => NativeMethods.gtk_text_view_get_buffer(_textView);
 
+    /// <summary>
+    /// The <c>GtkTextView</c>, not the <c>GtkScrolledWindow</c> wrapped around it: the view is what
+    /// actually takes the keyboard focus when the control is clicked, so the focus signals have to be
+    /// connected there. Left at the default, the scrolled window never emits "focus-in-event" and the
+    /// control reported <see cref="Control.Focused"/> as false while the user was typing into it.
+    /// </summary>
+    private protected override nint FocusWidget => _textView;
+
     /// <inheritdoc />
     protected override nint CreateWidget()
     {

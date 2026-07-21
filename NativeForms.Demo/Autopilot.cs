@@ -61,6 +61,7 @@ internal sealed partial class Autopilot
     private readonly List<string> _issues = [];
     private readonly List<string> _landings = [];
     private readonly List<string> _failedChecks = [];
+    private readonly List<string> _captureFailures = [];
     private nint _root;
     private int _passed;
     private int _failed;
@@ -93,7 +94,7 @@ internal sealed partial class Autopilot
 
             Console.WriteLine($"autopilot: driving \"{_WindowTitle}\" at {Injection.WindowBounds(_root)}");
             Console.WriteLine();
-            this.Screenshot("startup");
+            this.Screenshot("state-startup");
             this.RunScript();
         }
         catch (Exception e)
@@ -121,10 +122,17 @@ internal sealed partial class Autopilot
             Console.WriteLine();
         }
 
+        if (_captureFailures.Count > 0)
+        {
+            Console.WriteLine($"Captures that produced no file: {string.Join(", ", _captureFailures)}");
+            Console.WriteLine();
+        }
+
+        Console.WriteLine($"autopilot captures: {_shots} PNG(s) written to {_ShotDirectory}");
         Console.WriteLine(
             $"autopilot summary: {_passed + _failed} checks, {_passed} passed, {_failed} failed "
             + $"in {_clock.Elapsed.TotalSeconds:F1} s");
-        ExitCode = _failed == 0 ? 0 : 1;
+        ExitCode = _failed == 0 && _captureFailures.Count == 0 ? 0 : 1;
     }
 
     /// <summary>Closes the gallery, ending the process.</summary>
@@ -499,27 +507,32 @@ internal sealed partial class Autopilot
 
     // --- Screenshots ----------------------------------------------------------------------------
 
-    /// <summary>Captures the whole screen through ImageMagick's <c>import</c>, best effort.</summary>
+    /// <summary>
+    /// Writes a PNG of the gallery and every popup stacked over it, by asking the widgets to paint
+    /// into a Cairo image surface on the UI thread. Nothing outside the process is involved, so the
+    /// capture works on a display no screenshot tool can read — a rootless Xwayland server, say.
+    /// </summary>
     private void Screenshot(string name)
     {
+        var path = Path.Combine(_ShotDirectory, $"{name}.png");
         try
         {
-            Directory.CreateDirectory(_ShotDirectory);
-            var path = Path.Combine(_ShotDirectory, $"{++_shots:00}-{name}.png");
-            using var process = Process.Start(new ProcessStartInfo("import")
+            Size? size = null;
+            this.Pump("a capture", () => size = Capture.Toplevels(_root, path));
+            if (size is { } written)
             {
-                ArgumentList = { "-window", "root", path },
-                RedirectStandardError = true,
-            });
-
-            if (process is null || !process.WaitForExit(5000))
+                ++_shots;
+                Console.WriteLine($"      capture: {path} ({written.Width}×{written.Height})");
                 return;
+            }
 
-            Console.WriteLine($"      screenshot: {path}");
+            Console.WriteLine($"      capture failed: {path} — nothing mapped was drawable");
+            _captureFailures.Add(name);
         }
         catch (Exception e)
         {
-            Console.WriteLine($"      screenshot skipped: {e.Message}");
+            Console.WriteLine($"      capture failed: {path} — {e.Message}");
+            _captureFailures.Add(name);
         }
     }
 }
