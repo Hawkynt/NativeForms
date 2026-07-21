@@ -269,6 +269,20 @@ internal sealed partial class Autopilot
     /// that deliberately blocks, such as the one opening a modal dialog.</summary>
     private void Post(Action action) => _form.BeginInvoke(action);
 
+    /// <summary>
+    /// The display index of the grid column with this header. Checks name their column instead of
+    /// hard-coding an index, so inserting a column upstream cannot silently retarget a gesture at
+    /// the wrong cell.
+    /// </summary>
+    private int GridColumn(DataGridView grid, string header) => this.Read(() =>
+    {
+        for (var i = 0; i < grid.Columns.Count; ++i)
+            if (string.Equals(grid.Columns[i].HeaderText, header, StringComparison.Ordinal))
+                return i;
+
+        return -1;
+    });
+
     /// <summary>Reads a value off the UI thread.</summary>
     private T Read<T>(Func<T> getter)
     {

@@ -88,6 +88,7 @@ public class DataGridView : OwnerDrawnControl
     private TextBox? _textEditor;
     private NumericUpDown? _numericEditor;
     private DomainUpDown? _domainEditor;
+    private TimePicker? _timeEditor;
     private bool _editDirty;
     private IPopupPeer? _editPopup;
     private bool _editPopupShown;
@@ -540,6 +541,7 @@ public class DataGridView : OwnerDrawnControl
     /// <see langword="null"/> (popup- and dialog-based kinds host no child control).</summary>
     public Control? EditingControl => _textEditor is not null ? _textEditor
         : _numericEditor is not null ? _numericEditor
+        : _timeEditor is not null ? _timeEditor
         : _domainEditor;
 
     /// <summary>Raises <see cref="SelectionChanged"/>.</summary>
@@ -2265,6 +2267,24 @@ public class DataGridView : OwnerDrawnControl
                 break;
             }
 
+            case DataGridViewColumnKind.TimePicker:
+            {
+                var editor = new TimePicker
+                {
+                    ShowSeconds = column.ShowSeconds,
+                    Use24HourClock = column.Use24HourClock,
+                    MaxTime = column.MaxTime,
+                    MinTime = column.MinTime,
+                    Value = column.TimeSelector!(item),
+                    Bounds = cellBounds,
+                    TabStop = false,
+                };
+                _timeEditor = editor;
+                this.Controls.Add(editor);
+                editor.ValueChanged += this.OnEditorTextChanged; // the field has no text; a step is the edit
+                break;
+            }
+
             case DataGridViewColumnKind.DomainUpDown:
             {
                 var choices = column.ItemsSelector!(item);
@@ -2347,6 +2367,16 @@ public class DataGridView : OwnerDrawnControl
                 break;
             }
 
+            case DataGridViewColumnKind.TimePicker:
+            {
+                var value = _timeEditor!.Value;
+                if (!this.ValidateCell(rowIndex, columnIndex, value))
+                    return false;
+
+                column.TimeSetter!(item, value);
+                break;
+            }
+
             case DataGridViewColumnKind.DomainUpDown:
             {
                 // Match the editor's text against the choices, like the editor's own commit points
@@ -2412,6 +2442,7 @@ public class DataGridView : OwnerDrawnControl
         },
         DataGridViewColumnKind.CheckedListBox => column.ItemsSelector is not null && column.CheckedItemsSelector is not null && column.CheckedItemsSetter is not null,
         DataGridViewColumnKind.NumericUpDown => column.NumberSelector is not null && column.NumberSetter is not null,
+        DataGridViewColumnKind.TimePicker => column.TimeSelector is not null && column.TimeSetter is not null,
         DataGridViewColumnKind.DateTime => column.DateSelector is not null && column.DateSetter is not null,
         DataGridViewColumnKind.Color => column.ColorSelector is not null && column.ColorSetter is not null,
         _ => false,
@@ -2477,6 +2508,13 @@ public class DataGridView : OwnerDrawnControl
             _domainEditor = null;
             domainEditor.TextChanged -= this.OnEditorTextChanged;
             this.Controls.Remove(domainEditor);
+        }
+
+        if (_timeEditor is { } timeEditor)
+        {
+            _timeEditor = null;
+            timeEditor.ValueChanged -= this.OnEditorTextChanged;
+            this.Controls.Remove(timeEditor);
         }
 
         if (_editPopupShown)
@@ -2622,6 +2660,28 @@ public class DataGridView : OwnerDrawnControl
 
                     case Keys.Down when _domainEditor is { } domainDown:
                         domainDown.DownButton();
+                        e.Handled = true;
+                        break;
+
+                    // The time editor owns the arrows entirely: up/down step the part under its
+                    // caret, left/right move that caret between hours, minutes, seconds and AM/PM.
+                    case Keys.Up when _timeEditor is { } timeUp:
+                        timeUp.UpButton();
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Down when _timeEditor is { } timeDown:
+                        timeDown.DownButton();
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Left when _timeEditor is { } timeLeft:
+                        timeLeft.SelectPreviousField();
+                        e.Handled = true;
+                        break;
+
+                    case Keys.Right when _timeEditor is { } timeRight:
+                        timeRight.SelectNextField();
                         e.Handled = true;
                         break;
                 }
@@ -2949,6 +3009,7 @@ public class DataGridView : OwnerDrawnControl
         calendar.AnchorDate = day;
         calendar.FocusDate = day;
         calendar.DisplayMonth = new(day.Year, day.Month, 1);
+        calendar.Level = CalendarLevel.Month; // every open starts on the day page, however it was left
 
         var popup = this.EnsureEditPopup(backend);
         _editPopupShown = true;
@@ -3558,6 +3619,21 @@ public class DataGridView : OwnerDrawnControl
                     return false;
 
                 setter(item, picked);
+                return true;
+            }
+
+            case DataGridViewColumnKind.TimePicker:
+            {
+                if (column.TimeSetter is not { } setter || !TimeSpan.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var time))
+                    return false;
+
+                if (time < column.MinTime || time > column.MaxTime)
+                    return false;
+
+                if (!this.ValidateCell(rowIndex, columnIndex, time))
+                    return false;
+
+                setter(item, time);
                 return true;
             }
 

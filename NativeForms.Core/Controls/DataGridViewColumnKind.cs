@@ -84,4 +84,10 @@ public enum DataGridViewColumnKind
     /// through the vetoable <see cref="DataGridView.CellItemCheck"/> event.
     /// </summary>
     CheckedListBox,
+    /// <summary>The formatted time of day as plain text; editing hosts a
+    /// <see cref="Hawkynt.NativeForms.TimePicker"/> over the cell, seeded from
+    /// <see cref="DataGridViewColumn.TimeSelector"/> and committed through
+    /// <see cref="DataGridViewColumn.TimeSetter"/>, clamped by the column's
+    /// <see cref="DataGridViewColumn.MinTime"/> and <see cref="DataGridViewColumn.MaxTime"/>.</summary>
+    TimePicker,
 }

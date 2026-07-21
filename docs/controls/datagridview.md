@@ -78,7 +78,7 @@ Inherits the common members of [`Control`](control.md).
 | `SortedColumn` | `DataGridViewColumn?` (get) | `null` | The column the grid is currently sorted by. |
 | `SortOrder` | `SortOrder` (get) | `None` | The active sort direction; `None` shows `Items` order. |
 | `IsEditing` | `bool` (get) | `false` | Whether a cell is currently in edit mode. |
-| `EditingControl` | `Control?` (get) | `null` | The hosted editor while a `Text`/`MaskedText`/`NumericUpDown`/`DomainUpDown` cell edits; popup and dialog kinds host no child control. |
+| `EditingControl` | `Control?` (get) | `null` | The hosted editor while a `Text`/`MaskedText`/`NumericUpDown`/`TimePicker`/`DomainUpDown` cell edits; popup and dialog kinds host no child control. |
 | `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
 
 ### Events
@@ -94,6 +94,7 @@ handlers stay stable while the grid is sorted or the columns are reordered.
 | `CellContentClick` | Raised when the content of a check, button, link or multi-image cell is clicked; for multi-image cells `ContentIndex` names the icon (`-1` otherwise). |
 | `CellBeginEdit` | Raised before a cell enters edit mode; set `Cancel` to keep it read. |
 | `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, the chosen item, `DateTime`, or — for the set-valued kinds — the whole `IReadOnlyList<object?>` of picked items); set `Cancel` to veto the write and keep the cell in edit mode. |
+| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, `TimeSpan`, the chosen item, or `DateTime`); set `Cancel` to veto the write and keep the cell in edit mode. |
 | `CellEndEdit` | Raised after a cell leaves edit mode, whether the edit committed or was cancelled. |
 | `CellItemCheck` | Raised before an item's tick flips inside a `CheckedListBox` cell's popup — the grid-side sibling of `CheckedListBox.ItemCheck`, with the same veto shape (reset `NewValue` to `CurrentValue`). `Index` indexes the popup's item list; the cell is the one `SelectedRowIndex`/`CurrentColumnIndex` report while the popup is open. |
 | `CurrentCellDirtyStateChanged` | Raised when `IsCurrentCellDirty` flips — on the first editor change after the edit begins, and again when the edit ends. |
@@ -164,6 +165,8 @@ Kind-specific content and editing members:
 | `NumberSelector` / `NumberSetter` | `Func<object?, decimal>?` / `Action<object?, decimal>?` | `NumericUpDown` | Seed and write-back of the hosted numeric editor; the written value is already clamped into [`Minimum`, `Maximum`]. |
 | `Minimum` / `Maximum` / `Increment` / `DecimalPlaces` | `decimal` ×3, `int` | `NumericUpDown` | Editor range (0..100), spinner/arrow step (1) and displayed digits (0). |
 | `DateSelector` / `DateSetter` | `Func<object?, DateTime>?` / `Action<object?, DateTime>?` | `DateTime` | Seed and write-back of the popup calendar; the picked day keeps the seed's time of day. |
+| `TimeSelector` / `TimeSetter` | `Func<object?, TimeSpan>?` / `Action<object?, TimeSpan>?` | `TimePicker` | Seed and write-back of the hosted time editor; the written value is already inside [`MinTime`, `MaxTime`]. |
+| `MinTime` / `MaxTime` / `ShowSeconds` / `Use24HourClock` | `TimeSpan` ×2, `bool` ×2 | `TimePicker` | Editor window (`00:00:00`..`23:59:59`) and layout (seconds shown, 24-hour clock). |
 | `Mask` | `string` | `MaskedText` | The input mask the hosted [`MaskedTextBox`](maskedtextbox.md) editor forces; empty hosts a plain masked box. Commits through `TextSetter`. |
 | `ColorSelector` / `ColorSetter` | `Func<object?, Color>?` / `Action<object?, Color>?` | `Color` | The swatch color and the write-back of the picked color; both are required for the cell to edit. |
 
@@ -179,7 +182,8 @@ Kind-specific content and editing members:
 | `Progress` | Themed 0..100 fill from `ProgressSelector` | Display-only. |
 | `ComboBox` | The value text plus a drop arrow | Edits in a popup choice list; the pick commits through `ValueSetter`. |
 | `NumericUpDown` | The value as text | Edits in a hosted `NumericUpDown` clamped and stepped by the column. |
-| `DateTime` | The formatted date as text | Edits in the popup month calendar (the `DateTimePicker` engine); the pick commits through `DateSetter`. |
+| `DateTime` | The formatted date as text | Edits in the popup month calendar (the `DateTimePicker` engine, title drill-down included); the pick commits through `DateSetter`. |
+| `TimePicker` | The formatted time of day as text | Edits in a hosted [`TimePicker`](timepicker.md) over the cell; Up/Down step the part under its caret, Left/Right move that caret, Enter commits through `TimeSetter`. |
 | `MaskedText` | The value text | Edits in a hosted [`MaskedTextBox`](maskedtextbox.md) forcing the column's `Mask`; commits through `TextSetter`. |
 | `DomainUpDown` | The value as text | Edits in a hosted [`DomainUpDown`](domainupdown.md) over `ItemsSelector`'s choices; commits through `ValueSetter`. |
 | `Color` | A color swatch from `ColorSelector` | Edits through the platform's modal color dialog; the pick commits through `ColorSetter`, cancel writes nothing. |
@@ -247,12 +251,16 @@ path — return cached values and capture nothing.
 `DomainUpDown` over the cell, floats a popup below it — the choice list of a `ComboBox` cell, the
 taller list of a `ListBox` or `CheckedListBox` cell, the month calendar of a `DateTime` cell — or
 opens the platform's modal color dialog (`Color`). It
+`BeginEdit` hosts a `TextBox` (`Text`), `MaskedTextBox` (`MaskedText`), `NumericUpDown`,
+`TimePicker` or `DomainUpDown` over the cell, floats a popup below it — the choice list of a `ComboBox` cell, the
+month calendar of a `DateTime` cell — or opens the platform's modal color dialog (`Color`). It
 refuses (returning `false`) for read-only cells, kinds whose edit selectors/setters are unset (a
 `Text` column without `TextSetter` is display-only), merged or hidden rows, cells outside the
 visible window, a `CellBeginEdit` veto, or popup/dialog kinds before realization. An edit already
 active on another cell is committed first; its validation veto also refuses the new edit. Entry
 gestures follow `EditMode`: with the default `EditOnKeystrokeOrF2` a double-click, F2 on the current
-cell, or typing a character (text/numeric kinds; the character seeds the editor) begins the edit;
+cell, or typing a character (text/numeric kinds; the character seeds the editor) begins the edit — a
+`TimePicker` cell has no text to seed, so a double-click or F2 opens it;
 `EditOnEnter` additionally edits a cell the moment it becomes current; `EditProgrammatically`
 ignores every gesture. While an edit is open, the first editor change flips `IsCurrentCellDirty`
 (raising `CurrentCellDirtyStateChanged`); the flag clears when the edit ends.
@@ -326,8 +334,9 @@ exactly this on the system clipboard through the backend.
 map onto display rows from the current row downward (skipping hidden, unselectable and merged
 rows), tab-separated cells onto display columns from the current column rightward; content past the
 last row or column is dropped. Each target cell converts its text to the column kind's value and
-writes through that kind's setter — read-only cells, display-only columns and unparseable text are
-skipped, their position still consumed, and every write runs `CellValidating` first (a veto skips
+writes through that kind's setter (a `TimePicker` cell parses invariant `hh:mm[:ss]` and rejects
+anything outside [`MinTime`, `MaxTime`]) — read-only cells, display-only columns and unparseable
+text are skipped, their position still consumed, and every write runs `CellValidating` first (a veto skips
 that one cell). `PasteCompleted` closes the operation. Ctrl+V feeds it from the system clipboard.
 
 ### Theming

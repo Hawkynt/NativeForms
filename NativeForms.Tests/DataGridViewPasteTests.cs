@@ -21,6 +21,7 @@ internal sealed class DataGridViewPasteTests
         public bool Done;
         public int Age;
         public DateTime When;
+        public TimeSpan Shift;
         public string Status = string.Empty;
     }
 
@@ -159,7 +160,7 @@ internal sealed class DataGridViewPasteTests
     }
 
     [Test]
-    public void Paste_converts_check_numeric_date_and_combo_cells()
+    public void Paste_converts_check_numeric_date_time_and_combo_cells()
     {
         var choices = new object?[] { "New", "Active", "Done" };
         var rows = new List<Row> { new() { Status = "New" } };
@@ -183,6 +184,13 @@ internal sealed class DataGridViewPasteTests
             DateSelector = static o => ((Row)o!).When,
             DateSetter = static (o, value) => ((Row)o!).When = value,
         });
+        grid.Columns.Add(new DataGridViewColumn("Shift", static o => ((Row)o!).Shift)
+        {
+            Kind = DataGridViewColumnKind.TimePicker,
+            TimeSelector = static o => ((Row)o!).Shift,
+            TimeSetter = static (o, value) => ((Row)o!).Shift = value,
+            MaxTime = new(18, 0, 0),
+        });
         grid.Columns.Add(new DataGridViewColumn("Status", static o => ((Row)o!).Status)
         {
             Kind = DataGridViewColumnKind.ComboBox,
@@ -193,13 +201,14 @@ internal sealed class DataGridViewPasteTests
         grid.SelectedRowIndex = 0;
         RealizeBackend(grid);
 
-        grid.Paste("true\t420\t2026-07-14\tActive");
+        grid.Paste("true\t420\t2026-07-14\t09:45:00\tActive");
 
         Assert.Multiple(() =>
         {
             Assert.That(rows[0].Done, Is.True);
             Assert.That(rows[0].Age, Is.EqualTo(100), "clamped into the column range");
             Assert.That(rows[0].When, Is.EqualTo(new DateTime(2026, 7, 14)));
+            Assert.That(rows[0].Shift, Is.EqualTo(new TimeSpan(9, 45, 0)));
             Assert.That(rows[0].Status, Is.EqualTo("Active"), "matched by display text");
         });
     }

@@ -20,9 +20,6 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public abstract class UpDownBase : OwnerDrawnControl
 {
-    /// <summary>The number of stacked lines forming a spinner arrow glyph.</summary>
-    private const int _ArrowRows = 3;
-
     private readonly TextBox _editor;
     private AutoRepeat? _autoRepeat;
     private bool _updatingEditor;
@@ -79,20 +76,13 @@ public abstract class UpDownBase : OwnerDrawnControl
     }
 
     /// <summary>The width of the spinner-button column at the right edge of the field.</summary>
-    private int ButtonWidth => this.Theme.ScrollBarSize + 1;
+    private int ButtonWidth => SpinnerRenderer.ColumnWidth(this.Theme);
 
     /// <summary>The upper (increment) spinner button.</summary>
-    private Rectangle UpButtonRect => new(this.Width - this.ButtonWidth, 0, this.ButtonWidth, this.Height / 2);
+    private Rectangle UpButtonRect => SpinnerRenderer.UpButton(this.Theme, this.Width, this.Height);
 
     /// <summary>The lower (decrement) spinner button.</summary>
-    private Rectangle DownButtonRect
-    {
-        get
-        {
-            var top = this.Height / 2;
-            return new(this.Width - this.ButtonWidth, top, this.ButtonWidth, this.Height - top);
-        }
-    }
+    private Rectangle DownButtonRect => SpinnerRenderer.DownButton(this.Theme, this.Width, this.Height);
 
     private protected override void OnRealized(IControlPeer peer)
     {
@@ -117,22 +107,7 @@ public abstract class UpDownBase : OwnerDrawnControl
         var width = this.Width;
         var height = this.Height;
         g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, height));
-
-        var up = this.UpButtonRect;
-        var down = this.DownButtonRect;
-        if (_pressedDirection > 0)
-            g.FillRectangle(theme.Accent, up);
-        else if (_pressedDirection < 0)
-            g.FillRectangle(theme.Accent, down);
-
-        var restingColor = this.Enabled ? theme.ControlText : theme.DisabledText;
-        DrawArrow(g, _pressedDirection > 0 ? theme.SelectionText : restingColor, up, pointsUp: true);
-        DrawArrow(g, _pressedDirection < 0 ? theme.SelectionText : restingColor, down, pointsUp: false);
-
-        // Seams between the field, the buttons, and around the whole control.
-        g.DrawLine(theme.Border, up.X, 0, up.X, height - 1);
-        g.DrawLine(theme.Border, up.X, down.Y, width - 1, down.Y);
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
+        SpinnerRenderer.Paint(g, theme, width, height, _pressedDirection, this.Enabled);
     }
 
     /// <inheritdoc/>
@@ -220,17 +195,5 @@ public abstract class UpDownBase : OwnerDrawnControl
             this.UserEdit = true;
 
         this.OnTextChanged(EventArgs.Empty);
-    }
-
-    /// <summary>Draws a small spinner triangle centered in <paramref name="rect"/>.</summary>
-    private static void DrawArrow(IGraphics g, Color color, Rectangle rect, bool pointsUp)
-    {
-        var centerX = rect.X + rect.Width / 2;
-        var top = rect.Y + (rect.Height - _ArrowRows) / 2;
-        for (var i = 0; i < _ArrowRows; ++i)
-        {
-            var half = pointsUp ? i : _ArrowRows - 1 - i;
-            g.DrawLine(color, centerX - half, top + i, centerX + half, top + i);
-        }
     }
 }

@@ -348,6 +348,7 @@ public class DateTimePicker : OwnerDrawnControl
         calendar.AnchorDate = day;
         calendar.FocusDate = day;
         calendar.DisplayMonth = new(day.Year, day.Month, 1);
+        calendar.Level = CalendarLevel.Month; // every open starts on the day page, however it was left
 
         _droppedDown = true;
         this.OwnsOpenPopup = true;

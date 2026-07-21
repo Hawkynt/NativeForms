@@ -163,6 +163,42 @@ internal sealed class PaintAllocationTests
         Assert.That(MeasureSteadyStatePaint(calendar), Is.Zero);
     }
 
+    [Test]
+    public void TimePicker_steady_state_repaint_allocates_nothing()
+    {
+        var picker = new TimePicker { Bounds = new(0, 0, 160, 24), Value = new(14, 30, 5), Use24HourClock = false };
+
+        Assert.That(MeasureSteadyStatePaint(picker), Is.Zero);
+    }
+
+    [Test]
+    public void A_drilled_out_MonthCalendar_steady_state_repaint_allocates_nothing()
+    {
+        // The decade page is the worst case: its twelve captions are built strings rather than the
+        // static month names, so a regression that rebuilt them per frame would show up here.
+        var calendar = new MonthCalendar { Bounds = new(0, 0, 210, 180), TodayDate = new(2026, 7, 19) };
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 640, 480) };
+        form.Controls.Add(calendar);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(100, 10); // the title: drill out to the year page
+        canvas.RaiseMouseUp(100, 10);
+        canvas.RaiseMouseDown(100, 10); // and again: the decade page
+        canvas.RaiseMouseUp(100, 10);
+
+        var graphics = new NullGraphics();
+        for (var pass = 0; pass < 2; ++pass)
+            canvas.RaisePaint(graphics);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < _Frames; ++i)
+            canvas.RaisePaint(graphics);
+
+        Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
+    }
+
     // ---- Range controls ----
 
     [Test]

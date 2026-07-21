@@ -341,6 +341,8 @@ strategy (may differ per platform; note exceptions inline).
         `DataGridViewDisableButtonColumn`), [x] link, [x] multi-image (per-icon click index),
         [x] progress (shared `GlyphRenderer` fill), [x] combo (popup list),
         [x] numeric up-down (hosted editor), [x] date-time picker (CalendarCore popup),
+        [x] time picker (hosted `TimePicker`, `TimeSelector`/`TimeSetter`, per-column window and
+        layout, TSV paste conversion),
         [x] masked text (hosted MaskedTextBox + per-column `Mask`), [x] domain up-down,
         [x] color (swatch + native ColorDialog edit), [x] list box (taller scrollable popup list,
         single pick via `ValueSetter` or a whole set via `SelectionMode` +
@@ -392,10 +394,18 @@ strategy (may differ per platform; note exceptions inline).
       header, 6×7 grid with leading/trailing greying, today accent, single + Shift/drag range
       selection capped by `MaxSelectionCount`, `Min`/`MaxDate` clamps, full keyboard set incl.
       Ctrl+Page year paging, wheel month paging)
+  - [x] Title drill-down (month → months of the year → years of the decade → decades of the
+        century and back), shared by the `DateTimePicker` drop-down: per-level paging arrows and
+        wheel, `Min`/`MaxDate` greying/bouncing at every level, keyboard (Ctrl+Up/Ctrl+Down,
+        arrows, Home/End, PageUp/PageDown, Enter), allocation-free drilled-out repaint
 - [~] `DateTimePicker` (owner field + popup calendar sharing `CalendarCore`) — Long/Short/Time/
       Custom invariant formats, `ShowCheckBox`/`Checked` greying, closed Up/Down day stepping,
-      Alt+Down/F4, commit/cancel semantics done; `BoldedDates`, per-part focus, time spinner
-      editing pending
+      Alt+Down/F4, commit/cancel semantics, drop-down title drill-down done; `BoldedDates` and
+      per-part focus on the closed field pending
+- [x] `TimePicker` (owner field + shared `Drawing.SpinnerRenderer` column) — `TimeSpan` `Value`,
+      `Min`/`MaxTime` window, `ShowSeconds`/`Use24HourClock` layouts, per-part caret (click,
+      Left/Right) with the spinner buttons, Up/Down and the wheel stepping the part under it,
+      wrap-without-carry, timer-driven autorepeat via the shared `AutoRepeat` engine
 - [x] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill), `Style.Marquee`
       (timer-driven sweep, allocation-free per tick), `Step`/`PerformStep`, vertical orientation
 
@@ -592,7 +602,8 @@ same commit. `—` = not applicable.
 | `HScrollBar` / `VScrollBar` | ✔ | ✔ | [controls/scrollbar.md](controls/scrollbar.md) |
 | `ProgressBar` (incl. marquee) | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
 | `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
-| `MonthCalendar` | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
+| `MonthCalendar` (title drill-down) | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
+| `TimePicker` | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
 | `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
 | `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
 | `GroupBox` (caption image, nesting) | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |

@@ -263,6 +263,28 @@ public sealed class DataGridViewColumn
     /// to the row item; the time of day of the <see cref="DateSelector"/> value is preserved.</summary>
     public Action<object?, DateTime>? DateSetter { get; set; }
 
+    /// <summary>Maps a row item to the time of day a <see cref="DataGridViewColumnKind.TimePicker"/>
+    /// editor starts from.</summary>
+    public Func<object?, TimeSpan>? TimeSelector { get; set; }
+
+    /// <summary>Writes a committed <see cref="DataGridViewColumnKind.TimePicker"/> edit back to the
+    /// row item, already clamped into [<see cref="MinTime"/>, <see cref="MaxTime"/>].</summary>
+    public Action<object?, TimeSpan>? TimeSetter { get; set; }
+
+    /// <summary>The earliest time the <see cref="DataGridViewColumnKind.TimePicker"/> editor accepts.</summary>
+    public TimeSpan MinTime { get; set; } = TimeSpan.Zero;
+
+    /// <summary>The latest time the <see cref="DataGridViewColumnKind.TimePicker"/> editor accepts.</summary>
+    public TimeSpan MaxTime { get; set; } = new(23, 59, 59);
+
+    /// <summary>Whether the <see cref="DataGridViewColumnKind.TimePicker"/> editor carries a seconds
+    /// part.</summary>
+    public bool ShowSeconds { get; set; } = true;
+
+    /// <summary>Whether the <see cref="DataGridViewColumnKind.TimePicker"/> editor runs a 24-hour
+    /// clock rather than a 12-hour one with an AM/PM part.</summary>
+    public bool Use24HourClock { get; set; } = true;
+
     /// <summary>The input mask a <see cref="DataGridViewColumnKind.MaskedText"/> editor forces —
     /// the <see cref="MaskedTextBox.Mask"/> language; empty hosts a plain masked box.</summary>
     public string Mask

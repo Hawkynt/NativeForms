@@ -46,6 +46,8 @@ internal static class Program
         Construct("TreeView", static () => new TreeView(), _OwnerDrawnConstructionBudget);
         Construct("DataGridView", static () => new DataGridView(), _OwnerDrawnConstructionBudget);
         Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
+        Construct("TimePicker", static () => new TimePicker(), _OwnerDrawnConstructionBudget);
+        Construct("MonthCalendar", static () => new MonthCalendar(), _OwnerDrawnConstructionBudget);
 
         RealizeEmptyForm();
         RealizeHundredControlForm();
@@ -56,6 +58,8 @@ internal static class Program
         PaintThroughput("TreeView", MakeTreeView(1000));
         PaintThroughput("DataGridView", MakeDataGridView(1000));
         PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
+        PaintThroughput("TimePicker", MakeTimePicker());
+        PaintThroughput("MonthCalendar", MakeMonthCalendar());
 
         // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
         ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
@@ -230,6 +234,13 @@ internal static class Program
             tree.Nodes.Add("Node " + i);
         return tree;
     }
+
+    /// <summary>The busiest time field: twelve-hour, seconds shown, so every part paints.</summary>
+    private static TimePicker MakeTimePicker()
+        => new() { Bounds = new(0, 0, 200, 26), Value = new(14, 30, 5), Use24HourClock = false };
+
+    private static MonthCalendar MakeMonthCalendar()
+        => new() { Bounds = new(0, 0, 240, 200), TodayDate = new(2026, 7, 19) };
 
     private static DataGridView MakeDataGridView(int rows)
     {

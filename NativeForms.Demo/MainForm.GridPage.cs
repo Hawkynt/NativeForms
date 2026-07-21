@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Globalization;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Demo;
@@ -25,6 +26,9 @@ internal sealed partial class MainForm
 
         /// <summary>The booked hours; edited through the numeric column.</summary>
         public decimal Hours { get; set; }
+
+        /// <summary>When the task starts; edited through the time column.</summary>
+        public TimeSpan Start { get; set; }
 
         /// <summary>The documentation link shown by the link column.</summary>
         public string Docs { get; init; } = string.Empty;
@@ -64,7 +68,7 @@ internal sealed partial class MainForm
 
         grid.Columns.Add(new DataGridViewColumn("Task", static o => ((WorkItem)o!).Name)
         {
-            Width = 200,
+            Width = 190,
             Frozen = true,
             SortMode = DataGridViewColumnSortMode.Automatic,
             ImageSelector = static o => ((WorkItem)o!).Icon,
@@ -79,7 +83,7 @@ internal sealed partial class MainForm
         grid.Columns.Add(new DataGridViewColumn("Progress", static o => ((WorkItem)o!).Percent)
         {
             Kind = DataGridViewColumnKind.Progress,
-            Width = 110,
+            Width = 90,
             ProgressSelector = static o => ((WorkItem)o!).Percent,
         });
         grid.Columns.Add(new DataGridViewColumn("Hours", static o => ((WorkItem)o!).Hours)
@@ -95,6 +99,18 @@ internal sealed partial class MainForm
                 ? new(foreColor: Color.Firebrick)
                 : default,
         });
+        grid.Columns.Add(new DataGridViewColumn("Start", static o => ((WorkItem)o!).Start)
+        {
+            Kind = DataGridViewColumnKind.TimePicker,
+            Width = 90,
+            Alignment = ContentAlignment.MiddleRight,
+            ShowSeconds = false,
+            MinTime = new(6, 0, 0),
+            MaxTime = new(20, 0, 0),
+            FormatSelector = static v => ((TimeSpan)v!).ToString(@"hh\:mm", CultureInfo.InvariantCulture),
+            TimeSelector = static o => ((WorkItem)o!).Start,
+            TimeSetter = static (o, value) => ((WorkItem)o!).Start = value,
+        });
         grid.Columns.Add(new DataGridViewColumn("Open", static _ => "Open…")
         {
             Kind = DataGridViewColumnKind.Button,
@@ -103,7 +119,7 @@ internal sealed partial class MainForm
         grid.Columns.Add(new DataGridViewColumn("Docs", static o => ((WorkItem)o!).Docs)
         {
             Kind = DataGridViewColumnKind.Link,
-            Width = 110,
+            Width = 90,
         });
         grid.Columns.Add(new DataGridViewColumn("Owner", static o => ((WorkItem)o!).Owner)
         {
@@ -115,7 +131,7 @@ internal sealed partial class MainForm
         grid.Columns.Add(new DataGridViewColumn("Labels", static o => ((WorkItem)o!).Labels)
         {
             Kind = DataGridViewColumnKind.CheckedListBox,
-            Width = 160,
+            Width = 120,
             ItemsSelector = static _ => _Labels,
             CheckedItemsSelector = static o => ((WorkItem)o!).Labels,
             CheckedItemsSetter = static (o, items) => ((WorkItem)o!).Labels = items,
@@ -147,7 +163,7 @@ internal sealed partial class MainForm
         page.Controls.AddRange(
             Caption("DataGridView — click the Task header to sort; the column stays frozen.", 16, 12, 540),
             grid,
-            Caption("Check, Hours, Owner and Labels cells write back into the bound items — Labels as a whole set.", 16, 544, 700));
+            Caption("Check, Hours, Start, Owner and Labels cells write back into the bound items — Labels as a whole set.", 16, 544, 760));
 
         // The walkthrough sorts the grid, widens a column, scrolls both ways and writes back into two
         // bound cells. The column widths and the rows themselves are the authored state; the offsets
@@ -162,12 +178,14 @@ internal sealed partial class MainForm
         var hourValues = new decimal[authoredRows.Length];
         var owners = new string[authoredRows.Length];
         var labels = new IReadOnlyList<object?>[authoredRows.Length];
+        var startValues = new TimeSpan[authoredRows.Length];
         for (var i = 0; i < authoredRows.Length; ++i)
         {
             doneFlags[i] = authoredRows[i].Done;
             hourValues[i] = authoredRows[i].Hours;
             owners[i] = authoredRows[i].Owner;
             labels[i] = authoredRows[i].Labels;
+            startValues[i] = authoredRows[i].Start;
         }
 
         var selectedRow = grid.SelectedRowIndex;
@@ -183,6 +201,7 @@ internal sealed partial class MainForm
                 authoredRows[i].Hours = hourValues[i];
                 authoredRows[i].Owner = owners[i];
                 authoredRows[i].Labels = labels[i];
+                authoredRows[i].Start = startValues[i];
             }
 
             grid.HorizontalOffset = 0;
@@ -232,6 +251,7 @@ internal sealed partial class MainForm
                     Done = ordinal % 3 == 0,
                     Percent = ordinal * 11 % 101,
                     Hours = 2.5m * (ordinal + 1),
+                    Start = new(8 + (ordinal % 8), ordinal % 2 == 0 ? 0 : 30, 0),
                     Docs = $"docs/{category.ToLowerInvariant()}.md",
                     Owner = (string)_Owners[ordinal % _Owners.Length]!,
                     Labels = ordinal % 2 == 0 ? [_Labels[0]] : [_Labels[1], _Labels[2]],

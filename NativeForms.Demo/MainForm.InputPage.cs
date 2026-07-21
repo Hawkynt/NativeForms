@@ -8,7 +8,8 @@ internal sealed partial class MainForm
     /// The Input page: text boxes (single-line, placeholder, password, multiline), a masked text box
     /// with a phone mask, a rich text box pre-styled through <see cref="RichTextBox.Rtf"/>, both
     /// up-down spinners, a search box, a track bar and both scroll bars each echoing their value
-    /// into a label, a date-time picker and a month calendar.
+    /// into a label, a date-time picker, a month calendar whose title drills out to months, years
+    /// and decades, and both shapes of time picker (24-hour with seconds, 12-hour without).
     /// </summary>
     private TabPage BuildInputPage()
     {
@@ -129,11 +130,24 @@ internal sealed partial class MainForm
         calendar.DateSelected += (_, e)
             => this.SetStatus($"MonthCalendar: {e.Start:yyyy-MM-dd} … {e.End:yyyy-MM-dd}");
 
+        var time = new TimePicker { Bounds = new(664, 356, 200, 26), Value = new(9, 30, 0) };
+        time.ValueChanged += (_, _) => this.SetStatus($"TimePicker: {time.Value:hh\\:mm\\:ss}");
+
+        var time12 = new TimePicker
+        {
+            Bounds = new(664, 388, 200, 26),
+            Value = new(14, 15, 0),
+            Use24HourClock = false,
+            ShowSeconds = false,
+        };
+
         page.Controls.AddRange(
             Caption("DateTimePicker (Short + Custom)", 664, 12),
             shortPicker, customPicker,
-            Caption("MonthCalendar (week selections)", 664, 100),
-            calendar);
+            Caption("MonthCalendar (title drills to years)", 664, 100),
+            calendar,
+            Caption("TimePicker (24h with seconds + 12h)", 664, 332),
+            time, time12);
 
         // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
         var singleText = single.Text;
@@ -153,6 +167,8 @@ internal sealed partial class MainForm
         var customValue = customPicker.Value;
         var calendarStart = calendar.SelectionStart;
         var calendarEnd = calendar.SelectionEnd;
+        var timeValue = time.Value;
+        var time12Value = time12.Value;
         this.OnReset(() =>
         {
             single.Text = singleText;
@@ -170,6 +186,9 @@ internal sealed partial class MainForm
             shortPicker.Value = pickerValue;
             shortPicker.Checked = pickerChecked;
             customPicker.Value = customValue;
+            time.Value = timeValue;
+            time.SelectedField = TimePickerField.Hour;
+            time12.Value = time12Value;
 
             // Restoring the range also pages the calendar back to the month that holds it, so a
             // walkthrough that browsed backwards does not leave the shot on the wrong month.
@@ -198,6 +217,8 @@ internal sealed partial class MainForm
         this.Publish("input.vscroll", vertical);
         this.Publish("input.picker", shortPicker);
         this.Publish("input.calendar", calendar);
+        this.Publish("input.time", time);
+        this.Publish("input.time12", time12);
 
         return page;
     }

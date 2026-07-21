@@ -46,6 +46,7 @@ each control page carries its own "Differences from WinForms" section where beha
 | `ProgressBar` | owner-drawn | [progressbar.md](controls/progressbar.md) |
 | `DateTimePicker` | owner-drawn + popup calendar | [datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
+| `TimePicker` | owner-drawn | [timepicker.md](controls/timepicker.md) |
 | `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
 | `GroupBox` | owner-drawn | [groupbox.md](controls/groupbox.md) |
 | `TabControl` / `TabPage` | owner-drawn | [tabcontrol.md](controls/tabcontrol.md) |

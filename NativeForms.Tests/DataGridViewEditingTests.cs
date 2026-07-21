@@ -21,6 +21,7 @@ internal sealed class DataGridViewEditingTests
         public int Age;
         public string Status = string.Empty;
         public DateTime When;
+        public TimeSpan Shift;
     }
 
     private static HeadlessBackend RealizeBackend(OwnerDrawnControl control)
@@ -769,6 +770,132 @@ internal sealed class DataGridViewEditingTests
         {
             Assert.That(grid.IsEditing, Is.False);
             Assert.That(rows[0].When, Is.EqualTo(new DateTime(2026, 7, 15)), "nothing written");
+        });
+    }
+
+    // --- The time column ---------------------------------------------------------------------------
+
+    /// <summary>Turns the Age column into a time column bound to <see cref="Row.Shift"/>.</summary>
+    private static DataGridView MakeTimeGrid(out List<Row> rows)
+    {
+        var grid = MakeGrid(out rows);
+        rows[0].Shift = new(9, 30, 0);
+        rows[1].Shift = new(13, 0, 0);
+        var column = grid.Columns[1];
+        column.Kind = DataGridViewColumnKind.TimePicker;
+        column.TimeSelector = static o => ((Row)o!).Shift;
+        column.TimeSetter = static (o, value) => ((Row)o!).Shift = value;
+        return grid;
+    }
+
+    [Test]
+    public void Time_editing_hosts_a_picker_over_the_cell_seeded_from_the_selector()
+    {
+        var grid = MakeTimeGrid(out _);
+        grid.Columns[1].ShowSeconds = false;
+        grid.Columns[1].Use24HourClock = false;
+        grid.Columns[1].MinTime = new(8, 0, 0);
+        grid.Columns[1].MaxTime = new(18, 0, 0);
+        RealizeBackend(grid);
+
+        var began = grid.BeginEdit(0, 1);
+        var editor = (TimePicker)grid.EditingControl!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(began, Is.True);
+            Assert.That(editor.Value, Is.EqualTo(new TimeSpan(9, 30, 0)));
+            Assert.That(editor.Bounds, Is.EqualTo(new Rectangle(100, 22, 60, 22)), "the editor covers the cell");
+            Assert.That(editor.ShowSeconds, Is.False, "the column shapes the editor");
+            Assert.That(editor.Use24HourClock, Is.False);
+            Assert.That(editor.MinTime, Is.EqualTo(new TimeSpan(8, 0, 0)));
+            Assert.That(editor.MaxTime, Is.EqualTo(new TimeSpan(18, 0, 0)));
+        });
+    }
+
+    [Test]
+    public void Time_editing_round_trips_through_the_time_setter()
+    {
+        var grid = MakeTimeGrid(out var rows);
+        var backend = RealizeBackend(grid);
+        var canvas = CanvasOf(backend);
+
+        grid.BeginEdit(0, 1);
+        canvas.RaiseKeyDown(Keys.Up); // the caret starts on the hour
+        canvas.RaiseKeyDown(Keys.Right);
+        canvas.RaiseKeyDown(Keys.Down); // now on the minute
+        canvas.RaiseKeyDown(Keys.Enter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows[0].Shift, Is.EqualTo(new TimeSpan(10, 29, 0)));
+            Assert.That(grid.IsEditing, Is.False, "Enter commits and leaves edit mode, like the other hosted editors");
+        });
+    }
+
+    [Test]
+    public void Time_editing_escape_cancels_without_writing()
+    {
+        var grid = MakeTimeGrid(out var rows);
+        var backend = RealizeBackend(grid);
+        var canvas = CanvasOf(backend);
+
+        grid.BeginEdit(0, 1);
+        canvas.RaiseKeyDown(Keys.Up);
+        canvas.RaiseKeyDown(Keys.Escape);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsEditing, Is.False);
+            Assert.That(rows[0].Shift, Is.EqualTo(new TimeSpan(9, 30, 0)), "nothing written");
+        });
+    }
+
+    [Test]
+    public void A_time_column_without_its_selectors_or_on_a_read_only_cell_refuses_to_edit()
+    {
+        var grid = MakeTimeGrid(out _);
+        RealizeBackend(grid);
+        var column = grid.Columns[1];
+
+        column.TimeSetter = null;
+        var withoutSetter = grid.BeginEdit(0, 1);
+        column.TimeSetter = static (o, value) => ((Row)o!).Shift = value;
+        column.ReadOnly = true;
+        var readOnly = grid.BeginEdit(0, 1);
+        column.ReadOnly = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(withoutSetter, Is.False);
+            Assert.That(readOnly, Is.False);
+            Assert.That(grid.BeginEdit(0, 1), Is.True, "with both halves present and no read-only flag it edits");
+        });
+    }
+
+    [Test]
+    public void A_vetoed_time_commit_keeps_the_cell_in_edit_mode()
+    {
+        var grid = MakeTimeGrid(out var rows);
+        var backend = RealizeBackend(grid);
+        var canvas = CanvasOf(backend);
+        object? proposed = null;
+        grid.CellValidating += (_, e) =>
+        {
+            proposed = e.ProposedValue;
+            e.Cancel = true;
+        };
+
+        grid.BeginEdit(0, 1);
+        canvas.RaiseKeyDown(Keys.Up);
+        var committed = grid.CommitEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(committed, Is.False);
+            Assert.That(proposed, Is.EqualTo(new TimeSpan(10, 30, 0)));
+            Assert.That(grid.IsEditing, Is.True);
+            Assert.That(rows[0].Shift, Is.EqualTo(new TimeSpan(9, 30, 0)), "the veto wrote nothing");
         });
     }
 }

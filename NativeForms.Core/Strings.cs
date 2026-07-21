@@ -15,6 +15,9 @@ public static class Strings
 {
     private static readonly string[] _DefaultDayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+    private static readonly string[] _DefaultMonthNames =
+        ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
     /// <summary>The placeholder a <see cref="SearchBox"/> shows while empty (read at construction).</summary>
     public static string SearchPlaceholder
     {
@@ -90,6 +93,25 @@ public static class Strings
     } = _DefaultDayNames;
 
     /// <summary>
+    /// The twelve abbreviated month names the calendar's month grid paints when the title is drilled
+    /// out of the day page, January first. Assigning copies the array, so later caller mutations do
+    /// not leak into painting.
+    /// </summary>
+    /// <exception cref="ArgumentException">The array does not hold exactly twelve names.</exception>
+    public static string[] AbbreviatedMonthNames
+    {
+        get => field;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (value.Length != 12)
+                throw new ArgumentException($"Expected 12 month names (January first), got {value.Length}.", nameof(value));
+
+            field = (string[])value.Clone();
+        }
+    } = _DefaultMonthNames;
+
+    /// <summary>
     /// The format provider behind every date/time string the toolkit renders (the calendar's month
     /// title, <see cref="DateTimePicker"/> text). Typically a hand-built
     /// <see cref="DateTimeFormatInfo"/> carrying localized month/day names.
@@ -113,6 +135,7 @@ public static class Strings
         ShortcutShiftPrefix = "Shift+";
         ShortcutAltPrefix = "Alt+";
         AbbreviatedDayNames = _DefaultDayNames;
+        AbbreviatedMonthNames = _DefaultMonthNames;
         DateTimeFormat = CultureInfo.InvariantCulture;
     }
 }

@@ -52,6 +52,38 @@ internal sealed class AllocationBudgetTests
     }
 
     [Test]
+    public void TimePicker_construction_stays_within_the_owner_drawn_budget()
+    {
+        // The time field owns no collections and no hosted editor: its whole state is the value, the
+        // window, the caret and the layout flags, so it must sit well inside the owner-drawn budget.
+        var sink = new Control[_Count];
+        var bytes = Measure(() =>
+        {
+            for (var i = 0; i < _Count; ++i)
+                sink[i] = new TimePicker();
+        });
+
+        var perControl = (double)bytes / _Count;
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void MonthCalendar_construction_stays_within_the_owner_drawn_budget()
+    {
+        // The drill-down levels must not cost an unused calendar anything: the period captions are
+        // allocated on the first drill-out, never in the constructor.
+        var sink = new Control[_Count];
+        var bytes = Measure(() =>
+        {
+            for (var i = 0; i < _Count; ++i)
+                sink[i] = new MonthCalendar();
+        });
+
+        var perControl = (double)bytes / _Count;
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
     public void Empty_form_realization_stays_within_byte_budget()
     {
         // Warm-up pass: JIT the whole construct-realize-flush path so the measured pass sees only

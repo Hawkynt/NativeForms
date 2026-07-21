@@ -474,6 +474,85 @@ internal sealed partial class Autopilot
                 $"paging back one month should move the same cell 28..31 days earlier, observed {delta} ({first:yyyy-MM-dd} then {second:yyyy-MM-dd})",
                 delta is >= 28 and <= 31);
         });
+
+        this.Check("MonthCalendar: the title drills out to years and a cell drills back in", () =>
+        {
+            var size = this.Read(() => calendar.Size);
+            var rowHeight = this.Read(() => Theme.RowHeight);
+            var startYear = this.Read(() => calendar.SelectionStart).Year;
+            var decadeStart = startYear - (startYear % 10);
+
+            // Two title clicks reach the decade page, whose cells run decadeStart-1 .. decadeStart+10.
+            this.Click(calendar, size.Width / 2, rowHeight / 2);
+            this.Click(calendar, size.Width / 2, rowHeight / 2);
+            this.Screenshot("state-input-monthcalendar-decade");
+
+            var targetYear = decadeStart + 2;
+            var yearCell = PeriodCell(size, rowHeight, targetYear - (decadeStart - 1));
+            this.Click(calendar, yearCell.X, yearCell.Y); // the year page of targetYear
+            this.Screenshot("state-input-monthcalendar-year");
+            var juneCell = PeriodCell(size, rowHeight, 5);
+            this.Click(calendar, juneCell.X, juneCell.Y); // June of it, back on the day page
+
+            var dayCell = DayCell(size, rowHeight, row: 2, column: 3);
+            this.Click(calendar, dayCell.X, dayCell.Y);
+            var picked = this.Read(() => calendar.SelectionStart);
+            this.ExpectTrue(
+                $"drilling decade -> year -> month should land on June {targetYear}, observed {picked:yyyy-MM-dd}",
+                picked.Year == targetYear && picked.Month == 6);
+        });
+
+        this.Check("MonthCalendar: the drilled-out page comes back to the day grid", () =>
+        {
+            var size = this.Read(() => calendar.Size);
+            var rowHeight = this.Read(() => Theme.RowHeight);
+            this.Do(() => calendar.SetSelectionRange(new(2026, 7, 15), new(2026, 7, 15)));
+            var dayCell = DayCell(size, rowHeight, row: 2, column: 3);
+            this.Click(calendar, dayCell.X, dayCell.Y);
+            this.Expect("the day page selects whole days again", this.Read(() => calendar.SelectionStart).Year, 2026);
+        });
+
+        var time = _form.Part<TimePicker>("input.time");
+
+        this.Check("TimePicker: a spinner click steps the part under the caret", () =>
+        {
+            var before = this.Read(() => time.Value);
+            var geometry = this.Read(() => (time.Width, time.Height));
+            this.Click(time, geometry.Width - 5, geometry.Height / 4); // the up button
+            var afterHour = this.Read(() => time.Value);
+            this.Expect("TimePicker.Value after stepping the hour", afterHour, before.Add(TimeSpan.FromHours(1)));
+            this.ExpectTrue(
+                "the status line did not report the new time",
+                this.Read(() => status.Text).StartsWith("TimePicker: ", StringComparison.Ordinal));
+
+            this.Click(time, geometry.Width - 5, geometry.Height - (geometry.Height / 4)); // the down button
+            this.Expect("stepping back down", this.Read(() => time.Value), before);
+        });
+
+        this.Check("TimePicker: Right moves the caret so the spinner steps the minute", () =>
+        {
+            var geometry = this.Read(() => (time.Width, time.Height));
+            this.Click(time, 10, geometry.Height / 2); // park the caret on the hour
+            this.Key(KeySym.Right);
+            this.Expect("the selected part after Right", this.Read(() => time.SelectedField), TimePickerField.Minute);
+
+            var before = this.Read(() => time.Value);
+            this.Click(time, geometry.Width - 5, geometry.Height / 4);
+            this.Expect("TimePicker.Value after stepping the minute", this.Read(() => time.Value), before.Add(TimeSpan.FromMinutes(1)));
+        });
+
+        this.Check("TimePicker: a 12-hour field flips the half day from its AM/PM part", () =>
+        {
+            var time12 = _form.Part<TimePicker>("input.time12");
+            var before = this.Read(() => time12.Value);
+            this.Do(() => time12.SelectedField = TimePickerField.Meridiem);
+            var geometry = this.Read(() => (time12.Width, time12.Height));
+            this.Click(time12, geometry.Width - 5, geometry.Height / 4);
+            var after = this.Read(() => time12.Value);
+            this.ExpectTrue(
+                $"stepping the meridiem should move the value 12 hours, observed {before} then {after}",
+                (after - before).Duration() == TimeSpan.FromHours(12));
+        });
     }
 
     // --- Lists ----------------------------------------------------------------------------------
@@ -709,7 +788,7 @@ internal sealed partial class Autopilot
 
         this.Check("DataGridView: a button cell raises CellContentClick", () =>
         {
-            var cell = this.Read(() => grid.GetCellBounds(3, 4));
+            var cell = this.Read(() => grid.GetCellBounds(3, 5));
             this.Click(grid, cell.X + (cell.Width / 2), cell.Y + (cell.Height / 2));
             this.ExpectTrue(
                 $"the status line should report the Open column, observed \"{this.Read(() => status.Text)}\"",
@@ -718,7 +797,7 @@ internal sealed partial class Autopilot
 
         this.Check("DataGridView: a link cell raises CellContentClick", () =>
         {
-            var cell = this.Read(() => grid.GetCellBounds(3, 5));
+            var cell = this.Read(() => grid.GetCellBounds(3, 6));
             this.Click(grid, cell.X + 30, cell.Y + (cell.Height / 2));
             this.ExpectTrue(
                 $"the status line should report the Docs column, observed \"{this.Read(() => status.Text)}\"",
@@ -727,12 +806,13 @@ internal sealed partial class Autopilot
 
         this.Check("DataGridView: a list cell opens its popup anchored under the cell and a click commits the pick", () =>
         {
-            var cell = this.Read(() => grid.GetCellBounds(3, 6));
+            var owner = this.GridColumn(grid, "Owner");
+            var cell = this.Read(() => grid.GetCellBounds(3, owner));
             var item = this.Read(() => grid.Items[3]);
-            var selector = this.Read(() => grid.Columns[6].ValueSelector);
+            var selector = this.Read(() => grid.Columns[owner].ValueSelector);
             var before = this.Read(() => selector(item));
 
-            var popup = this.OpenCellEditorPopup(grid, 3, 6);
+            var popup = this.OpenCellEditorPopup(grid, 3, owner);
             if (popup == 0)
                 return;
 
@@ -753,10 +833,11 @@ internal sealed partial class Autopilot
         this.Check("DataGridView: a checked-list cell ticks several items and commits them as one set", () =>
         {
             var item = this.Read(() => grid.Items[3]);
-            var selector = this.Read(() => grid.Columns[7].CheckedItemsSelector!);
+            var labels = this.GridColumn(grid, "Labels");
+            var selector = this.Read(() => grid.Columns[labels].CheckedItemsSelector!);
             var before = this.Read(() => Count(selector(item)));
 
-            var popup = this.OpenCellEditorPopup(grid, 3, 7);
+            var popup = this.OpenCellEditorPopup(grid, 3, labels);
             if (popup == 0)
                 return;
 
@@ -782,11 +863,12 @@ internal sealed partial class Autopilot
             // Escape has to reach the grid rather than merely dismissing the popup: for the
             // set-valued kinds dismissal *commits*, so a backend that swallowed Escape at the popup
             // top-level would silently turn "abandon" into "save".
+            var labels = this.GridColumn(grid, "Labels");
             var item = this.Read(() => grid.Items[5]);
-            var selector = this.Read(() => grid.Columns[7].CheckedItemsSelector!);
+            var selector = this.Read(() => grid.Columns[labels].CheckedItemsSelector!);
             var before = this.Read(() => Count(selector(item)));
 
-            var popup = this.OpenCellEditorPopup(grid, 5, 7);
+            var popup = this.OpenCellEditorPopup(grid, 5, labels);
             if (popup == 0)
                 return;
 
@@ -811,6 +893,27 @@ internal sealed partial class Autopilot
             var after = this.Read(() => selector(item));
             this.ExpectChanged("the bound item's Hours", before, after);
             this.Expect("the committed value", after, 7m);
+        });
+
+        this.Check("DataGridView: a double click on a time cell hosts a TimePicker and Enter commits its step", () =>
+        {
+            var cell = this.Read(() => grid.GetCellBounds(4, 4));
+            var item = this.Read(() => grid.Items[4]);
+            var selector = this.Read(() => grid.Columns[4].TimeSelector!);
+            var before = this.Read(() => selector(item));
+            // Two plain clicks inside the double-click window, rather than the DoubleClick helper:
+            // its trailing third press would land on the editor the second one just created.
+            var x = cell.X + (cell.Width / 2);
+            var y = cell.Y + (cell.Height / 2);
+            this.Click(grid, x, y);
+            this.Click(grid, x, y);
+            this.ExpectTrue("the double click did not start an edit", this.Read(() => grid.IsEditing));
+            this.ExpectTrue("the hosted editor is not a TimePicker", this.Read(() => grid.EditingControl) is TimePicker);
+            this.Key(KeySym.Up);
+            this.Key(KeySym.Return);
+            var after = this.Read(() => selector(item));
+            this.ExpectTrue("the edit did not leave edit mode", !this.Read(() => grid.IsEditing));
+            this.Expect("the bound item's Start after stepping the hour", after, before.Add(TimeSpan.FromHours(1)));
         });
 
         this.Check("DataGridView: the wheel scrolls the rows", () =>
@@ -869,9 +972,10 @@ internal sealed partial class Autopilot
             });
 
             this.ExpectTrue("the grid already scrolls horizontally, so the frozen column cannot be proved", !this.Read(() => grid.IsHorizontalScrollBarVisible));
+            var widened = this.GridColumn(grid, "Labels");
             this.Drag(grid, new(edge - 1, headerHeight / 2), new(edge + 320, headerHeight / 2));
             this.ExpectTrue(
-                $"widening the last column by 320 px should make the grid scroll horizontally (Labels is now {this.Read(() => grid.Columns[7].Width)} px wide)",
+                $"widening the last column by 320 px should make the grid scroll horizontally (Labels is now {this.Read(() => grid.Columns[widened].Width)} px wide)",
                 this.Read(() => grid.IsHorizontalScrollBarVisible));
         });
 
@@ -1383,6 +1487,15 @@ internal sealed partial class Autopilot
     }
 
     /// <summary>The centre of a calendar day cell, mirroring <c>CalendarCore</c>'s own hit test.</summary>
+    /// <summary>The centre of a cell on a drilled-out calendar page: a 4×3 grid under the title
+    /// row, indexed 0–11 in reading order.</summary>
+    private static Point PeriodCell(Size size, int rowHeight, int index)
+    {
+        var cellWidth = size.Width / 4;
+        var cellHeight = (size.Height - rowHeight) / 3;
+        return new(((index % 4) * cellWidth) + (cellWidth / 2), rowHeight + ((index / 4) * cellHeight) + (cellHeight / 2));
+    }
+
     private static Point DayCell(Size size, int rowHeight, int row, int column)
     {
         var top = 2 * rowHeight;

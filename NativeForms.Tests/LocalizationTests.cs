@@ -82,6 +82,40 @@ internal sealed class LocalizationTests
     }
 
     [Test]
+    public void A_drilled_out_MonthCalendar_paints_the_provided_month_names()
+    {
+        Strings.AbbreviatedMonthNames = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 400, 300) };
+        var calendar = new MonthCalendar { Bounds = new(0, 0, 210, 180) };
+        form.Controls.Add(calendar);
+        form.RealizeWindow(backend);
+        var canvas = (HeadlessCanvasPeer)calendar.Peer!;
+
+        canvas.RaiseMouseDown(105, 10); // the title: drill out to the month grid
+        canvas.RaiseMouseUp(105, 10);
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.DrewText("Jän"), Is.True);
+            Assert.That(g.DrewText("Dez"), Is.True);
+        });
+    }
+
+    [Test]
+    public void AbbreviatedMonthNames_rejects_wrong_counts_and_copies_on_assignment()
+    {
+        Assert.Throws<ArgumentException>(() => Strings.AbbreviatedMonthNames = ["Jan", "Feb"]);
+
+        var names = new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l" };
+        Strings.AbbreviatedMonthNames = names;
+        names[0] = "mutated";
+
+        Assert.That(Strings.AbbreviatedMonthNames[0], Is.EqualTo("a"), "assignment took a defensive copy");
+    }
+
+    [Test]
     public void AbbreviatedDayNames_rejects_wrong_counts_and_copies_on_assignment()
     {
         Assert.Throws<ArgumentException>(() => Strings.AbbreviatedDayNames = ["Mo", "Di"]);
@@ -102,6 +136,7 @@ internal sealed class LocalizationTests
         Strings.ShortcutShiftPrefix = "x";
         Strings.ShortcutAltPrefix = "x";
         Strings.AbbreviatedDayNames = ["1", "2", "3", "4", "5", "6", "7"];
+        Strings.AbbreviatedMonthNames = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
         Strings.DateTimeFormat = new DateTimeFormatInfo();
 
         Strings.Reset();
@@ -114,6 +149,7 @@ internal sealed class LocalizationTests
             Assert.That(Strings.ShortcutShiftPrefix, Is.EqualTo("Shift+"));
             Assert.That(Strings.ShortcutAltPrefix, Is.EqualTo("Alt+"));
             Assert.That(Strings.AbbreviatedDayNames, Is.EqualTo(new[] { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" }));
+            Assert.That(Strings.AbbreviatedMonthNames, Is.EqualTo(new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }));
             Assert.That(Strings.DateTimeFormat, Is.EqualTo(CultureInfo.InvariantCulture));
         });
     }
