@@ -480,6 +480,13 @@ strategy (may differ per platform; note exceptions inline).
       (dock order, form lifecycle, input gates, member parity, event pipelines) or documented as
       deliberate in the control's "Differences from WinForms" section.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
+- [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
+      clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
+      input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
+      CI needs a real X server (XTEST does not land under Xwayland).
+- [ ] `# GtkPopupPeer.IsOutside` compares coordinates from the event window's space during a
+      grab, so a click near the main window's origin can read as "inside" the popup and fail to
+      dismiss it (latent; found during the input-routing fix).
 - [x] **Demo gallery**: `NativeForms.Demo` is a tabbed showcase of every shipped control with
       representative property settings; every new control lands with a gallery section
       (coverage tracked in §11).
