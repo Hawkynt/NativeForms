@@ -482,6 +482,11 @@ strategy (may differ per platform; note exceptions inline).
       semantics (names, defaults, event order, behavioral contracts). Deviations were either fixed
       (dock order, form lifecycle, input gates, member parity, event pipelines) or documented as
       deliberate in the control's "Differences from WinForms" section.
+- [x] **Demo autopilot**: `dotnet run --project NativeForms.Demo -- --autopilot` drives the whole
+      gallery with injected input, asserts real control state, runs a layout audit (out-of-frame,
+      truncated captions, overlaps) per page and writes in-process PNG captures
+      (`gtk_widget_draw` → cairo → `cairo_surface_write_to_png`, no external tool). 90 checks;
+      the pass/fail gate for "the demo works and looks right".
 - [~] **Real-GTK test tier**: fixtures that drive the actual backend (in-process `GdkEvent`
       injection via `gtk_main_do_event`/`gdk_display_put_event`, `gtk_test_widget_wait_for_draw`
       before capture) and self-skip without a `DISPLAY`, so CI stays headless-green while a
