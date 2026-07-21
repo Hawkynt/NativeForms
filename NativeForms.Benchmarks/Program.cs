@@ -51,6 +51,7 @@ internal static class Program
         Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
         Construct("TimePicker", static () => new TimePicker(), _OwnerDrawnConstructionBudget);
         Construct("MonthCalendar", static () => new MonthCalendar(), _OwnerDrawnConstructionBudget);
+        Construct("CalendarView", static () => new CalendarView(), _OwnerDrawnConstructionBudget);
         Construct("IconLabel", static () => new IconLabel(), _OwnerDrawnConstructionBudget);
         Construct("ProgressTile", static () => new ProgressTile(), _OwnerDrawnConstructionBudget);
         Construct("FilePicker", static () => new FilePicker(), _CompositeConstructionBudget);
@@ -82,6 +83,9 @@ internal static class Program
         PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
         PaintThroughput("TimePicker", MakeTimePicker());
         PaintThroughput("MonthCalendar", MakeMonthCalendar());
+        PaintThroughput("CalendarViewDay", MakeCalendarView(CalendarViewMode.Day, 1000));
+        PaintThroughput("CalendarViewWeek", MakeCalendarView(CalendarViewMode.Week, 1000));
+        PaintThroughput("CalendarViewMonth", MakeCalendarView(CalendarViewMode.Month, 1000));
         PaintThroughput("IconLabel", MakeIconLabel());
         PaintThroughput("ProgressTile", MakeProgressTile());
         PaintThroughput("FilePicker", MakeFilePicker());
@@ -93,6 +97,7 @@ internal static class Program
         ScrollTraversal("DataGridView", MakeDataGridView(_TraversalRows), Keys.PageDown);
         ScrollTraversal("DataGridViewLists", MakeListColumnGrid(_TraversalRows), Keys.PageDown);
         ScrollTraversal("TreeView", MakeTreeView(_TraversalRows), key: null);
+        ScrollTraversal("CalendarView", MakeCalendarView(CalendarViewMode.Week, _TraversalRows), Keys.PageDown);
 
         PrintTable();
 
@@ -306,6 +311,32 @@ internal static class Program
 
     private static MonthCalendar MakeMonthCalendar()
         => new() { Bounds = new(0, 0, 240, 200), TodayDate = new(2026, 7, 19) };
+
+    /// <summary>A scheduler bound to <paramref name="rows"/> appointments spread across time, centred on
+    /// a week that holds a busy day — the paint and scroll benchmarks' populated instance.</summary>
+    private static CalendarView MakeCalendarView(CalendarViewMode mode, int rows)
+    {
+        var calendar = new CalendarView
+        {
+            Bounds = new(0, 0, 640, 440),
+            ViewMode = mode,
+            SelectedDate = new(2020, 1, 1),
+            Now = new(2020, 1, 1, 10, 30, 0),
+        };
+
+        var appts = new Appointment[rows];
+        var start = new DateTime(2020, 1, 1, 8, 0, 0);
+        for (var i = 0; i < rows; ++i)
+        {
+            // Stagger starts by 37 minutes so several land on the same day and overlap — the column
+            // packing runs — while the whole set spans years so a page touches only a slice.
+            var when = start.AddMinutes(i * 37);
+            appts[i] = new Appointment("Item " + i, when, when.AddMinutes(45));
+        }
+
+        calendar.SetAppointments(appts);
+        return calendar;
+    }
     /// <summary>A three-pane navigation stack with real children in the open pane.</summary>
     private static Accordion MakeAccordion()
     {

@@ -221,6 +221,60 @@ internal sealed class PaintAllocationTests
         Assert.That(MeasureSteadyStatePaint(picker), Is.Zero);
     }
 
+    private static Appointment[] BusyWeek()
+    {
+        var list = new List<Appointment>();
+        var monday = new DateTime(2026, 7, 13);
+        for (var d = 0; d < 7; ++d)
+        {
+            var day = monday.AddDays(d);
+            // Several timed appointments per day, some overlapping so the column packing runs, plus an
+            // all-day banner — dozens of appointments across the shown week.
+            list.Add(new Appointment("Standup", day.AddHours(9), day.AddHours(9).AddMinutes(30)));
+            list.Add(new Appointment("Design", day.AddHours(9).AddMinutes(15), day.AddHours(10)));
+            list.Add(new Appointment("Review", day.AddHours(11), day.AddHours(12)));
+            list.Add(new Appointment("Lunch", day.AddHours(12), day.AddHours(13)));
+            list.Add(new Appointment("Sync", day.AddHours(14), day.AddHours(15)));
+            list.Add(new Appointment("Focus", day.AddHours(15).AddMinutes(30), day.AddHours(17)));
+            if (d % 2 == 0)
+                list.Add(new Appointment("Conference", day, day, allDay: true));
+        }
+
+        return [.. list];
+    }
+
+    [Test]
+    public void CalendarView_week_steady_state_repaint_allocates_nothing()
+    {
+        // A populated week with overlapping timed appointments and all-day banners: the column packing
+        // and the day layout must be cached, so a steady repaint (the "now" line ticking, a hover)
+        // allocates nothing.
+        var calendar = new CalendarView
+        {
+            Bounds = new(0, 0, 700, 460),
+            SelectedDate = new(2026, 7, 15),
+            Now = new(2026, 7, 15, 10, 30, 0),
+        };
+        calendar.SetAppointments(BusyWeek());
+
+        Assert.That(MeasureSteadyStatePaint(calendar), Is.Zero);
+    }
+
+    [Test]
+    public void CalendarView_month_steady_state_repaint_allocates_nothing()
+    {
+        var calendar = new CalendarView
+        {
+            Bounds = new(0, 0, 700, 520),
+            ViewMode = CalendarViewMode.Month,
+            SelectedDate = new(2026, 7, 15),
+            Now = new(2026, 7, 15, 10, 30, 0),
+        };
+        calendar.SetAppointments(BusyWeek());
+
+        Assert.That(MeasureSteadyStatePaint(calendar), Is.Zero);
+    }
+
     [Test]
     public void A_drilled_out_MonthCalendar_steady_state_repaint_allocates_nothing()
     {

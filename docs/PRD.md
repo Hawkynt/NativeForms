@@ -407,6 +407,14 @@ strategy (may differ per platform; note exceptions inline).
         century and back), shared by the `DateTimePicker` drop-down: per-level paging arrows and
         wheel, `Min`/`MaxDate` greying/bouncing at every level, keyboard (Ctrl+Up/Ctrl+Down,
         arrows, Home/End, PageUp/PageDown, Enter), allocation-free drilled-out repaint
+- [x] `CalendarView` (owner) — Outlook-style appointment scheduler, distinct from the `MonthCalendar`
+      picker: `Day`/`WorkWeek`/`Week`/`Month` (`CalendarViewMode`) with a time grid (configurable
+      `TimeScale`, shaded `WorkDayStart`/`WorkDayEnd`, "now" line) or a month day grid with chips +
+      "+n more" overflow; reflection-free `SetAppointments<T>(…, Func<T,Appointment>)` binding into a
+      start-sorted snapshot; side-by-side overlap column packing; click select (`SelectionChanged`),
+      double-click/Enter `AppointmentActivate`, empty-time drag `TimeRangeSelected` (`DateRangeEventArgs`),
+      keyboard/wheel navigation; virtualized (only visible days laid out, bounded for 100k), cached
+      layout so populated repaints allocate zero (empty ≈ 624 B, `Appointment` ≈ 48 B)
 - [~] `DateTimePicker` (owner field + popup calendar sharing `CalendarCore`) — Long/Short/Time/
       Custom invariant formats, `ShowCheckBox`/`Checked` greying, closed Up/Down day stepping,
       Alt+Down/F4, commit/cancel semantics, drop-down title drill-down done; `BoldedDates` and
@@ -652,6 +660,7 @@ same commit. `—` = not applicable.
 | `ProgressTile` (Explorer-style drive tile) | ✔ | ✔ | [controls/progresstile.md](controls/progresstile.md) |
 | `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` (title drill-down) | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
+| `CalendarView` (Day/WorkWeek/Week/Month scheduler) | ✔ | ✔ | [controls/calendarview.md](controls/calendarview.md) |
 | `TimePicker` | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
 | `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
 | `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |

@@ -146,6 +146,43 @@ internal sealed class AllocationBudgetTests
     }
 
     [Test]
+    public void CalendarView_construction_stays_within_the_owner_drawn_budget()
+    {
+        // The scheduler holds no appointment buffers until bound — an empty control is the layout
+        // lists and the value-type view state, nothing per-appointment — so it must sit inside the
+        // owner-drawn budget like every other single-surface control.
+        var sink = new Control[_Count];
+        var bytes = Measure(() =>
+        {
+            for (var i = 0; i < _Count; ++i)
+                sink[i] = new CalendarView();
+        });
+
+        var perControl = (double)bytes / _Count;
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void An_appointment_is_a_small_value_type()
+    {
+        // Appointments are stored in one flat array, so their per-item cost is the struct's own size,
+        // not a heap object each. Measuring a big array isolates that: total bytes over the count is
+        // the element size the 100k case pays.
+        const int count = 100_000;
+        var start = new DateTime(2026, 1, 1, 9, 0, 0);
+        Appointment[] sink = [];
+        var bytes = Measure(() =>
+        {
+            sink = new Appointment[count];
+            for (var i = 0; i < count; ++i)
+                sink[i] = new Appointment("Item", start, start.AddMinutes(30));
+        });
+
+        var perItem = (double)bytes / count;
+        Assert.That(perItem, Is.LessThan(64), $"~{perItem:F0} bytes/appointment");
+    }
+
+    [Test]
     public void Empty_form_realization_stays_within_byte_budget()
     {
         // Warm-up pass: JIT the whole construct-realize-flush path so the measured pass sees only

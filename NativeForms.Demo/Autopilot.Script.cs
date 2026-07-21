@@ -27,6 +27,7 @@ internal sealed partial class Autopilot
         this.DriveLayout();
         this.DrivePickers();
         this.DriveRibbonPage();
+        this.DriveCalendar();
         this.DriveChrome();
         this.DriveModalDialog();
         this.DriveTextEntry();

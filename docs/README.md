@@ -50,6 +50,7 @@ each control page carries its own "Differences from WinForms" section where beha
 | `ProgressTile` | owner-drawn | [progresstile.md](controls/progresstile.md) |
 | `DateTimePicker` | owner-drawn + popup calendar | [datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
+| `CalendarView` | owner-drawn | [calendarview.md](controls/calendarview.md) |
 | `TimePicker` | owner-drawn | [timepicker.md](controls/timepicker.md) |
 | `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
 | `GroupBox` | owner-drawn | [groupbox.md](controls/groupbox.md) |
