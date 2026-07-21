@@ -20,4 +20,10 @@
     <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
   </ItemGroup>
 
+  <!-- Pure translation helpers (keyval → Keys, state → modifiers) are asserted directly rather than
+       only through a display, so the tests need the internal surface. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hawkynt.NativeForms.Tests" />
+  </ItemGroup>
+
 </Project>

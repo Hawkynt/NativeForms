@@ -329,6 +329,11 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         NativeMethods.GDK_KEY_plus or NativeMethods.GDK_KEY_KP_Add => Keys.Add,
         NativeMethods.GDK_KEY_minus or NativeMethods.GDK_KEY_KP_Subtract => Keys.Subtract,
 
+        // F1..F12 are contiguous in both numberings, so the block maps as one range: without this
+        // F2 — the grid's documented edit gesture — never reaches any control on GTK.
+        >= NativeMethods.GDK_KEY_F1 and <= NativeMethods.GDK_KEY_F12
+            => Keys.F1 + (int)(keyval - NativeMethods.GDK_KEY_F1),
+
         // Letters and digits carry their (uppercased) ASCII code, matching the Win32 virtual-key numbering.
         >= 'a' and <= 'z' => (Keys)(keyval - 0x20),
         >= 'A' and <= 'Z' => (Keys)keyval,

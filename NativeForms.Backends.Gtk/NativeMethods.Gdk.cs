@@ -59,6 +59,12 @@ internal static partial class NativeMethods
     internal const uint GDK_KEY_Down = 0xff54;
     internal const uint GDK_KEY_Insert = 0xff63;
     internal const uint GDK_KEY_Delete = 0xffff;
+
+    /// <summary>The function keys run contiguously from <c>F1</c>, so the whole block maps as a range.</summary>
+    internal const uint GDK_KEY_F1 = 0xffbe;
+
+    /// <summary>The last function key this toolkit names; <see cref="Keys.F12"/> is its counterpart.</summary>
+    internal const uint GDK_KEY_F12 = 0xffc9;
     internal const uint GDK_KEY_asterisk = 0x02a;
     internal const uint GDK_KEY_plus = 0x02b;
     internal const uint GDK_KEY_minus = 0x02d;
