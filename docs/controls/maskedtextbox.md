@@ -49,6 +49,7 @@ Unfilled slots render as `PromptChar`.
 | Name | Description |
 |---|---|
 | `MaskedTextChanged` | Raised after a candidate value was successfully applied through the mask and changed the text. Fires alongside the inherited `TextChanged` while a mask is active. |
+| `MaskInputRejected` | Raised when a candidate value fails to map into the mask and is reverted; `MaskInputRejectedEventArgs` carries the failing `Position` and a `MaskedTextResultHint` in `RejectionHint`. |
 
 ### Methods
 
@@ -65,3 +66,9 @@ Inherits the members of [`TextBox`](textbox.md) (selection API, `ReadOnly`, `Cha
 - Mapping rules: literal positions render themselves and consume a matching input character when one is next (so pasting `"(123) 456-7890"` into the phone mask works as well as pasting `"1234567890"`); input remaining after the last mask position rejects the whole candidate.
 - `MaskedTextBoxTests` pin the behavior headlessly: rendering, partial input, rejection with revert, prompt/mask changes, and the raw-text extraction.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): per-keystroke caret steering through the slots — it needs key events on `ITextBoxPeer`.
+
+## Differences from System.Windows.Forms.MaskedTextBox
+
+- **The mask language is exactly the table above** — `0 9 L ? A a & C \` and nothing else. WinForms' remaining codes are *not* special here: `#` (digit/sign/space), the shift codes `< > |`, and the culture placeholders `. , : / $` all fall through as plain literals, rendered verbatim with no culture-aware substitution.
+- **Validation is transactional, whole-text** (see Notes) — no per-keystroke slot steering, no caret placement per slot.
+- `MaskInputRejected` exists as in WinForms; there is no `MaskFull` (use `MaskCompleted`), no `MaskedTextProvider`, no `TextMaskFormat`/`CutCopyMaskFormat` (use `GetTextWithoutPromptOrLiterals()`), and no `BeepOnError`.

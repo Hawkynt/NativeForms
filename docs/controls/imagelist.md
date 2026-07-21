@@ -35,6 +35,8 @@ listView.SmallImageList = icons;          // controls materialize entries on fir
 | Name | Description |
 |---|---|
 | `Add(ReadOnlySpan<int> argb)` | Adds an image from row-major 32-bit ARGB pixels and returns its index. Throws `ArgumentException` when the pixel count is not `ImageSize.Width * ImageSize.Height`. |
+| `AddPng(ReadOnlySpan<byte> png)` | Decodes a PNG (the core decoder's 8-bit non-interlaced subset) and adds it, returning its index; a size other than `ImageSize` is nearest-neighbor-resampled to fit. Throws `FormatException` outside the subset. |
+| `AddIco(ReadOnlySpan<byte> ico)` | Decodes the ICO entry closest to `ImageSize` and adds it, resampled the same way, returning its index. |
 | `AddBadged(int baseIndex, ReadOnlySpan<int> badgeArgb, int badgeWidth, int badgeHeight, ContentAlignment corner = BottomRight)` | Adds a **copy** of the base image with a badge composed onto it (status overlays like "modified" or "locked") and returns the new entry's index; the base entry stays untouched. Throws `ArgumentOutOfRangeException` for a bad index or a badge that is empty or larger than `ImageSize`, `ArgumentException` for a pixel-count mismatch. |
 | `Clear()` | Removes all images and disposes any realized native bitmaps. |
 | `Dispose()` | Disposes all realized native bitmaps; the pixel data stays usable, so the list can re-materialize later. |
@@ -45,4 +47,10 @@ listView.SmallImageList = icons;          // controls materialize entries on fir
 - **AddBadged blending**: a straight-alpha Porter-Duff "over" in integer math — opaque badge pixels overwrite, fully transparent ones preserve the base, semi-transparent ones mix (e.g. 50 % red over opaque blue yields `FF80007F`). `corner` anchors the badge at one of the nine `ContentAlignment` points, bottom-right by default.
 - `Dispose` differs from `Clear`: `Clear` drops the pixels too, `Dispose` only the native bitmaps.
 - `ImageListTests` pin the backend-free adds, the size validation, lazy materialization with per-index caching, the backend-swap rebuild and pixels-survive-dispose; `ImageListBadgeTests` pin the overwrite/preserve/blend cases, all corner anchors, base immutability and the argument validation.
-- Partially done per [docs/PRD.md](../PRD.md) §7.7: wiring into controls via `ImageIndex`/`ImageKey` is pending; the badge overlays (§7.9) are done.
+- Consumed via `ImageList` + `ImageIndex` pairs across the toolkit — [`ListView`](listview.md), [`TreeView`](treeview.md), [`ComboBox`](combobox.md), [`TabControl`](tabcontrol.md) and the strips.
+
+## Differences from System.Windows.Forms.ImageList
+
+- **No `Images` collection.** The WinForms `ImageCollection` (with its `Image` objects, string keys and removal-by-key) maps to the flat API above: `Add`/`AddPng`/`AddIco` return the index you hand to a control's `ImageIndex`, `Count` sizes the list, `Clear` empties it. There is no `ImageKey` — indices only — and no per-entry removal.
+- **No `ColorDepth`, no `TransparentColor`**: storage is fixed 32-bit ARGB with real alpha.
+- `AddBadged` (compose a status badge onto a copy of an entry) is a NativeForms extension.

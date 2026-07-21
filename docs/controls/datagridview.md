@@ -1,10 +1,11 @@
 # DataGridView
 
 > The flagship owner-drawn control: a vertically virtualized data grid whose rows are arbitrary
-> objects and whose cells — text, check, button, link, multi-image, progress, combo, numeric, date —
-> are produced by reflection-free selector lambdas. Sorting and column order run over index
-> indirections that never touch the model, cells edit in place through hosted editors and popups,
-> and millions of rows paint at constant per-row cost in the native theme.
+> objects and whose cells — text, masked text, check, button, link, multi-image, progress, combo,
+> numeric, domain, date, color — are produced by reflection-free selector lambdas. Sorting and
+> column order run over index indirections that never touch the model, cells edit in place through
+> hosted editors, popups and dialogs, and millions of rows paint at constant per-row cost in the
+> native theme.
 
 `Hawkynt.NativeForms.DataGridView` · strategy: **owner-drawn** (native theme) · peer: `ICanvasPeer`
 
@@ -69,11 +70,15 @@ Inherits the common members of [`Control`](control.md).
 | `SelectedItem` | `object?` | `null` | The selected row item; setting selects by `IndexOf`. |
 | `SelectedItems` | `IEnumerable<object?>` (get) | empty | The selected items in model order: the whole Ctrl/Shift set under `MultiSelect`, otherwise the single row. |
 | `CurrentColumnIndex` | `int` | `0` | The column keyboard activation (Space/Enter) and F2 target; follows the last clicked cell. |
-| `TopRow` | `int` (get) | `0` | Display index of the first visible data row (vertical scroll position). |
+| `TopRow` | `int` | `0` | Display index of the first visible data row (vertical scroll position). Settable — the value clamps into the scroll range; the vertical scrollbar thumb reads and writes it. |
+| `EditMode` | `DataGridViewEditMode` | `EditOnKeystrokeOrF2` | How cells enter edit mode: keystroke/F2/double-click (default), `EditOnEnter` (a cell edits as soon as it becomes current), or `EditProgrammatically` (only `BeginEdit`). |
+| `ShowCellToolTips` | `bool` | `true` | Whether resting the pointer on a cell whose column has a `TooltipSelector` pops that text up near the cursor. |
+| `IsCurrentCellDirty` | `bool` (get) | `false` | Whether the hosted editor's content changed since the edit began; cleared when the edit ends. Popup kinds commit through their pick gesture and never report dirty. |
+| `IsVerticalScrollBarVisible` / `IsHorizontalScrollBarVisible` | `bool` (get) | `false` | Whether the interactive scrollbar strips are currently shown (rows/columns overflow the viewport). |
 | `SortedColumn` | `DataGridViewColumn?` (get) | `null` | The column the grid is currently sorted by. |
 | `SortOrder` | `SortOrder` (get) | `None` | The active sort direction; `None` shows `Items` order. |
 | `IsEditing` | `bool` (get) | `false` | Whether a cell is currently in edit mode. |
-| `EditingControl` | `Control?` (get) | `null` | The hosted editor while a `Text`/`NumericUpDown` cell edits; popup kinds host no child control. |
+| `EditingControl` | `Control?` (get) | `null` | The hosted editor while a `Text`/`MaskedText`/`NumericUpDown`/`DomainUpDown` cell edits; popup and dialog kinds host no child control. |
 | `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
 
 ### Events
@@ -90,6 +95,10 @@ handlers stay stable while the grid is sorted or the columns are reordered.
 | `CellBeginEdit` | Raised before a cell enters edit mode; set `Cancel` to keep it read. |
 | `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, the chosen item, or `DateTime`); set `Cancel` to veto the write and keep the cell in edit mode. |
 | `CellEndEdit` | Raised after a cell leaves edit mode, whether the edit committed or was cancelled. |
+| `CurrentCellDirtyStateChanged` | Raised when `IsCurrentCellDirty` flips — on the first editor change after the edit begins, and again when the edit ends. |
+| `RowValidating` | Raised before the current row is left for another one, carrying the row being left; set `Cancel` to keep the selection where it is. |
+| `RowValidated` | Raised after the current row was left without a `RowValidating` veto. |
+| `PasteCompleted` | Raised after `Paste` processed clipboard text — every attempted cell already ran its own `CellValidating`. |
 
 ### Methods
 
@@ -104,6 +113,7 @@ handlers stay stable while the grid is sorted or the columns are reordered.
 | `CancelEdit()` | Leaves edit mode without writing, still raising `CellEndEdit`. |
 | `GetCellBounds(rowIndex, columnIndex)` | The client-space rectangle of a cell, honoring scroll, per-row heights, hidden rows, sorting and display order; `Rectangle.Empty` outside the visible window. |
 | `GetClipboardContent()` | The selection as tab-separated text (see *Clipboard*). |
+| `Paste(string text)` | Pastes tab-separated text starting at the current cell (see *Clipboard*); Ctrl+V feeds this from the system clipboard. |
 
 ### DataGridViewColumn
 
@@ -116,17 +126,21 @@ Core members:
 | `HeaderText` | `string` | ctor | Text painted in the column header. |
 | `Kind` | `DataGridViewColumnKind` | `Text` | How the column renders and reacts to clicks (see *Column kinds*). |
 | `Width` | `int` | `100` | Column width in pixels. |
+| `MinimumWidth` | `int` | `8` | The narrowest width the column accepts (floored at 2 px): the lower bound of a divider drag and of a `Fill` column's share. |
+| `FillWeight` | `float` | `100` | The column's share of the leftover viewport width under `AutoSizeMode.Fill`, relative to the other fill columns' weights. |
+| `Resizable` | `DataGridViewTriState` | `NotSet` | Whether the user may drag this column's divider: `True`/`False` override the grid's `AllowUserToResizeColumns`; `NotSet` inherits it — WinForms semantics. |
 | `Alignment` | `ContentAlignment` | `MiddleLeft` | Alignment of header and cell content. |
 | `ValueSelector` | `Func<object?, object?>` | ctor | Maps a row item to the cell value, rendered via `ToString()`. |
 | `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional per-cell icon before the text (text kinds); `null` result means none. |
-| `DisplayTextSelector` | `Func<object?, string?>?` | `null` | Overrides the displayed cell text; `null` result falls back to `ValueSelector`. |
+| `FormatSelector` | `Func<object?, string>?` | `null` | Formats the `ValueSelector` result into display text — the reflection-free `CellFormatting` seam. Shapes the displayed text only (editors still seed from the raw value); the result is cached per cell until the row changes. |
+| `DisplayTextSelector` | `Func<object?, string?>?` | `null` | Overrides the displayed cell text wholesale; `null` result falls back to `FormatSelector`/`ValueSelector`. |
 | `CellStyleSelector` | `Func<object?, DataGridViewCellStyle>?` | `null` | Per-cell style overrides — a value type with optional `ForeColor`, `BackColor` and `Alignment`; unset members keep the column/theme default. |
 | `TooltipSelector` | `Func<object?, string?>?` | `null` | Per-cell tooltip text, surfaced through `GetCellTooltip`. |
 | `ReadOnly` | `bool` | `false` | Whether every cell in the column refuses edits and check toggling. |
 | `ReadOnlyCellSelector` | `Func<object?, bool>?` | `null` | Per-cell read-only predicate over the row item. |
 | `SortMode` | `DataGridViewColumnSortMode` | `NotSortable` | `Automatic` makes a header click toggle ascending/descending. |
 | `SortComparison` | `Comparison<object?>?` | `null` | Row-item comparison used when this column sorts; `null` compares the `ValueSelector` values. |
-| `AutoSizeMode` | `DataGridViewAutoSizeColumnMode` | `None` | `AllCells` fits the widest cell text in the visible row window, remeasured each paint. |
+| `AutoSizeMode` | `DataGridViewAutoSizeColumnMode` | `None` | `AllCells` fits the widest cell text in the visible row window, remeasured each paint; `Fill` shares the leftover viewport width with the other fill columns by `FillWeight`, floored at `MinimumWidth`. |
 | `Frozen` | `bool` | `false` | Pins the column at the left edge: frozen columns form the leading display run and stay put while `HorizontalOffset` scrolls the rest underneath. |
 | `DisplayIndex` | `int` | `-1` | The column's position in the display order (negative = its `Columns` position). Drag-reorder rewrites it on every column; `Columns` itself is never reordered. |
 
@@ -146,6 +160,8 @@ Kind-specific content and editing members:
 | `NumberSelector` / `NumberSetter` | `Func<object?, decimal>?` / `Action<object?, decimal>?` | `NumericUpDown` | Seed and write-back of the hosted numeric editor; the written value is already clamped into [`Minimum`, `Maximum`]. |
 | `Minimum` / `Maximum` / `Increment` / `DecimalPlaces` | `decimal` ×3, `int` | `NumericUpDown` | Editor range (0..100), spinner/arrow step (1) and displayed digits (0). |
 | `DateSelector` / `DateSetter` | `Func<object?, DateTime>?` / `Action<object?, DateTime>?` | `DateTime` | Seed and write-back of the popup calendar; the picked day keeps the seed's time of day. |
+| `Mask` | `string` | `MaskedText` | The input mask the hosted [`MaskedTextBox`](maskedtextbox.md) editor forces; empty hosts a plain masked box. Commits through `TextSetter`. |
+| `ColorSelector` / `ColorSetter` | `Func<object?, Color>?` / `Action<object?, Color>?` | `Color` | The swatch color and the write-back of the picked color; both are required for the cell to edit. |
 
 ### Column kinds
 
@@ -160,6 +176,9 @@ Kind-specific content and editing members:
 | `ComboBox` | The value text plus a drop arrow | Edits in a popup choice list; the pick commits through `ValueSetter`. |
 | `NumericUpDown` | The value as text | Edits in a hosted `NumericUpDown` clamped and stepped by the column. |
 | `DateTime` | The formatted date as text | Edits in the popup month calendar (the `DateTimePicker` engine); the pick commits through `DateSetter`. |
+| `MaskedText` | The value text | Edits in a hosted [`MaskedTextBox`](maskedtextbox.md) forcing the column's `Mask`; commits through `TextSetter`. |
+| `DomainUpDown` | The value as text | Edits in a hosted [`DomainUpDown`](domainupdown.md) over `ItemsSelector`'s choices; commits through `ValueSetter`. |
+| `Color` | A color swatch from `ColorSelector` | Edits through the platform's modal color dialog; the pick commits through `ColorSetter`, cancel writes nothing. |
 
 ## Notes
 
@@ -218,16 +237,20 @@ path — return cached values and capture nothing.
 
 ### Cell editing
 
-`BeginEdit` hosts a `TextBox` (`Text`) or `NumericUpDown` (`NumericUpDown`) over the cell, or floats
-a popup below it — the choice list of a `ComboBox` cell, the month calendar of a `DateTime` cell. It
+`BeginEdit` hosts a `TextBox` (`Text`), `MaskedTextBox` (`MaskedText`), `NumericUpDown` or
+`DomainUpDown` over the cell, floats a popup below it — the choice list of a `ComboBox` cell, the
+month calendar of a `DateTime` cell — or opens the platform's modal color dialog (`Color`). It
 refuses (returning `false`) for read-only cells, kinds whose edit selectors/setters are unset (a
 `Text` column without `TextSetter` is display-only), merged or hidden rows, cells outside the
-visible window, a `CellBeginEdit` veto, or popup kinds before realization. An edit already active
-on another cell is committed first; its validation veto also refuses the new edit. Entry gestures:
-double-click, F2 on the current cell, or typing a character (text/numeric kinds; the character seeds
-the editor).
+visible window, a `CellBeginEdit` veto, or popup/dialog kinds before realization. An edit already
+active on another cell is committed first; its validation veto also refuses the new edit. Entry
+gestures follow `EditMode`: with the default `EditOnKeystrokeOrF2` a double-click, F2 on the current
+cell, or typing a character (text/numeric kinds; the character seeds the editor) begins the edit;
+`EditOnEnter` additionally edits a cell the moment it becomes current; `EditProgrammatically`
+ignores every gesture. While an edit is open, the first editor change flips `IsCurrentCellDirty`
+(raising `CurrentCellDirtyStateChanged`); the flag clears when the edit ends.
 
-There is no toolkit-wide focus model yet, so edits commit at the honest points available:
+A hosted native editor cannot preview keys yet, so edits commit at the honest points available:
 Enter on the grid surface (Escape cancels), a press on the grid outside the editor (click-away —
 commit first, then the click), the edited row scrolling out of the visible window (commit, matching
 the classic grid; a validation veto abandons instead so scrolling never wedges), and explicit
@@ -236,6 +259,10 @@ Enter on a combo choice, picking a day in the calendar — and light dismissal c
 runs `CellValidating` first; a veto keeps the cell (or popup) editing and writes nothing.
 `CellEndEdit` always closes the cycle. While a cell edits, the keyboard belongs to the edit; the
 hosted editor's bounds follow the cell under scroll and resize.
+
+Row-level validation piggybacks on the current row: leaving it for another one raises the vetoable
+`RowValidating` (a `Cancel` keeps the selection where it is), then `RowValidated` once the move
+committed.
 
 ### Columns: resize, auto-size, frozen, reorder
 
@@ -248,18 +275,35 @@ the pinned run priority over columns scrolled beneath it. With `AllowUserToOrder
 header past a neighbor reorders the display by rewriting every column's `DisplayIndex` — the drag
 never crosses the frozen boundary, and the model `Columns` list is never touched.
 
-### Keyboard, wheel and clipboard
+### Scrolling
+
+When the rows or columns overflow the viewport, the grid paints interactive themed scrollbar strips
+(`IsVerticalScrollBarVisible`/`IsHorizontalScrollBarVisible`): the arrows step, a channel click
+pages, and dragging a thumb scrubs `TopRow` (vertical) or `HorizontalOffset` (horizontal) live —
+the shared `ScrollBarRenderer` geometry, so they match the standalone
+[scrollbars](scrollbar.md). The wheel scrolls three rows per notch (selection untouched);
+Shift+wheel scrolls horizontally by 30 px per notch, clamped. `TopRow` is settable for programmatic
+vertical scrolling; `EnsureVisible` targets a row.
+
+### Keyboard and clipboard
 
 Up/Down move the selection by one display row, PageUp/PageDown by one visible page, Home/End to the
 edges — always skipping hidden, unselectable and merged rows; Shift extends under `MultiSelect`.
 Space/Enter raise `CellClick` on the current cell, F2 edits it, printable characters start a text or
-numeric edit. The wheel scrolls three rows per notch (selection untouched); Shift+wheel scrolls
-horizontally by 30 px per notch, clamped.
+numeric edit.
 
 `GetClipboardContent()` renders the selection as text: one line per selected row in display order,
 the cells in display column order through the usual display selectors, joined with tabs; merged
 rows contribute their full-row text as the whole line; empty without a selection. Ctrl+C puts
 exactly this on the system clipboard through the backend.
+
+`Paste(string)` is the reverse — the Excel-style block paste every WinForms grid hand-rolls: lines
+map onto display rows from the current row downward (skipping hidden, unselectable and merged
+rows), tab-separated cells onto display columns from the current column rightward; content past the
+last row or column is dropped. Each target cell converts its text to the column kind's value and
+writes through that kind's setter — read-only cells, display-only columns and unparseable text are
+skipped, their position still consumed, and every write runs `CellValidating` first (a veto skips
+that one cell). `PasteCompleted` closes the operation. Ctrl+V feeds it from the system clipboard.
 
 ### Theming
 
@@ -268,5 +312,36 @@ selection background/text, grid lines in the grid-line color, sort arrows and th
 header text color, links and progress fills in the accent color. `AlternatingRows` tints odd
 display rows.
 
-**Not yet implemented** (per `docs/PRD.md` §7.4): clipboard paste, an interactive horizontal
-scrollbar, formatting beyond the selectors, and DPI + dark mode.
+**Not yet implemented** (per `docs/PRD.md` §7.4): DPI + dark mode polish.
+
+## Differences from System.Windows.Forms.DataGridView
+
+The grid keeps the WinForms *shape* — columns, cell events, in-place editing, header sort — but its
+data model is deliberately different, in service of trim-safety and constant memory:
+
+- **No `Rows` collection, no cell objects.** Rows are your own objects in `Items`
+  (`ObservableList<object?>`); every cell reads and writes through the column's selector/setter
+  lambdas. There are no `DataGridViewRow`/`DataGridViewCell` instances to index, style or tag.
+- **No `CurrentCell` object.** The current position is the pair `SelectedRowIndex` (model index
+  into `Items`) + `CurrentColumnIndex` (model index into `Columns`).
+- **The edit pipeline is `CellValidating` → column setter → `CellEndEdit`.** There is no
+  `CellValueChanged` (the setter *is* the value change — react there) and no `CellParsing`
+  (conversion is the column kind's job); `CellFormatting` exists as the `FormatSelector` lambda,
+  not an event.
+- **Selection is full-row only.** No `SelectionMode`, no cell/column selection. `MultiSelect`
+  defaults to `false` (WinForms: `true`), and the selection readout is
+  `SelectedItem`/`SelectedItems` — no `SelectedRows`/`SelectedCells` collections.
+- **No new-row placeholder.** `AllowUserToAddRows`/`AllowUserToDeleteRows` and the `*` row do not
+  exist — mutate `Items` instead.
+- **Virtualization is paint-only and always on.** Only the visible row window is painted and
+  measured, whatever the row count — so there is no `VirtualMode` and no `CellValueNeeded`; the
+  selectors already are the on-demand value source.
+- **No `EditingControlShowing`.** The active hosted editor is exposed directly through the
+  `EditingControl` property.
+- **`SortMode` defaults to `NotSortable`** (WinForms text columns: `Automatic`) — opt each sortable column in.
+  Sorting reorders a display map; `Items` is never mutated (unlike WinForms' bound-list sort).
+- **Cell clicks land on mouse-down**, not mouse-up: selection, `CellClick` and `CellContentClick`
+  fire on the press.
+- **Naming**: `GetCellBounds` (WinForms: `GetCellDisplayRectangle`), `TopRow` (WinForms:
+  `FirstDisplayedScrollingRowIndex`), `ShowColumnHeaders`/`ShowRowHeaders` (WinForms:
+  `ColumnHeadersVisible`/`RowHeadersVisible`); all cell events carry model indices.

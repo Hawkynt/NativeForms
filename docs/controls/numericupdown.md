@@ -32,6 +32,7 @@ spinner.UpButton();   // 0.00 -> 0.25
 | `Value` | `decimal` | `0` | The current value, clamped into the range. Reading it commits a pending typed edit first, so callers always see what the user entered. |
 | `Increment` | `decimal` | `1` | The step a spinner button or Up/Down key changes the value by. Negative values throw `ArgumentOutOfRangeException`. |
 | `DecimalPlaces` | `int` | `0` | Decimal digits the editor displays (0–28); out-of-range values throw. |
+| `ThousandsSeparator` | `bool` | `false` | Whether the editor displays group separators (`"N"` instead of `"F"` formatting); typed input parses with separators either way. |
 
 ### Events
 
@@ -51,5 +52,11 @@ The inherited `Text` property is the hosted editor's content; assigning it count
 
 - Built on the shared `UpDownBase` engine (also behind [`DomainUpDown`](domainupdown.md)): the native editor fills the field so caret, selection, clipboard and IME stay platform-native, and the owner-drawn surface paints the themed up/down button column (`ScrollBarSize + 1` px wide) at the right edge.
 - **Autorepeat.** Clicking a spinner button steps once; holding it repeats through a backend timer — 500 ms initial delay, then every 50 ms. Release, or the pointer leaving the control, stops it. `NumericUpDownTests` drive the timer headlessly.
-- **Commit points, honestly.** There is no toolkit-wide focus model yet, so a typed edit has no Enter-key moment to commit at. Instead a pending edit is committed — parsed and clamped, or reverted when unparsable — before any step (buttons, keys, autorepeat, exactly like the classic control validates before stepping), when the surface loses focus, and whenever `Value` is read while an edit is pending (mirroring the classic getter-side validation). Out-of-range input clamps and the editor is rewritten to the clamped value; garbage reverts to the current value.
+- **Commit points, honestly.** A native text widget cannot preview keys yet, so a typed edit has no Enter-key moment to commit at. Instead a pending edit is committed — parsed and clamped, or reverted when unparsable — before any step (buttons, keys, autorepeat, exactly like the classic control validates before stepping), when the surface loses focus, and whenever `Value` is read while an edit is pending (mirroring the classic getter-side validation). Out-of-range input clamps and the editor is rewritten to the clamped value; garbage reverts to the current value.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.5 and §7.1): an Enter commit from inside the hosted editor — it needs key events on `ITextBoxPeer` and the focus model.
+
+## Differences from System.Windows.Forms.NumericUpDown
+
+- **Clamping happens at the commit points** (before a step, on focus loss, on a `Value` read) rather than per keystroke, and there is **no `MaxLength`** or input-length limiting — type freely, the commit clamps or reverts.
+- `ThousandsSeparator` exists as in WinForms; **`Hexadecimal`, `InterceptArrowKeys` and `Accelerations` do not** — arrow keys always step, at the fixed autorepeat cadence.
+- No `UpDownAlign`, no `ReadOnly` on the spinner itself (the hosted editor's `ReadOnly` is not surfaced).

@@ -52,6 +52,8 @@ The inherited `Text` property is overridden: in the editable style it mirrors th
 | Name | Description |
 |---|---|
 | `SelectedIndexChanged` | Raised when `SelectedIndex` changes — by popup commit, keyboard, assignment, or the selected item being removed. |
+| `DropDown` | Raised when the popup opens. |
+| `DropDownClosed` | Raised when the popup closes — commit, cancel and light-dismiss alike. |
 
 ### Methods
 
@@ -70,3 +72,10 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - Icons come from `ImageSelector` or `ImageList` + `ImageIndexSelector` and are painted by the shared `ListBox` row painter in both the closed field and the popup rows.
 - `ComboBoxTests` pin the whole surface headlessly: popup geometry, hover/commit, dismissal, the keyboard model, value binding, and the hosted editor.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.4): the `Simple` style and autocomplete (needs key events on `ITextBoxPeer`).
+
+## Differences from System.Windows.Forms.ComboBox
+
+- **`DropDownStyle` defaults to `DropDownList`** (closed, owner-painted), not WinForms' editable `DropDown`; `Simple` throws `NotSupportedException`.
+- **`SelectedIndexChanged` fires on commit only** — a click or Enter in the popup commits, mere hover never does — so there is no separate `SelectionChangeCommitted`; the one event covers commits, keyboard moves on the closed field and programmatic assignment.
+- **Binding is selector-based**: `DisplaySelector`/`ValueSelector` replace `DisplayMember`/`ValueMember` (no reflection), and `DataSource` is a set-only snapshot, not a live currency-managed binding.
+- `DropDown` and `DropDownClosed` exist as in WinForms; there is no `TextUpdate`, `DropDownWidth`/`DropDownHeight` (the popup is field-wide, `MaxDropDownItems` rows tall) or autocomplete yet.

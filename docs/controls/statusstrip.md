@@ -64,3 +64,11 @@ hosting differs. It is inset 2 px horizontally and 3 px vertically within its pa
 - Any panel state change (`Text`, `Spring`, `Value`, …) bubbles through the item collection into a
   repaint; the bar draws a theme border line along its top edge.
 - Testable headlessly through the test backend's recording canvas.
+
+## Differences from System.Windows.Forms.StatusStrip
+
+- **`ToolStripProgressBarItem` replaces `ToolStripProgressBar`** — an owner-drawn item painting
+  through the shared gauge renderer, not a hosted `ProgressBar` control (no `Style`/marquee in the
+  strip).
+- The shared item-model differences apply (no `ItemClicked`, items are not controls — see
+  [menustrip.md](menustrip.md)); the size grip is visual only, the frame handles the actual resize.

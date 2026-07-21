@@ -28,6 +28,13 @@ in the platform's own theme**, so they still look native.
 It is built to be **small and quick**: reflection-free, `IsAotCompatible`, buffered peer state,
 value-type geometry, and no per-frame allocation — kilobytes of managed overhead, not megabytes.
 
+**WinForms compatibility, honestly.** The API is WinForms-shaped, not WinForms-cloned: porting is
+mostly a namespace swap, but reflection-bound surfaces (`DataBindings`, `DisplayMember`) become
+delegates, a few defaults differ, and legacy corners like MDI are deliberate non-goals. The
+deviations are documented per control — start with the base-class list in
+[docs/controls/control.md](docs/controls/control.md#differences-from-systemwindowsformscontrol);
+every page whose control diverges carries its own "Differences from WinForms" section.
+
 ## 🧩 Architecture
 
 ```
@@ -79,7 +86,7 @@ tables, behavior notes). What ships today:
 | Labels & media | [`Label`](docs/controls/label.md) · [`PictureBox`](docs/controls/picturebox.md) · [`ImageList`](docs/controls/imagelist.md) (icons + badges) |
 | Ranges & dates | [`TrackBar`](docs/controls/trackbar.md) · [`HScrollBar` / `VScrollBar`](docs/controls/scrollbar.md) · [`ProgressBar`](docs/controls/progressbar.md) (incl. marquee) · [`DateTimePicker`](docs/controls/datetimepicker.md) · [`MonthCalendar`](docs/controls/monthcalendar.md) |
 | Lists & trees | [`ListBox`](docs/controls/listbox.md) · [`CheckedListBox`](docs/controls/checkedlistbox.md) · [`ComboBox`](docs/controls/combobox.md) · [`ListView`](docs/controls/listview.md) (5 views, groups) · [`TreeView`](docs/controls/treeview.md) · [`TreeListView`](docs/controls/treelistview.md) |
-| Data grid | [`DataGridView`](docs/controls/datagridview.md) — virtualized, 9 column kinds, editing, sorting, frozen columns, reorder, merged rows, clipboard |
+| Data grid | [`DataGridView`](docs/controls/datagridview.md) — virtualized, 12 column kinds, editing, sorting, frozen columns, reorder, merged rows, clipboard copy/paste |
 | Containers & layout | [`Panel`](docs/controls/panel.md) (AutoScroll) · [`GroupBox`](docs/controls/groupbox.md) · [`TabControl`](docs/controls/tabcontrol.md) · [`SplitContainer`](docs/controls/splitcontainer.md) · [`Expander`](docs/controls/expander.md) · [`FlowLayoutPanel`](docs/controls/flowlayoutpanel.md) · [`TableLayoutPanel`](docs/controls/tablelayoutpanel.md) |
 | Menus, toolbars, status | [`MenuStrip`](docs/controls/menustrip.md) · [`ContextMenuStrip`](docs/controls/contextmenustrip.md) · [`ToolStrip`](docs/controls/toolstrip.md) · [`StatusStrip`](docs/controls/statusstrip.md) · [`ToolTip`](docs/controls/tooltip.md) · [`NotifyIcon`](docs/controls/notifyicon.md) |
 | Non-visual | [`Application` & backends](docs/controls/application.md) · [`Control` base class](docs/controls/control.md) · [`Timer`](docs/controls/timer.md) |

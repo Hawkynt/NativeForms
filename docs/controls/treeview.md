@@ -37,7 +37,7 @@ Inherits the common members of [`Control`](control.md).
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `Nodes` | `TreeNodeCollection` | empty | The root nodes. Mutating any level of the hierarchy re-flattens and repaints. |
-| `SelectedNode` | `TreeNode?` | `null` | The selected node. Setting it scrolls the node into view and raises `AfterSelect`; a node attached to a different tree throws `ArgumentException`. |
+| `SelectedNode` | `TreeNode?` | `null` | The selected node. Setting it runs the vetoable `BeforeSelect`, scrolls the node into view and raises `AfterSelect`; setting `null` clears silently (no events); a node attached to a different tree throws `ArgumentException`. |
 | `CheckBoxes` | `bool` | `false` | Whether every node shows a themed check box. |
 | `ImageList` | `ImageList?` | `null` | The icon store for `TreeNode.ImageIndex`; `null` for no icons. |
 | `ItemHeight` | `int` | theme row height | Pixel height of a row — also the indent per level. |
@@ -51,14 +51,23 @@ Inherits the common members of [`Control`](control.md).
 
 | Event | Description |
 |---|---|
+| `BeforeSelect` | Raised before the selection moves to a node; set `TreeViewCancelEventArgs.Cancel` to veto. |
 | `AfterSelect` | Raised after `SelectedNode` changes to a node. |
-| `BeforeExpand` | Raised before a node expands; set `TreeViewCancelEventArgs.Cancel` to veto. |
+| `BeforeExpand` | Raised before a node expands; set `Cancel` to veto. |
 | `AfterExpand` | Raised after a node expanded. |
 | `BeforeCollapse` | Raised before a node collapses; set `Cancel` to veto. |
 | `AfterCollapse` | Raised after a node collapsed. |
+| `BeforeCheck` | Raised before a node's `Checked` state flips; set `Cancel` to veto. |
 | `AfterCheck` | Raised after a node's `Checked` state changed. |
 
 All event args carry the affected node in `Node`.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `ExpandAll()` | Expands every node in the tree. |
+| `CollapseAll()` | Collapses every node in the tree. |
 
 ### TreeNode
 
@@ -119,3 +128,10 @@ appear only on nodes that actually have children.
 
 **Not yet implemented** (per `docs/PRD.md` §7.4): label editing (waits on the text-box overlay) and
 state images; multi-selection, drag and drop and a virtual-mode node API are further open TODOs.
+
+## Differences from System.Windows.Forms.TreeView
+
+- **The event args carry no `TreeViewAction`**: `TreeViewEventArgs` has only `Node`, `TreeViewCancelEventArgs` only `Node` and `Cancel` — a handler cannot tell mouse from keyboard from programmatic origin.
+- **`SelectedNode = null` raises no event**: clearing the selection fires neither `BeforeSelect` nor `AfterSelect` (WinForms raises `AfterSelect` with a null node); the veto pipeline runs only when selecting an actual node.
+- `BeforeSelect`/`BeforeCheck` and `ExpandAll`/`CollapseAll` exist as in WinForms (node-level folding is `Expand`/`ExpandAll`/`Collapse`/`Toggle` on `TreeNode`; there is no `TreeNode.CollapseAll`).
+- No `FullPath`/`PathSeparator`, no `HideSelection`, no `Sorted`/`TreeViewNodeSorter`, no label editing yet (see above).

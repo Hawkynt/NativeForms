@@ -47,3 +47,13 @@ controls through a per-control text map, a single shared popup and a single dela
   the host desktop.
 - Testable headlessly: `ToolTipTests` drive the delays through the test backend's controllable
   timer and pin the popup geometry, painting, every hide path and `Dispose`.
+
+## Differences from System.Windows.Forms.ToolTip
+
+- **The surface is `InitialDelay`, `AutoPopDelay`, `SetToolTip`/`GetToolTip`, `Hide`, `Dispose`** —
+  there is no `ReshowDelay`, no `AutomaticDelay`, no `ShowAlways`, no balloon/title styling, and no
+  manual `Show(text, control, …)` overloads; tips appear only through the hover lifecycle.
+- **`SetToolTip` holds a strong reference to the control** in its text map. A `ToolTip` outliving
+  its controls keeps them alive until you unregister (`SetToolTip(control, null)`) or `Dispose()` —
+  dispose the component with the form it serves.
+- Tips currently show over owner-drawn controls only (see Notes).

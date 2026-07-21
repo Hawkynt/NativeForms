@@ -30,7 +30,8 @@ form.Controls.Add(bar);
 
 | Name | Description |
 |---|---|
-| `ValueChanged` | Raised when `Value` changes (after clamping) — live, once per position change, while the thumb is dragged. |
+| `Scroll` | Raised for **user gestures only** — thumb drag, track page, arrow key — after the value moved; programmatic `Value` writes raise no `Scroll`. |
+| `ValueChanged` | Raised when `Value` changes (after clamping) — by gesture or assignment; live, once per position change, while the thumb is dragged. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
@@ -42,3 +43,8 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - **Geometry**: an 8 px margin at both ends leaves room for the 10 px thumb to center over the extremes; one tick paints per `TickFrequency` step plus one at `Maximum` when the range does not divide evenly.
 - `TrackBarTests` pin the defaults, the clamping, both key sets, track paging, live drag scrubbing (one `ValueChanged` per change, none after release) and the painted groove/fill/thumb/tick geometry in both orientations.
 - Done per [docs/PRD.md](../PRD.md) §7.5; no open items.
+
+## Differences from System.Windows.Forms.TrackBar
+
+- `Scroll` exists and keeps the WinForms gesture-only contract, but carries plain `EventArgs` (no `ScrollEventArgs`).
+- No `TickStyle` (ticks always paint below/right of the groove), no `SetRange`, no `AutoSize`.

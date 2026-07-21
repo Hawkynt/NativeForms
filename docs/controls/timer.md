@@ -37,7 +37,7 @@ timer.Start(); // == Enabled = true
 
 ## Notes
 
-- **Deferred arm**: the native timer source comes from the backend the application runs on, so a timer enabled before `Application.Run` has started cannot tick yet — the enabled wish is remembered and the source is armed on the next `Enabled`, `Interval` or `Start` touch while the loop is running, which is exactly when a handler inside that loop first pokes the timer.
+- **Pending arm**: the native timer source comes from the backend the application runs on, so a timer enabled before `Application.Run` has started cannot tick yet — it registers as *pending*, and `Application.Run` arms every pending enabled timer right before the loop starts pumping. Starting a timer in a form's constructor therefore just works; no touch after `Run` is needed.
 - **Interval restart**: assigning `Interval` while enabled re-starts the peer at the new period immediately; while stopped it only stores the value and creates nothing.
 - The native peer is created once on first arm and reused across `Start`/`Stop` cycles; `Dispose` unhooks and releases it.
 - `TimerTests` pin the default and validation, start/stop mirroring `Enabled`, tick forwarding, the running restart vs. the stopped no-op, idempotent enabling, peer reuse, dispose, the deferred arm through a real `Application.Run` and a zero-allocation tick path.

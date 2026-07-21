@@ -133,3 +133,17 @@ model — tracked in [docs/PRD.md](../PRD.md) §7.1/§7.6.
   `OpenIndex`.
 - Testable headlessly: `MenuStripTests` drive the bar and its popups through the test backend's
   recording canvas and popup peers — geometry, marks, hover fills, keyboard and shortcut dispatch.
+
+## Differences from System.Windows.Forms.MenuStrip
+
+- **Items are not controls**: `ToolStripItem` owns no peer, no bounds and no per-item events beyond
+  the surface above — the hosting strip lays out and paints. There is **no `ItemClicked`** on any
+  strip; subscribe the item's `Click` or attach an `ICommand`.
+- **`Checked` is a plain `bool`** — no `CheckState`, no indeterminate menu marks.
+- **No `DropDownOpening`/`DropDownOpened`** on drop-down items — populate `DropDownItems` up front
+  (a context menu's `Opening` covers the lazy case; see
+  [contextmenustrip.md](contextmenustrip.md)).
+- **`CheckedGroup` is a NativeForms extension**: sibling items sharing a group string are mutually
+  exclusive and paint radio bullets — WinForms has no built-in radio grouping for menu items.
+- Alt bar activation and form-wide shortcut dispatch run through the form's dialog-key chain, which
+  sees keys from owner-drawn surfaces only (see [form.md](form.md)).

@@ -39,6 +39,8 @@ form.Controls.Add(picker);
 | Name | Description |
 |---|---|
 | `ValueChanged` | Raised when `Value` changes, by user gesture or assignment (after clamping). |
+| `DropDown` | Raised when the calendar popup opens. |
+| `CloseUp` | Raised when the calendar popup closes — commit, cancel and light-dismiss alike. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
@@ -51,3 +53,9 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - **Clamps interact**: raising `MinDate` above `Value` drags the value up (raising `ValueChanged`); the same for `MaxDate` downward.
 - `DateTimePickerTests` pin the defaults, all four formats, the popup position and size, commit-preserves-time, dismissal/Escape, keyboard navigation, day stepping at the clamps, the check-box greying/suppression and the mutual clamping.
 - Partially done per [docs/PRD.md](../PRD.md) §7.5: `BoldedDates`, per-part focus and time spinner editing are pending.
+
+## Differences from System.Windows.Forms.DateTimePicker
+
+- **Formatting is invariant-culture, always** — WinForms renders in the user's locale; here every pattern uses `CultureInfo.InvariantCulture` so the field is identical on every machine. The popup calendar likewise starts its weeks on Monday by default (see [monthcalendar.md](monthcalendar.md)).
+- **No `ShowUpDown`** — there is no spin-button rendering mode; the drop-down calendar is the only picker (Up/Down keys still step the day while closed).
+- `DropDown`/`CloseUp`, `ShowCheckBox`/`Checked` and the min/max clamping match WinForms; per-part focus (stepping the focused date part) is pending.

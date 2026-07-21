@@ -24,7 +24,7 @@ bar.Style = ProgressBarStyle.Marquee;   // indeterminate sweep, timer-driven
 | `Maximum` | `int` | `100` | The highest value the bar can represent. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
 | `Value` | `int` | `0` | The current progress, clamped to [`Minimum`, `Maximum`] on assignment. |
 | `Style` | `ProgressBarStyle` | `Blocks` | How the bar presents progress. Switching to `Marquee` starts the animation timer; switching away stops it. |
-| `MarqueeAnimationSpeed` | `int` | `30` | The marquee tick period in milliseconds; 0 pauses the animation. Throws `ArgumentOutOfRangeException` when negative. |
+| `MarqueeAnimationSpeed` | `int` | `100` | The marquee tick period in milliseconds (the WinForms default); 0 pauses the animation. Throws `ArgumentOutOfRangeException` when negative. |
 | `Step` | `int` | `10` | The amount `PerformStep` advances `Value` by. |
 | `Orientation` | `Orientation` | `Horizontal` | The axis the bar fills along. Horizontal bars fill left to right, vertical ones bottom to top. |
 
@@ -50,3 +50,9 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - Purely visual — it takes no focus and handles no input.
 - `ProgressBarTests` pin the defaults, `PerformStep` clamping, the bottom-up vertical fill, marquee timer start/stop, segment movement per tick, the zero-speed pause and the vertical sweep; `RadioGroupTests` pin the value clamping and proportional fill.
 - Done per [docs/PRD.md](../PRD.md) §7.5; no open items.
+
+## Differences from System.Windows.Forms.ProgressBar
+
+- **`ValueChanged` and `Orientation` are NativeForms additions** — WinForms has neither (vertical bars there need a style hack).
+- `ProgressBarStyle` offers `Blocks` and `Marquee` only; there is no `Continuous` (on modern themed Windows, `Blocks` renders continuously anyway).
+- No `Increment(int)` — use `PerformStep` or assign `Value`.

@@ -45,6 +45,16 @@ window.
   Failing is more honest than adding an icon no shell will show.
 - The decoder-free ARGB pixel contract matches the `ImageList` pipeline — no image codecs, no
   `System.Drawing.Common`.
+- The Win32 tray tip holds at most 127 characters; the Windows peer truncates longer `Text`
+  values when forwarding to the shell (the property itself keeps the full string).
 - Testable headlessly: an internal constructor binds the icon to an explicit backend, and
   `NotifyIconTests` pin buffering, forwarding, validation, shell-event forwarding and disposal
   against the test backend's recording peer.
+
+## Differences from System.Windows.Forms.NotifyIcon
+
+- **No balloon tips**: `ShowBalloonTip` and the `BalloonTip*` properties/events do not exist.
+- **No `ContextMenuStrip` on the icon** and no `MouseDown`/`MouseMove` — the surface is `Click` and
+  `DoubleClick` only.
+- `Icon` is `SetIcon(width, height, argb)` over raw pixels, not a `System.Drawing.Icon`; the
+  Windows shell truncates hover text at 127 characters (see Notes).

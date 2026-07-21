@@ -40,6 +40,15 @@ box.SelectedText = "Jane";    // replace them, caret lands after the insertion
 | `SelectionLength` | `int` | `0` | Number of selected characters. Buffered/live like `SelectionStart`. |
 | `SelectedText` | `string` | `""` | The selected run of `Text`; assigning replaces the selection and places the caret after the inserted text. |
 
+### Methods
+
+| Name | Description |
+|---|---|
+| `Select(int start, int length)` | Selects the given run (negative values clamp to zero); buffered until realization like the `Selection*` setters. |
+| `SelectAll()` | Selects the whole content. |
+| `Clear()` | Empties the box, raising `TextChanged` when it held text. |
+| `AppendText(string text)` | Appends to the content and parks the caret at the end — the classic log-window helper. |
+
 The inherited `Text` property is overridden: assigned text is normalized by `CharacterCasing` and pushed to the widget; user edits flow back from the peer and raise `TextChanged` exactly once — the peer's echo of a programmatic write never raises a second event.
 
 Inherits the common members of [`Control`](control.md).
@@ -52,3 +61,9 @@ Inherits the common members of [`Control`](control.md).
 - `CharacterCasing` is normalized in the core — on assignment and on user input alike (a corrective push rewrites the widget when it disagrees) — so it behaves identically on every backend; no `ES_UPPERCASE`/`ES_LOWERCASE` style bits.
 - [`MaskedTextBox`](maskedtextbox.md) and [`RichTextBox`](richtextbox.md) build on this control; [`SearchBox`](searchbox.md), [`ComboBox`](combobox.md) (editable style) and the spinners host one as their editor.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): an owner-drawn placeholder for multiline boxes, the `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, and an undo API.
+
+## Differences from System.Windows.Forms.TextBox
+
+- **`MaxLength` defaults to `0` = unlimited** — WinForms defaults to 32767. Same property name, different default and sentinel.
+- **No `Modified` flag, no undo** (`Undo`/`CanUndo`/`ClearUndo`), **no `ScrollBars`** (a multiline box always scrolls vertically), **no `Lines` array** and no `WordWrap` toggle.
+- `Select`/`SelectAll`/`Clear`/`AppendText` and the `Selection*` trio match WinForms; `AcceptsReturn`/`AcceptsTab` exist but are stored-only for now (see above).

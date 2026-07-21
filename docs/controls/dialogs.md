@@ -23,7 +23,7 @@ The verdict a dialog returns. The numeric values match both `System.Windows.Form
 
 ## MessageBox
 
-`MessageBox.Show(text[, caption[, buttons[, icon]]])` shows the platform's native message box and returns the pressed button as a `DialogResult`. `MessageBoxButtons` (`OK`, `OKCancel`, `YesNoCancel`, `YesNo`, `RetryCancel`) and `MessageBoxIcon` (`None`, `Error`, `Question`, `Warning`, `Information`) match the WinForms enums and the Win32 `MB_*` flags numerically. Null text or caption is treated as empty. `MessageBoxTests` pin the forwarding of every button set and the scripted result round-trip.
+`MessageBox.Show(text[, caption[, buttons[, icon]]])` — and the owner-form overloads `Show(owner, text[, caption[, buttons[, icon]]])`, which parent the box to that window — shows the platform's native message box and returns the pressed button as a `DialogResult`. `MessageBoxButtons` (`OK`, `OKCancel`, `AbortRetryIgnore`, `YesNoCancel`, `YesNo`, `RetryCancel`) and `MessageBoxIcon` (`None`, `Error`, `Question`, `Warning`, `Information`) match the WinForms enums and the Win32 `MB_*` flags numerically. Null text or caption is treated as empty. Closing a GTK message dialog through the window manager instead of a button maps to the mildest available verdict: OK-only reports `OK` (as Win32 does), `YesNo` reports `No`, `AbortRetryIgnore` reports `Ignore`, the rest `Cancel`. `MessageBoxTests` pin the forwarding of every button set and the scripted result round-trip.
 
 ## File dialogs
 
@@ -55,7 +55,7 @@ Any [`Form`](form.md) runs modally via `ShowDialog(Form? owner = null)`: the for
 
 - Setting `Form.DialogResult` to anything but `None` while modal closes the dialog with that result; closing without one yields `Cancel`.
 - A click on a `Button` with a non-`None` `Button.DialogResult` walks up to its owning form — however deep in the container tree — sets the result and closes; outside a modal loop it only sets `Form.DialogResult`.
-- Assigning `Form.CancelButton` defaults that button's `DialogResult` to `Cancel` when it still has none; `AcceptButton` is stored without touching the button. (Enter/Escape routing waits on the focus model.)
+- Assigning `Form.CancelButton` defaults that button's `DialogResult` to `Cancel` when it still has none; Enter/Escape click `AcceptButton`/`CancelButton` through the form's dialog-key chain, fed by focused owner-drawn controls (see [form.md](form.md)).
 - The form unrealizes on close (`FormClosed` fires, the peer is disposed) and can be shown again; calling `ShowDialog` while already modal throws `InvalidOperationException`.
 
 `ModalTests` pin all of the above; `DialogTests` pin the option forwarding, filter parsing/validation, OK/Cancel round-trips of every common dialog and the no-backend exception.
@@ -63,4 +63,11 @@ Any [`Form`](form.md) runs modally via `ShowDialog(Form? owner = null)`: the for
 ## Notes
 
 - Common dialogs are not controls: nothing realizes, there is no peer to keep — construct, set options, `ShowDialog()`, read the properties back after `OK`.
-- Per [docs/PRD.md](../PRD.md) §7.8: `MessageBox`, `ColorDialog` and `FontDialog` are done; the file dialogs pend `FilterIndex` write-back, the folder browser pends the Win32 initial-directory hook. `Form.ShowDialog`/`DialogResult` (§7.2) pends only the Enter/Escape routing blocked on the §7.1 focus model.
+- Per [docs/PRD.md](../PRD.md) §7.8: `MessageBox`, `ColorDialog` and `FontDialog` are done; the file dialogs pend `FilterIndex` write-back, the folder browser pends the Win32 initial-directory hook.
+
+## Differences from System.Windows.Forms
+
+- **No `MessageBoxDefaultButton`** — the platform's own default-button convention applies (typically the first/affirmative button); there are no `MessageBoxOptions` either.
+- **File dialogs carry the core option set only**: no `DefaultExt`, `AddExtension`, `CheckFileExists`/`CheckPathExists`, `RestoreDirectory`, `ValidateNames` or `OverwritePrompt` toggle (`SaveFileDialog` always prompts before overwriting) — the platform dialog's own behavior stands in for the missing knobs.
+- `ColorDialog`/`FontDialog` are seed-and-read only: no `AllowFullOpen`/`CustomColors`, no `ShowEffects`/`MinSize`/`MaxSize`.
+- On GTK, closing a message box via the window manager maps to the mildest verdict of its button set (see above) — Win32 disables the close box in the same situations instead.

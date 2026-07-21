@@ -78,3 +78,13 @@ the tab control's content area. Constructors: `TabPage()` and `TabPage(string te
   recording canvas.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.2): `Alignment` (bottom/left/right headers)
   and per-tab close buttons.
+
+## Differences from System.Windows.Forms.TabControl
+
+- **No `Selecting`/`Deselecting`** — page switches cannot be vetoed; `SelectedIndexChanged` is the
+  only selection event.
+- **No `Alignment`, no `Multiline`** (the header is always a single top strip that scrolls on
+  overflow) and **no `GetTabRect`** — header hit zones are internal.
+- **`Controls.Add` routes into `TabPages`**: adding a `TabPage` through either collection keeps both
+  in sync, and adding a non-`TabPage` child throws `InvalidOperationException` — put content on a
+  page, exactly like WinForms' designer enforces.

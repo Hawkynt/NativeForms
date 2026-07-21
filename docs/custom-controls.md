@@ -70,6 +70,11 @@ Use it like any other control: `form.Controls.Add(new Swatch { Text = "On air", 
 
 You never touch the peer. State changes call `Invalidate()` (or `Invalidate(Rectangle)` for a sub-region); the platform schedules a repaint and calls back into `OnPaint` with an `IGraphics` surface and a clip rectangle. `OnTextChanged` already invalidates for you.
 
+Two contracts the base class enforces so subclasses stay lean:
+
+- **Input is gated centrally on the effective `Enabled`.** A disabled control — or one inside a disabled ancestor — receives no mouse or key input at all (the WinForms contract), so your `OnMouse…`/`OnKey…` overrides need no `Enabled` guard of their own. Only `OnMouseLeave` still fires while disabled, so a control disabled mid-hover can clear its hot state. Click-to-focus (a press focuses a `Focusable` control before your handler runs) and the form's dialog-key preview (Tab, Enter/Escape, menu shortcuts, mnemonics — unless `IsInputKey` claims the key) are wired centrally too.
+- **`PaintEventArgs` is reused.** Peers rebind one instance to each paint's surface and clip, so never cache `e` or `e.Graphics` beyond the `OnPaint` call — draw and return.
+
 The canvas is also a **container** (`IContainerPeer`): an owner-drawn control can host real native children on top of its painted surface. That is how `Panel`, `GroupBox` and `TabPage` parent buttons and text boxes — you just add to `Controls`, the realization walk does the rest (see [architecture.md](architecture.md)).
 
 ## ContextMenuStrip and ToolTip come for free
@@ -99,7 +104,7 @@ Several themed visuals recur across controls, so they live in reusable helpers i
 
 - **State + invalidate + event.** `Checked` compares, stores, calls `this.Invalidate()`, then raises `CheckedChanged`. Never paint directly from a setter — invalidate and let the platform drive `OnPaint`.
 - **Focus.** `protected override bool Focusable => true;` — interactive controls opt in; purely visual ones (`ProgressBar`) keep the `false` default.
-- **Input.** `OnMouseUp` toggles when the left button releases inside `new Rectangle(0, 0, this.Width, this.Height)`; `OnKeyDown` toggles on `Keys.Space` and sets `e.Handled = true`.
+- **Input.** A left-button release inside the bounds and Space on key-up both route into `OnClick`, whose override flips `Checked` before raising `Click` — which is also what makes `PerformClick()` toggle like a real click. No `Enabled` guard needed anywhere: the base class gates input centrally (see above).
 - **Paint, entirely through the theme and the shared primitives:**
 
 ```csharp

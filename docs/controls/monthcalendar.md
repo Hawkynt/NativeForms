@@ -52,3 +52,9 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - Painted with the platform `ITheme` (`FieldBackground` page, `SelectionBackground`/`SelectionText` highlight, `Accent` today-circle and focus outline, `HeaderText` day names, `Border` frame). The focus outline shows only while the control has focus.
 - `MonthCalendarTests` pin the defaults, the grid-start math, invariant title/header painting, disabled greying, single/Shift/drag selection with the cap, min/max rejection, the full keyboard set, wheel/arrow paging and selection-follows-month.
 - Done per [docs/PRD.md](../PRD.md) §7.5; bolded dates are not implemented yet.
+
+## Differences from System.Windows.Forms.MonthCalendar
+
+- **Invariant culture, Monday first** — WinForms localizes month/day names and takes the first day of week from the user's locale; here the title and day names render invariantly and `FirstDayOfWeek` defaults to `Monday` (settable per control).
+- **No `SelectionRange` type**: the range is the `SelectionStart`/`SelectionEnd` pair plus `SetSelectionRange(start, end)` — same semantics, no wrapper object. Multi-day ranges, `MaxSelectionCount` and `TodayDate` behave as in WinForms.
+- **Always one month page** — no `CalendarDimensions` multi-month grid, no `ShowToday`/`ShowTodayCircle` toggles (today always wears the accent circle), no `BoldedDates` yet.

@@ -54,6 +54,13 @@ Tests bypass the registry and pass a backend directly — `Application.Run(form,
 
 **Exit/Quit semantics.** `Application.Exit()` is a *request*: it calls `IPlatformBackend.Quit()` on the backend the current `Run` selected, which posts a quit to the native loop. Before any `Run` (or after it returned), `Exit()` is a harmless no-op. Closing the main window ends the loop on its own — `Exit` is only needed to end it programmatically.
 
+**Threading.** The thread that calls `Run` becomes the UI thread: its id anchors `Control.InvokeRequired`, and a `NativeFormsSynchronizationContext` is installed on it for the duration of the loop — `Post` queues onto the loop, `Send` runs inline on the loop thread or blocks from any other, so `await` continuations inside event handlers resume on the UI thread. From worker threads, marshal through `Control.Invoke(Action)` (blocking, exception-propagating) or `Control.BeginInvoke(Action)` (fire-and-forget) — see [control.md](control.md). `Run` also arms any `Timer` started before the loop existed.
+
 **One binary, many platforms — or trim to one.** Registration is explicit construction, never reflection, so the trimmer sees exactly which backends ship. Register all three and only the backend whose `IsSupported` matches the running OS is ever realized (the macOS entry currently registers but throws on use — the Cocoa backend is a placeholder). Register only `Win32Backend` and a Windows build carries no GTK code at all. Resolution order is registration order: put the preferred backend first.
 
-**Not yet implemented.** UI-thread affinity helpers (`Control.Invoke`/`BeginInvoke`, `SynchronizationContext`) are planned — [../PRD.md](../PRD.md) §8; the Cocoa backend is tracked in §10 (M9).
+## Differences from System.Windows.Forms.Application
+
+- `Run` always takes a `Form` — there is no form-less `Application.Run()` overload and no `ApplicationContext`.
+- No `DoEvents()` (the loop is never pumped manually), no `Idle` event, no `OpenForms` collection, no `ApplicationExit`/`ThreadExit` events, no `EnableVisualStyles`/`SetHighDpiMode` bootstrap calls.
+- `Exit()` only requests the loop to quit; it raises no events and does not close forms individually.
+- The Cocoa backend is a placeholder — tracked in [../PRD.md](../PRD.md) §10 (M9).

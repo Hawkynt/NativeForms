@@ -5,6 +5,13 @@
 New to the library? Read the [architecture overview](architecture.md) first, then the
 [`Control`](controls/control.md) base page; every control page builds on those two.
 
+**WinForms compatibility.** The API is Windows-Forms-shaped, close enough that porting is mostly a
+namespace swap — but not a clone: reflection-bound surfaces are replaced by delegates, a few
+defaults differ, and some legacy corners are deliberate non-goals. The base-class deviations are
+collected in
+[Control — Differences from System.Windows.Forms.Control](controls/control.md#differences-from-systemwindowsformscontrol);
+each control page carries its own "Differences from WinForms" section where behavior diverges.
+
 ## Guides
 
 | Page | Covers |

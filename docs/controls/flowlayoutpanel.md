@@ -51,3 +51,11 @@ common members of [`Control`](control.md).
   `Margin` change, and any change to `FlowDirection` or `WrapContents`.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.2): `Anchor`/`Dock` interplay and skipping
   invisible children.
+
+## Differences from System.Windows.Forms.FlowLayoutPanel
+
+- **No `SetFlowBreak`** — a wrap happens only at the client edge; force one by sizing or ordering.
+- **A child's `Anchor` is ignored inside the flow** (WinForms uses it for cross-axis alignment and
+  stretching within a row/column); every child keeps its own `Size` at the flow position.
+- The container's `Padding` insets the flow area exactly like WinForms; `FlowDirection`/`WrapContents`
+  match.

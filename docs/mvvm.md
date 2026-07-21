@@ -67,6 +67,9 @@ public sealed class CounterViewModel : ObservableObject
 | `protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)` | Raises `PropertyChanging` for the calling property. |
 | `protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)` | Raises `PropertyChanged` for the calling property. |
 | `protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)` | Assigns if different, raising changing/changed around the write; returns whether a change occurred. |
+| `event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged` | Raised when a property's validation error is set or cleared. |
+| `string? GetError(string propertyName)` | The property's current validation error, or `null` while valid. |
+| `protected void SetError(string propertyName, string? error)` | Sets (or, with null/empty, clears) the property's single validation error — the `INotifyDataErrorInfo`-style hook, zero storage while everything is valid. |
 
 ## RelayCommand and RelayCommand&lt;T&gt;
 
@@ -75,13 +78,15 @@ button. `RelayCommand` ignores the command parameter; `RelayCommand<T>` casts it
 it to both delegates. `CanExecute` returns `true` when no guard was supplied. When the guard's
 answer may have changed, call `RaiseCanExecuteChanged()` so bound controls re-query it.
 
-Menu and tool-strip items take a command directly — `ToolStripItem.Command` executes on activation
-and its `CanExecute` gates the item's effective `Enabled`, re-evaluated on `CanExecuteChanged`.
-`Button` has no `Command` property yet (see [Notes](#notes)); there you wire the click event
-yourself, exactly as the demo does:
+Commands attach directly to the click surfaces: `Button.Command` (with `CommandParameter`) executes
+on click and puts `Enabled` under the command's guard — `CanExecute` is applied immediately and
+re-applied on every `CanExecuteChanged` — and `ToolStripItem.Command` and `SplitButton.Command` do
+the same for menu/toolbar items and split buttons. Wiring the click event by hand remains
+equivalent:
 
 ```csharp
-button.Click += (_, _) => viewModel.Increment.Execute(null);
+button.Command = viewModel.Increment;          // preferred: enable/disable follows CanExecute
+button.Click += (_, _) => viewModel.Increment.Execute(null); // manual alternative
 ```
 
 | `RelayCommand` member | Description |
@@ -152,6 +157,37 @@ All four `BindingMode` values exist:
 | `PropertyBinding(source, sourcePropertyName, getSource, setTarget, mode, setSource, getTarget, subscribeTargetChanged, unsubscribeTargetChanged)` | Creates and immediately activates the binding (full signature above). |
 | `BindingMode Mode { get; }` | The flow direction chosen at construction. |
 | `void Dispose()` | Detaches the binding from both endpoints. |
+
+### Bind sugar, converters, fallbacks, validation
+
+The fluent layer over the primitive lives in `BindingExtensions`: control-first `Bind` overloads so
+a binding reads as one line at the call site —
+
+```csharp
+label.Bind(vm, nameof(vm.Count), v => v.Display, (c, text) => c.Text = text);
+```
+
+Three shapes exist: a plain value-setter overload, the canonical control-passing overload above,
+and a full two-way overload taking `setSource`/`getTarget` plus the target change-event
+subscribe/unsubscribe pair. All of them accept optional `BindingFallback<T>` arguments —
+`defaultValue` replaces the value when reading the source *throws* (the null-link-in-a-chain case),
+`nullReplacement` replaces a successfully read `null` — and an optional `onError` callback.
+Lifetime matches the primitive: the source holds the binding alive; keep the return value only to
+dispose early.
+
+Type conversion is `PropertyBinding<TSource, TTarget>` — the reflection-free `IValueConverter`
+equivalent: a `convert` delegate on the way out, `convertBack` for the write-back modes.
+
+Validation is `INotifyDataErrorInfo`-shaped but delegate-simple: `ObservableObject.SetError(name,
+error)` stores one error per property (null clears) and raises `ErrorsChanged`; a `Bind(...,
+onError: text => label.Text = text ?? "")` callback receives the current error at bind time and on
+every change.
+
+Nested paths chain typed selectors instead of parsing `"a.b.c"`: `BindingPath.Chain(vm,
+nameof(vm.Child), v => v.Child, nameof(Child.Name), c => c.Name, onChanged)` returns a
+`ChainedBinding` that re-subscribes when the middle link is swapped and observes the leaf property.
+
+### The primitive, spelled out
 
 A two-way binding, mirroring the binding tests — any target with a value and a change event fits
 the write-back shape:
@@ -340,25 +376,18 @@ Application.Run(new CounterForm());
 
 ## Notes
 
+**Lambdas everywhere.** Every binding/configuration surface — the `Bind` sugar, column
+value/image/style selectors, read-only predicates, display-text/tooltip providers — accepts plain
+`Func<>`/`Action<>` lambdas, never string member names and never `Expression<>` trees (interpreted
+under NativeAOT). The WinForms string API (`DataBindings.Add("Text", vm, "Name")`) is a permanent
+non-goal — it needs reflection.
+
 Planned, not yet implemented — tracked box-by-box in `docs/PRD.md` §3 and §6:
 
-- **Lambda binding sugar on controls** over `PropertyBinding<T>`, e.g.
-  `label.Bind(vm, nameof(vm.Count), v => v.Display, (c, text) => c.Text = text)` plus two-way
-  overloads. The WinForms string API (`DataBindings.Add("Text", vm, "Name")`) is a non-goal — it
-  needs reflection.
-- **`ICommand` wiring on `Button`** with automatic enable/disable via `CanExecute`; until then, wire
-  `Click` manually as shown above. Menu and tool-strip items already have it
-  (`ToolStripItem.Command`).
-- **Lambdas everywhere:** every binding/configuration surface (bindings, column value/image/style
-  selectors, read-only predicates, display-text/tooltip providers) accepts plain `Func<>`/`Action<>`
-  lambdas — never string member names, never `Expression<>` trees.
 - **Source-generated property accessors** (`[Bindable]`) so `DataSource` + `DisplayMember` resolve
   member getters at compile time.
 - **`IReadOnlyObservableList<T>`** and richer change granularity (move) for virtualized list
   controls.
-- **Format/parse converters** (`IValueConverter`-style) for two-way text↔value.
-- **Validation hooks** (`INotifyDataErrorInfo`-style) with error surfacing on controls.
-- **Nested-path binding** (`a.b.c`) via chained typed selectors.
 - **Remaining list/selection binding:** `ListView` value binding; `ComboBox` already closes the
   `ValueMember`/`SelectedValue` loop reflection-free via its `ValueSelector` delegate, and
   `ListBox`/`DataGridView` `DataSource` + selectors are done (one-way).

@@ -67,3 +67,9 @@ replacing an item resets its state, and a reset clears everything.
 and checkmark strokes `CheckBox` uses), vertically centered, then delegates the rest of the row —
 icon and text, shifted right past the glyph — to the `ListBox` row painter. Virtualization is
 inherited: only the visible row window is painted, whatever the item count.
+
+## Differences from System.Windows.Forms.CheckedListBox
+
+- **`ItemCheckEventArgs` is `bool`-based**, not `CheckState`-based — there is no indeterminate state — and its constructor order is `(index, currentValue, newValue)`, the reverse of WinForms' `(index, newCheckValue, currentCheckValue)`. Port handlers by property name (`CurrentValue`/`NewValue`), not argument position.
+- **Multi-selection is allowed**: the control inherits every `SelectionMode` (WinForms forces `One`), and **Space toggles the check of *all* selected rows**, not just the caret item.
+- `CheckOnClick`, `GetItemChecked`/`SetItemChecked` and `CheckedItems`/`CheckedIndices` match WinForms; there is no `CheckedItemCollection` class — the live views are plain `IReadOnlyList`s.

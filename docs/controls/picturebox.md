@@ -43,3 +43,12 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - Purely visual — it takes no focus and handles no input.
 - `PictureBoxTests` pin each geometry with exact destination rectangles (e.g. a 40×30 image in a 100×80 box centers at 30,25; a 50×25 image zooms to 0,15,100,50), the clip bracket around the draw, the `FixedSingle` frame and one invalidation per property change.
 - Done per [docs/PRD.md](../PRD.md) §7.7; no open items.
+
+## Differences from System.Windows.Forms.PictureBox
+
+- **`PictureBoxSizeMode` has no `AutoSize`** — the box never resizes itself to the image — and the
+  remaining members therefore sit at different ordinals (`CenterImage` = 2, `Zoom` = 3 versus
+  WinForms' 3 and 4). Match by name, never by persisted numeric value.
+- `Image` is an `IImage` (the toolkit's decoder-free image seam), not a `System.Drawing.Image`;
+  there is no `ImageLocation`/`Load`/`LoadAsync` and no `ErrorImage`/`InitialImage`.
+- The control is purely visual: no focus, no click events of its own.

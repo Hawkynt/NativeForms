@@ -27,6 +27,9 @@ form.Controls.Add(split);
 | `Orientation` | `Orientation` | `Vertical` | The direction of the splitter bar: `Vertical` puts the panels side by side, `Horizontal` stacks them. |
 | `SplitterDistance` | `int` | `50` | Pixel size of `Panel1` along the split axis. Assignments clamp to the minimum sizes against the current control size. |
 | `SplitterWidth` | `int` | `4` | Thickness of the splitter bar; at least 1. |
+| `FixedPanel` | `FixedPanel` | `None` | Which panel keeps its size when the container resizes: `Panel1`, `Panel2`, or `None` (both scale proportionally). |
+| `Panel1Collapsed` | `bool` | `false` | Hides `Panel1` and gives the whole area to `Panel2`; mutually exclusive with `Panel2Collapsed`. |
+| `Panel2Collapsed` | `bool` | `false` | Hides `Panel2` and gives the whole area to `Panel1`. |
 | `Panel1MinSize` | `int` | `25` | The smallest size `Panel1` may be squeezed to. |
 | `Panel2MinSize` | `int` | `25` | The smallest size `Panel2` may be squeezed to. |
 
@@ -52,3 +55,9 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - Painted with the platform `ITheme` (`ControlBackground`, `Border`) — the bar carries a subtle
   three-dot grip; testable headlessly through the test backend's recording canvas.
 - Complete per [docs/PRD.md](../PRD.md) §7.2 — no pending items.
+
+## Differences from System.Windows.Forms.SplitContainer
+
+- **`SplitterMoved` carries plain `EventArgs`** (WinForms: `SplitterEventArgs` with coordinates) and fires only on commit — mouse release or a keyboard nudge — never during the live drag; there is **no `SplitterMoving`** preview event.
+- **No `IsSplitterFixed`** — the bar is always draggable; use `Panel1MinSize`/`Panel2MinSize` (or equal min sizes) to constrain it.
+- `FixedPanel` and `Panel1Collapsed`/`Panel2Collapsed` match WinForms.

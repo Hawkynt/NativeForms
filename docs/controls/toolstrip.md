@@ -84,3 +84,12 @@ A vertical dividing line, 7 px wide. Takes no clicks and no hover.
 - Testable headlessly: `ToolStripTests` pin painting, hover/pressed fills, the commit contract,
   toggling, command gating, both split-button zones, and the chevron geometry and popup.
 - The standalone control-sized siblings are documented in [`SplitButton`](splitbutton.md).
+
+## Differences from System.Windows.Forms.ToolStrip
+
+- **No `ItemClicked`** — per-item `Click`/`Command` only — and **no `DropDownOpening`** on the
+  drop-down items (see [menustrip.md](menustrip.md) for the shared item-model differences,
+  including bool-only `Checked` and the `CheckedGroup` extension).
+- **No hosted-control items**: `ToolStripComboBox`/`ToolStripTextBox` and the generic
+  `ToolStripControlHost` do not exist — the item kinds are the owner-drawn set documented here.
+- No `GripStyle`/rafting/`ToolStripContainer`; the bar is a plain docked control.

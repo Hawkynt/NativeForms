@@ -45,3 +45,8 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - Geometry and painting live in the internal `ScrollBarRenderer`, shared with future scrolling hosts; colors come from the platform `ITheme`.
 - `ScrollBarTests` pin the defaults, the `Maximum − LargeChange + 1` clamp, the proportional thumb, arrow autorepeat timing, channel paging, drag scrubbing with `EndScroll`, the horizontal layout and the programmatic-`Value` event split.
 - Done per [docs/PRD.md](../PRD.md) §7.5; unifying this renderer with the `Panel.AutoScroll` one is a tracked follow-up there.
+
+## Differences from System.Windows.Forms.ScrollBar
+
+- **`Scroll` cannot steer the value.** WinForms raises `Scroll` *before* committing and lets a handler rewrite `e.NewValue`; here `ScrollEventArgs.NewValue` is read-only and the event fires *after* the clamped value is already committed — observe, don't veto. `ScrollEventArgs` also carries no `OldValue` or `ScrollOrientation`.
+- The Win32 range semantics (`Maximum − LargeChange + 1`) and the `Scroll`-vs-`ValueChanged` split match WinForms.

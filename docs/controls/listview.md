@@ -76,6 +76,8 @@ Inherits the common members of [`Control`](control.md).
 | `ColumnClick` | Raised when a Details column header is clicked, before any automatic sort; `ColumnClickEventArgs.Column` is the index into `Columns`. |
 | `ItemCheck` | Raised before an item's check state flips. `ItemCheckEventArgs` (the same type [`CheckedListBox`](checkedlistbox.md) uses) carries `Index`, `CurrentValue` and a writable `NewValue`; a handler vetoes the flip by resetting `NewValue` to `CurrentValue`. |
 | `ItemChecked` | Raised after an item's check state flipped; `ItemCheckedEventArgs.Item` is the item. Vetoed flips raise nothing. |
+| `ItemActivate` | Raised when an item is activated — double-click or Enter on the caret item. |
+| `BeforeLabelEdit` | Raised before a label edit opens; setting `CancelEdit` keeps the editor closed. |
 | `AfterLabelEdit` | Raised after a label edit finished. `LabelEditEventArgs` carries the `Item` index and the entered `Label` (`null` when the edit was cancelled); setting `CancelEdit` discards the text and keeps the item's current label. |
 
 ### Methods
@@ -175,8 +177,8 @@ themed sort arrow. Items are not kept sorted automatically — after bulk mutati
 again.
 
 **Label editing.** `BeginEdit` hosts a native [`TextBox`](textbox.md) over the item's label,
-pre-filled and fully selected for overtyping. There is no toolkit-wide focus model yet, so no
-reliable native focus-loss moment exists; edits commit at the honest points available: Enter, any
+pre-filled and fully selected for overtyping. The hosted native editor reports no reliable
+focus-loss moment yet; edits commit at the honest points available: Enter, any
 click on the list, `EndEdit`, starting another edit and changing `View`. Escape cancels (the event
 reports a `null` label). `AfterLabelEdit` runs on every outcome and can still veto the commit;
 removing the edited item abandons the edit without an event. F2 edits the caret item.
@@ -195,3 +197,12 @@ it in place does not repaint. Setting `Text` (or any collection or selection cha
 in-place sub-item edits, call `Invalidate()`.
 
 **Not yet implemented** (per `docs/PRD.md` §7.4): a virtual-mode item API.
+
+## Differences from System.Windows.Forms.ListView
+
+- **`View` defaults to `Details`**, not WinForms' `LargeIcon` — the multi-column grid is the common case here.
+- **`FullRowSelect` defaults to `true`** (WinForms: `false`).
+- **Sorting is richer than the classic label-only model**: `Sorting` in WinForms compares item labels regardless of column; here a Details header click sorts by the *clicked* column, repeat clicks flip the direction, and the active column carries a themed sort glyph. `ItemSorter` is a `Comparison<ListViewItem>` delegate instead of an `IComparer` (`ListViewItemSorter`).
+- **`ShowColumnHeaders` replaces `HeaderStyle`** — a `bool` instead of the `ColumnHeaderStyle` enum; headers are never clickable-vs-nonclickable styled, they always raise `ColumnClick`.
+- `ItemActivate`, `BeforeLabelEdit` and `AfterLabelEdit` exist as in WinForms. `ItemCheck` uses the shared bool-based `ItemCheckEventArgs` (see [checkedlistbox.md](checkedlistbox.md)), not `CheckState`.
+- No `VirtualMode`/`RetrieveVirtualItem` (painting is virtualized regardless), no `HitTest`/`InsertionMark`/`HotTracking`, no per-subitem objects (`SubItems` is a `List<string>`).

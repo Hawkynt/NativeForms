@@ -37,4 +37,11 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - A left mouse-button release inside the bounds selects the button; so does the Space key when focused (the control is focusable). Selection raises `CheckedChanged` and the inherited `Click`; the unchecked sibling raises only `CheckedChanged`.
 - With an `Image`, the icon and text lay out via the shared `ContentLayout` (`ImageBeforeText`, middle-left) in the area right of the 14 px ring; without one, the classic text placement stays untouched.
 - `RadioGroupTests` pin the exclusivity: selecting the second of two siblings unchecks the first. `RadioButtonImageTests` pin the icon placement, the text shift and the invalidation on image change.
+- **Keyboard focus checks**: receiving focus via the keyboard (Tab) auto-checks an unchecked button — the WinForms tab-into-group behavior; a focus gained by the mouse press itself does not double-fire (the press is detected and the click does the checking).
 - Done per [docs/PRD.md](../PRD.md) §7.3 (image + text via `ContentLayout` included).
+
+## Differences from System.Windows.Forms.RadioButton
+
+- **No arrow-key navigation within the group yet** — WinForms moves and checks with Up/Down/Left/Right among sibling radio buttons; here use Tab (which auto-checks on arrival) or the mouse.
+- **`PerformClick()` checks the button** like a real click (gated by effective `Enabled`/`Visible`); Space checks on key-up.
+- No `AutoCheck` opt-out, no `Appearance.Button`, no `CheckAlign`; grouping is strictly by direct parent (as in WinForms).

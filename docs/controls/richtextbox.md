@@ -50,3 +50,10 @@ Inherits the members of [`TextBox`](textbox.md) and the common members of [`Cont
 - Setting `Rtf` on a realized control hands the string to the widget, which reports the resulting plain text back like a user edit — `Text` and `TextChanged` follow. On unrealization the peer's last RTF is captured so a re-realized box keeps its formatting instead of flattening to plain text.
 - **GTK limitations, all documented in the peer.** GTK has no native RTF, so both directions round-trip through the core serializer; bullets are a literal `"• "` paragraph prefix (GTK text views have no list model), so they are part of the reported text; paragraph alignment is a text tag over the paragraph's characters, which an empty paragraph cannot hold; URL detection re-tags `http(s)://…` and `www.…` tokens after every change. Placeholder, password masking and max length remain single-line-entry features and are no-ops here.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): `PlaceholderText` rendering (multiline), a per-selection font family (`SelectionFont`), paragraph indent, and `LoadFile`/`SaveFile`.
+
+## Differences from System.Windows.Forms.RichTextBox
+
+- **No `SelectionFont`.** WinForms formats the selection by assigning a whole `Font`; here the individual `SelectionBold`/`SelectionItalic`/`SelectionUnderline`/`SelectionStrikeout`/`SelectionFontSize` properties do it piecewise — a font *family* per selection is not part of the RTF subset yet.
+- **`SelectionAlignment` is a `ContentAlignment`**, not WinForms' `HorizontalAlignment`; only its horizontal component is meaningful.
+- **The `Selection…` getters return the last value written**, not the state under the caret — they are write-through commands, effective only while realized (see Notes).
+- `LinkClicked` matches WinForms; there is no `SelectionIndent`/`SelectionHangingIndent`, no `Find`, no `LoadFile`/`SaveFile` yet.

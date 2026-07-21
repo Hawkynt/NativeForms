@@ -78,3 +78,13 @@ auto-sized tracks). Tracks beyond the styled ones share the remaining space equa
   single deterministic sweep over reused buffers — no per-layout allocation once warm.
 - Not yet implemented (see [docs/PRD.md](../PRD.md) §7.2): grid auto-grow, skipping invisible
   children, and `Anchor`/`Dock` interplay.
+
+## Differences from System.Windows.Forms.TableLayoutPanel
+
+- **No `GrowStyle`** — the grid never adds rows or columns on overflow. Explicit cell positions past
+  the grid are clamped into it; an auto-placed child no free run of cells can hold is simply not
+  laid out and keeps its current bounds.
+- **`SetCellPosition(control, column, row)` takes an int pair**, not a
+  `TableLayoutPanelCellPosition` argument (the struct exists as `GetCellPosition`'s return type).
+- A child's `Anchor`/`Dock` inside its cell is not honored yet (each child fills cell minus
+  `Margin`); WinForms aligns and stretches by anchor within the cell.

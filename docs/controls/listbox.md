@@ -63,6 +63,8 @@ Inherits the common members of [`Control`](control.md).
 |---|---|
 | `EnsureVisible(int index)` | Scrolls so the given index is inside the visible row range. |
 | `GetSelected(int index)` | Whether the row at the given index is selected. |
+| `SetSelected(int index, bool value)` | Adds the row to or removes it from the selection; throws `ArgumentException` while `SelectionMode` is `None`. |
+| `ClearSelected()` | Deselects every row. |
 | `IndexFromPoint(int x, int y)` | The row index at the given client coordinates, or `-1` for none. |
 
 ## Notes
@@ -95,3 +97,10 @@ under the cursor. Up/Down move by one row, PageUp/PageDown by one visible page, 
 first/last item — selecting in `One` and `MultiExtended`, caret-only in `None` and `MultiSimple`.
 Space toggles the caret row in both multi modes. The wheel scrolls three rows per notch without
 changing the selection. Keyboard moves call `EnsureVisible`.
+
+## Differences from System.Windows.Forms.ListBox
+
+- **Binding is selector-based**: `DisplaySelector`/`ImageSelector` replace `DisplayMember` (no reflection); `DataSource` is a set-only snapshot, not a live currency-managed binding.
+- **No `Sorted`** — order the items yourself before adding — and **no `BeginUpdate`/`EndUpdate`**: painting is virtualized and mutations coalesce into one repaint, so the batching seam is unnecessary.
+- **`TopIndex` is read-only** (WinForms lets you assign it); scroll programmatically via `EnsureVisible`.
+- `SetSelected`/`ClearSelected`/`GetSelected` exist as in WinForms; `SelectedIndexChanged` fires once per gesture, not once per changed row.
