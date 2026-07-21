@@ -75,7 +75,7 @@ internal sealed partial class MainForm
         var link = new LinkLabel { Bounds = new(340, 114, 300, 20), Text = "Open the project page" };
         link.LinkClicked += (_, _) =>
         {
-            link.Visited = true;
+            link.LinkVisited = true;
             this.SetStatus("LinkLabel clicked — now painted as visited.");
         };
 
