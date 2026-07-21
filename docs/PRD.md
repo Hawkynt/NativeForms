@@ -479,6 +479,12 @@ strategy (may differ per platform; note exceptions inline).
       semantics (names, defaults, event order, behavioral contracts). Deviations were either fixed
       (dock order, form lifecycle, input gates, member parity, event pipelines) or documented as
       deliberate in the control's "Differences from WinForms" section.
+- [~] **Real-GTK test tier**: fixtures that drive the actual backend (in-process `GdkEvent`
+      injection via `gtk_main_do_event`/`gdk_display_put_event`, `gtk_test_widget_wait_for_draw`
+      before capture) and self-skip without a `DISPLAY`, so CI stays headless-green while a
+      developer with a display gets real coverage — `GtkNativeSizingTests` is the first.
+      XTEST is unusable here (`:1` is Xwayland `-rootless`; the compositor swallows injected
+      pointer events), which is why injection happens in-process.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
