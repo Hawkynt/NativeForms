@@ -444,8 +444,9 @@ strategy (may differ per platform; note exceptions inline).
 ---
 
 ## 8. Cross-cutting features
-- [ ] DPI awareness & scaling (per-monitor v2 on Windows, GDK scale, backing-scale on macOS)
-- [ ] Dark mode / high contrast, live theme-change notifications
+- [~] DPI awareness & scaling — `GetDpiScale` + `Control.LogicalToDevice` groundwork done (§5);
+      per-monitor v2 rescale-on-move (Windows), GDK scale and macOS backing-scale pending
+- [x] Dark mode / high contrast with live theme-change notifications — see §5
 - [ ] Accessibility (UIA on Windows, ATK/AT-SPI on GTK, NSAccessibility on macOS)
 - [~] Right-to-left: ambient `Control.RightToLeft` + mirrored owner-drawn painting done; container layout mirroring pending
 - [x] Localization: `NativeForms.Strings` providers cover every built-in string (OS dialogs localize themselves)
