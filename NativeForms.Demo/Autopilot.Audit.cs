@@ -179,7 +179,7 @@ internal sealed partial class Autopilot
     /// <summary>Whether a container places its own children, in which case their positions are the
     /// layout engine's business and a "wrong" one is a different bug than a hand-placed overlap.</summary>
     private static bool ManagesItsOwnLayout(Control control)
-        => control is FlowLayoutPanel or TableLayoutPanel or SplitContainer or TabControl;
+        => control is FlowLayoutPanel or TableLayoutPanel or SplitContainer or TabControl or Accordion or Ribbon;
 
     /// <summary>The visible children of a control, or an empty list when it hosts none.</summary>
     private static List<Control> Children(Control control)

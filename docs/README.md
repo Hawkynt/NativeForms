@@ -56,6 +56,8 @@ each control page carries its own "Differences from WinForms" section where beha
 | `TabControl` / `TabPage` | owner-drawn | [tabcontrol.md](controls/tabcontrol.md) |
 | `SplitContainer` | owner-drawn | [splitcontainer.md](controls/splitcontainer.md) |
 | `Expander` | owner-drawn | [expander.md](controls/expander.md) |
+| `Accordion` / `AccordionPane` | owner-drawn | [accordion.md](controls/accordion.md) |
+| `Ribbon` (tabs, groups, items) | owner-drawn + popup | [ribbon.md](controls/ribbon.md) |
 | `FlowLayoutPanel` | owner-drawn layout | [flowlayoutpanel.md](controls/flowlayoutpanel.md) |
 | `TableLayoutPanel` | owner-drawn layout | [tablelayoutpanel.md](controls/tablelayoutpanel.md) |
 | `ListBox` | owner-drawn | [listbox.md](controls/listbox.md) |

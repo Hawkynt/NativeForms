@@ -464,6 +464,21 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `SplitButton` / `DropDownButton` (owner) — shared `DropDownButtonBase` over the MenuDropDown engine; SplitButton gates its main action through `ICommand`
 - [x] `Expander` (owner) — collapsible header (themed triangle + caption, click/Space) +
       content whose child peers hide while collapsed; height restores on expand
+- [x] `Accordion` / `AccordionPane` (owner) — Outlook-style stack of collapsible panes hosting real
+      nested children; `Single`/`Multiple` `ExpandMode`, `SelectedIndex`/`SelectedPane` +
+      `SelectedIndexChanged`, cancelable `PaneExpanding` plus `PaneExpanded`/`PaneCollapsed`,
+      keyboard header navigation (Up/Down/Home/End, Enter/Space), open panes sharing the height the
+      headers leave, and collapsed panes vetoed through the child-peer seam so reopening restores
+      exactly the body that was there
+- [x] `Ribbon` / `RibbonTab` / `RibbonGroup` / `RibbonItem` (owner) — Office-style tab strip over
+      groups drawn as labelled boxes with a bottom caption strip; `Large` items (icon over caption,
+      full group height) and `Small` items stacked three per column; `RibbonButton`,
+      `RibbonToggleButton` and `RibbonHostItem` (hosts a real `Control`), all deriving from
+      `ToolStripItem` so `ICommand` wiring and mnemonics come for free; group overflow collapsing
+      right-to-left into a `MenuDropDown` button, `Minimized` state, keyboard tab switching, and
+      per-ribbon font-keyed width caches
+  - [ ] Two-line caption wrapping on large items; Quick Access Toolbar, contextual tab groups and
+        KeyTips (a `MenuStrip` above the ribbon covers the application-menu case)
 - [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 - [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`
@@ -644,6 +659,8 @@ same commit. `—` = not applicable.
 | `TabControl` / `TabPage` | ✔ | ✔ | [controls/tabcontrol.md](controls/tabcontrol.md) |
 | `SplitContainer` | ✔ | ✔ | [controls/splitcontainer.md](controls/splitcontainer.md) |
 | `Expander` | ✔ | ✔ | [controls/expander.md](controls/expander.md) |
+| `Accordion` / `AccordionPane` | ✔ | ✔ | [controls/accordion.md](controls/accordion.md) |
+| `Ribbon` (tabs, groups, item model, overflow) | ✔ | ✔ | [controls/ribbon.md](controls/ribbon.md) |
 | `FlowLayoutPanel` | ✔ | ✔ | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md) |
 | `TableLayoutPanel` | ✔ | ✔ | [controls/tablelayoutpanel.md](controls/tablelayoutpanel.md) |
 | `ListBox` (selection modes, icons) | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |

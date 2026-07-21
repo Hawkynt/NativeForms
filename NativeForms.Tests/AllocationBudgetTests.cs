@@ -179,4 +179,109 @@ internal sealed class AllocationBudgetTests
         // constructed, so appends without a subscriber allocate nothing at all.
         Assert.That(bytes, Is.Zero, $"{bytes} bytes for two appends");
     }
+    /// <summary>Measures the per-instance cost of a non-control type — the item models the strips and
+    /// the ribbon hang off, which carry no peer and so have no owner-drawn budget of their own.</summary>
+    private static double MeasurePerInstance(Func<object> factory)
+    {
+        var sink = new object[_Count];
+        var bytes = Measure(() =>
+        {
+            for (var i = 0; i < _Count; ++i)
+                sink[i] = factory();
+        });
+
+        return (double)bytes / _Count;
+    }
+
+    [Test]
+    public void Accordion_construction_stays_within_the_owner_drawn_budget()
+    {
+        var perControl = MeasurePerInstance(static () => new Accordion());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void AccordionPane_construction_stays_within_the_owner_drawn_budget()
+    {
+        var perControl = MeasurePerInstance(static () => new AccordionPane("Mail"));
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void Ribbon_construction_stays_within_the_owner_drawn_budget()
+    {
+        var perControl = MeasurePerInstance(static () => new Ribbon());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void Ribbon_structure_types_stay_tiny_per_instance()
+    {
+        // Tabs, groups and items are plain objects, not controls: a hundred ribbon buttons must cost
+        // a hundred small allocations rather than a hundred native widgets.
+        var tab = MeasurePerInstance(static () => new RibbonTab("Home"));
+        var group = MeasurePerInstance(static () => new RibbonGroup("Clipboard"));
+        var button = MeasurePerInstance(static () => new RibbonButton("Paste"));
+        var toggle = MeasurePerInstance(static () => new RibbonToggleButton("Bold", RibbonItemSize.Small));
+
+        // The floor is the shared ToolStripItem field set every strip item already pays for; a ribbon
+        // button must not cost meaningfully more than the toolbar button it is modelled on.
+        var baseline = MeasurePerInstance(static () => new ToolStripButton("Paste"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tab, Is.LessThan(256), $"RibbonTab ~{tab:F0} bytes");
+            Assert.That(group, Is.LessThan(256), $"RibbonGroup ~{group:F0} bytes");
+            Assert.That(button, Is.LessThan(baseline + 16), $"RibbonButton ~{button:F0} bytes vs ToolStripButton ~{baseline:F0}");
+            Assert.That(toggle, Is.LessThan(baseline + 32), $"RibbonToggleButton ~{toggle:F0} bytes vs ToolStripButton ~{baseline:F0}");
+        });
+    }
+
+    [Test]
+    public void A_populated_ribbon_stays_within_a_few_kilobytes()
+    {
+        // The structural worst case the toolkit ships: three tabs, six groups, twenty-four items.
+        // If a ribbon of that size cost tens of kilobytes the design would be wrong, not the budget.
+        var bytes = Measure(static () =>
+        {
+            var ribbon = new Ribbon();
+            for (var t = 0; t < 3; ++t)
+            {
+                var tab = new RibbonTab("Tab");
+                for (var g = 0; g < 2; ++g)
+                {
+                    var group = new RibbonGroup("Group");
+                    group.Items.AddRange(
+                        new RibbonButton("Large"),
+                        new RibbonButton("One", RibbonItemSize.Small),
+                        new RibbonButton("Two", RibbonItemSize.Small),
+                        new RibbonToggleButton("Three", RibbonItemSize.Small));
+                    tab.Groups.Add(group);
+                }
+
+                ribbon.Tabs.Add(tab);
+            }
+        });
+
+        Assert.That(bytes, Is.LessThan(8192), $"{bytes} bytes for a 3-tab, 6-group, 24-item ribbon");
+    }
+
+    [Test]
+    public void A_populated_accordion_stays_within_a_few_kilobytes()
+    {
+        var bytes = Measure(static () =>
+        {
+            var accordion = new Accordion();
+            accordion.Panes.AddRange(
+                new AccordionPane("Mail"),
+                new AccordionPane("Calendar"),
+                new AccordionPane("Contacts"));
+        });
+
+        Assert.That(bytes, Is.LessThan(4096), $"{bytes} bytes for a three-pane accordion");
+    }
+
 }

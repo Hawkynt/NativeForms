@@ -76,7 +76,8 @@ internal sealed partial class MainForm : Form
             this.BuildListsPage(),
             this.BuildGridPage(),
             this.BuildLayoutPage(),
-            this.BuildPickersPage());
+            this.BuildPickersPage(),
+            this.BuildRibbonPage());
 
         // Building the pages set initial selections, and those raised the same change events a user
         // click does — so the status line already carried a grid message before anyone touched

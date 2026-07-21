@@ -7,13 +7,12 @@ namespace Hawkynt.NativeForms.Demo;
 internal sealed partial class Autopilot
 {
     /// <summary>The index of the Pickers page in the gallery's tab strip.</summary>
-    private const int _PickersTab = 5;
 
     /// <summary>Drives the file/folder pickers, the icon labels and the drive tiles.</summary>
     private void DrivePickers()
     {
         Section("Pickers, icon labels and drive tiles");
-        this.SelectTab(_PickersTab);
+        this.SelectTab("Pickers");
         var status = _form.Part<ToolStripStatusLabel>("chrome.statusLabel");
 
         this.Check("FolderPicker: typing a path and pressing Enter commits it", () =>
@@ -176,7 +175,7 @@ internal sealed partial class Autopilot
     private void DrivePickerDialog()
     {
         Section("Native file dialog");
-        this.SelectTab(_PickersTab);
+        this.SelectTab("Pickers");
 
         this.Check("FilePicker: the browse button opens the native file dialog and Escape cancels it", () =>
         {

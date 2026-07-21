@@ -55,6 +55,21 @@ internal static class Program
         Construct("ProgressTile", static () => new ProgressTile(), _OwnerDrawnConstructionBudget);
         Construct("FilePicker", static () => new FilePicker(), _CompositeConstructionBudget);
         Construct("FolderPicker", static () => new FolderPicker(), _CompositeConstructionBudget);
+        Construct("Accordion", static () => new Accordion(), _OwnerDrawnConstructionBudget);
+        Construct("Ribbon", static () => new Ribbon(), _OwnerDrawnConstructionBudget);
+
+        // Item models carry no peer, so they have no §4 control budget — but a ribbon is made of
+        // hundreds of them, so their per-instance cost is tracked all the same.
+        ConstructItem("AccordionPane", static () => new AccordionPane("Mail"));
+        ConstructItem("RibbonTab", static () => new RibbonTab("Home"));
+        ConstructItem("RibbonGroup", static () => new RibbonGroup("Clipboard"));
+        ConstructItem("RibbonButton", static () => new RibbonButton("Paste"));
+        ConstructItem("RibbonToggleButton", static () => new RibbonToggleButton("Bold", RibbonItemSize.Small));
+
+        // The two structure-heavy containers, measured populated: what a real navigation pane and a
+        // real ribbon cost to build, not what their empty shells do.
+        ConstructAggregate("accordion3", static () => MakeAccordion());
+        ConstructAggregate("ribbon3x2", static () => MakeRibbon());
 
         RealizeEmptyForm();
         RealizeHundredControlForm();
@@ -70,6 +85,8 @@ internal static class Program
         PaintThroughput("IconLabel", MakeIconLabel());
         PaintThroughput("ProgressTile", MakeProgressTile());
         PaintThroughput("FilePicker", MakeFilePicker());
+        PaintThroughput("Accordion", MakeAccordion());
+        PaintThroughput("Ribbon", MakeRibbon());
 
         // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
         ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
@@ -112,6 +129,44 @@ internal static class Program
 
         if (bytesPerOp >= byteBudget)
             _failures.Add($"construct.{name}: {bytesPerOp:F0} B/op exceeds the {byteBudget} B budget");
+    }
+
+    /// <summary>Per-instance construction cost of a peerless item model.</summary>
+    private static void ConstructItem(string name, Func<object> factory)
+    {
+        var sink = new object[_ConstructionCount];
+        for (var i = 0; i < _ConstructionCount; ++i)
+            sink[i] = factory(); // warm-up
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < _ConstructionCount; ++i)
+            sink[i] = factory();
+        watch.Stop();
+        var bytes = (double)(GC.GetAllocatedBytesForCurrentThread() - before) / _ConstructionCount;
+
+        var nsPerOp = watch.Elapsed.TotalNanoseconds / _ConstructionCount;
+        Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytes)}}}",
+            $"{nsPerOp,8:F0} ns/op  {bytes,6:F0} B/op");
+    }
+
+    /// <summary>Construction cost of a whole populated control tree — reported, not gated, because
+    /// the number is a design signal rather than a per-instance budget.</summary>
+    private static void ConstructAggregate(string name, Func<Control> factory)
+    {
+        for (var i = 0; i < 64; ++i)
+            factory(); // warm-up
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < 64; ++i)
+            factory();
+        watch.Stop();
+        var bytes = (GC.GetAllocatedBytesForCurrentThread() - before) / 64.0;
+
+        var nsPerOp = watch.Elapsed.TotalNanoseconds / 64;
+        Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytes)}}}",
+            $"{nsPerOp,8:F0} ns/op  {bytes,6:F0} B/op");
     }
 
     // ---- Metric: realization ----
@@ -251,6 +306,42 @@ internal static class Program
 
     private static MonthCalendar MakeMonthCalendar()
         => new() { Bounds = new(0, 0, 240, 200), TodayDate = new(2026, 7, 19) };
+    /// <summary>A three-pane navigation stack with real children in the open pane.</summary>
+    private static Accordion MakeAccordion()
+    {
+        var accordion = new Accordion { Bounds = new(0, 0, 240, 440) };
+        var mail = new AccordionPane("Mail");
+        mail.Controls.Add(new CheckBox { Text = "Unread only", Bounds = new(8, 8, 160, 20) });
+        mail.Controls.Add(new Button { Text = "Compose", Bounds = new(8, 34, 100, 26) });
+        var calendar = new AccordionPane("Calendar");
+        calendar.Controls.Add(new RadioButton { Text = "Week", Bounds = new(8, 8, 120, 20) });
+        accordion.Panes.AddRange(mail, calendar, new AccordionPane("Contacts"));
+        return accordion;
+    }
+
+    /// <summary>A three-tab, six-group ribbon mixing both item sizes and a hosted control.</summary>
+    private static Ribbon MakeRibbon()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 900, 120) };
+        for (var t = 0; t < 3; ++t)
+        {
+            var tab = new RibbonTab("Tab " + t);
+            for (var g = 0; g < 2; ++g)
+            {
+                var group = new RibbonGroup("Group " + g);
+                group.Items.AddRange(
+                    new RibbonButton("Large"),
+                    new RibbonButton("One", RibbonItemSize.Small),
+                    new RibbonButton("Two", RibbonItemSize.Small),
+                    new RibbonToggleButton("Three", RibbonItemSize.Small));
+                tab.Groups.Add(group);
+            }
+
+            ribbon.Tabs.Add(tab);
+        }
+
+        return ribbon;
+    }
 
     private static DataGridView MakeDataGridView(int rows)
     {

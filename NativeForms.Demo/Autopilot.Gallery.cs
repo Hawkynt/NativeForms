@@ -22,7 +22,7 @@ internal sealed partial class Autopilot
         Section("Gallery captures");
 
         var tabs = _form.Part<TabControl>("chrome.tabs");
-        var names = new[] { "01-basics", "02-input", "03-lists", "04-grid", "05-layout", "06-pickers" };
+        var names = new[] { "01-basics", "02-input", "03-lists", "04-grid", "05-layout", "06-pickers", "06-ribbon" };
         var count = Math.Min(names.Length, this.Read(() => tabs.TabPages.Count));
         for (var i = 0; i < count; ++i)
         {
@@ -36,7 +36,59 @@ internal sealed partial class Autopilot
         this.CaptureFileMenu();
         this.CaptureExpander();
         this.CaptureScrolledPanel();
+        this.CaptureRibbonStates();
+        this.CaptureAccordionPanes();
         this.CaptureMessageBox();
+    }
+
+    /// <summary>The ribbon on a second tab, squeezed until a group collapses, and minimized.</summary>
+    private void CaptureRibbonStates()
+    {
+        this.SelectTab("Ribbon");
+        this.Pristine();
+        var ribbon = _form.Part<Ribbon>("ribbon.control");
+
+        this.Do(() => ribbon.SelectedIndex = 1);
+        this.Settle(120);
+        this.Screenshot("13-ribbon-second-tab");
+
+        this.Do(() => ribbon.SelectedIndex = 0);
+        this.Do(() => ribbon.Width = 380);
+        this.Settle(120);
+        this.Screenshot("14-ribbon-group-overflow");
+
+        this.Do(() => ribbon.Width = 800);
+        this.Do(() => ribbon.Minimized = true);
+        this.Settle(120);
+        this.Screenshot("15-ribbon-minimized");
+        this.Do(() => ribbon.Minimized = false);
+        this.Settle(80);
+    }
+
+    /// <summary>The accordion with its second pane open, and with several panes open at once.</summary>
+    private void CaptureAccordionPanes()
+    {
+        this.SelectTab("Ribbon");
+        this.Pristine();
+        var accordion = _form.Part<Accordion>("ribbon.accordion");
+
+        this.Do(() => accordion.SelectedIndex = 1);
+        this.Settle(120);
+        this.Screenshot("16-accordion-second-pane");
+
+        // The two compact panes, not all three: with three bodies open each gets a third of the
+        // height and the Mail pane's list is taller than that, so the shot would be of content
+        // sliced through a row rather than of the height-sharing it is meant to show.
+        this.Do(() => accordion.ExpandMode = AccordionExpandMode.Multiple);
+        this.Do(() => accordion.Panes[0].Expanded = false);
+        this.Do(() => accordion.Panes[1].Expanded = true);
+        this.Do(() => accordion.Panes[2].Expanded = true);
+        this.Settle(120);
+        this.Screenshot("17-accordion-multiple-open");
+
+        this.Do(() => accordion.ExpandMode = AccordionExpandMode.Single);
+        this.Do(() => accordion.SelectedIndex = 0);
+        this.Settle(80);
     }
 
     /// <summary>

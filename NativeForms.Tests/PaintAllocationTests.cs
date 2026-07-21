@@ -514,6 +514,101 @@ internal sealed class PaintAllocationTests
     }
 
     [Test]
+    public void Accordion_steady_state_repaint_allocates_nothing()
+    {
+        // A populated stack, not an empty one: three headers with captions and icons, a body with
+        // real children, and one pane open — every branch the header walk can take.
+        var accordion = new Accordion { Bounds = new(0, 0, 220, 300) };
+        var mail = new AccordionPane("Mail");
+        mail.Controls.Add(new CheckBox { Text = "Unread only", Bounds = new(8, 8, 160, 20) });
+        mail.Controls.Add(new Button { Text = "Compose", Bounds = new(8, 34, 100, 26) });
+        var calendar = new AccordionPane("Calendar");
+        calendar.Controls.Add(new RadioButton { Text = "Week", Bounds = new(8, 8, 120, 20) });
+        accordion.Panes.AddRange(mail, calendar, new AccordionPane("Contacts"));
+
+        Assert.That(MeasureSteadyStatePaint(accordion), Is.Zero);
+    }
+
+    [Test]
+    public void Accordion_in_multiple_mode_steady_state_repaint_allocates_nothing()
+    {
+        var accordion = new Accordion { Bounds = new(0, 0, 220, 300), ExpandMode = AccordionExpandMode.Multiple };
+        var first = new AccordionPane("Mail");
+        var second = new AccordionPane("Calendar");
+        accordion.Panes.AddRange(first, second, new AccordionPane("Contacts"));
+        second.Expanded = true; // two open bodies sharing the leftover height
+
+        Assert.That(MeasureSteadyStatePaint(accordion), Is.Zero);
+    }
+
+    [Test]
+    public void Ribbon_steady_state_repaint_allocates_nothing()
+    {
+        // Several tabs, several groups, both item sizes, a toggle latched down and a hosted control —
+        // the whole column-scanning paint path, not an empty strip.
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        var home = new RibbonTab("Home");
+        var clipboard = new RibbonGroup("Clipboard");
+        clipboard.Items.AddRange(
+            new RibbonButton("Paste"),
+            new RibbonButton("Cut", RibbonItemSize.Small),
+            new RibbonButton("Copy", RibbonItemSize.Small),
+            new RibbonButton("Format", RibbonItemSize.Small));
+        var font = new RibbonGroup("Font");
+        font.Items.AddRange(
+            new RibbonToggleButton("Bold", RibbonItemSize.Small) { Checked = true },
+            new RibbonToggleButton("Italic", RibbonItemSize.Small),
+            new RibbonButton("Size", RibbonItemSize.Small));
+        var styles = new RibbonGroup("Styles");
+        styles.Items.Add(new RibbonHostItem(new ComboBox()) { HostWidth = 120 });
+        home.Groups.AddRange(clipboard, font, styles);
+
+        var insert = new RibbonTab("Insert");
+        var tables = new RibbonGroup("Tables");
+        tables.Items.AddRange(new RibbonButton("Table"), new RibbonButton("Chart"));
+        insert.Groups.Add(tables);
+
+        ribbon.Tabs.AddRange(home, insert);
+
+        Assert.That(MeasureSteadyStatePaint(ribbon), Is.Zero);
+    }
+
+    [Test]
+    public void Ribbon_with_a_collapsed_group_steady_state_repaint_allocates_nothing()
+    {
+        // Narrow enough that the rightmost group folds into its drop-down button, which is a
+        // different paint branch from a laid-out group.
+        var ribbon = new Ribbon { Bounds = new(0, 0, 200, 120) };
+        var home = new RibbonTab("Home");
+        var clipboard = new RibbonGroup("Clipboard");
+        clipboard.Items.AddRange(
+            new RibbonButton("Paste"),
+            new RibbonButton("Cut", RibbonItemSize.Small),
+            new RibbonButton("Copy", RibbonItemSize.Small));
+        var font = new RibbonGroup("Font");
+        font.Items.AddRange(
+            new RibbonButton("Bold", RibbonItemSize.Small),
+            new RibbonButton("Italic", RibbonItemSize.Small));
+        home.Groups.AddRange(clipboard, font);
+        ribbon.Tabs.Add(home);
+
+        Assert.That(MeasureSteadyStatePaint(ribbon), Is.Zero);
+    }
+
+    [Test]
+    public void Minimized_ribbon_steady_state_repaint_allocates_nothing()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120), Minimized = true };
+        var home = new RibbonTab("Home");
+        var clipboard = new RibbonGroup("Clipboard");
+        clipboard.Items.Add(new RibbonButton("Paste"));
+        home.Groups.Add(clipboard);
+        ribbon.Tabs.AddRange(home, new RibbonTab("Insert"));
+
+        Assert.That(MeasureSteadyStatePaint(ribbon), Is.Zero);
+    }
+
+    [Test]
     public void SplitContainer_steady_state_repaint_allocates_nothing()
     {
         var split = new SplitContainer { Bounds = new(0, 0, 320, 160), SplitterDistance = 120 };

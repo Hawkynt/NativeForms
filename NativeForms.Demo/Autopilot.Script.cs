@@ -26,6 +26,7 @@ internal sealed partial class Autopilot
         this.DriveGrid();
         this.DriveLayout();
         this.DrivePickers();
+        this.DriveRibbonPage();
         this.DriveChrome();
         this.DriveModalDialog();
         this.DriveTextEntry();
@@ -97,6 +98,23 @@ internal sealed partial class Autopilot
         }
 
         this.Do(() => tabs.SelectedIndex = index);
+    }
+
+    /// <summary>Selects the tab whose page carries this header, so a page's driver never has to know
+    /// its ordinal — inserting a tab upstream cannot silently point a walkthrough at the wrong page.</summary>
+    private void SelectTab(string header)
+    {
+        var tabs = _form.Part<TabControl>("chrome.tabs");
+        var index = this.Read(() =>
+        {
+            for (var i = 0; i < tabs.TabPages.Count; ++i)
+                if (string.Equals(tabs.TabPages[i].Text, header, StringComparison.Ordinal))
+                    return i;
+
+            return -1;
+        });
+
+        this.SelectTab(index);
     }
 
     // --- Basics ---------------------------------------------------------------------------------
