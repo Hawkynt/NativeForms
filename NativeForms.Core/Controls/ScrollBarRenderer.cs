@@ -123,11 +123,18 @@ internal static class ScrollBarRenderer
         return position < thumbStart ? ScrollBarPart.DecreaseChannel : ScrollBarPart.IncreaseChannel;
     }
 
-    /// <summary>Paints the whole bar — channel, arrows and thumb — through the theme, highlighting
+    /// <summary>Paints the whole bar — trough, arrows and thumb — through the theme, highlighting
     /// <paramref name="pressed"/>.</summary>
     public static void Paint(IGraphics g, ITheme theme, Rectangle bounds, bool vertical, int minimum, int maximum, int value, int largeChange, ScrollBarPart pressed)
     {
         g.FillRectangle(theme.ControlBackground, bounds);
+
+        // The channel the thumb travels in, in the trough tone the scrolling containers share.
+        // Without it the bar's rectangle keeps the control background — the page behind it — so the
+        // two arrow glyphs and the thumb float as disconnected parts with bare page showing through
+        // the gap between them, and the control reads as broken rather than as a scrollbar. The
+        // trough is what joins the parts into one control.
+        g.FillRectangle(Drawing.ScrollBarRenderer.TroughColor(theme), TrackRect(bounds, vertical));
 
         var decrease = DecreaseArrowRect(bounds, vertical);
         var increase = IncreaseArrowRect(bounds, vertical);

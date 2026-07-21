@@ -118,6 +118,35 @@ internal sealed class ContainerClippingTests
         });
     }
 
+    /// <summary>
+    /// A child that only <em>partly</em> leaves the viewport is the case the outside-the-rectangle
+    /// count above cannot see: its peer still starts inside the panel, so nothing flags it, yet its
+    /// trailing edge hangs over the panel's border and — on GTK, where a native child peer is drawn
+    /// above the container's surface — paints across whatever sits below the panel.
+    /// </summary>
+    [Test]
+    public void A_child_straddling_an_autoscroll_panels_edge_is_trimmed_to_the_viewport()
+    {
+        var panel = new Panel { Bounds = new(0, 0, 100, 60), AutoScroll = true };
+        panel.Controls.Add(new Button { Bounds = new(0, 0, 80, 30) });
+        panel.Controls.Add(new Button { Bounds = new(0, 80, 80, 30) });
+        var canvas = Realize(panel, out _);
+
+        // 110px of content in a 60px panel raises the vertical bar, leaving an 84x60 viewport. Scrolled
+        // 40px down, the second child runs from y=40 to y=70 and so reaches 10px past the panel.
+        panel.AutoScrollPosition = new Point(0, 40);
+
+        var overhang = new List<string>();
+        foreach (var child in canvas.Children)
+            if (child is HeadlessPeer { Visible: true } peer && (peer.Bounds.Bottom > 60 || peer.Bounds.Right > 84))
+                overhang.Add($"{peer.Bounds.X},{peer.Bounds.Y},{peer.Bounds.Width},{peer.Bounds.Height}");
+
+        Assert.That(
+            overhang,
+            Is.Empty,
+            "no child peer may reach past the panel's viewport: " + string.Join(" | ", overhang));
+    }
+
     [Test]
     public void An_autoscroll_panels_own_paint_stays_inside_the_client_rectangle_while_scrolled()
     {

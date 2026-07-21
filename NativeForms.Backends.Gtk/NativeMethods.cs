@@ -257,6 +257,12 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_size_allocate(nint widget, ref GdkRectangle allocation);
 
+    /// <summary>Assigns the area a widget may draw into. GTK 3.20 and later derive a container's clip
+    /// from the union of its children's, so a container whose content is larger than itself claims the
+    /// content's whole bounding box; this is the seam that pins the clip back to the allocation.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_set_clip(nint widget, ref GdkRectangle clip);
+
     /// <summary>Makes <paramref name="widget"/> the target of all the application's events (a GTK grab).</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_grab_add(nint widget);

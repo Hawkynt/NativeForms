@@ -15,7 +15,7 @@ namespace Hawkynt.NativeForms.Tests;
 [TestFixture]
 internal sealed class TableLayoutPanelTests
 {
-    private static readonly string _TrackFill = "fill #FFECECEC"; // HeaderBackground = scrollbar track
+    private static readonly string _TrackFill = "fill #FFE2E2E2"; // the shared scrollbar trough tone
     private static readonly string _BorderLine = "line #FFC8C8C8"; // Border = cell grid lines
 
     private static HeadlessCanvasPeer Realize(TableLayoutPanel panel, out HeadlessBackend backend)

@@ -16,6 +16,7 @@ internal sealed class DataGridViewColumnTypesTests
 {
     private const string _Accent = "#FF0078D4";
     private const string _DisabledText = "#FF9A9A9A";
+    private const string _SelectionText = "#FFFFFFFF";
 
     private sealed class Row
     {
@@ -265,6 +266,63 @@ internal sealed class DataGridViewColumnTypesTests
             Assert.That(content, Is.Not.Null);
             Assert.That(content!.RowIndex, Is.EqualTo(0));
         });
+    }
+
+    /// <summary>
+    /// The link is the one cell kind that puts the accent straight onto the row background — every
+    /// other kind either draws through the cell's fore color or lays down an opaque face of its own
+    /// first. A theme whose selection background <em>is</em> the accent (the default one, and GTK's
+    /// Adwaita) therefore paints the selected row's link in its own background colour and the text
+    /// disappears.
+    /// </summary>
+    [Test]
+    public void Link_column_on_the_selected_row_uses_the_selection_foreground()
+    {
+        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
+        {
+            Kind = DataGridViewColumnKind.Link,
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(50, 30);
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.Zero, "the click selected the row");
+            Assert.That(
+                g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_SelectionText)),
+                Is.True,
+                "the link text switches to the selection foreground");
+            Assert.That(g.Operations, Does.Contain($"line {_SelectionText} 4,40-39,40"), "and so does its underline");
+            Assert.That(
+                g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_Accent)),
+                Is.False,
+                "never accent text on an accent-coloured selection");
+        });
+    }
+
+    /// <summary>An explicit cell fore color still wins on a selected row, exactly as it does for text
+    /// cells — the selection default only applies where the style left the colour open.</summary>
+    [Test]
+    public void Link_column_honors_an_explicit_cell_fore_color_when_selected()
+    {
+        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
+        {
+            Kind = DataGridViewColumnKind.Link,
+            CellStyleSelector = static _ => new DataGridViewCellStyle(foreColor: Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(50, 30);
+        var g = canvas.RaisePaint();
+
+        Assert.That(
+            g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("#FF00FF00")),
+            Is.True,
+            "the explicit fore color survives selection");
     }
 
     [Test]

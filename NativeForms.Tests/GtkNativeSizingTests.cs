@@ -57,6 +57,12 @@ public sealed partial class GtkNativeSizingTests
         /// <summary>The platform tooltip GTK reports on a native button after its tip was raised.</summary>
         public string? NativeToolTipText;
 
+        /// <summary>Whether a child scrolled completely below the viewport is still mapped.</summary>
+        public bool OffscreenChildMapped;
+
+        /// <summary>Whether that same child is mapped again once it is scrolled back into view.</summary>
+        public bool ScrolledBackChildMapped;
+
         public string? Failure;
     }
 
@@ -197,6 +203,19 @@ public sealed partial class GtkNativeSizingTests
 
         // The band starts where the client area ends; the allocation above must not reach into it.
         measurements.StripLeft = panel.DisplayRectangle.Right;
+
+        // "Tall bottom" sits at y=500 in a viewport 184px tall, so at rest it is entirely out of
+        // view. Its rectangle therefore has no area, and only unmapping can express that: an
+        // allocation cannot, because gtk_widget_set_size_request is a minimum and a widget asked for
+        // zero height falls back to its natural one, reappearing full-size outside the panel.
+        measurements.OffscreenChildMapped = gtk_widget_get_mapped(ButtonLabelled("Tall bottom")) != 0;
+
+        // Scrolled to the bottom the same child is back inside the viewport and has to reappear.
+        panel.AutoScrollPosition = new Point(0, 1000);
+        Pump();
+        measurements.ScrolledBackChildMapped = gtk_widget_get_mapped(ButtonLabelled("Tall bottom")) != 0;
+        panel.AutoScrollPosition = Point.Empty;
+        Pump();
 
         var tipped = ButtonLabelled("Tipped");
         var tippedWindow = EventWindowOf(tipped, gtk_widget_get_window(gtk_widget_get_parent(tipped)));
@@ -371,6 +390,30 @@ public sealed partial class GtkNativeSizingTests
             $"the child was allocated {measured.OverhangingChild}, reaching into the band at x={measured.StripLeft}");
     }
 
+    // --- Defect: an AutoScroll panel did not clip its native children ---------------------------
+    //
+    // Two mechanisms let a scrolled child escape, and neither is visible headlessly. GTK 3.20 and
+    // later derive a container's clip from the union of its children's, so the panel claimed its
+    // whole 300x530 content box and everything drawn through that clip — gtk_widget_draw, an
+    // offscreen surface, the damage region — painted the children across the panel's border. And a
+    // child scrolled entirely out of view gets a rectangle with no area, which an allocation cannot
+    // express at all: gtk_widget_set_size_request only raises the minimum, so the widget fell back
+    // to its natural size and reappeared, full height, below the panel and over its neighbours.
+
+    [Test]
+    public void A_child_scrolled_completely_out_of_view_is_unmapped()
+        => Assert.That(
+            Result().OffscreenChildMapped,
+            Is.False,
+            "a child with no visible area left must not stay mapped, or GTK gives it its natural size back");
+
+    [Test]
+    public void A_child_scrolled_back_into_view_is_mapped_again()
+        => Assert.That(
+            Result().ScrolledBackChildMapped,
+            Is.True,
+            "unmapping an out-of-view child must be reversible");
+
     // --- Defect: a tip on a native-peer control ---------------------------------------------------
     //
     // SetToolTip used to hook OwnerDrawnControl only, so a Button's registration was accepted and
@@ -488,6 +531,7 @@ public sealed partial class GtkNativeSizingTests
     private const string GObject = "libgobject-2.0.so.0";
 
     [LibraryImport(Gtk)] private static partial void gtk_widget_get_allocation(nint widget, out GtkAllocation allocation);
+    [LibraryImport(Gtk)] private static partial int gtk_widget_get_mapped(nint widget);
     [LibraryImport(Gtk)] private static partial nint gtk_widget_get_window(nint widget);
     [LibraryImport(Gtk)] private static partial nint gtk_widget_get_parent(nint widget);
     [LibraryImport(Gtk)] private static partial nint gtk_widget_get_name(nint widget);

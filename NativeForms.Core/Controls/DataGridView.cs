@@ -1896,9 +1896,15 @@ public class DataGridView : OwnerDrawnControl
 
             case DataGridViewColumnKind.Link:
             {
+                // The link is the one cell kind that puts a colour of its own straight onto the row
+                // background instead of using foreColor or laying down an opaque face first, so it is
+                // also the one that has to fall back to the selection foreground: a theme whose
+                // selection background is the accent (the default one, and GTK's Adwaita) would
+                // otherwise paint the selected row's link in its own background and lose it entirely.
                 var text = this.GetDisplayText(column, item, modelIndex);
+                var linkColor = style.ForeColor ?? (selected ? theme.SelectionText : theme.Accent);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding), cellRect.Height);
-                g.DrawText(text, theme.DefaultFont, theme.Accent, textRect, alignment);
+                g.DrawText(text, theme.DefaultFont, linkColor, textRect, alignment);
 
                 var size = g.MeasureText(text, theme.DefaultFont);
                 var left = textRect.X;
@@ -1908,7 +1914,7 @@ public class DataGridView : OwnerDrawnControl
                     left = textRect.Right - size.Width;
 
                 var underlineY = textRect.Y + ((textRect.Height + size.Height) / 2) - 1;
-                g.DrawLine(theme.Accent, left, underlineY, left + size.Width, underlineY);
+                g.DrawLine(linkColor, left, underlineY, left + size.Width, underlineY);
                 break;
             }
 

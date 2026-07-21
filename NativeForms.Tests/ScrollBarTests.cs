@@ -68,6 +68,40 @@ internal sealed class ScrollBarTests
     }
 
     [Test]
+    public void Track_between_the_arrows_is_painted_as_a_trough()
+    {
+        var bar = CreateVertical();
+        var canvas = CanvasOf(Realize(bar));
+
+        var g = canvas.RaisePaint();
+
+        // 16px arrow buttons at both ends of the 132px bar leave a 16x100 channel at y=16. Painting
+        // the bar's whole rectangle in the control background leaves that channel indistinguishable
+        // from the page behind it, so the arrows and the thumb read as loose parts rather than as one
+        // control; the trough is what joins them.
+        Assert.That(g.Operations, Does.Contain("fill #FFE2E2E2 0,16,16,100"), "the trough spans arrow to arrow");
+    }
+
+    [Test]
+    public void Trough_is_painted_before_the_thumb_so_the_thumb_stays_visible()
+    {
+        var bar = CreateVertical();
+        bar.Value = 40;
+        var canvas = CanvasOf(Realize(bar));
+
+        var g = canvas.RaisePaint();
+
+        var trough = g.Operations.IndexOf("fill #FFE2E2E2 0,16,16,100");
+        var thumb = g.Operations.FindIndex(static o => o.StartsWith("fill #FFC8C8C8 0,"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(trough, Is.GreaterThanOrEqualTo(0), "the trough is painted");
+            Assert.That(thumb, Is.GreaterThan(trough), "and the thumb lands on top of it");
+        });
+    }
+
+    [Test]
     public void Arrow_click_steps_by_SmallChange_and_autorepeats()
     {
         var bar = CreateVertical();

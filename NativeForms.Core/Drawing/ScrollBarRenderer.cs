@@ -13,10 +13,32 @@ internal static class ScrollBarRenderer
     private const int _MinThumbLength = 16;
     private const int _ThumbMargin = 2;
 
+    /// <summary>
+    /// The channel tone every scrollbar the toolkit draws shares — the standalone control's as well
+    /// as the ones a scrolling container paints.
+    ///
+    /// It has to be derived rather than read straight off the palette because not every theme
+    /// publishes a distinct trough colour: GTK answers the same value for the window background and
+    /// the header band, so a channel painted in either is invisible against the page behind it and
+    /// the bar's arrows and thumb read as loose parts. Carrying the control background half-way to
+    /// the border gives a recess that shows on every theme yet stays lighter than the thumb, and it
+    /// still follows the OS palette because both ends of the blend do.
+    /// </summary>
+    public static Color TroughColor(ITheme theme)
+    {
+        var background = theme.ControlBackground;
+        var border = theme.Border;
+        return Color.FromArgb(
+            (background.A + border.A) / 2,
+            (background.R + border.R) / 2,
+            (background.G + border.G) / 2,
+            (background.B + border.B) / 2);
+    }
+
     /// <summary>Paints a scrollbar (track plus proportional thumb) into <paramref name="track"/>.</summary>
     public static void Paint(IGraphics g, ITheme theme, Rectangle track, bool vertical, int extent, int viewport, int position)
     {
-        g.FillRectangle(theme.HeaderBackground, track);
+        g.FillRectangle(TroughColor(theme), track);
         g.FillRectangle(theme.Border, GetThumb(track, vertical, extent, viewport, position));
     }
 

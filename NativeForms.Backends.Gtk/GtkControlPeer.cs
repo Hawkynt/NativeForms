@@ -104,6 +104,10 @@ internal abstract class GtkControlPeer : IControlPeer
         if (_parentFixed != 0)
             NativeMethods.gtk_fixed_move(_parentFixed, _widget, bounds.X, bounds.Y);
 
+        // A rectangle that lost its area means the child scrolled out of view entirely, which only
+        // unmapping can express; one that regained it has to come back.
+        this.ApplyVisibility();
+
         // A resize re-runs GTK's allocation, which sizes the widget to its own preference; clamp it
         // back so the new rectangle applies immediately rather than one frame later.
         this.ClampAllocation();
@@ -149,9 +153,6 @@ internal abstract class GtkControlPeer : IControlPeer
             return;
 
         NativeMethods.gtk_widget_get_allocation(_widget, out var current);
-        if (current.Width == _bounds.Width && current.Height == _bounds.Height)
-            return;
-
         var corrected = new GdkRectangle
         {
             X = current.X,
@@ -160,15 +161,26 @@ internal abstract class GtkControlPeer : IControlPeer
             Height = _bounds.Height,
         };
 
-        _clamping = true;
-        try
+        if (current.Width != _bounds.Width || current.Height != _bounds.Height)
         {
-            NativeMethods.gtk_widget_size_allocate(_widget, ref corrected);
+            _clamping = true;
+            try
+            {
+                NativeMethods.gtk_widget_size_allocate(_widget, ref corrected);
+            }
+            finally
+            {
+                _clamping = false;
+            }
         }
-        finally
-        {
-            _clamping = false;
-        }
+
+        // The clip is pinned as well: GTK 3.20 and later derive a container's clip from the union of
+        // its children's, so a scrolling panel claims its whole content bounding box however small
+        // its allocation is, and the clip — not the allocation — is what bounds the children when the
+        // hierarchy is drawn into one surface. Left alone, a child scrolled off the top is drawn
+        // above the panel, across whatever sits there. Bounds are what the widget occupies, so the
+        // clip has to say so too.
+        NativeMethods.gtk_widget_set_clip(_widget, ref corrected);
     }
 
     /// <summary>
@@ -224,8 +236,28 @@ internal abstract class GtkControlPeer : IControlPeer
     public void SetVisible(bool visible)
     {
         _visible = visible;
+        this.ApplyVisibility();
+    }
+
+    /// <summary>
+    /// Whether the widget should actually be mapped: what the toolkit asked for, and — for a widget
+    /// the toolkit positions — only while the rectangle it was given still has an area.
+    ///
+    /// An empty rectangle is how a scrolling container says "this child is entirely out of view", and
+    /// that cannot be expressed as an allocation. <c>gtk_widget_set_size_request</c> sets a
+    /// <em>minimum</em>, so a widget asked for zero height simply falls back to its natural one, and
+    /// <see cref="ClampAllocation"/> has nothing authoritative to clamp to either — the child
+    /// reappears at full size outside the container, painting over whatever sits beyond it. Unmapping
+    /// is the only faithful way to say it is not there.
+    /// </summary>
+    private bool IsEffectivelyVisible
+        => _visible && (!this.ClampsAllocation || (_bounds.Width > 0 && _bounds.Height > 0));
+
+    /// <summary>Pushes <see cref="IsEffectivelyVisible"/> to the widget.</summary>
+    private void ApplyVisibility()
+    {
         if (_widget != 0)
-            NativeMethods.gtk_widget_set_visible(_widget, Bool(visible));
+            NativeMethods.gtk_widget_set_visible(_widget, Bool(this.IsEffectivelyVisible));
     }
 
     /// <inheritdoc />
@@ -386,7 +418,7 @@ internal abstract class GtkControlPeer : IControlPeer
 
         var window = NativeMethods.gtk_widget_get_window(_widget);
         if (window == 0)
-            return clientPoint;
+            return this.UnmappedPointToScreen(clientPoint);
 
         NativeMethods.gdk_window_get_origin(window, out var x, out var y);
 
@@ -400,6 +432,28 @@ internal abstract class GtkControlPeer : IControlPeer
         }
 
         return new(x + clientPoint.X, y + clientPoint.Y);
+    }
+
+    /// <summary>
+    /// Where the widget would map to if it were on screen, for the moment it is not: a widget an
+    /// ancestor has scrolled entirely out of view is unmapped and so owns no <c>GdkWindow</c> to ask.
+    ///
+    /// The toolkit still knows the answer — the rectangle it assigned inside the parent surface —
+    /// and callers depend on it: hit-testing, drag sources and tooltips all map client points to the
+    /// screen, and the result must describe where the control is, not whether the peer happens to be
+    /// mapped right now.
+    /// </summary>
+    private Point UnmappedPointToScreen(Point clientPoint)
+    {
+        if (_parentFixed == 0)
+            return clientPoint;
+
+        var parentWindow = NativeMethods.gtk_widget_get_window(_parentFixed);
+        if (parentWindow == 0)
+            return clientPoint;
+
+        NativeMethods.gdk_window_get_origin(parentWindow, out var x, out var y);
+        return new(x + _bounds.X + clientPoint.X, y + _bounds.Y + clientPoint.Y);
     }
 
     /// <summary>Creates the concrete native widget, using the buffered state where relevant.</summary>
@@ -436,7 +490,7 @@ internal abstract class GtkControlPeer : IControlPeer
             this.ApplyColors();
 
         this.ApplyCursor();
-        NativeMethods.gtk_widget_set_visible(_widget, Bool(_visible));
+        this.ApplyVisibility();
         return _widget;
     }
 

@@ -17,7 +17,7 @@ internal sealed class PanelScrollTests
     private const int _ScrollBarSize = 16;
     private const int _WheelStep = 3 * 22;
 
-    private static readonly string _TrackFill = "fill #FFECECEC"; // HeaderBackground = scrollbar track
+    private static readonly string _TrackFill = "fill #FFE2E2E2"; // the shared scrollbar trough tone
 
     private static HeadlessCanvasPeer Realize(Panel panel, out HeadlessBackend backend)
     {
@@ -67,7 +67,10 @@ internal sealed class PanelScrollTests
         {
             Assert.That(panel.AutoScrollPosition, Is.EqualTo(new Point(0, -_WheelStep)));
             Assert.That(button.Bounds, Is.EqualTo(new Rectangle(10, 150, 60, 30)), "logical bounds stay put");
-            Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(10, 150 - _WheelStep, 60, 30)), "peer moves");
+
+            // Scrolled to y=84 the child straddles the 100px viewport's bottom edge, so the peer is
+            // both moved and trimmed to the 16px that remain visible.
+            Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(10, 150 - _WheelStep, 60, 16)), "peer moves and is trimmed");
         });
     }
 
@@ -127,7 +130,11 @@ internal sealed class PanelScrollTests
         Assert.Multiple(() =>
         {
             Assert.That(panel.AutoScrollPosition, Is.EqualTo(new Point(-50, 0)));
-            Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(100, 10, 60, 20)));
+
+            // Logical x 150 less the 50px scroll puts the child at the 100px viewport's right edge,
+            // so it is off-screen entirely and collapses rather than painting beside the panel.
+            Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(100, 10, 0, 20)));
+            Assert.That(button.Bounds, Is.EqualTo(new Rectangle(150, 10, 60, 20)), "logical bounds stay untouched");
         });
     }
 
@@ -226,13 +233,13 @@ internal sealed class PanelScrollTests
     }
 
     /// <summary>
-    /// The pull-back applies only to an edge facing a bar that is actually shown. Without a
-    /// horizontal bar a child must keep its full height while it scrolls past the bottom edge —
-    /// clipping there is the parent window's job, and trimming instead would visibly shrink the
-    /// widget.
+    /// The pull-back applies to every trailing edge, not only one facing a visible bar. Leaving a
+    /// child its full height past the bottom edge relied on the parent window clipping it, which it
+    /// does not: a native child peer is drawn <em>above</em> the container's surface, so the overhang
+    /// paints across the panel's own border and over whatever lies below it.
     /// </summary>
     [Test]
-    public void A_child_below_the_viewport_keeps_its_height_while_no_horizontal_bar_shows()
+    public void A_child_below_the_viewport_is_trimmed_at_the_bottom_edge()
     {
         var panel = new Panel { Bounds = new(0, 0, 100, 100), AutoScroll = true };
         var low = new Button { Bounds = new(10, 90, 60, 30) };
@@ -240,6 +247,10 @@ internal sealed class PanelScrollTests
         Realize(panel, out var backend);
         var lowPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
 
-        Assert.That(lowPeer.Bounds, Is.EqualTo(new Rectangle(10, 90, 60, 30)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(lowPeer.Bounds, Is.EqualTo(new Rectangle(10, 90, 60, 10)), "trimmed to the 100px viewport");
+            Assert.That(low.Bounds, Is.EqualTo(new Rectangle(10, 90, 60, 30)), "logical bounds stay untouched");
+        });
     }
 }

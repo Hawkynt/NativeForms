@@ -101,18 +101,18 @@ public class Panel : OwnerDrawnControl
     }
 
     /// <summary>
-    /// The scroll offset applied to a child's peer, with any edge that would reach into a visible
-    /// scrollbar's band pulled back to the viewport.
+    /// The scroll offset applied to a child's peer, with any trailing edge that would reach past the
+    /// viewport pulled back to it.
     ///
-    /// Only an edge facing a bar that is actually shown is touched, and only the trailing one: the
-    /// leading edges must stay free to go negative — that is what scrolling a child up and out of
-    /// view means — and a panel without a horizontal bar must not have its children's heights
-    /// trimmed at its own bottom edge, which is the parent window's clipping job, not this method's.
-    ///
-    /// The band itself has to be kept clear because a native child peer sits <em>above</em> the
-    /// container's own surface. A child the Anchor/Dock engine never touched — one placed at
-    /// absolute coordinates, so <see cref="DisplayRectangle"/> never constrained it — would
-    /// otherwise overhang the strip and swallow every press aimed at the thumb.
+    /// Only the trailing edges are touched: the leading ones must stay free to go negative — that is
+    /// what scrolling a child up and out of view means — and cutting a child's top or left off would
+    /// move it rather than clip it. Trimming the trailing edges is not the same as relying on the
+    /// parent to clip, because a native child peer sits <em>above</em> the container's own surface:
+    /// nothing the panel paints can cover it, so a child scrolled half out of the viewport draws
+    /// across the panel's own border and over whatever lies beyond it. That includes a visible
+    /// scrollbar's band, which a child placed at absolute coordinates — one the Anchor/Dock engine
+    /// never passed through <see cref="DisplayRectangle"/> — would otherwise overhang, swallowing
+    /// every press aimed at the thumb.
     /// </summary>
     private protected override Rectangle GetChildPeerBounds(Control child)
     {
@@ -120,12 +120,14 @@ public class Panel : OwnerDrawnControl
         if (!this.AutoScroll)
             return bounds;
 
-        this.GetScrollState(out _, out var verticalBar, out var horizontalBar, out var viewport);
+        this.GetScrollState(out _, out _, out _, out var viewport);
         var x = bounds.X - _scroll.X;
         var y = bounds.Y - _scroll.Y;
-        var width = verticalBar ? Math.Max(0, Math.Min(bounds.Width, viewport.Width - x)) : bounds.Width;
-        var height = horizontalBar ? Math.Max(0, Math.Min(bounds.Height, viewport.Height - y)) : bounds.Height;
-        return new(x, y, width, height);
+        return new(
+            x,
+            y,
+            Math.Max(0, Math.Min(bounds.Width, viewport.Width - x)),
+            Math.Max(0, Math.Min(bounds.Height, viewport.Height - y)));
     }
 
     /// <summary>

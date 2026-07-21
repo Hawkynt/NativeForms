@@ -15,7 +15,7 @@ namespace Hawkynt.NativeForms.Tests;
 [TestFixture]
 internal sealed class FlowLayoutPanelTests
 {
-    private static readonly string _TrackFill = "fill #FFECECEC"; // HeaderBackground = scrollbar track
+    private static readonly string _TrackFill = "fill #FFE2E2E2"; // the shared scrollbar trough tone
 
     private static HeadlessCanvasPeer Realize(FlowLayoutPanel panel, out HeadlessBackend backend)
     {
