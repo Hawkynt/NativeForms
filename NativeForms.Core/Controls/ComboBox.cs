@@ -437,6 +437,7 @@ public class ComboBox : OwnerDrawnControl
         _popupTopIndex = 0;
         this.EnsurePopupVisible(_hoverIndex);
         _droppedDown = true;
+        this.OwnsOpenPopup = true;
         popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), _popupSize);
         this.Invalidate();
         this.OnDropDown(EventArgs.Empty);
@@ -449,6 +450,7 @@ public class ComboBox : OwnerDrawnControl
             return;
 
         _droppedDown = false;
+        this.OwnsOpenPopup = false;
         _popup?.Hide();
         this.Invalidate();
         this.OnDropDownClosed(EventArgs.Empty);
@@ -536,6 +538,7 @@ public class ComboBox : OwnerDrawnControl
             return;
 
         _droppedDown = false;
+        this.OwnsOpenPopup = false;
         this.Invalidate();
         this.OnDropDownClosed(EventArgs.Empty);
     }

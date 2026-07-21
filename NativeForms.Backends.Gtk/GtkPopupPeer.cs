@@ -115,9 +115,23 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         Dismissed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Whether a point in the popup window's coordinate space lies outside its allocation.</summary>
-    private bool IsOutside(int x, int y)
+    /// <summary>
+    /// Whether a press at the given root (screen) coordinates lies outside the popup's own rectangle.
+    /// The grab redirects presses aimed at any other window here without rewriting their coordinates,
+    /// so <c>GdkEventButton.X/Y</c> still measures from whichever window the pointer was actually
+    /// over. Testing those against this popup's allocation reads a press near the main window's origin
+    /// as a press near the popup's origin and refuses to dismiss; only the root coordinates, mapped
+    /// through the popup's own origin, describe both windows in the same space.
+    /// </summary>
+    private bool IsOutside(int rootX, int rootY)
     {
+        var window = NativeMethods.gtk_widget_get_window(_window);
+        if (window == 0)
+            return true;
+
+        NativeMethods.gdk_window_get_origin(window, out var originX, out var originY);
+        var x = rootX - originX;
+        var y = rootY - originY;
         var width = NativeMethods.gtk_widget_get_allocated_width(_window);
         var height = NativeMethods.gtk_widget_get_allocated_height(_window);
         return x < 0 || y < 0 || x >= width || y >= height;
@@ -138,7 +152,7 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         unsafe
         {
             ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
-            if (!peer.IsOutside((int)e.X, (int)e.Y))
+            if (!peer.IsOutside((int)e.XRoot, (int)e.YRoot))
                 return 0;
         }
 

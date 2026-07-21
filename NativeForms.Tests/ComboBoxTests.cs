@@ -381,4 +381,49 @@ internal sealed class ComboBoxTests
         PopupOf(backend).FireDismiss(); // light dismissal closes too
         Assert.That((opens, closes), Is.EqualTo((2, 2)));
     }
+
+    /// <summary>A popup takes a grab, and toolkits report that grab as the field losing focus even
+    /// though the user moved focus nowhere. Adopting it would close the surface that had just opened,
+    /// so an open drop-down ignores the loss — and hears it again as soon as the surface is gone.</summary>
+    [Test]
+    public void An_open_drop_down_ignores_the_focus_loss_its_own_popup_grab_causes()
+    {
+        var combo = CreateCombo(out var canvas, out _, "a", "b");
+        var losses = 0;
+        combo.LostFocus += (_, _) => ++losses;
+
+        combo.OpenDropDown();
+        canvas.RaiseLostFocus();
+        Assert.Multiple(() =>
+        {
+            Assert.That(combo.DroppedDown, Is.True, "the grab's focus report closed the drop-down");
+            Assert.That(losses, Is.Zero);
+        });
+
+        combo.CloseDropDown();
+        canvas.RaiseLostFocus();
+        Assert.That(losses, Is.EqualTo(1));
+    }
+
+    /// <summary>Unrealizing while the drop-down is open tears the surface down with the peer, so the
+    /// suppression must not outlive it and deafen the control to every later focus loss.</summary>
+    [Test]
+    public void Unrealizing_an_open_drop_down_does_not_leave_focus_loss_suppressed()
+    {
+        var combo = new ComboBox { Bounds = new(10, 10, 120, 24) };
+        combo.Items.AddRange(["a", "b"]);
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(combo);
+        Application.Run(form, backend);
+
+        combo.OpenDropDown();
+        form.Controls.Remove(combo);
+        form.Controls.Add(combo);
+
+        var losses = 0;
+        combo.LostFocus += (_, _) => ++losses;
+        backend.Created.OfType<HeadlessCanvasPeer>().Last().RaiseLostFocus();
+        Assert.That(losses, Is.EqualTo(1));
+    }
 }

@@ -257,6 +257,15 @@ internal struct GdkEventButton
 
     /// <summary>The button number (1 = left, 2 = middle, 3 = right).</summary>
     public uint Button;
+
+    /// <summary>The device that produced the event (<c>GdkDevice*</c>).</summary>
+    public nint Device;
+
+    /// <summary>Pointer x in root (screen) coordinates — the only space shared across windows.</summary>
+    public double XRoot;
+
+    /// <summary>Pointer y in root (screen) coordinates — the only space shared across windows.</summary>
+    public double YRoot;
 }
 
 /// <summary>The leading fields of <c>GdkEventMotion</c> — enough to read the pointer position.</summary>

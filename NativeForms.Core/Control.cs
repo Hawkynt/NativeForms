@@ -45,6 +45,9 @@ public abstract class Control
 
         /// <summary>A layout was requested while suspended and runs on the closing <see cref="ResumeLayout()"/>.</summary>
         LayoutPending = 1 << 12,
+
+        /// <summary>A light-dismiss surface owned by this control is on screen holding the grab.</summary>
+        PopupOpen = 1 << 13,
     }
 
     /// <summary>The bit position of the packed <see cref="AnchorStyles"/> flags inside <see cref="_state"/>.</summary>
@@ -720,12 +723,33 @@ public abstract class Control
     /// followed by <see cref="Leave"/>. Deliberately not guarded by <see cref="Focused"/> — some
     /// platforms report a loss for a widget that never announced its gain, and controls (spin boxes
     /// committing an edit) rely on hearing it.
+    ///
+    /// It is guarded by <see cref="OwnsOpenPopup"/> though: a light-dismiss surface takes a grab, and
+    /// toolkits report that grab as the owning widget losing focus even though the user never moved
+    /// focus anywhere. Adopting it would have the field tear down the very surface it just opened, so
+    /// while the surface is up the loss is treated as the toolkit's own bookkeeping and dropped; the
+    /// grab's outside-press dismissal is what ends the interaction.
     /// </summary>
     private void OnPeerLostFocus(object? sender, EventArgs e)
     {
+        if (this.OwnsOpenPopup)
+            return;
+
         _state &= ~State.Focused;
         this.OnLostFocus(EventArgs.Empty);
         this.OnLeave(EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Whether this control currently owns a shown <see cref="Backends.IPopupPeer"/>. Every popup
+    /// owner sets it across the surface's lifetime — from just before <c>ShowAt</c> until the surface
+    /// is hidden or light-dismissed — which is what keeps the grab's spurious focus loss from closing
+    /// it. Packed into the existing state bits, so it costs no per-instance footprint.
+    /// </summary>
+    private protected bool OwnsOpenPopup
+    {
+        get => (_state & State.PopupOpen) != 0;
+        set => _state = value ? _state | State.PopupOpen : _state & ~State.PopupOpen;
     }
 
     /// <summary>Hook for subclasses when <see cref="RightToLeft"/> changes; owner-drawn controls repaint.</summary>
@@ -1304,7 +1328,10 @@ public abstract class Control
 
         _peer.GotFocus -= this.OnPeerGotFocus;
         _peer.LostFocus -= this.OnPeerLostFocus;
-        _state &= ~State.Focused;
+
+        // The popup bit goes with the peer: unrealizing tears every owned surface down, and leaving it
+        // set would have the control swallow every focus loss it is ever told about again.
+        _state &= ~(State.Focused | State.PopupOpen);
         _peer.Dispose();
         _peer = null;
         _backend = null;

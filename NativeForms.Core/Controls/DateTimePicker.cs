@@ -350,6 +350,7 @@ public class DateTimePicker : OwnerDrawnControl
         calendar.DisplayMonth = new(day.Year, day.Month, 1);
 
         _droppedDown = true;
+        this.OwnsOpenPopup = true;
         popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), _popupSize);
         this.Invalidate();
         this.OnDropDown(EventArgs.Empty);
@@ -362,6 +363,7 @@ public class DateTimePicker : OwnerDrawnControl
             return;
 
         _droppedDown = false;
+        this.OwnsOpenPopup = false;
         _popup?.Hide();
         this.Invalidate();
         this.OnCloseUp(EventArgs.Empty);
@@ -404,6 +406,7 @@ public class DateTimePicker : OwnerDrawnControl
             return;
 
         _droppedDown = false;
+        this.OwnsOpenPopup = false;
         this.Invalidate();
         this.OnCloseUp(EventArgs.Empty);
     }
