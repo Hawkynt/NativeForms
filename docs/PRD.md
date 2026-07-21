@@ -533,6 +533,11 @@ strategy (may differ per platform; note exceptions inline).
       developer with a display gets real coverage — `GtkNativeSizingTests` is the first.
       XTEST is unusable here (`:1` is Xwayland `-rootless`; the compositor swallows injected
       pointer events), which is why injection happens in-process.
+- [ ] `!` A focused owner-drawn control whose page is then hidden **strands the GTK toplevel's focus
+      widget**: later clicks land correctly but move no focus, and a programmatic `Focus()` only
+      recovers it intermittently (a synthesized click does). Hiding a control that holds focus should
+      surrender it to the next focusable sibling. Found while adding the pickers and worked around in
+      the walkthrough, not solved.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
 - [ ] `TableLayoutPanel` lays its cells out from `Width`/`Height` and never reads
       `DisplayRectangle`, so cells still sit under a visible `AutoScroll` scrollbar — the same

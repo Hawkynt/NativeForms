@@ -29,7 +29,7 @@ The inherited `Text` property is the hosted editor's content; user edits flow ba
 | Name | Description |
 |---|---|
 | `SearchCleared` | Raised after a click on the clear (×) zone emptied the box. Clicking while already empty does nothing. |
-| `SearchCommitted` | Raised when Enter commits the search — with a reach limitation, see Notes. |
+| `SearchCommitted` | Raised when Enter commits the search, whether the caret is in the hosted editor or on the painted surface. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
@@ -37,6 +37,5 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 - Built like the `UpDownBase` spinners: the native editor fills the field so caret, selection, clipboard and IME stay platform-native. The editor sits between a 20 px leading zone (magnifier: stroked lens circle plus handle) and a 20 px trailing clear zone; the × strokes paint only while text is present. Everything uses the platform `ITheme` colors, greyed when disabled.
 - Clearing rewrites both the control and the native editor and raises `SearchCleared` plus one `TextChanged`. A disabled box ignores the clear zone.
-- **Enter limitation, honestly.** `SearchCommitted` fires for Enter on the owner-drawn surface. Enter typed *inside the hosted native editor* is not observable from the core — `ITextBoxPeer` exposes text changes but no key events — so committing from within the editor needs a key seam on the peer first, like every native-widget control.
+- **Enter reaches the composite.** `SearchCommitted` fires for Enter typed inside the hosted native editor as well as on the painted surface: `ITextBoxPeer.KeyDown` lets the editor offer a key to its owner before acting on it, and `SearchBox` claims Enter there. Keys it does not claim stay with the editor.
 - `SearchBoxTests` pin the surface headlessly: editor placement, glyph painting, clear behavior, Enter commit, and the disabled state.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.9): the in-editor Enter commit described above.
