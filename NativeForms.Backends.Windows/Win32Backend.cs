@@ -77,7 +77,7 @@ public sealed partial class Win32Backend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();
 
     /// <inheritdoc/>
-    public IPopupPeer CreatePopup() => new Win32PopupPeer();
+    public IPopupPeer CreatePopup(IWindowPeer? owner) => new Win32PopupPeer(owner is WindowPeer window ? window.Handle : 0);
 
     /// <inheritdoc/>
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)

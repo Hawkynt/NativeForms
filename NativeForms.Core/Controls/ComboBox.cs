@@ -458,7 +458,7 @@ public class ComboBox : OwnerDrawnControl
 
     private IPopupPeer CreatePopup(IPlatformBackend backend)
     {
-        var popup = backend.CreatePopup();
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
         popup.Paint += (_, e) => this.OnPopupPaint(e);
         popup.MouseMove += (_, e) => this.OnPopupMouseMove(e);
         popup.MouseDown += (_, e) => this.OnPopupMouseDown(e);

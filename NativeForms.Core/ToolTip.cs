@@ -35,6 +35,11 @@ public sealed class ToolTip : Component
     private IPopupPeer? _popup;
     private IPlatformBackend? _backend;
 
+    /// <summary>The window the cached surface was created for. One tip component can serve controls
+    /// on several forms, and a surface belongs to exactly one of them, so a tip that moves to another
+    /// form needs a new surface rather than one still anchored to the form it left.</summary>
+    private IWindowPeer? _popupOwner;
+
     private Control? _hoverControl;
     private Point _hoverPoint;
     private string _shownText = string.Empty;
@@ -130,6 +135,7 @@ public sealed class ToolTip : Component
         _timer = null;
         _popup?.Dispose();
         _popup = null;
+        _popupOwner = null;
         _backend = null;
         foreach (var control in _texts.Keys)
             this.Unhook(control);
@@ -178,7 +184,7 @@ public sealed class ToolTip : Component
         // A native widget gets the platform's own tip; only an owner-drawn surface, which has no
         // platform tip of its own, is worth floating a toolkit popup for. See ShowNativeTip.
         if (control is OwnerDrawnControl)
-            this.ShowPopup(backend, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + control.LogicalToDevice(CursorOffset))), text);
+            this.ShowPopup(backend, control, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + control.LogicalToDevice(CursorOffset))), text);
         else if (!this.ShowNativeTip(control, text))
             return;
 
@@ -206,14 +212,18 @@ public sealed class ToolTip : Component
     }
 
     /// <summary>Shows (creating on first use) the popup with the given text at a screen position.</summary>
-    private void ShowPopup(IPlatformBackend backend, Point screenLocation, string text)
+    /// <param name="owner">The control being tipped; its form owns the surface, so the tip is
+    /// anchored to that window and does not make it look inactive while it floats.</param>
+    private void ShowPopup(IPlatformBackend backend, Control owner, Point screenLocation, string text)
     {
         var popup = _popup;
-        if (popup is null || !ReferenceEquals(_backend, backend))
+        var ownerWindow = owner.OwnerWindowPeer;
+        if (popup is null || !ReferenceEquals(_backend, backend) || !ReferenceEquals(_popupOwner, ownerWindow))
         {
             _popup?.Dispose();
             _backend = backend;
-            _popup = popup = backend.CreatePopup();
+            _popupOwner = ownerWindow;
+            _popup = popup = backend.CreatePopup(ownerWindow);
 
             // A tip is passive: it must never take the grab that arms light dismiss, or the next
             // click would be spent closing the tip instead of reaching the control it was aimed at.

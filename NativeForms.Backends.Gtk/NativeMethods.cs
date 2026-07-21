@@ -87,6 +87,14 @@ internal static partial class NativeMethods
     /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_UTILITY</c> — a small persistent tool window.</summary>
     internal const int GDK_WINDOW_TYPE_HINT_UTILITY = 5;
 
+    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU</c> — a menu pulled from a menu bar.
+    /// A window manager keeps the window it belongs to looking focused while one of these is up,
+    /// which is why an application's own menu must not read as an ordinary window.</summary>
+    internal const int GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU = 8;
+
+    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_TOOLTIP</c> — a passive surface the user never aims at.</summary>
+    internal const int GDK_WINDOW_TYPE_HINT_TOOLTIP = 10;
+
     /// <summary>Value of <c>GDK_HINT_MIN_SIZE</c> — the geometry's minimum size is valid.</summary>
     internal const int GDK_HINT_MIN_SIZE = 1 << 1;
 

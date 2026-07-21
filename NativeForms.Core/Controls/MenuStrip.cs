@@ -147,6 +147,9 @@ public class MenuStrip : OwnerDrawnControl
                 };
             }
 
+            // Refreshed on every access rather than captured once: the bar may have been realized
+            // — or reparented onto another form — after the engine was built.
+            engine.Owner = this.OwnerWindowPeer;
             return engine;
         }
     }

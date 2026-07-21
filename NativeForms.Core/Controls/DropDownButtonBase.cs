@@ -71,6 +71,9 @@ public abstract class DropDownButtonBase : OwnerDrawnControl
                 engine.Closed += (_, _) => this.Invalidate();
             }
 
+            // Refreshed on every access rather than captured once: the control may have been realized
+            // — or reparented onto another form — after the engine was built.
+            engine.Owner = this.OwnerWindowPeer;
             return engine;
         }
     }

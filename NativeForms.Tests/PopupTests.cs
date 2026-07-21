@@ -12,7 +12,7 @@ internal sealed class PopupTests
     {
         var backend = new HeadlessBackend();
 
-        var popup = backend.CreatePopup();
+        var popup = backend.CreatePopup(null);
 
         Assert.That(popup, Is.InstanceOf<Hawkynt.NativeForms.Backends.ICanvasPeer>());
         var peer = (HeadlessPopupPeer)popup;
@@ -38,7 +38,7 @@ internal sealed class PopupTests
     [Test]
     public void ShowAt_records_position_and_size()
     {
-        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup();
+        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup(null);
 
         peer.ShowAt(new(100, 250), new(180, 90));
 
@@ -52,7 +52,7 @@ internal sealed class PopupTests
     [Test]
     public void Hide_records_and_marks_the_surface_hidden()
     {
-        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup();
+        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup(null);
         peer.ShowAt(new(10, 20), new(50, 60));
 
         peer.Hide();
@@ -67,7 +67,7 @@ internal sealed class PopupTests
     [Test]
     public void FireDismiss_hides_first_then_raises_Dismissed_exactly_once()
     {
-        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup();
+        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup(null);
         peer.ShowAt(new(0, 0), new(80, 40));
         var dismissals = 0;
         peer.Dismissed += (sender, e) =>
@@ -91,7 +91,7 @@ internal sealed class PopupTests
     [Test]
     public void FireDismiss_while_hidden_does_nothing()
     {
-        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup();
+        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup(null);
         var dismissals = 0;
         peer.Dismissed += (_, _) => ++dismissals;
 
@@ -110,7 +110,7 @@ internal sealed class PopupTests
     [Test]
     public void Peer_PointToScreen_offsets_the_client_point_by_the_screen_origin()
     {
-        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup();
+        var peer = (HeadlessPopupPeer)new HeadlessBackend().CreatePopup(null);
         peer.ScreenOrigin = new(300, 400);
 
         Assert.Multiple(() =>
@@ -139,5 +139,65 @@ internal sealed class PopupTests
         canvas.ScreenOrigin = new(640, 480);
 
         Assert.That(panel.PointToScreen(new(5, 8)), Is.EqualTo(new Point(645, 488)));
+    }
+
+    // --- Every popup names the window it belongs to ----------------------------------------------
+    //
+    // A floating surface is a separate native window. A platform that is not told which window owns it
+    // treats it as an unrelated application window: it cannot anchor it to its opener, and it marks
+    // that opener inactive while the surface is up — which is how opening a menu greyed out the window
+    // behind it. These assertions pin the owner at the seam it travels through, so a control that
+    // forgets to name its form is caught without a display.
+
+    /// <summary>Realizes a control on a form and hands back the backend that recorded it all.</summary>
+    private static HeadlessBackend Realize(Control control, out Form form)
+    {
+        var backend = new HeadlessBackend();
+        form = new Form();
+        form.Controls.Add(control);
+        Application.Run(form, backend);
+        return backend;
+    }
+
+    /// <summary>The single popup surface the backend was asked for.</summary>
+    private static HeadlessPopupPeer PopupOf(HeadlessBackend backend)
+        => backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+    [Test]
+    public void ComboBox_drop_down_is_owned_by_the_form_it_sits_on()
+    {
+        var combo = new ComboBox { Bounds = new(10, 10, 120, 24) };
+        combo.Items.Add("Mercury");
+        combo.Items.Add("Venus");
+        var backend = Realize(combo, out var form);
+
+        combo.OpenDropDown();
+
+        Assert.That(PopupOf(backend).OwnerWindow, Is.SameAs(form.WindowPeer));
+    }
+
+    [Test]
+    public void DateTimePicker_calendar_is_owned_by_the_form_it_sits_on()
+    {
+        var picker = new DateTimePicker { Bounds = new(10, 10, 200, 24) };
+        var backend = Realize(picker, out var form);
+
+        picker.OpenDropDown();
+
+        Assert.That(PopupOf(backend).OwnerWindow, Is.SameAs(form.WindowPeer));
+    }
+
+    [Test]
+    public void MenuStrip_drop_down_is_owned_by_the_form_it_sits_on()
+    {
+        var menu = new MenuStrip { Bounds = new(0, 0, 300, 24) };
+        var file = new ToolStripMenuItem("File");
+        file.DropDownItems.Add(new ToolStripMenuItem("New"));
+        menu.Items.Add(file);
+        var backend = Realize(menu, out var form);
+
+        menu.OpenDropDown(0);
+
+        Assert.That(PopupOf(backend).OwnerWindow, Is.SameAs(form.WindowPeer));
     }
 }

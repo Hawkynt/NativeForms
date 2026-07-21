@@ -58,6 +58,13 @@ internal sealed class MenuDropDown
     /// <summary>Whether at least one cascade level is open.</summary>
     public bool IsOpen => _levels.Count > 0;
 
+    /// <summary>
+    /// The window every level of the cascade belongs to. Set it before <see cref="Open"/>: the engine
+    /// outlives any single opening and the owning control may not have been realized when the engine
+    /// was built, so the owner is read afresh each time rather than captured in the constructor.
+    /// </summary>
+    public IWindowPeer? Owner { get; set; }
+
     /// <summary>Raised once when the cascade fully closes, whatever caused it.</summary>
     public event EventHandler? Closed;
 
@@ -220,7 +227,7 @@ internal sealed class MenuDropDown
     /// <summary>Creates, wires and shows one cascade level.</summary>
     private void OpenLevel(IReadOnlyList<ToolStripItem> items, Point screenLocation)
     {
-        var popup = _backend.CreatePopup();
+        var popup = _backend.CreatePopup(this.Owner);
         var level = new Level { Popup = popup, Items = items, Location = screenLocation, Size = this.ComputeSize(items) };
         popup.Paint += (_, e) => this.PaintLevel(level, e.Graphics);
         popup.MouseMove += (_, e) => this.OnLevelMouseMove(level, e);

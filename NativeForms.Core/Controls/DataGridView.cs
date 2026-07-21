@@ -2766,7 +2766,7 @@ public class DataGridView : OwnerDrawnControl
         if (popup is not null)
             return popup;
 
-        popup = backend.CreatePopup();
+        popup = backend.CreatePopup(this.OwnerWindowPeer);
         popup.Paint += (_, e) => this.OnEditPopupPaint(e);
         popup.MouseDown += (_, e) => this.OnEditPopupMouseDown(e);
         popup.MouseMove += (_, e) => this.OnEditPopupMouseMove(e);
@@ -3047,7 +3047,7 @@ public class DataGridView : OwnerDrawnControl
         if (popup is not null)
             return popup;
 
-        popup = backend.CreatePopup();
+        popup = backend.CreatePopup(this.OwnerWindowPeer);
 
         // Passive, exactly like ToolTip's own surface: a tip that grabbed would eat the next click
         // on the grid underneath it.

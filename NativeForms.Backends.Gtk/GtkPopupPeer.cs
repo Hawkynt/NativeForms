@@ -10,7 +10,9 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// whole owner-drawn pipeline — the app-paintable <c>GtkFixed</c> and every paint/input signal — is
 /// reused untouched; the canvas is simply created eagerly and dropped into an undecorated
 /// <c>GTK_WINDOW_POPUP</c> top-level, which floats at screen coordinates without taking the window
-/// manager's focus. Light dismiss rides on two grabs taken in <see cref="ShowAt"/>: a GDK seat grab
+/// manager's focus. That top-level is made transient for the window that owns it and carries a
+/// menu/tooltip type hint, so the display server can anchor it to its opener and keeps that opener
+/// looking active. Light dismiss rides on two grabs taken in <see cref="ShowAt"/>: a GDK seat grab
 /// (<c>GDK_SEAT_CAPABILITY_ALL_POINTING</c>, owner events on) that routes clicks outside the
 /// application to the popup, and a GTK grab that redirects the application's own events to it. A
 /// button press outside the allocation dismisses, Escape dismisses, and both grabs are released on
@@ -33,9 +35,20 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     public bool LightDismiss { get; set; } = true;
 
     /// <summary>Creates the popup top-level, realizes the canvas into it and wires the dismissal signals.</summary>
-    internal GtkPopupPeer()
+    /// <param name="owner">The <c>GtkWindow</c> this surface belongs to, or zero when none is known.</param>
+    internal GtkPopupPeer(nint owner)
     {
         _window = NativeMethods.gtk_window_new(NativeMethods.GTK_WINDOW_POPUP);
+
+        // Without a transient parent a GTK_WINDOW_POPUP is an unrelated, override-redirect top-level:
+        // GDK says so out loud ("temporary window without parent, application will not be able to
+        // position it on screen") and cannot anchor it to the window that opened it, and GTK has no
+        // reason to keep that window looking focused — so pulling down the application's own menu put
+        // the whole window into its :backdrop state and greyed out every widget behind the menu.
+        // Naming the owner fixes both: the surface is positioned relative to a real parent, and the
+        // parent stays active for as long as its transient child is up.
+        if (owner != 0)
+            NativeMethods.gtk_window_set_transient_for(_window, owner);
 
         // Realize the canvas eagerly: no container ever parents a top-level surface, so the lazy
         // child path never runs for a popup.
@@ -63,6 +76,13 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     /// <inheritdoc />
     public void ShowAt(Point screenLocation, Size size)
     {
+        // Say what kind of surface this is before it is mapped. A window manager reads the hint to
+        // decide whether the surface is an ordinary window that should take the focus and push its
+        // opener into the background, or a transient of it that should not; both kinds here are the
+        // latter. Set on every show because LightDismiss is written after construction.
+        NativeMethods.gtk_window_set_type_hint(
+            _window,
+            this.LightDismiss ? NativeMethods.GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU : NativeMethods.GDK_WINDOW_TYPE_HINT_TOOLTIP);
         NativeMethods.gtk_window_move(_window, screenLocation.X, screenLocation.Y);
 
         // A popup is sized here rather than through SetBounds, so record the size as this peer's

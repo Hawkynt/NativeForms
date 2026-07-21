@@ -52,12 +52,15 @@ public class ContextMenuStrip : Component
         if (backend is null)
             return;
 
-        this.ShowAt(backend, control.PointToScreen(clientLocation));
+        this.ShowAt(backend, control.PointToScreen(clientLocation), control.OwnerWindowPeer);
     }
 
     /// <summary>Opens the menu at an absolute screen position on the given backend, unless a
     /// <see cref="Opening"/> handler vetoes it.</summary>
-    internal void ShowAt(IPlatformBackend backend, Point screenLocation)
+    /// <param name="owner">The window the cascade belongs to. Not optional: a menu with no owner is
+    /// an unrelated top-level window to the display server, which cannot then anchor it and greys out
+    /// the window it was opened from.</param>
+    internal void ShowAt(IPlatformBackend backend, Point screenLocation, IWindowPeer? owner)
     {
         if (this.Opening is not null)
         {
@@ -76,6 +79,7 @@ public class ContextMenuStrip : Component
             engine.Closed += (_, _) => this.Closed?.Invoke(this, EventArgs.Empty);
         }
 
+        engine.Owner = owner;
         engine.Open(this.Items, screenLocation);
     }
 

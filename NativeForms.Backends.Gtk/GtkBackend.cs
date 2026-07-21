@@ -122,10 +122,10 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
-    public IPopupPeer CreatePopup()
+    public IPopupPeer CreatePopup(IWindowPeer? owner)
     {
         EnsureInitialized();
-        return new GtkPopupPeer();
+        return new GtkPopupPeer(owner is GtkWindowPeer window ? window.WidgetHandle : 0);
     }
 
     /// <inheritdoc />

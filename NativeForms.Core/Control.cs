@@ -894,6 +894,13 @@ public abstract class Control
     internal IPlatformBackend? Backend => _backend;
 
     /// <summary>
+    /// The realized window peer of the form this control sits on, or <see langword="null"/> while it
+    /// is unparented or its form is not realized yet. This is the owner every popup this control puts
+    /// up belongs to — see <see cref="Backends.IPlatformBackend.CreatePopup"/>.
+    /// </summary>
+    internal IWindowPeer? OwnerWindowPeer => this.FindForm()?.WindowPeer;
+
+    /// <summary>
     /// The peer's pointer events, relayed to core listeners. Lazily allocated, so a control nothing
     /// ever hovers pays a single null reference rather than two delegate slots — the same shape the
     /// appearance state uses.

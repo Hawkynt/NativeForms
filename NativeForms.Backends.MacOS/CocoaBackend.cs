@@ -39,7 +39,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
-    public IPopupPeer CreatePopup() => throw new PlatformNotSupportedException(_NotImplemented);
+    public IPopupPeer CreatePopup(IWindowPeer? owner) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)

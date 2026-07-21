@@ -19,17 +19,14 @@ namespace Hawkynt.NativeForms.Demo;
 /// <para>
 /// Drop-downs, menus and modal dialogs are separate toplevels stacked over the gallery, so a capture
 /// unions their screen rectangles with the main window's and paints each at its own offset. That is
-/// what makes an open combo list or a modal message box show up in the shot at all. Each is drawn
-/// twice — once through the toplevel and once through its single child — because a
-/// <c>GTK_WINDOW_POPUP</c> renders nothing through its own toplevel and says nothing about it.
+/// what makes an open combo list or a modal message box show up in the shot at all. A popup is drawn
+/// through its single child rather than through the toplevel, which renders nothing for it; an
+/// ordinary window is drawn through the toplevel.
 /// </para>
 /// <para>
-/// A popup lands wherever the display server put it, which on a rootless Xwayland server is not
-/// necessarily beside the widget that opened it: such a window is override-redirect and GDK reports
-/// "temporary window without parent, application will not be able to position it on screen". The
-/// capture stays faithful to the reported origin rather than pretending the popup is anchored, so a
-/// drop-down may appear beyond the window's edge in the shot. That is the environment, not the
-/// toolkit — the same popup takes clicks at the coordinates the walkthrough aims at.
+/// Each popup is drawn at the origin its own <c>GdkWindow</c> reports, never at the anchor the
+/// toolkit asked for, so a shot is evidence about placement rather than a restatement of the
+/// request: a drop-down that the display server put somewhere else photographs somewhere else.
 /// </para>
 /// Every entry point must be called on the UI thread.
 /// </remarks>
@@ -47,6 +44,9 @@ internal static unsafe partial class Capture
 
     /// <summary>The widest capture we will attempt, so a nonsense geometry cannot ask for gigabytes.</summary>
     private const int _MaxExtent = 8192;
+
+    /// <summary>Value of <c>GTK_WINDOW_POPUP</c> — an undecorated floating surface.</summary>
+    private const int _GtkWindowPopup = 1;
 
     // --- GTK / GDK / Cairo entry points --------------------------------------------------------
 
@@ -72,6 +72,10 @@ internal static unsafe partial class Capture
     /// <summary>The single child of a <c>GtkBin</c> — every <c>GtkWindow</c> is one.</summary>
     [LibraryImport(_Gtk)]
     private static partial nint gtk_bin_get_child(nint bin);
+
+    /// <summary>Whether a window is an ordinary toplevel or an undecorated floating surface.</summary>
+    [LibraryImport(_Gtk)]
+    private static partial int gtk_window_get_window_type(nint window);
 
     [LibraryImport(_Gdk)]
     private static partial void gdk_window_get_origin(nint window, out int x, out int y);
@@ -143,21 +147,13 @@ internal static unsafe partial class Capture
     /// a popup that never overlaps it still widens the frame rather than replacing it.</param>
     internal static Size? Toplevels(nint mainWindow, string path)
     {
-        var layers = MappedLayers();
+        var layers = MappedLayers(mainWindow);
         if (layers.Count == 0)
             return null;
 
-
-        // Anchor on the main window so a shot always frames the gallery, then widen to whatever the
-        // stacked popups need — a drop-down may hang below the window's bottom edge.
-        var frame = Rectangle.Empty;
-        foreach (var layer in layers)
-            if (gtk_widget_get_window(layer.Widget) == mainWindow)
-                frame = layer.Bounds;
-
-        if (frame.IsEmpty)
-            frame = layers[0].Bounds;
-
+        // Anchor on the main window — it sorts first — so a shot always frames the gallery, then
+        // widen to whatever the stacked popups need: a drop-down may hang below the bottom edge.
+        var frame = layers[0].Bounds;
         foreach (var layer in layers)
             frame = Rectangle.Union(frame, layer.Bounds);
 
@@ -182,15 +178,20 @@ internal static unsafe partial class Capture
             {
                 cairo_save(cr);
                 cairo_translate(cr, layer.Bounds.X - frame.X, layer.Bounds.Y - frame.Y);
-                gtk_widget_draw(layer.Widget, cr);
-
                 // A GTK_WINDOW_POPUP renders nothing through its own toplevel — no warning, just an
-                // empty rectangle where the drop-down should be — so the surface that actually holds
-                // the menu, the window's single child, is drawn as well. Harmless for the main
-                // window, which paints correctly either way.
-                var content = gtk_bin_get_child(layer.Widget);
-                if (content != 0)
-                    gtk_widget_draw(content, cr);
+                // empty rectangle where the drop-down should be — so for those the surface that
+                // actually holds the menu, the window's single child, is drawn instead. An ordinary
+                // toplevel paints itself correctly and must not be drawn twice: its child sits at a
+                // different offset inside it, so a second pass stamps a ghost copy of every widget a
+                // few pixels away, which is what a message box's buttons used to look like.
+                if (gtk_window_get_window_type(layer.Widget) == _GtkWindowPopup)
+                {
+                    var content = gtk_bin_get_child(layer.Widget);
+                    if (content != 0)
+                        gtk_widget_draw(content, cr);
+                }
+                else
+                    gtk_widget_draw(layer.Widget, cr);
 
                 cairo_restore(cr);
             }
@@ -209,18 +210,26 @@ internal static unsafe partial class Capture
     }
 
     /// <summary>
-    /// Every mapped toplevel with its screen rectangle, bottom of the stack first. GTK lists
-    /// toplevels newest-first and a popup is always newer than the window it belongs to, so
-    /// reversing the list paints the gallery before the menus stacked over it.
+    /// Every mapped toplevel with its screen rectangle, bottom of the stack first — the gallery, then
+    /// whatever is floating over it.
     /// </summary>
-    private static List<Layer> MappedLayers()
+    /// <remarks>
+    /// The order matters more than it looks: the layers are painted in sequence onto one surface, so
+    /// the last one drawn wins the overlap. <c>gtk_window_list_toplevels</c> reports oldest first,
+    /// which already puts the gallery ahead of the drop-downs and menus opened later — walking it
+    /// backwards, as this did, painted the gallery <em>over</em> every popup and erased it from the
+    /// shot, which is why an open combo list photographed as a closed one. Rather than trust either
+    /// order, the window named by <paramref name="mainWindow"/> is moved to the front explicitly and
+    /// the rest keep the order GTK gave, so a cascade's parent still precedes its submenu.
+    /// </remarks>
+    private static List<Layer> MappedLayers(nint mainWindow)
     {
         var result = new List<Layer>();
         var list = gtk_window_list_toplevels();
         var count = g_list_length(list);
-        for (var i = count; i > 0; --i)
+        for (var i = 0u; i < count; ++i)
         {
-            var widget = g_list_nth_data(list, i - 1);
+            var widget = g_list_nth_data(list, i);
             if (widget == 0 || gtk_widget_get_mapped(widget) == 0)
                 continue;
 
@@ -230,8 +239,14 @@ internal static unsafe partial class Capture
 
             gdk_window_get_origin(window, out var x, out var y);
             var bounds = new Rectangle(x, y, gdk_window_get_width(window), gdk_window_get_height(window));
-            if (bounds.Width > 0 && bounds.Height > 0)
-                result.Add(new(widget, bounds));
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                continue;
+
+            var layer = new Layer(widget, bounds);
+            if (window == mainWindow)
+                result.Insert(0, layer);
+            else
+                result.Add(layer);
         }
 
         g_list_free(list);

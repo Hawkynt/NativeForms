@@ -58,7 +58,7 @@ internal sealed class BackendRegistryTests
         public ITextBoxPeer CreateTextBox() => throw new NotSupportedException();
         public IRichTextBoxPeer CreateRichTextBox() => throw new NotSupportedException();
         public ICanvasPeer CreateCanvas() => throw new NotSupportedException();
-        public IPopupPeer CreatePopup() => throw new NotSupportedException();
+        public IPopupPeer CreatePopup(IWindowPeer? owner) => throw new NotSupportedException();
         public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => throw new NotSupportedException();
         public System.Drawing.Size GetScreenSize() => throw new NotSupportedException();
         public System.Drawing.Size MeasureText(string text, Font font) => throw new NotSupportedException();

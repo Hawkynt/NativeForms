@@ -57,7 +57,16 @@ public interface IPlatformBackend
     ICanvasPeer CreateCanvas();
 
     /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
-    IPopupPeer CreatePopup();
+    /// <param name="owner">
+    /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.
+    /// A floating surface is a separate native window, and a platform that is not told which window
+    /// owns it treats it as an unrelated application window: it cannot anchor it to the owner (X11
+    /// warns "temporary window without parent, application will not be able to position it on
+    /// screen"), and it marks the owner inactive while the surface is up, so opening an application's
+    /// own menu greys out the window behind it. Naming the owner is what makes a drop-down land where
+    /// it was asked to and leaves its window looking focused.
+    /// </param>
+    IPopupPeer CreatePopup(IWindowPeer? owner);
 
     /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
     IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);

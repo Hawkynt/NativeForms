@@ -430,6 +430,9 @@ internal sealed partial class Autopilot
             this.CheckProgrammaticOpen("the calendar", () => picker.DroppedDown, picker.OpenDropDown);
         });
 
+        this.Check("DateTimePicker: the calendar surface lands directly below the field", () =>
+            this.CheckPopupAnchored("the calendar", picker, () => picker.DroppedDown, picker.OpenDropDown));
+
         this.Screenshot("state-input-datetimepicker-dropdown");
 
         this.Check("DateTimePicker: picking a day in the drop-down commits it and closes up", () =>
@@ -531,6 +534,9 @@ internal sealed partial class Autopilot
             this.ExpectTrue("no popup toplevel is on screen for the list", this.Popups().Count > 0);
             this.CheckProgrammaticOpen("the list", () => combo.DroppedDown, combo.OpenDropDown);
         });
+
+        this.Check("ComboBox: the drop-down surface lands directly below the field", () =>
+            this.CheckPopupAnchored("the list", combo, () => combo.DroppedDown, combo.OpenDropDown));
 
         this.Screenshot("state-lists-combobox-dropdown");
 
@@ -1182,6 +1188,38 @@ internal sealed partial class Autopilot
         this.Fail(immediately
             ? $"{what}: opening it directly through its own API, with no input at all, still leaves it closed one main-loop iteration later"
             : $"{what}: opening it directly through its own API does not open it");
+    }
+
+    /// <summary>How far a popup's surface may sit from the anchor it was opened at before the
+    /// placement counts as wrong. Not zero: a compositor may nudge a surface to keep it on screen.</summary>
+    private const int _AnchorTolerance = 4;
+
+    /// <summary>
+    /// Opens a drop-down and reports whether its surface actually landed under the control that owns
+    /// it, comparing the popup toplevel's own screen origin against the anchor the control hands
+    /// <c>ShowAt</c> — directly below its bottom-left corner.
+    /// </summary>
+    /// <remarks>
+    /// The rest of the walkthrough cannot see this. It aims its clicks at computed coordinates rather
+    /// than at wherever the surface really is, so a drop-down that the display server parked somewhere
+    /// else entirely still takes every gesture and every check still passes, while the user looks at a
+    /// list floating off the side of the window. Asking the surface where it is is the only assertion
+    /// that notices — it is what caught popups being created without a transient parent, which leaves
+    /// a display server free to place them wherever it likes.
+    /// </remarks>
+    private void CheckPopupAnchored(string what, Control owner, Func<bool> isOpen, Action open)
+    {
+        var popups = this.Reopen(isOpen, open);
+        if (popups.Count == 0)
+        {
+            this.Fail($"{what}: no popup toplevel to measure — it could not be opened");
+            return;
+        }
+
+        var anchor = this.ScreenOf(owner, 0, this.Read(() => owner.Height));
+        var origin = this.Read(() => Injection.WindowBounds(popups[0])).Location;
+        if (Math.Abs(origin.X - anchor.X) > _AnchorTolerance || Math.Abs(origin.Y - anchor.Y) > _AnchorTolerance)
+            this.Fail($"{what}: opened at {anchor} but its surface sits at {origin}");
     }
 
     /// <summary>Names the phase in which a drop-down lost its open state, for the failure line.</summary>

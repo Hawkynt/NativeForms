@@ -36,7 +36,7 @@ internal sealed class BenchBackend : IPlatformBackend
         return canvas;
     }
 
-    public IPopupPeer CreatePopup() => new BenchPopupPeer();
+    public IPopupPeer CreatePopup(IWindowPeer? owner) => new BenchPopupPeer();
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new BenchImage(width, height);
     public ITimerPeer CreateTimer() => new BenchTimerPeer();
     public INotifyIconPeer CreateNotifyIcon() => new BenchNotifyIconPeer();

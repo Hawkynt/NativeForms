@@ -376,7 +376,7 @@ public class DateTimePicker : OwnerDrawnControl
         calendar.DateSelected = this.OnCalendarDateSelected;
         _calendar = calendar;
 
-        var popup = backend.CreatePopup();
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
         popup.Paint += (_, e) => calendar.Paint(e.Graphics, this.Theme, _popupSize, true);
         popup.MouseDown += (_, e) => calendar.HandleMouseDown(this.Theme, _popupSize, e);
         popup.MouseMove += (_, e) => calendar.HandleMouseMove(this.Theme, _popupSize, e);

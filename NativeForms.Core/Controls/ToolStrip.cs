@@ -71,8 +71,17 @@ public class ToolStrip : OwnerDrawnControl
         _itemWidths = null;
     }
 
-    /// <summary>The lazily created drop-down engine shared by drop-down buttons and the chevron.</summary>
-    private MenuDropDown Engine => _dropDown ??= new(this.Backend!, this.Theme);
+    /// <summary>The lazily created drop-down engine shared by drop-down buttons and the chevron, with
+    /// its owning window refreshed on every access so each cascade is anchored to the current form.</summary>
+    private MenuDropDown Engine
+    {
+        get
+        {
+            var engine = _dropDown ??= new(this.Backend!, this.Theme);
+            engine.Owner = this.OwnerWindowPeer;
+            return engine;
+        }
+    }
 
     /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)

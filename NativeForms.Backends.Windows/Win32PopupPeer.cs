@@ -7,8 +7,8 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// The Win32 peer for a light-dismiss popup surface. It derives from <see cref="Win32CanvasPeer"/> so
 /// the whole owner-drawn pipeline — window class, procedure, paint, mouse, keyboard, child hosting —
 /// is reused untouched; only the window's creation and life cycle differ: instead of a child HWND it
-/// is a topmost <c>WS_POPUP</c> tool window (<c>WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE</c>), shown
-/// without activation so the owner window keeps focus. Light dismiss rides on mouse capture taken in
+/// is a topmost <c>WS_POPUP</c> tool window (<c>WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE</c>) owned by the
+/// window that put it up, shown without activation so the owner window keeps focus. Light dismiss rides on mouse capture taken in
 /// <see cref="ShowAt"/>: a left click outside the client area, losing the capture to another window,
 /// losing keyboard focus, or Escape all hide the surface and then raise <see cref="Dismissed"/>.
 /// Because the surface never activates, keyboard messages only arrive while it is explicitly focused;
@@ -17,6 +17,13 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
 {
     private bool _shown;
+
+    /// <summary>The window that owns the surface, or zero. An owned <c>WS_POPUP</c> stays above its
+    /// owner, is destroyed with it and keeps off the taskbar; an unowned one is a stray window.</summary>
+    private readonly nint _owner;
+
+    /// <summary>Creates the hidden surface, owned by <paramref name="owner"/> when one is known.</summary>
+    internal Win32PopupPeer(nint owner) => _owner = owner;
 
     /// <inheritdoc/>
     public event EventHandler? Dismissed;
@@ -134,7 +141,7 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
             0,
             0,
             0,
-            0,
+            _owner,
             0,
             NativeMethods.GetModuleHandleW(null),
             0);

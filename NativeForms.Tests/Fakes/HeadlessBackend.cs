@@ -131,7 +131,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITextBoxPeer CreateTextBox() => this.Track(new HeadlessTextBoxPeer());
     public IRichTextBoxPeer CreateRichTextBox() => this.Track(new HeadlessRichTextBoxPeer());
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
-    public IPopupPeer CreatePopup() => this.Track(new HeadlessPopupPeer());
+    public IPopupPeer CreatePopup(IWindowPeer? owner) => this.Track(new HeadlessPopupPeer { OwnerWindow = owner });
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
     public Size MeasureText(string text, Font font) => RecordingGraphics.Measure(text);
 
@@ -923,6 +923,10 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
 /// <summary>A popup peer that records every ShowAt/Hide and lets tests trigger light dismissal.</summary>
 internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
 {
+    /// <summary>The window the surface was created for, so tests can assert that a popup is anchored
+    /// to the form that opened it rather than floating unowned.</summary>
+    public IWindowPeer? OwnerWindow { get; init; }
+
     public List<(Point Location, Size Size)> ShowCalls { get; } = [];
     public int HideCount { get; private set; }
     public bool IsShown { get; private set; }
