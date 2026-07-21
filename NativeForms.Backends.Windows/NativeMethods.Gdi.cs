@@ -218,6 +218,9 @@ internal static unsafe partial class NativeMethods
     /// <summary>The extended window-style (<c>WS_EX_*</c>) long.</summary>
     internal const int GWL_EXSTYLE = -20;
 
+    /// <summary>The window procedure pointer — written to subclass a control, read to chain to it.</summary>
+    internal const int GWLP_WNDPROC = -4;
+
     /// <summary>The paint information filled in by <see cref="BeginPaint"/>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct PAINTSTRUCT
@@ -507,6 +510,10 @@ internal static unsafe partial class NativeMethods
     /// <summary>Writes a window-style long (see <c>GWL_STYLE</c>).</summary>
     [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     internal static partial nint SetWindowLongPtrW(nint hWnd, int nIndex, nint dwNewLong);
+
+    /// <summary>Calls a window procedure directly — the tail of a subclassed control's own proc.</summary>
+    [LibraryImport("user32.dll", EntryPoint = "CallWindowProcW")]
+    internal static partial nint CallWindowProcW(nint wndProc, nint hWnd, uint msg, nint wParam, nint lParam);
 
     // --- GDI32: brushes, pens, fonts, DCs, bitmaps, clipping ---
 

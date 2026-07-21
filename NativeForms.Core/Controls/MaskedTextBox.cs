@@ -24,8 +24,8 @@ public sealed class MaskInputRejectedEventArgs(int position, MaskedTextResultHin
 /// <summary>
 /// A <see cref="TextBox"/> whose content is forced through an input mask — phone numbers, dates,
 /// license keys. The mask engine lives entirely in the core: the control uses the plain native text
-/// widget of every backend and validates <em>whole-text transitions</em>, mapping each candidate
-/// value into the mask's slots and pushing the rendered result back to the widget.
+/// widget of every backend, maps every candidate value into the mask's slots and pushes the rendered
+/// result — and the caret that belongs with it — back to the widget.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,13 +36,21 @@ public sealed class MaskInputRejectedEventArgs(int position, MaskedTextResultHin
 /// into a literal. Unfilled slots render as <see cref="PromptChar"/>.
 /// </para>
 /// <para>
-/// Because peers report text changes as whole values (there are no per-keystroke events on
-/// <see cref="Backends.ITextBoxPeer"/>), validation is transactional: a candidate that maps cleanly
-/// into the mask becomes the new content, one that does not is rejected by reverting the widget to
-/// the last valid rendering — the same corrective-push mechanism <see cref="TextBox.CharacterCasing"/>
-/// uses. The trade-off is honest and documented: the engine cannot steer the caret slot-by-slot the
-/// way Windows Forms does, so free-form edits in the middle of the text re-flow the remaining input
-/// through the mask, and a prompt character in the input always reads as an empty slot.
+/// Peers report text changes as whole values, so the engine works in two modes. A programmatic
+/// assignment to <see cref="TextBox.Text"/> is transactional over the whole string: a value that maps
+/// cleanly into the mask becomes the new content, one that does not is rejected outright and the last
+/// valid rendering stands. A <em>user</em> edit cannot be read that way — every keystroke makes the
+/// widget's text longer than the mask — so the edit is reconstructed first: the previous rendering,
+/// the candidate and the caret the widget left behind identify an insertion, a deletion or a replaced
+/// selection, and only that edit is pushed through the mask. The corrected rendering and the caret
+/// that belongs with it are written back to the widget, the same corrective push
+/// <see cref="TextBox.CharacterCasing"/> uses.
+/// </para>
+/// <para>
+/// Typing therefore fills slot by slot, skipping literals: a character lands in the first editable
+/// slot at or after the caret, and a caret parked past the last slot (End on a partly filled mask)
+/// falls back to the first still-empty slot rather than being refused. A prompt character in the
+/// input always reads as an empty slot.
 /// </para>
 /// </remarks>
 public class MaskedTextBox : TextBox
@@ -210,6 +218,163 @@ public class MaskedTextBox : TextBox
 
         _lastValid = display;
         return display;
+    }
+
+    /// <summary>
+    /// Applies a <em>user</em> edit through the mask. The candidate the widget reports is never a
+    /// mask rendering — an insertion makes it one character too long, a deletion one too short — so
+    /// the edit itself is derived first (see <see cref="DeriveEdit"/>) and replayed slot by slot onto
+    /// the last valid rendering. A character that no slot accepts, or one with nowhere left to go,
+    /// rejects the whole edit and restores that rendering, exactly like a rejected assignment does.
+    /// </summary>
+    private protected override string NormalizeUserEdit(string value, int caret, out int correctedCaret)
+    {
+        if (_slots.Length == 0)
+            return base.NormalizeUserEdit(value, caret, out correctedCaret);
+
+        correctedCaret = -1;
+        value = base.NormalizeText(value);
+
+        var previous = _lastValid.Length == _slots.Length ? _lastValid : this.RenderEmpty();
+        DeriveEdit(previous, value, caret, out var start, out var removedLength, out var insertedLength);
+        if (!this.TryEdit(previous, value, start, removedLength, insertedLength, out var display, out var position, out var hint))
+        {
+            if (this.MaskInputRejected is not null)
+                this.OnMaskInputRejected(new(position, hint));
+
+            correctedCaret = Math.Min(start, _lastValid.Length);
+            return _lastValid;
+        }
+
+        correctedCaret = position;
+        _lastValid = display;
+        return display;
+    }
+
+    /// <summary>
+    /// Reconstructs the edit that turned <paramref name="previous"/> into <paramref name="candidate"/>
+    /// as one replaced run: the characters <c>[start, start + removedLength)</c> of the previous value
+    /// gave way to <c>[start, start + insertedLength)</c> of the candidate.
+    /// </summary>
+    /// <remarks>
+    /// The common prefix may not run past <paramref name="caret"/> and the common suffix may not run
+    /// back before it, which is what makes the reconstruction unambiguous: typing a character equal to
+    /// the ones around it (a <c>5</c> into <c>555</c>) is a tie the caret — and only the caret —
+    /// breaks. Everything outside the two common runs is the edit.
+    /// </remarks>
+    private static void DeriveEdit(
+        string previous,
+        string candidate,
+        int caret,
+        out int start,
+        out int removedLength,
+        out int insertedLength)
+    {
+        caret = Math.Clamp(caret, 0, candidate.Length);
+
+        start = 0;
+        while (start < caret && start < previous.Length && previous[start] == candidate[start])
+            ++start;
+
+        var suffix = 0;
+        var maximum = Math.Min(previous.Length - start, candidate.Length - caret);
+        while (suffix < maximum && previous[previous.Length - 1 - suffix] == candidate[candidate.Length - 1 - suffix])
+            ++suffix;
+
+        removedLength = previous.Length - suffix - start;
+        insertedLength = candidate.Length - suffix - start;
+    }
+
+    /// <summary>
+    /// Replays one derived edit onto a rendering: the removed run empties the slots it covers
+    /// (literals survive, they are not the user's to delete), then each inserted character is written
+    /// into the first editable slot at or after the running position. A caret that sat past the last
+    /// slot has no slot to write into, so it falls back to the first still-empty one — that is what
+    /// makes typing after End fill the mask from the front instead of being refused.
+    /// </summary>
+    private bool TryEdit(
+        string previous,
+        string candidate,
+        int start,
+        int removedLength,
+        int insertedLength,
+        out string display,
+        out int position,
+        out MaskedTextResultHint rejectHint)
+    {
+        var slots = _slots;
+        var prompt = this.PromptChar;
+        var result = previous.ToCharArray();
+        rejectHint = MaskedTextResultHint.InvalidInput;
+        display = string.Empty;
+
+        for (var i = Math.Max(0, start); i < start + removedLength && i < result.Length; ++i)
+            if (!slots[i].IsLiteral)
+                result[i] = prompt;
+
+        position = Math.Max(0, start);
+        for (var i = 0; i < insertedLength; ++i)
+        {
+            var c = candidate[start + i];
+
+            // A literal the user typed themselves is absorbed by the matching mask position rather
+            // than stored in a slot — the same consumption a whole-value mapping does, which is what
+            // lets "87-65" be pasted or retyped over "12-34".
+            var scan = position;
+            while (scan < slots.Length && slots[scan].IsLiteral && slots[scan].Literal != c)
+                ++scan;
+
+            if (scan < slots.Length && slots[scan].IsLiteral)
+            {
+                position = scan + 1;
+                continue;
+            }
+
+            var slot = NextEditable(slots, position);
+            if (slot < 0)
+                slot = FirstEmptyEditable(slots, result, prompt);
+
+            if (slot < 0)
+            {
+                position = slots.Length;
+                rejectHint = MaskedTextResultHint.UnavailableEditPosition;
+                return false;
+            }
+
+            if (c != prompt && !slots[slot].Accepts(c))
+            {
+                position = slot;
+                return false;
+            }
+
+            result[slot] = c;
+            position = slot + 1;
+        }
+
+        var next = NextEditable(slots, position);
+        position = next < 0 ? result.Length : next;
+        display = new string(result);
+        return true;
+    }
+
+    /// <summary>The first non-literal slot at or after <paramref name="from"/>, or -1 when none is left.</summary>
+    private static int NextEditable(MaskSlot[] slots, int from)
+    {
+        for (var i = Math.Max(0, from); i < slots.Length; ++i)
+            if (!slots[i].IsLiteral)
+                return i;
+
+        return -1;
+    }
+
+    /// <summary>The first slot that is editable and still empty, or -1 when the mask is full.</summary>
+    private static int FirstEmptyEditable(MaskSlot[] slots, char[] rendering, char prompt)
+    {
+        for (var i = 0; i < slots.Length; ++i)
+            if (!slots[i].IsLiteral && rendering[i] == prompt)
+                return i;
+
+        return -1;
     }
 
     /// <summary>Raises <see cref="MaskInputRejected"/>.</summary>

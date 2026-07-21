@@ -588,6 +588,8 @@ internal class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
 
     public event EventHandler? TextChangedByUser;
 
+    public event EventHandler<KeyEventArgs>? KeyDown;
+
     public void SetMultiline(bool multiline)
     {
         this.Multiline = multiline;
@@ -631,11 +633,38 @@ internal class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
 
     /// <summary>Simulates the user replacing the widget's content, leaving the caret at the end.</summary>
     public void SimulateUserInput(string text)
+        => this.SimulateUserInput(text, text.Length);
+
+    /// <summary>
+    /// Simulates the user editing the widget's content, reporting <paramref name="caret"/> as the
+    /// place the edit began — the convention <see cref="ITextBoxPeer.GetSelection"/> promises for the
+    /// duration of a change, and the only way to express which edit produced a candidate when the
+    /// text alone is ambiguous.
+    /// </summary>
+    public void SimulateUserInput(string text, int caret)
     {
         this.SetText(text);
-        this.SelectionStart = text.Length;
+        this.SelectionStart = caret;
         this.SelectionLength = 0;
         this.TextChangedByUser?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Simulates keystrokes typed at the caret, as the native editor would apply them.</summary>
+    public void SimulateTyping(string characters)
+    {
+        foreach (var c in characters)
+        {
+            var caret = Math.Clamp(this.SelectionStart, 0, this.Text.Length);
+            this.SimulateUserInput(string.Concat(this.Text.AsSpan(0, caret), c.ToString(), this.Text.AsSpan(caret)), caret);
+        }
+    }
+
+    /// <summary>Simulates a key pressed inside the widget; returns whether a handler consumed it.</summary>
+    public bool SimulateKeyDown(Keys key, KeyModifiers modifiers = KeyModifiers.None)
+    {
+        var args = new KeyEventArgs(key, modifiers);
+        this.KeyDown?.Invoke(this, args);
+        return args.Handled;
     }
 }
 

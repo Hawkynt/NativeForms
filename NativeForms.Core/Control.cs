@@ -372,14 +372,23 @@ public abstract class Control
     private protected virtual bool DefaultTabStop => this.Focusable;
 
     /// <summary>
+    /// The control that actually takes the keyboard on this one's behalf. Plain controls answer with
+    /// themselves; a composite that hosts a native editor inside an owner-drawn surface answers with
+    /// that editor, because the editor — not the painted shell — is the widget that takes text.
+    /// </summary>
+    private protected virtual Control FocusTarget => this;
+
+    /// <summary>
     /// Moves keyboard focus to this control by asking the peer (<c>SetFocus</c> on Win32,
     /// <c>gtk_widget_grab_focus</c> on GTK). A no-op while <see cref="CanFocus"/> is
     /// <see langword="false"/>; <see cref="Focused"/> flips when the platform reports the change.
+    /// On a composite the focus lands on its <see cref="FocusTarget"/>.
     /// </summary>
     public void Focus()
     {
-        if (this.CanFocus)
-            _peer!.Focus();
+        var target = this.FocusTarget;
+        if (target.CanFocus)
+            target._peer!.Focus();
     }
 
     /// <summary>The form this control sits on — itself for a form — or <see langword="null"/> while unparented.</summary>

@@ -29,8 +29,26 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     /// <summary>The <c>GtkTextView</c> inside the scrolled window, or 0 while single-line.</summary>
     private nint _textView;
 
+    /// <summary>How deep the peer currently is inside its own "changed" emissions — a corrective
+    /// <c>gtk_entry_set_text</c> nests one inside another — see <see cref="_caretToRestore"/>.</summary>
+    private int _changeDepth;
+
+    /// <summary>
+    /// The caret the core asked for while the widget was reporting a change, or -1. GTK finishes a
+    /// keystroke with <c>gtk_editable_set_position</c> <em>after</em> the insertion — and therefore
+    /// after "changed" — so a caret placed from a change handler is silently overwritten. The wish is
+    /// parked here and re-applied once the event that carried the edit has been dispatched.
+    /// </summary>
+    private int _caretToRestore = -1;
+
+    /// <summary>Whether a caret restoration is already queued, so one edit queues at most one.</summary>
+    private bool _caretRestoreQueued;
+
     /// <inheritdoc />
     public event EventHandler? TextChangedByUser;
+
+    /// <inheritdoc />
+    public event EventHandler<KeyEventArgs>? KeyDown;
 
     /// <summary>The multiline view's <c>GtkTextBuffer</c> (owned by the view).</summary>
     private nint Buffer => NativeMethods.gtk_text_view_get_buffer(_textView);
@@ -76,8 +94,19 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
             var callback = (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnChanged;
             NativeMethods.g_signal_connect_data(
                 _multiline ? this.Buffer : _widget, "changed", callback, GCHandle.ToIntPtr(_selfHandle), 0, 0);
+
+            // Connected (not "_after") on the editing widget itself, so the owning control gets first
+            // refusal on every key before GtkEntry/GtkTextView runs its own binding for it. A
+            // G_CONNECT_AFTER handler would be useless here: "key-press-event" accumulates on the
+            // handled flag, so the widget consuming the key ends the emission before it.
+            var keyPressed = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyPress;
+            NativeMethods.g_signal_connect_data(
+                _multiline ? _textView : _widget, "key-press-event", keyPressed, GCHandle.ToIntPtr(_selfHandle), 0, 0);
         }
     }
+
+    /// <summary>Ahead of event dispatch, so a corrected caret is in place before the next keystroke.</summary>
+    private const int _GPriorityHigh = -100;
 
     /// <inheritdoc />
     public void SetMultiline(bool multiline)
@@ -150,6 +179,9 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     {
         _selectionStart = start;
         _selectionLength = length;
+        if (_changeDepth > 0 && length == 0)
+            this.QueueCaretRestore(start);
+
         if (_widget == 0)
             return;
 
@@ -225,7 +257,64 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     }
 
     /// <summary>Raises <see cref="TextChangedByUser"/>; invoked from the native "changed" callback.</summary>
-    private void RaiseTextChanged() => TextChangedByUser?.Invoke(this, EventArgs.Empty);
+    private void RaiseTextChanged()
+    {
+        if (_changeDepth == 0)
+            _caretToRestore = -1;
+
+        ++_changeDepth;
+        try
+        {
+            TextChangedByUser?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            --_changeDepth;
+        }
+    }
+
+    /// <summary>
+    /// Parks a caret the widget is about to overwrite and queues its restoration as a high-priority
+    /// idle — the first moment after the current event has been dispatched, and still ahead of the
+    /// next queued event. The peer is kept alive by a handle of its own for the hop, the same
+    /// pattern <c>Post</c> uses, so a peer disposed in between cannot be resurrected through a
+    /// dangling pin.
+    /// </summary>
+    private void QueueCaretRestore(int caret)
+    {
+        _caretToRestore = caret;
+        if (_caretRestoreQueued)
+            return;
+
+        _caretRestoreQueued = true;
+        var handle = GCHandle.Alloc(this);
+        unsafe
+        {
+            var callback = (nint)(delegate* unmanaged[Cdecl]<nint, int>)&OnCaretIdle;
+            NativeMethods.g_idle_add_full(_GPriorityHigh, callback, GCHandle.ToIntPtr(handle), 0);
+        }
+    }
+
+    /// <summary>Re-applies the parked caret; see <see cref="QueueCaretRestore"/>.</summary>
+    private void RestoreCaret()
+    {
+        _caretRestoreQueued = false;
+        var caret = _caretToRestore;
+        _caretToRestore = -1;
+        if (caret >= 0 && _widget != 0)
+            this.SetSelection(caret, 0);
+    }
+
+    /// <summary>Raises <see cref="KeyDown"/> and reports whether a handler consumed the key.</summary>
+    private bool RaiseKeyDown(Keys key, KeyModifiers modifiers)
+    {
+        if (KeyDown is not { } handler)
+            return false;
+
+        var args = new KeyEventArgs(key, modifiers);
+        handler(this, args);
+        return args.Handled;
+    }
 
     /// <summary>
     /// Native handler for the entry's (or the multiline buffer's) "changed" signal, shaped as
@@ -237,5 +326,41 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     {
         if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkTextBoxPeer peer)
             peer.RaiseTextChanged();
+    }
+
+    /// <summary>
+    /// Native "key-press-event" handler, shaped as <c>gboolean (GtkWidget*, GdkEvent*, gpointer)</c>.
+    /// Returning <c>GDK_EVENT_STOP</c> for a key a managed handler claimed keeps it out of the
+    /// editor; everything else propagates and the widget edits as usual.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnKeyPress(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkTextBoxPeer peer)
+            return 0;
+
+        unsafe
+        {
+            ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+            return peer.RaiseKeyDown(GtkCanvasPeer.ToKey(e.KeyVal), GtkCanvasPeer.ToModifiers(e.State)) ? 1 : 0;
+        }
+    }
+
+    /// <summary>
+    /// Native <c>GSourceFunc</c> shaped as <c>gboolean (gpointer user_data)</c>: applies the parked
+    /// caret once, frees the handle that carried the peer across the hop and retires the source.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnCaretIdle(nint userData)
+    {
+        if (userData == 0)
+            return 0;
+
+        var handle = GCHandle.FromIntPtr(userData);
+        if (handle.Target is GtkTextBoxPeer peer)
+            peer.RestoreCaret();
+
+        handle.Free();
+        return 0;
     }
 }

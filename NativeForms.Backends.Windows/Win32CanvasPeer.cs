@@ -344,7 +344,7 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     private protected static int HiWord(nint value) => (short)((value >> 16) & 0xFFFF);
 
     /// <summary>Reads the live Shift/Control/Alt state via <c>GetKeyState</c> into modifier flags.</summary>
-    private static KeyModifiers CurrentModifiers()
+    internal static KeyModifiers CurrentModifiers()
     {
         var modifiers = KeyModifiers.None;
         if ((NativeMethods.GetKeyState(NativeMethods.VK_SHIFT) & 0x8000) != 0)

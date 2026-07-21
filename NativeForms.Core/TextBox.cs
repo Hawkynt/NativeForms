@@ -25,6 +25,9 @@ public class TextBox : Control
     private int _selectionStart;
     private int _selectionLength;
 
+    /// <summary>Whether the core is currently writing to the widget, so its echo is not a user edit.</summary>
+    private bool _pushing;
+
     /// <summary>
     /// The content of the box. Assigned text is normalized by <see cref="CharacterCasing"/> and
     /// pushed to the native widget; user edits arrive here through the peer and raise
@@ -40,7 +43,7 @@ public class TextBox : Control
                 return;
 
             _text = value;
-            _peer?.SetText(value);
+            this.PushText(value);
             this.OnTextChanged(EventArgs.Empty);
         }
     }
@@ -216,6 +219,17 @@ public class TextBox : Control
         _peer?.SetSelection(_selectionStart, _selectionLength);
     }
 
+    /// <summary>
+    /// Raised for a key pressed inside the native editor, before the editor acts on it; a handler
+    /// that sets <see cref="KeyEventArgs.Handled"/> keeps the key away from the widget. This is what
+    /// lets a composite hosting this box (a <see cref="SearchBox"/>, a spinner, a grid cell editor)
+    /// claim Enter, Escape or the arrows while the editor keeps the caret.
+    /// </summary>
+    public event EventHandler<KeyEventArgs>? KeyDown;
+
+    /// <summary>Raises <see cref="KeyDown"/>.</summary>
+    protected virtual void OnKeyDown(KeyEventArgs e) => this.KeyDown?.Invoke(this, e);
+
     /// <summary>Selects the whole content.</summary>
     public void SelectAll() => this.Select(0, _text.Length);
 
@@ -245,6 +259,7 @@ public class TextBox : Control
 
         _peer = textBox;
         textBox.TextChangedByUser += this.OnPeerTextChanged;
+        textBox.KeyDown += this.OnPeerKeyDown;
         textBox.SetMultiline(this.Multiline);
         textBox.SetPlaceholder(this.PlaceholderText);
         textBox.SetPasswordChar(this.EffectivePasswordChar);
@@ -260,30 +275,80 @@ public class TextBox : Control
 
         (_selectionStart, _selectionLength) = _peer.GetSelection();
         _peer.TextChangedByUser -= this.OnPeerTextChanged;
+        _peer.KeyDown -= this.OnPeerKeyDown;
         _peer = null;
     }
+
+    /// <summary>Routes a key the widget reported to the <see cref="OnKeyDown"/> hook.</summary>
+    private void OnPeerKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
 
     /// <summary>
     /// Syncs a text change reported by the widget back into <see cref="Text"/>. Guarded by value
     /// comparison — exactly like the <c>Checked</c>-style properties — so echoes of programmatic
     /// writes and of the casing correction below never raise a second
-    /// <see cref="Control.TextChanged"/>.
+    /// <see cref="Control.TextChanged"/>. The widget's caret travels with the candidate, because a
+    /// normalizer that rewrites the value has to be able to say where the caret belongs afterwards.
     /// </summary>
     private void OnPeerTextChanged(object? sender, EventArgs e)
     {
         var peer = _peer;
-        if (peer is null)
+        if (peer is null || _pushing)
             return;
 
         var raw = peer.GetText();
-        var value = this.NormalizeText(raw);
+        var value = this.NormalizeUserEdit(raw, peer.GetSelection().Start, out var caret);
         var changed = _text != value;
         _text = value;
         if (value != raw)
-            peer.SetText(value);
+        {
+            this.PushText(value);
+            if (caret >= 0)
+                peer.SetSelection(Math.Min(caret, value.Length), 0);
+        }
 
         if (changed)
             this.OnTextChanged(EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Writes text into the widget without letting the echo come back as a user edit. Native editors
+    /// do not replace their content atomically — <c>gtk_entry_set_text</c> empties the entry before it
+    /// refills it — so an unguarded push reports an intermediate empty value, which a normalizer that
+    /// reads edits differentially would faithfully interpret as the user clearing the box.
+    /// </summary>
+    private void PushText(string value)
+    {
+        if (_peer is not { } peer)
+            return;
+
+        _pushing = true;
+        try
+        {
+            peer.SetText(value);
+        }
+        finally
+        {
+            _pushing = false;
+        }
+    }
+
+    /// <summary>
+    /// Normalizes a candidate the <em>widget</em> produced, knowing where the edit left the caret.
+    /// The base implementation is the plain <see cref="NormalizeText"/> whole-value pass and asks for
+    /// no caret correction (<paramref name="correctedCaret"/> stays negative); the masked box
+    /// overrides it, because reconstructing which keystroke happened — an insertion at the caret, a
+    /// deletion, a replaced selection — is only possible from the previous value, the candidate and
+    /// the caret together.
+    /// </summary>
+    /// <param name="value">The live text the widget reports.</param>
+    /// <param name="caret">Where the edit started — see <see cref="ITextBoxPeer.GetSelection"/> for
+    /// the guarantee peers give while they are reporting a change.</param>
+    /// <param name="correctedCaret">Where the caret must be placed when the value was rewritten, or
+    /// a negative number to leave the widget's own caret alone.</param>
+    private protected virtual string NormalizeUserEdit(string value, int caret, out int correctedCaret)
+    {
+        correctedCaret = -1;
+        return this.NormalizeText(value);
     }
 
     /// <summary>

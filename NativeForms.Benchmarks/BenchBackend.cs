@@ -138,6 +138,7 @@ internal class BenchTextBoxPeer : BenchPeer, ITextBoxPeer
     private string _text = string.Empty;
 
     public event EventHandler? TextChangedByUser { add { } remove { } }
+    public event EventHandler<KeyEventArgs>? KeyDown { add { } remove { } }
 
     public override void SetText(string text) => _text = text;
     public void SetMultiline(bool multiline) { }

@@ -12,10 +12,11 @@ namespace Hawkynt.NativeForms;
 /// clipboard and IME stay platform-native.
 /// </summary>
 /// <remarks>
-/// <see cref="SearchCommitted"/> fires for Enter on the owner-drawn surface. Enter typed inside the
-/// hosted native editor is not observable from the core — <see cref="ITextBoxPeer"/> exposes text
-/// changes but no key events — so committing from within the editor needs a key seam on the peer
-/// first, like every native-widget control (tracked in <c>docs/PRD.md</c>).
+/// Keyboard focus belongs to the hosted editor — it is the widget that takes text — so
+/// <see cref="Control.Focus"/> lands there rather than on the painted shell. Enter is claimed back
+/// from the editor through <see cref="ITextBoxPeer.KeyDown"/>: the editor never sees it, and
+/// <see cref="SearchCommitted"/> fires whether the key was typed inside the editor or on the surface
+/// around it.
 /// </remarks>
 public class SearchBox : OwnerDrawnControl
 {
@@ -35,6 +36,7 @@ public class SearchBox : OwnerDrawnControl
     {
         _editor = new() { PlaceholderText = Strings.SearchPlaceholder, TabStop = false };
         _editor.TextChanged += (_, _) => this.OnTextChanged(EventArgs.Empty);
+        _editor.KeyDown += this.OnEditorKeyDown;
         this.Controls.Add(_editor);
     }
 
@@ -60,6 +62,9 @@ public class SearchBox : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    /// <summary>The keyboard belongs to the hosted editor, not to the painted shell around it.</summary>
+    private protected override Control FocusTarget => _editor;
 
     /// <summary>Enter commits the search, so it stays out of the form's AcceptButton routing.</summary>
     protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
@@ -125,4 +130,7 @@ public class SearchBox : OwnerDrawnControl
         this.OnSearchCommitted(EventArgs.Empty);
         e.Handled = true;
     }
+
+    /// <summary>Claims Enter back from the hosted editor, so a search typed into it still commits.</summary>
+    private void OnEditorKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
 }

@@ -284,7 +284,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     };
 
     /// <summary>Maps a GDK modifier mask to <see cref="KeyModifiers"/>.</summary>
-    private static KeyModifiers ToModifiers(uint state)
+    internal static KeyModifiers ToModifiers(uint state)
     {
         var modifiers = KeyModifiers.None;
         if ((state & NativeMethods.GDK_SHIFT_MASK) != 0)
@@ -297,7 +297,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     }
 
     /// <summary>Maps a GDK key symbol to the toolkit's <see cref="Keys"/> (or <see cref="Keys.None"/>).</summary>
-    private static Keys ToKey(uint keyval) => keyval switch
+    internal static Keys ToKey(uint keyval) => keyval switch
     {
         NativeMethods.GDK_KEY_BackSpace => Keys.Back,
         NativeMethods.GDK_KEY_Tab => Keys.Tab,

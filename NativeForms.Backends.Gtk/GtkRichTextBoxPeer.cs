@@ -45,6 +45,9 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
     public event EventHandler? TextChangedByUser;
 
     /// <inheritdoc />
+    public event EventHandler<KeyEventArgs>? KeyDown;
+
+    /// <inheritdoc />
     public event EventHandler<string>? LinkClicked;
 
     /// <summary>The view's <c>GtkTextBuffer</c> (owned by the view).</summary>
@@ -86,6 +89,9 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
 
             var released = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnButtonReleased;
             NativeMethods.g_signal_connect_data(_textView, "button-release-event", released, GCHandle.ToIntPtr(_selfHandle), 0, 0);
+
+            var keyPressed = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyPress;
+            NativeMethods.g_signal_connect_data(_textView, "key-press-event", keyPressed, GCHandle.ToIntPtr(_selfHandle), 0, 0);
         }
     }
 
@@ -778,5 +784,27 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
             peer.HandleButtonReleased(eventPtr);
 
         return 0;
+    }
+
+    /// <summary>
+    /// Native "key-press-event" handler: gives the owning control first refusal on the key and stops
+    /// the event when a handler claimed it, exactly like the plain text peer's seam.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnKeyPress(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkRichTextBoxPeer peer)
+            return 0;
+
+        if (peer.KeyDown is not { } handler)
+            return 0;
+
+        unsafe
+        {
+            ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+            var args = new KeyEventArgs(GtkCanvasPeer.ToKey(e.KeyVal), GtkCanvasPeer.ToModifiers(e.State));
+            handler(peer, args);
+            return args.Handled ? 1 : 0;
+        }
     }
 }

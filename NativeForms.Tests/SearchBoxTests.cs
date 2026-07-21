@@ -146,6 +146,55 @@ internal sealed class SearchBoxTests
     }
 
     [Test]
+    public void Focus_lands_on_the_hosted_editor_not_on_the_painted_surface()
+    {
+        // The editor is the widget that takes text; focusing the shell around it would leave the
+        // keyboard nowhere and every typed character would be lost.
+        var box = CreateBox(out var canvas, out var editor);
+
+        box.Focus();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(editor.FocusRequested, Is.True);
+            Assert.That(canvas.FocusRequested, Is.False);
+        });
+    }
+
+    [Test]
+    public void Enter_typed_inside_the_hosted_editor_commits_the_search()
+    {
+        var box = CreateBox(out _, out var editor);
+        var committed = 0;
+        box.SearchCommitted += (_, _) => ++committed;
+        editor.SimulateUserInput("grid");
+
+        var handled = editor.SimulateKeyDown(Keys.Enter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(committed, Is.EqualTo(1));
+            Assert.That(handled, Is.True, "the key is claimed, so the editor never sees it");
+        });
+    }
+
+    [Test]
+    public void Keys_the_search_box_does_not_claim_stay_with_the_editor()
+    {
+        var box = CreateBox(out _, out var editor);
+        var committed = 0;
+        box.SearchCommitted += (_, _) => ++committed;
+
+        var handled = editor.SimulateKeyDown(Keys.A);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(committed, Is.Zero);
+            Assert.That(handled, Is.False);
+        });
+    }
+
+    [Test]
     public void Disabled_box_ignores_the_clear_zone()
     {
         var box = CreateBox(out var canvas, out _);

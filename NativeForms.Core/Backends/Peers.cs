@@ -252,7 +252,16 @@ public interface ITextBoxPeer : IControlPeer
     /// <summary>Selects <paramref name="length"/> characters starting at <paramref name="start"/> (length 0 places the caret).</summary>
     void SetSelection(int start, int length);
 
-    /// <summary>Returns the current selection as a start/length pair (length 0 = a bare caret).</summary>
+    /// <summary>
+    /// Returns the current selection as a start/length pair (length 0 = a bare caret).
+    /// </summary>
+    /// <remarks>
+    /// While <see cref="TextChangedByUser"/> is being raised the start reports where the reported
+    /// edit <em>began</em> — the caret as it stood before the widget applied the change. That is the
+    /// only reading that identifies the edit: the text alone is ambiguous whenever the typed
+    /// character matches the ones around it. Platforms whose change notification arrives after the
+    /// widget has already advanced its caret compensate in the peer, so the core sees one convention.
+    /// </remarks>
     (int Start, int Length) GetSelection();
 
     /// <summary>Returns the live text held by the widget, including edits the user has made.</summary>
@@ -260,6 +269,20 @@ public interface ITextBoxPeer : IControlPeer
 
     /// <summary>Raised whenever the widget's text changes, including edits typed by the user.</summary>
     event EventHandler? TextChangedByUser;
+
+    /// <summary>
+    /// Raised for a key pressed inside the widget, <em>before</em> the native editor acts on it. A
+    /// handler that sets <see cref="KeyEventArgs.Handled"/> consumes the key, so the editor never
+    /// sees it; anything left unhandled runs the platform's own editing behavior unchanged.
+    /// </summary>
+    /// <remarks>
+    /// This is the seam every composite that hosts a native editor needs: the editor keeps owning
+    /// caret, selection, clipboard and IME, while the owning control still gets first refusal on the
+    /// keys that belong to it — Enter to commit a search or a grid cell, Escape to revert an edit,
+    /// the arrows to step a spinner. Without it those keys vanish into the widget, because focus
+    /// lives in the editor and never reaches the composite's own surface.
+    /// </remarks>
+    event EventHandler<KeyEventArgs>? KeyDown;
 }
 
 /// <summary>

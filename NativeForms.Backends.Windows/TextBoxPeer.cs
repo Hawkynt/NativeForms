@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
 
 namespace Hawkynt.NativeForms.Backends.Windows;
@@ -14,9 +17,22 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// The cue banner (<c>EM_SETCUEBANNER</c>) only exists on single-line EDIT controls, so multiline
 /// boxes show no placeholder until an owner-drawn hint is added. Character casing is normalized by
 /// the core, so no <c>ES_UPPERCASE</c>/<c>ES_LOWERCASE</c> style bits are needed here.
+///
+/// Keys have no <c>WM_COMMAND</c> notification, so <see cref="KeyDown"/> comes from a window-procedure
+/// subclass on the EDIT: the replacement proc is a static function pointer and the peer is recovered
+/// from a handle-keyed map, never from a captured closure or a marshalled delegate.
 /// </remarks>
 internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
 {
+    /// <summary>Maps a live EDIT window to its peer so the static <see cref="EditProc"/> can find it.</summary>
+    private static readonly ConcurrentDictionary<nint, TextBoxPeer> _edits = new();
+
+    /// <summary>The window procedure the EDIT class installed, chained to for everything unclaimed.</summary>
+    private nint _baseProc;
+
+    /// <summary>Whether the peer is reporting a change — see <see cref="GetSelection"/>.</summary>
+    private bool _inChange;
+
     private bool _multiline;
     private string _placeholder = string.Empty;
     private char _passwordChar;
@@ -29,6 +45,9 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
 
     /// <inheritdoc/>
     public event EventHandler? TextChangedByUser;
+
+    /// <inheritdoc/>
+    public event EventHandler<KeyEventArgs>? KeyDown;
 
     /// <inheritdoc/>
     protected override string WindowClass => "EDIT";
@@ -47,7 +66,70 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         _parentHandle = parent;
         _controlId = controlId;
         base.CreateChildHandle(parent, controlId);
+        this.Subclass();
         this.FlushEditState();
+    }
+
+    /// <summary>Installs the key-intercepting window procedure on the freshly created EDIT.</summary>
+    private void Subclass()
+    {
+        if (Handle == 0)
+            return;
+
+        _edits[Handle] = this;
+        _baseProc = NativeMethods.SetWindowLongPtrW(
+            Handle,
+            NativeMethods.GWLP_WNDPROC,
+            (nint)(delegate* unmanaged<nint, uint, nint, nint, nint>)&EditProc);
+    }
+
+    /// <summary>Restores the EDIT's own window procedure and forgets the handle.</summary>
+    private void Unsubclass()
+    {
+        if (Handle == 0)
+            return;
+
+        if (_baseProc != 0)
+        {
+            NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWLP_WNDPROC, _baseProc);
+            _baseProc = 0;
+        }
+
+        _edits.TryRemove(Handle, out _);
+    }
+
+    /// <inheritdoc/>
+    public override void Dispose()
+    {
+        this.Unsubclass();
+        base.Dispose();
+    }
+
+    /// <summary>
+    /// The subclassed EDIT procedure: gives the owning control first refusal on every key down and
+    /// swallows the ones it claims, then chains to the control's own behavior.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    private static nint EditProc(nint hwnd, uint msg, nint wParam, nint lParam)
+    {
+        if (!_edits.TryGetValue(hwnd, out var peer))
+            return NativeMethods.DefWindowProcW(hwnd, msg, wParam, lParam);
+
+        if (msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN && peer.RaiseKeyDown(wParam))
+            return 0;
+
+        return NativeMethods.CallWindowProcW(peer._baseProc, hwnd, msg, wParam, lParam);
+    }
+
+    /// <summary>Raises <see cref="KeyDown"/> and reports whether a handler consumed the key.</summary>
+    private bool RaiseKeyDown(nint virtualKey)
+    {
+        if (KeyDown is not { } handler)
+            return false;
+
+        var args = new KeyEventArgs((Keys)(int)virtualKey, Win32CanvasPeer.CurrentModifiers());
+        handler(this, args);
+        return args.Handled;
     }
 
     /// <inheritdoc/>
@@ -65,6 +147,7 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         // id is reused, so the parent's WM_COMMAND routing keeps working unchanged.
         this.SetText(this.GetText());
         (_selectionStart, _selectionLength) = this.GetSelection();
+        this.Unsubclass();
         NativeMethods.DestroyWindow(Handle);
         Handle = 0;
         this.CreateChildHandle(_parentHandle, _controlId);
@@ -119,8 +202,19 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
 
         int start, end;
         NativeMethods.SendMessageW(Handle, NativeMethods.EM_GETSEL, (nint)(&start), (nint)(&end));
-        return (start, end - start);
+
+        // EN_CHANGE arrives once the EDIT has finished the edit and moved its caret past what was
+        // inserted, so during a change the caret is walked back to where the edit began — the
+        // convention ITextBoxPeer.GetSelection promises, and the one a GtkEntry reports natively.
+        // _text still holds the value the core last pushed, which is exactly the pre-edit content.
+        if (_inChange)
+            start -= Math.Max(0, GetTextLength() - _text.Length);
+
+        return (Math.Max(0, start), end - start);
     }
+
+    /// <summary>The character count the EDIT currently holds.</summary>
+    private int GetTextLength() => Handle == 0 ? _text.Length : NativeMethods.GetWindowTextLengthW(Handle);
 
     /// <inheritdoc/>
     public string GetText()
@@ -145,7 +239,16 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         switch (notifyCode)
         {
             case NativeMethods.EN_CHANGE:
-                TextChangedByUser?.Invoke(this, EventArgs.Empty);
+                _inChange = true;
+                try
+                {
+                    TextChangedByUser?.Invoke(this, EventArgs.Empty);
+                }
+                finally
+                {
+                    _inChange = false;
+                }
+
                 break;
 
             case NativeMethods.EN_SETFOCUS:
