@@ -22,8 +22,15 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     private readonly nint _window;
     private bool _shown;
 
+    /// <summary>Whether the grabs taken by the last <see cref="ShowAt"/> are still standing, so
+    /// <see cref="Hide"/> releases exactly what it took even if the flag changed in between.</summary>
+    private bool _grabbed;
+
     /// <inheritdoc />
     public event EventHandler? Dismissed;
+
+    /// <inheritdoc />
+    public bool LightDismiss { get; set; } = true;
 
     /// <summary>Creates the popup top-level, realizes the canvas into it and wires the dismissal signals.</summary>
     internal GtkPopupPeer()
@@ -66,6 +73,11 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         NativeMethods.gtk_widget_show_all(_window);
         _shown = true;
 
+        // A passive surface takes no grab either, so the next press keeps its normal delivery path
+        // and reaches the widget the user aimed at.
+        if (!this.LightDismiss)
+            return;
+
         // The seat grab routes pointer events outside the application to the popup (owner events keep
         // in-app delivery normal); the GTK grab redirects the application's own events to it. Together
         // they make every outside click land in OnWindowButtonPress.
@@ -80,15 +92,17 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
             0,
             0);
         NativeMethods.gtk_grab_add(_window);
+        _grabbed = true;
     }
 
     /// <inheritdoc />
     public void Hide()
     {
-        if (_shown)
+        if (_grabbed)
         {
             NativeMethods.gtk_grab_remove(_window);
             NativeMethods.gdk_seat_ungrab(NativeMethods.gdk_display_get_default_seat(NativeMethods.gdk_display_get_default()));
+            _grabbed = false;
         }
 
         _shown = false;

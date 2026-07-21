@@ -75,6 +75,12 @@ internal static unsafe partial class Injection
     [LibraryImport(_Gtk)]
     private static partial nint gtk_window_get_title(nint window);
 
+    [LibraryImport(_Gtk)]
+    private static partial void gtk_window_present(nint window);
+
+    [LibraryImport(_Gtk)]
+    private static partial int gtk_window_is_active(nint window);
+
     [LibraryImport(_Gdk)]
     private static partial nint gdk_event_new(int type);
 
@@ -281,6 +287,34 @@ internal static unsafe partial class Injection
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Whether a toplevel is the one the keyboard is pointed at. A widget cannot take the focus at
+    /// all while its window is inactive, so a focus assertion made against an inactive gallery is
+    /// measuring the desktop rather than the toolkit.
+    /// </summary>
+    internal static bool IsActive(nint window)
+    {
+        gdk_window_get_user_data(window, out var widget);
+        return widget != 0 && gtk_window_is_active(widget) != 0;
+    }
+
+    /// <summary>
+    /// Asks the display server to point the keyboard back at a toplevel.
+    /// </summary>
+    /// <remarks>
+    /// Needed because the walkthrough runs on a bare display. With no window manager the input focus
+    /// only ever moves where something explicitly puts it, so every surface that takes it — a modal
+    /// dialog, a menu, a tooltip the desktop floated — hands it back to nobody when it goes away, and
+    /// the gallery stays inactive for the rest of the run. A real desktop restores the focus for the
+    /// user; here the harness has to ask.
+    /// </remarks>
+    internal static void Present(nint window)
+    {
+        gdk_window_get_user_data(window, out var widget);
+        if (widget != 0)
+            gtk_window_present(widget);
     }
 
     /// <summary>A toplevel's origin and size in screen pixels.</summary>

@@ -927,6 +927,8 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
     public int HideCount { get; private set; }
     public bool IsShown { get; private set; }
 
+    public bool LightDismiss { get; set; } = true;
+
     public event EventHandler? Dismissed;
 
     public void ShowAt(Point screenLocation, Size size)

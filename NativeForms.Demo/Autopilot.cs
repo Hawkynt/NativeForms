@@ -304,7 +304,45 @@ internal sealed partial class Autopilot
 
     /// <summary>Clicks at an offset inside a control and reports which widget the press landed on.</summary>
     private string Click(Control control, int dx, int dy, uint button = 1, uint modifiers = 0)
-        => this.ClickAt(this.ScreenOf(control, dx, dy), button, modifiers);
+    {
+        this.DropStrayTip();
+        return this.ClickAt(this.ScreenOf(control, dx, dy), button, modifiers);
+    }
+
+    /// <summary>
+    /// Takes down a tip left floating by an earlier hover, and disarms one still counting down, which
+    /// is what aiming the pointer at another control is supposed to have done already.
+    /// </summary>
+    /// <remarks>
+    /// Crossing events are made by the display server, not by <c>gtk_main_do_event</c>, so injected
+    /// motion can never tell a control the pointer went away — and a tip armed by a hover three
+    /// checks ago pops up, or stays up, while the walkthrough is somewhere else entirely. On a
+    /// display whose focus follows the pointer that is not cosmetic: the floating surface holds the
+    /// keyboard focus, the gallery reports itself inactive, and no widget in it will focus at all,
+    /// from a click or from <see cref="Control.Focus"/> alike. This is the one thing in-process
+    /// injection cannot synthesize, so the harness states it instead — it compensates for its own
+    /// limitation, never for the toolkit's behavior, and the tooltip checks that <em>want</em> a tip
+    /// hover rather than click.
+    /// <para>
+    /// Unconditional on purpose. Hiding only a tip that is already up leaves the pending delay
+    /// running, and a tip that surfaces between the press and the assertion is exactly the race that
+    /// makes a run look intermittently broken; <see cref="ToolTip.Hide"/> stops the delay too.
+    /// </para>
+    /// </remarks>
+    private void DropStrayTip() => this.Do(_form.Part<ToolTip>("chrome.toolTip").Hide);
+
+    /// <summary>
+    /// Makes sure the gallery is the window the keyboard is pointed at before anything asks about
+    /// focus. See <see cref="Injection.Present"/> for why this is the harness's job here.
+    /// </summary>
+    private void ActivateGallery()
+    {
+        for (var attempt = 0; attempt < 5 && !this.Read(() => Injection.IsActive(_root)); ++attempt)
+        {
+            this.Pump("activating the gallery", () => Injection.Present(_root));
+            this.Settle(80);
+        }
+    }
 
     /// <summary>
     /// The toplevel an event at a screen point belongs to. Drop-downs, menus and dialogs are separate

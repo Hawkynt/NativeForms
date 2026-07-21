@@ -22,6 +22,9 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
     public event EventHandler? Dismissed;
 
     /// <inheritdoc/>
+    public bool LightDismiss { get; set; } = true;
+
+    /// <inheritdoc/>
     public void ShowAt(Point screenLocation, Size size)
     {
         this.EnsureHandle();
@@ -37,6 +40,11 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
             size.Height,
             NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
         this._shown = true;
+
+        // A passive surface — a tooltip — takes no capture at all, so the next click keeps its normal
+        // delivery path and reaches the window the user aimed at.
+        if (!this.LightDismiss)
+            return;
 
         // Capture routes every mouse message here — including clicks outside the surface — without
         // stealing activation from the owner window.

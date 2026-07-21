@@ -170,6 +170,32 @@ internal sealed partial class MainForm
             Caption("PictureBox (generated gradient)", 664, 272),
             picture);
 
+        // Everything the walkthrough moves on this page, snapshotted the instant it was authored so
+        // the restore can never drift away from the values above.
+        var linkVisited = link.LinkVisited;
+        var plainChecked = plainCheck.Checked;
+        var toggleChecked = toggle.Checked;
+        var smallChecked = small.Checked;
+        var mediumChecked = medium.Checked;
+        var largeChecked = large.Checked;
+        var dialogResult = dialogResultLabel.Text;
+        var pictureImage = picture.Image;
+        this.OnReset(() =>
+        {
+            _viewModel.Count = 0;
+            link.LinkVisited = linkVisited;
+            plainCheck.Checked = plainChecked;
+            toggle.Checked = toggleChecked;
+
+            // The group is exclusive, so the one that was authored checked goes last: setting it
+            // clears whichever sibling the walkthrough left selected.
+            small.Checked = smallChecked;
+            large.Checked = largeChecked;
+            medium.Checked = mediumChecked;
+            dialogResultLabel.Text = dialogResult;
+            picture.Image = pictureImage;
+        });
+
         this.Publish("basics.page", page);
         this.Publish("basics.counterLabel", counterLabel);
         this.Publish("basics.counterBar", counterBar);

@@ -31,6 +31,10 @@ internal sealed partial class Autopilot
     private void DriveTextEntry()
     {
         Section("Text entry");
+
+        // Every check here asks where the keyboard focus went, and the modal dialog the previous
+        // section opened may have taken the window's activation away with it.
+        this.ActivateGallery();
         this.SelectTab(1);
 
         var single = _form.Part<TextBox>("input.single");
@@ -84,7 +88,6 @@ internal sealed partial class Autopilot
         var domain = _form.Part<DomainUpDown>("input.domain");
         this.Check("DomainUpDown: a click reaches its hosted editor and typing changes its text", () =>
         {
-            this.Neutralize(single);
             this.Click(domain, _EditorInset, this.Read(() => domain.Height) / 2);
             this.ExpectTrue("the domain spinner did not take the focus from a click on its editor", this.HoldsFocus(domain));
             this.ClearEditor();
@@ -97,7 +100,6 @@ internal sealed partial class Autopilot
         this.Check("NumericUpDown: a click reaches its hosted editor and typing changes the value", () =>
         {
             var before = this.Read(() => numeric.Value);
-            this.Neutralize(single);
             this.Click(numeric, _EditorInset, this.Read(() => numeric.Height) / 2);
             this.ExpectTrue("the spinner did not take the focus from a click on its editor", this.HoldsFocus(numeric));
             this.ClearEditor();
@@ -149,26 +151,6 @@ internal sealed partial class Autopilot
                 $"{typeof(T).Name}.Text is \"{Shorten(after)}\" after typing \"{typed}\" into it",
                 after.Contains(typed, StringComparison.Ordinal));
         });
-
-    /// <summary>
-    /// Clicks a plain text box before a composite's hosted editor is clicked, so the check measures
-    /// its own control rather than the tail of the previous one.
-    /// </summary>
-    /// <remarks>
-    /// This absorbs a known defect rather than hiding one: after the <see cref="MaskedTextBox"/> has
-    /// been typed into, exactly one following click is swallowed — it moves the focus nowhere, and
-    /// the control it was aimed at stays unfocused and untyped. Reordering the checks moves the
-    /// failure onto whichever hosted editor now comes first, so it is the mask's focus-out
-    /// transition and not any one spinner that is at fault. What pins it down is that a programmatic
-    /// <see cref="Control.Focus"/> in between does <em>not</em> clear it and a real click does:
-    /// it is the click that is lost, not the focus. Left for its own fix; the walkthrough spends the
-    /// swallowed click deliberately so the checks after it measure what they claim to.
-    /// </remarks>
-    private void Neutralize(Control resting)
-    {
-        this.Click(resting, this.Read(() => resting.Width) / 2, this.Read(() => resting.Height) / 2);
-        this.Settle(60);
-    }
 
     /// <summary>Empties the focused editor with the End key and a run of backspaces — the select-all
     /// accelerator is a text-widget binding the synthesized key path does not reach.</summary>

@@ -250,4 +250,20 @@ internal sealed class ToolTipTests
 
         Assert.That(backend.Timers, Is.Empty, "nothing armed a delay");
     }
+
+    /// <summary>
+    /// The tip's surface must be passive. A popup that arms light dismiss takes a pointer grab over
+    /// the whole application, and the next click is then spent closing the tip instead of reaching
+    /// the control it was aimed at — the control neither takes the focus nor sees the press, and only
+    /// a second click works.
+    /// </summary>
+    [Test]
+    public void The_tip_popup_never_arms_light_dismiss()
+    {
+        CreatePanel(out _, out var canvas, out var backend);
+        canvas.RaiseMouseMove(20, 30);
+        backend.Timers[0].FireTick();
+
+        Assert.That(PopupOf(backend).LightDismiss, Is.False);
+    }
 }

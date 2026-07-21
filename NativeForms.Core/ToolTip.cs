@@ -190,8 +190,9 @@ public sealed class ToolTip : Component
 
     /// <summary>
     /// Asks a native widget's peer to raise the platform tooltip, reporting whether a peer was there
-    /// to ask. Deliberately not the toolkit popup: that surface arms light dismiss and takes a
-    /// pointer grab, which would swallow the next click aimed at the control underneath.
+    /// to ask. A widget that has a platform tip gets it, so the tip carries the desktop's own shape,
+    /// shadow and animation; only a surface with no tip of its own is worth floating a toolkit popup
+    /// for (see <see cref="ShowPopup"/>, which shows that popup passively).
     /// </summary>
     private bool ShowNativeTip(Control control, string text)
     {
@@ -213,6 +214,12 @@ public sealed class ToolTip : Component
             _popup?.Dispose();
             _backend = backend;
             _popup = popup = backend.CreatePopup();
+
+            // A tip is passive: it must never take the grab that arms light dismiss, or the next
+            // click would be spent closing the tip instead of reaching the control it was aimed at.
+            // The tip is taken down by the pointer leaving, by a press on the control, or by the
+            // auto-pop delay — never by a grab it holds over the rest of the application.
+            popup.LightDismiss = false;
             popup.Paint += this.OnPopupPaint;
             popup.Dismissed += (_, _) => _shown = false;
         }

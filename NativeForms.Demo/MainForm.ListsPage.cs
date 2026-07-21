@@ -158,11 +158,15 @@ internal sealed partial class MainForm
         };
         var solution = new TreeNode("Solution") { ImageIndex = _IconFolder };
         var core = new TreeNode("Core") { ImageIndex = _IconFolder };
-        core.Nodes.Add(new TreeNode("Control.cs") { ImageIndex = _IconFile, Checked = true });
-        core.Nodes.Add(new TreeNode("Form.cs") { ImageIndex = _IconFile });
+        var controlFile = new TreeNode("Control.cs") { ImageIndex = _IconFile, Checked = true };
+        var formFile = new TreeNode("Form.cs") { ImageIndex = _IconFile };
+        core.Nodes.Add(controlFile);
+        core.Nodes.Add(formFile);
         var backends = new TreeNode("Backends") { ImageIndex = _IconFolder };
-        backends.Nodes.Add(new TreeNode("Win32") { ImageIndex = _IconFile });
-        backends.Nodes.Add(new TreeNode("Gtk") { ImageIndex = _IconFile, Checked = true });
+        var win32File = new TreeNode("Win32") { ImageIndex = _IconFile };
+        var gtkFile = new TreeNode("Gtk") { ImageIndex = _IconFile, Checked = true };
+        backends.Nodes.Add(win32File);
+        backends.Nodes.Add(gtkFile);
         solution.Nodes.Add(core);
         solution.Nodes.Add(backends);
         tree.Nodes.Add(solution);
@@ -204,6 +208,56 @@ internal sealed partial class MainForm
             tree,
             Caption("TreeListView (SetDataSource, 3 columns)", 664, 268),
             treeList);
+
+        // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
+        var listIndex = listBox.SelectedIndex;
+        var checkedIndex = checkedList.SelectedIndex;
+        var comboListIndex = comboList.SelectedIndex;
+        var comboEditText = comboEdit.Text;
+        var detailsIndex = details.SelectedIndex;
+
+        // The details view is sorted by the walkthrough, which permutes Items in place; only the
+        // authored order itself can put it back.
+        var detailsItems = new ListViewItem[details.Items.Count];
+        details.Items.CopyTo(detailsItems, 0);
+        var checkedStates = new bool[checkedList.Items.Count];
+        for (var i = 0; i < checkedStates.Length; ++i)
+            checkedStates[i] = checkedList.GetItemChecked(i);
+
+        var treeChecks = new[] { controlFile, formFile, win32File, gtkFile };
+        var treeCheckStates = new bool[treeChecks.Length];
+        for (var i = 0; i < treeChecks.Length; ++i)
+            treeCheckStates[i] = treeChecks[i].Checked;
+
+        this.OnReset(() =>
+        {
+            listBox.ClearSelected();
+            listBox.SelectedIndex = listIndex;
+            for (var i = 0; i < checkedStates.Length; ++i)
+                checkedList.SetItemChecked(i, checkedStates[i]);
+
+            checkedList.SelectedIndex = checkedIndex;
+
+            comboList.SelectedIndex = comboListIndex;
+            comboEdit.Text = comboEditText;
+
+            details.Sorting = SortOrder.None;
+            details.CheckBoxes = false;
+            details.Items.Clear();
+            details.Items.AddRange(detailsItems);
+            details.SelectedIndex = detailsIndex;
+
+            for (var i = 0; i < treeChecks.Length; ++i)
+                treeChecks[i].Checked = treeCheckStates[i];
+
+            tree.SelectedNode = null;
+            solution.Expand();
+            core.Expand();
+            backends.Collapse();
+            treeList.Nodes[0].Expand();
+            treeList.Nodes[1].Expand();
+            treeList.SelectedNode = null;
+        });
 
         this.Publish("lists.page", page);
         this.Publish("lists.listBox", listBox);

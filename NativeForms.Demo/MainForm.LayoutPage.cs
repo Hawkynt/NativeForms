@@ -111,6 +111,16 @@ internal sealed partial class MainForm
             Caption("Panel (AutoScroll, 464×200 content)", 500, 198),
             scrollPanel);
 
+        // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
+        var splitterDistance = split.SplitterDistance;
+        var expanderOpen = expander.Expanded;
+        this.OnReset(() =>
+        {
+            split.SplitterDistance = splitterDistance;
+            expander.Expanded = expanderOpen;
+            scrollPanel.AutoScrollPosition = Point.Empty;
+        });
+
         this.Publish("layout.page", page);
         this.Publish("layout.flow", flow);
         this.Publish("layout.table", table);

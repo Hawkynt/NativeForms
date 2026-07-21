@@ -115,6 +115,47 @@ internal sealed partial class MainForm : Form
             ? typed
             : throw new KeyNotFoundException($"nothing is published under \"{name}\"");
 
+    /// <summary>
+    /// One restore step per page, registered while the page is being built so each closure captures
+    /// the values that were <em>just</em> authored rather than a second copy of the literals. Only
+    /// created when <c>--autopilot</c> was passed, so an ordinary launch carries neither the list nor
+    /// the closures.
+    /// </summary>
+    private List<Action>? _resets;
+
+    /// <summary>Registers a page's restore step; see <see cref="_resets"/>.</summary>
+    private void OnReset(Action restore)
+    {
+        if (Autopilot.Enabled)
+            (_resets ??= []).Add(restore);
+    }
+
+    /// <summary>
+    /// Puts the whole gallery back the way it looked the moment the window first appeared: every
+    /// authored text, value, selection and check state, every scroll offset at zero, no menu down and
+    /// no tip floating.
+    /// </summary>
+    /// <remarks>
+    /// The capture pass calls this before each page shot. A walkthrough that has just clicked, typed,
+    /// dragged and scrolled its way through every control leaves the gallery covered in its own
+    /// fingerprints — a grid parked mid-scroll behind its frozen column, text boxes carrying typed
+    /// test strings, a status line quoting the last page visited — and a photograph of that is a
+    /// photograph of the test, not of the product. Restoring rather than rebuilding keeps the peers,
+    /// the bindings and the event wiring exactly as a running gallery has them.
+    /// </remarks>
+    internal void ResetToAuthoredState()
+    {
+        if (_resets is not { } resets)
+            return;
+
+        for (var i = 0; i < resets.Count; ++i)
+            resets[i]();
+
+        _menu.CloseDropDown();
+        _toolTip.Hide();
+        this.SetStatus("Ready.");
+    }
+
     /// <summary>Re-docks the chrome rows and the tab control to the current window size.</summary>
     private void LayoutChrome()
     {
@@ -198,6 +239,10 @@ internal sealed partial class MainForm : Form
         help.DropDownItems.Add(about);
 
         strip.Items.AddRange(file, help);
+
+        var autosaveChecked = autosave.Checked;
+        this.OnReset(() => autosave.Checked = autosaveChecked);
+
         this.Publish("menu.file", file);
         this.Publish("menu.new", newItem);
         this.Publish("menu.autosave", autosave);
@@ -238,6 +283,10 @@ internal sealed partial class MainForm : Form
         run.DropDownItems.Add(runProfiled);
 
         strip.Items.AddRange(newButton, openButton, saveButton, new ToolStripSeparator(), pin, new ToolStripSeparator(), run);
+
+        var pinChecked = pin.Checked;
+        this.OnReset(() => pin.Checked = pinChecked);
+
         this.Publish("tool.new", newButton);
         this.Publish("tool.pin", pin);
         this.Publish("tool.run", run);

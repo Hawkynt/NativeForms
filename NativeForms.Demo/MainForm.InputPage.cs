@@ -135,6 +135,53 @@ internal sealed partial class MainForm
             Caption("MonthCalendar (week selections)", 664, 100),
             calendar);
 
+        // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
+        var singleText = single.Text;
+        var placeholderText = placeholder.Text;
+        var passwordText = password.Text;
+        var multilineText = multiline.Text;
+        var maskedText = masked.Text;
+        var richRtf = rich.Rtf;
+        var numericValue = numeric.Value;
+        var domainIndex = domain.SelectedIndex;
+        var searchText = search.Text;
+        var trackValueNumber = track.Value;
+        var horizontalValueNumber = horizontal.Value;
+        var verticalValueNumber = vertical.Value;
+        var pickerValue = shortPicker.Value;
+        var pickerChecked = shortPicker.Checked;
+        var customValue = customPicker.Value;
+        var calendarStart = calendar.SelectionStart;
+        var calendarEnd = calendar.SelectionEnd;
+        this.OnReset(() =>
+        {
+            single.Text = singleText;
+            placeholder.Text = placeholderText;
+            password.Text = passwordText;
+            multiline.Text = multilineText;
+            masked.Text = maskedText;
+            rich.Rtf = richRtf;
+            numeric.Value = numericValue;
+            domain.SelectedIndex = domainIndex;
+            search.Text = searchText;
+            track.Value = trackValueNumber;
+            horizontal.Value = horizontalValueNumber;
+            vertical.Value = verticalValueNumber;
+            shortPicker.Value = pickerValue;
+            shortPicker.Checked = pickerChecked;
+            customPicker.Value = customValue;
+
+            // Restoring the range also pages the calendar back to the month that holds it, so a
+            // walkthrough that browsed backwards does not leave the shot on the wrong month.
+            calendar.SetSelectionRange(calendarStart, calendarEnd);
+
+            // The echoing labels follow their sliders through ValueChanged, which a restore to the
+            // authored value does not raise when the walkthrough happened to leave it there.
+            trackValue.Text = $"{track.Value}";
+            horizontalValue.Text = $"{horizontal.Value}";
+            verticalValue.Text = $"{vertical.Value}";
+        });
+
         this.Publish("input.page", page);
         this.Publish("input.single", single);
         this.Publish("input.placeholder", placeholder);

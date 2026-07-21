@@ -12,7 +12,24 @@ namespace Hawkynt.NativeForms.Backends;
 /// </summary>
 public interface IPopupPeer : ICanvasPeer
 {
-    /// <summary>Shows the surface at the given screen position with the given size, arming light dismiss.</summary>
+    /// <summary>
+    /// Whether showing the surface arms light dismiss — the pointer grab that routes the next click
+    /// anywhere in the application to this surface so it can close itself. Defaults to
+    /// <see langword="true"/>, which is what a menu, a drop-down list or a fly-out calendar wants: the
+    /// click that closes them belongs to them.
+    /// </summary>
+    /// <remarks>
+    /// A tooltip is the counter-example and must set this to <see langword="false"/>. It is a passive
+    /// surface the user never aims at, and a grab would make it consume the very click the user meant
+    /// for the control underneath — the control would neither take the focus nor see the press, and
+    /// only the <em>second</em> click would work. A passive surface is taken down by whoever put it
+    /// up (a tooltip hides on pointer-leave, on a press, or on its auto-pop delay) rather than by a
+    /// grab, so it never competes for input.
+    /// </remarks>
+    bool LightDismiss { get; set; }
+
+    /// <summary>Shows the surface at the given screen position with the given size, arming light
+    /// dismiss unless <see cref="LightDismiss"/> was turned off.</summary>
     void ShowAt(Point screenLocation, Size size);
 
     /// <summary>Hides the surface and releases any grab, without raising <see cref="Dismissed"/>.</summary>

@@ -21,21 +21,13 @@ internal sealed partial class Autopilot
     {
         Section("Gallery captures");
 
-        // The behavioral script leaves state behind — a scrolled panel, a collapsed expander — and a
-        // page shot is supposed to show the page, not the tail of the last gesture.
-        this.Do(() =>
-        {
-            _form.Part<Panel>("layout.scrollPanel").AutoScrollPosition = Point.Empty;
-            _form.Part<Expander>("layout.expander").Expanded = true;
-        });
-
         var tabs = _form.Part<TabControl>("chrome.tabs");
         var names = new[] { "01-basics", "02-input", "03-lists", "04-grid", "05-layout" };
         var count = Math.Min(names.Length, this.Read(() => tabs.TabPages.Count));
         for (var i = 0; i < count; ++i)
         {
             this.SelectTab(i);
-            this.Settle(120);
+            this.Pristine();
             this.Screenshot(names[i]);
         }
 
@@ -47,10 +39,53 @@ internal sealed partial class Autopilot
         this.CaptureMessageBox();
     }
 
+    /// <summary>
+    /// Puts the gallery back the way a user first sees it: any drop-down dismissed, the pointer taken
+    /// off whatever it was last aimed at, and every page restored to its authored state.
+    /// </summary>
+    /// <remarks>
+    /// Called before every posed shot, including the ones that then perform a single deliberate
+    /// interaction — an open menu, a collapsed expander, a scrolled panel. That is what makes such a
+    /// shot show exactly that one interaction instead of it plus the sediment of eighty-odd checks.
+    /// </remarks>
+    private void Pristine()
+    {
+        // A drop-down left open would photograph itself over the page and, while it holds the grab,
+        // would swallow the gestures the next posed shot makes.
+        for (var attempt = 0; attempt < 3 && this.Popups().Count > 0; ++attempt)
+        {
+            this.Key(KeySym.Escape);
+            this.Settle(60);
+        }
+
+        this.ParkPointer();
+        this.Do(_form.ResetToAuthoredState);
+        this.Settle(120);
+    }
+
+    /// <summary>
+    /// Slides the pointer to the empty stretch of menu bar right of the last item, which is where a
+    /// shot wants it: over nothing that highlights and nothing that carries a tip.
+    /// </summary>
+    /// <remarks>
+    /// Hover state is sticky under synthesized input. Crossing events are made by the display server,
+    /// not by <c>gtk_main_do_event</c>, so a widget the pointer was over is never told the pointer
+    /// went away and keeps painting itself hot — which is how a File menu ends up highlighted in a
+    /// picture of the Grid page. Moving <em>within</em> the bar is enough: the strip does get the
+    /// motion, and an x past every item resolves to no item at all.
+    /// </remarks>
+    private void ParkPointer()
+    {
+        var menu = _form.Part<MenuStrip>("chrome.menu");
+        var geometry = this.Read(() => (menu.Width, menu.Height));
+        this.Hover(menu, geometry.Width - 8, geometry.Height / 2);
+    }
+
     /// <summary>The Lists page with the drop-down-list combo box open.</summary>
     private void CaptureComboDropDown()
     {
         this.SelectTab(2);
+        this.Pristine();
         var combo = _form.Part<ComboBox>("lists.comboList");
         this.Do(combo.OpenDropDown);
         this.Settle(150);
@@ -63,6 +98,7 @@ internal sealed partial class Autopilot
     private void CaptureCalendarDropDown()
     {
         this.SelectTab(1);
+        this.Pristine();
         var picker = _form.Part<DateTimePicker>("input.picker");
         this.Do(picker.OpenDropDown);
         this.Settle(150);
@@ -75,6 +111,7 @@ internal sealed partial class Autopilot
     private void CaptureFileMenu()
     {
         this.SelectTab(0);
+        this.Pristine();
         var menu = _form.Part<MenuStrip>("chrome.menu");
         this.Click(menu, 20, this.Read(() => menu.Height) / 2);
 
@@ -96,6 +133,7 @@ internal sealed partial class Autopilot
     private void CaptureExpander()
     {
         this.SelectTab(4);
+        this.Pristine();
         var expander = _form.Part<Expander>("layout.expander");
         if (this.Read(() => expander.Expanded))
         {
@@ -113,6 +151,7 @@ internal sealed partial class Autopilot
     private void CaptureScrolledPanel()
     {
         this.SelectTab(4);
+        this.Pristine();
         var panel = _form.Part<Panel>("layout.scrollPanel");
         this.Do(() =>
         {
@@ -135,6 +174,7 @@ internal sealed partial class Autopilot
     private void CaptureMessageBox()
     {
         this.SelectTab(0);
+        this.Pristine();
         var button = _form.Part<Button>("basics.dialog");
         var screen = this.ScreenOf(button, 150, 15);
 

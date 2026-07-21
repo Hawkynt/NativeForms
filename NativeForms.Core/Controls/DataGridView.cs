@@ -3048,6 +3048,10 @@ public class DataGridView : OwnerDrawnControl
             return popup;
 
         popup = backend.CreatePopup();
+
+        // Passive, exactly like ToolTip's own surface: a tip that grabbed would eat the next click
+        // on the grid underneath it.
+        popup.LightDismiss = false;
         popup.Paint += (_, e) => ToolTip.PaintTip(e.Graphics, this.Theme, _tipText);
         popup.Dismissed += (_, _) => _tipShown = false;
         return _tipPopup = popup;

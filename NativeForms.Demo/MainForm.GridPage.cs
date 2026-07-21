@@ -126,6 +126,42 @@ internal sealed partial class MainForm
             grid,
             Caption("Check and Hours cells write back into the bound items.", 16, 544, 420));
 
+        // The walkthrough sorts the grid, widens a column, scrolls both ways and writes back into two
+        // bound cells. The column widths and the rows themselves are the authored state; the offsets
+        // are simply zero, which is where a grid nobody has touched sits.
+        var columnWidths = new int[grid.Columns.Count];
+        for (var i = 0; i < columnWidths.Length; ++i)
+            columnWidths[i] = grid.Columns[i].Width;
+
+        var authoredRows = new WorkItem[grid.Items.Count];
+        grid.Items.CopyTo(authoredRows, 0);
+        var doneFlags = new bool[authoredRows.Length];
+        var hourValues = new decimal[authoredRows.Length];
+        for (var i = 0; i < authoredRows.Length; ++i)
+        {
+            doneFlags[i] = authoredRows[i].Done;
+            hourValues[i] = authoredRows[i].Hours;
+        }
+
+        var selectedRow = grid.SelectedRowIndex;
+        this.OnReset(() =>
+        {
+            grid.Sort(null, SortOrder.None);
+            for (var i = 0; i < columnWidths.Length; ++i)
+                grid.Columns[i].Width = columnWidths[i];
+
+            for (var i = 0; i < authoredRows.Length; ++i)
+            {
+                authoredRows[i].Done = doneFlags[i];
+                authoredRows[i].Hours = hourValues[i];
+            }
+
+            grid.HorizontalOffset = 0;
+            grid.TopRow = 0;
+            grid.SelectedRowIndex = selectedRow;
+            grid.Invalidate();
+        });
+
         this.Publish("grid.page", page);
         this.Publish("grid.grid", grid);
 
