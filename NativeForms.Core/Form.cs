@@ -90,9 +90,9 @@ public class Form : Control
 
     /// <summary>
     /// The button Escape clicks through the form's dialog-key chain. As in WinForms, assigning it
-    /// gives the button a <see cref="DialogResult.Cancel"/> result when it still has none. Like
-    /// <see cref="AcceptButton"/>, the routing sees keys from owner-drawn surfaces only, and a
-    /// focused control may claim Escape (to close its own drop-down or cancel its edit) first.
+    /// gives the button a <see cref="DialogResult.Cancel"/> result when it still has none. The routing
+    /// sees keys from owner-drawn surfaces and from native text boxes (through the peer key seam), and
+    /// a focused control may claim Escape (to close its own drop-down or cancel its edit) first.
     /// </summary>
     public Button? CancelButton
     {

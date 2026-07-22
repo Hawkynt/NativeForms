@@ -134,14 +134,15 @@ public class TextBox : Control
         }
     }
 
-    /// <summary>Whether Enter inserts a newline in a multiline box instead of activating the default
-    /// button. Stored only for now: keys typed inside the hosted native editor are not observable
-    /// from the core, so the flag cannot steer them until the peers expose a key seam.</summary>
+    /// <summary>Whether Enter is kept by a multiline box (a newline) instead of activating the form's
+    /// <see cref="Form.AcceptButton"/>. Steered through the peer key seam: while set on a multiline
+    /// box, Enter is an <see cref="IsInputKey"/> the editor handles; otherwise it reaches the default
+    /// button.</summary>
     public bool AcceptsReturn { get; set; }
 
-    /// <summary>Whether Tab inserts a tab character in a multiline box instead of moving focus.
-    /// Stored only for now: keys typed inside the hosted native editor are not observable from the
-    /// core, so the flag cannot steer them until the peers expose a key seam.</summary>
+    /// <summary>Whether Tab is kept by the box (a tab character) instead of moving focus. Steered
+    /// through the peer key seam: while set, an unmodified Tab is an <see cref="IsInputKey"/> the
+    /// editor handles; otherwise it navigates.</summary>
     public bool AcceptsTab { get; set; }
 
     /// <summary>
@@ -279,8 +280,32 @@ public class TextBox : Control
         _peer = null;
     }
 
-    /// <summary>Routes a key the widget reported to the <see cref="OnKeyDown"/> hook.</summary>
-    private void OnPeerKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
+    /// <summary>
+    /// Routes a key the widget reported first through the form's dialog-key chain — Enter to the
+    /// <see cref="Form.AcceptButton"/>, Escape to the <see cref="Form.CancelButton"/>, Tab/Shift+Tab
+    /// to navigation, menu shortcuts and Alt+mnemonics — and, when nothing there consumes it, to the
+    /// <see cref="OnKeyDown"/> hook. A consumed key is marked handled so the native editor never sees
+    /// it. Keys the box wants for itself (<see cref="IsInputKey"/> — a newline while
+    /// <see cref="AcceptsReturn"/>, a tab while <see cref="AcceptsTab"/>) are left to the editor.
+    /// </summary>
+    private void OnPeerKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (this.FindForm() is { } form && form.ProcessDialogKey(this, e))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        this.OnKeyDown(e);
+    }
+
+    /// <inheritdoc/>
+    protected override bool IsInputKey(Keys keyData) => (keyData & Keys.KeyCode) switch
+    {
+        Keys.Enter => this.Multiline && this.AcceptsReturn,
+        Keys.Tab => this.AcceptsTab && (keyData & Keys.Modifiers) == 0,
+        _ => base.IsInputKey(keyData),
+    };
 
     /// <summary>
     /// Syncs a text change reported by the widget back into <see cref="Text"/>. Guarded by value

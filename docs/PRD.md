@@ -216,9 +216,12 @@ strategy (may differ per platform; note exceptions inline).
       control kind), WinForms event order (Enter→GotFocus / LostFocus→Leave with container-chain
       crossing), `Form.ActiveControl` + initial focus, Tab/Shift+Tab navigation through nested
       containers, `IsInputKey` claims, form-wide menu shortcuts + Alt-mnemonic bar activation
-- [~] Keyboard — `KeyDown`/`KeyUp`/`KeyPress` on owner-drawn surfaces, mnemonics/accelerators
-      via the form dialog-key chain done; native-widget key preview (peer key seam: Enter inside
-      a native TextBox → AcceptButton, native Tab handling, button-mnemonic clicks) pending
+- [~] Keyboard — `KeyDown`/`KeyUp`/`KeyPress` on owner-drawn surfaces, mnemonics/accelerators via the
+      form dialog-key chain done; a native `TextBox` now previews its keys through that chain over the
+      peer key seam (Enter → `AcceptButton`, Escape → `CancelButton`, Tab/Shift+Tab navigation, menu
+      shortcuts), with `AcceptsReturn`/`AcceptsTab` keeping the key for a multiline editor. Native
+      button-mnemonic clicks (an owner-drawn concern already, via the mnemonic chain) are the remaining
+      native-preview gap.
 - [~] Mouse events on `Control`: `MouseMove`/`MouseEnter`/`MouseLeave` ride the shared pointer
       channel for every control (native widgets and owner-drawn surfaces alike);
       `MouseDown`/`MouseUp`/`MouseWheel`/`MouseDoubleClick`/`DoubleClick` fire for owner-drawn controls

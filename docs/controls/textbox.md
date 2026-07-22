@@ -34,8 +34,8 @@ box.SelectedText = "Jane";    // replace them, caret lands after the insertion
 | `ReadOnly` | `bool` | `false` | Text can be selected and copied but not edited. |
 | `MaxLength` | `int` | `0` | Maximum characters the user can type; 0 means unlimited. Negative values coerce to 0. |
 | `CharacterCasing` | `CharacterCasing` | `Normal` | Forces `Upper`/`Lower` casing. Changing it re-cases the current `Text`; while active, programmatic writes and user input are normalized alike. |
-| `AcceptsReturn` | `bool` | `false` | Whether Enter inserts a newline in a multiline box instead of activating the default button. Stored only — the key behavior is not wired yet. |
-| `AcceptsTab` | `bool` | `false` | Whether Tab inserts a tab character in a multiline box instead of moving focus. Stored only. |
+| `AcceptsReturn` | `bool` | `false` | Whether a multiline box keeps Enter (a newline) instead of activating the form's `AcceptButton`. Wired through the peer key seam. |
+| `AcceptsTab` | `bool` | `false` | Whether the box keeps an unmodified Tab (a tab character) instead of moving focus. Wired through the peer key seam. |
 | `SelectionStart` | `int` | `0` | Index of the first selected character (the caret position when nothing is selected). Buffered before realization, read live from the widget afterwards. |
 | `SelectionLength` | `int` | `0` | Number of selected characters. Buffered/live like `SelectionStart`. |
 | `SelectedText` | `string` | `""` | The selected run of `Text`; assigning replaces the selection and places the caret after the inserted text. |
@@ -60,10 +60,11 @@ Inherits the common members of [`Control`](control.md).
 - **Platform limits, documented honestly.** Multiline placeholders are owner-drawn: neither Win32's cue banner (`EM_SETCUEBANNER`, single-line `EDIT` only) nor `GtkTextView` offers a native one, so on GTK the hint is painted after the view's own draw while the buffer is empty. The Win32 multiline half is not wired yet. `MaxLength` and password masking are also entry-only on GTK (`GtkTextView` has no native limit or masking).
 - `CharacterCasing` is normalized in the core — on assignment and on user input alike (a corrective push rewrites the widget when it disagrees) — so it behaves identically on every backend; no `ES_UPPERCASE`/`ES_LOWERCASE` style bits.
 - [`MaskedTextBox`](maskedtextbox.md) and [`RichTextBox`](richtextbox.md) build on this control; [`SearchBox`](searchbox.md), [`ComboBox`](combobox.md) (editable style) and the spinners host one as their editor.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): the Win32 half of the multiline placeholder (GTK is done), the `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, and an undo API.
+- **Key preview.** A native text box previews its keys through the form's dialog-key chain over the `ITextBoxPeer.KeyDown` seam: Enter reaches the `AcceptButton`, Escape the `CancelButton`, Tab/Shift+Tab navigate, and menu shortcuts fire — unless `AcceptsReturn`/`AcceptsTab` keep the key for a multiline editor.
+- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): the Win32 half of the multiline placeholder (GTK is done), word-wrap control, and an undo API.
 
 ## Differences from System.Windows.Forms.TextBox
 
 - **`MaxLength` defaults to `0` = unlimited** — WinForms defaults to 32767. Same property name, different default and sentinel.
 - **No `Modified` flag, no undo** (`Undo`/`CanUndo`/`ClearUndo`), **no `ScrollBars`** (a multiline box always scrolls vertically), **no `Lines` array** and no `WordWrap` toggle.
-- `Select`/`SelectAll`/`Clear`/`AppendText` and the `Selection*` trio match WinForms; `AcceptsReturn`/`AcceptsTab` exist but are stored-only for now (see above).
+- `Select`/`SelectAll`/`Clear`/`AppendText` and the `Selection*` trio match WinForms; `AcceptsReturn`/`AcceptsTab` steer Enter/Tab through the peer key seam (see above).
