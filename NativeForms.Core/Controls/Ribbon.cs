@@ -56,7 +56,31 @@ public class Ribbon : OwnerDrawnControl
     /// <summary>How many small items stack into one column.</summary>
     private const int _SmallRowsPerColumn = 3;
 
+    /// <summary>How close together two presses on the same tab count as a double-click.</summary>
+    private const long _DoubleClickMs = 500;
+
+    /// <summary>How long after a minimize toggle a further tab press is swallowed — long enough to
+    /// eat the trailing <c>GDK_2BUTTON_PRESS</c> a real double-click delivers as an extra press,
+    /// short enough that a deliberate follow-up click still lands.</summary>
+    private const long _ToggleGuardMs = 60;
+
     private MenuDropDown? _dropDown;
+
+    /// <summary>The height to restore to when the ribbon is un-minimized, captured the moment it was
+    /// minimized so a plain container can re-flow the content below.</summary>
+    private int _expandedHeight;
+
+    private long _lastTabDownTicks;
+    private int _lastTabDownTab = -1;
+    private long _toggleGuardTicks;
+
+    private IPopupPeer? _flyoutPopup;
+    private bool _flyoutShown;
+
+    private IPopupPeer? _gridPopup;
+    private GridPickerCore? _gridCore;
+    private RibbonGridButton? _gridButton;
+    private Size _gridSize;
 
     /// <summary>The theme font every cached caption width was measured with; a different snapshot
     /// voids them all. Held once per ribbon rather than once per item, so two hundred buttons carry
@@ -130,10 +154,27 @@ public class Ribbon : OwnerDrawnControl
                 return;
 
             field = value;
+            this.CloseFlyout();
+
+            // Office folds the whole group area away: the control shrinks to just its tab strip,
+            // remembering the height to grow back to. There is no automatic layout owner here, so the
+            // honest contract is that the control changes its own height and raises
+            // PreferredHeightChanged; a plain container re-flows the content below off that.
+            if (value)
+            {
+                _expandedHeight = this.Height;
+                this.Height = this.TabStripHeight;
+            }
+            else if (_expandedHeight > 0)
+            {
+                this.Height = _expandedHeight;
+            }
+
             this.PerformLayout();
             this.PushHostedVisibility();
             this.Invalidate();
             this.MinimizedChanged?.Invoke(this, EventArgs.Empty);
+            this.PreferredHeightChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -143,11 +184,28 @@ public class Ribbon : OwnerDrawnControl
     /// <summary>Raised after <see cref="Minimized"/> changes.</summary>
     public event EventHandler? MinimizedChanged;
 
+    /// <summary>Raised after <see cref="PreferredHeight"/> changes because the ribbon was minimized or
+    /// restored, so a host can re-flow the content sitting below it.</summary>
+    public event EventHandler? PreferredHeightChanged;
+
     /// <summary>The pixel height of the tab strip along the top.</summary>
     public int TabStripHeight => this.Theme.RowHeight + _TabChrome;
 
+    /// <summary>
+    /// The height the ribbon wants to be: just the <see cref="TabStripHeight"/> while
+    /// <see cref="Minimized"/>, else the strip plus a full group area. Minimizing already shrinks the
+    /// control to it and raises <see cref="PreferredHeightChanged"/>; this getter lets a host read the
+    /// target directly.
+    /// </summary>
+    public int PreferredHeight => this.Minimized ? this.TabStripHeight : Math.Max(this.TabStripHeight, this.Height);
+
     /// <summary>The pixel height of the group area below the tab strip; zero while minimized.</summary>
     public int GroupAreaHeight => this.Minimized ? 0 : Math.Max(0, this.Height - this.TabStripHeight);
+
+    /// <summary>The group-area height the tab-click flyout paints — the height the ribbon had before
+    /// it was minimized, so the flyout shows exactly what the expanded ribbon would.</summary>
+    private int ExpandedGroupAreaHeight
+        => Math.Max(0, (_expandedHeight > 0 ? _expandedHeight : this.Height) - this.TabStripHeight);
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
@@ -347,9 +405,10 @@ public class Ribbon : OwnerDrawnControl
         return Math.Max(content, caption) + (2 * _GroupPadding);
     }
 
-    /// <summary>The height available to a group's items, above its caption strip.</summary>
-    private int GroupContentHeight()
-        => Math.Max(0, this.GroupAreaHeight - this.CaptionStripHeight() - (2 * _GroupPadding));
+    /// <summary>The height available to a group's items, above its caption strip, for a group area of
+    /// the given height.</summary>
+    private int GroupContentHeight(int areaHeight)
+        => Math.Max(0, areaHeight - this.CaptionStripHeight() - (2 * _GroupPadding));
 
     /// <summary>The height of the caption strip along a group's bottom edge.</summary>
     private int CaptionStripHeight() => Math.Max(12, this.Theme.RowHeight - 6);
@@ -392,7 +451,19 @@ public class Ribbon : OwnerDrawnControl
             return;
         }
 
-        var available = this.Width;
+        this.ArrangeGroupArea(tab, this.TabStripHeight, this.GroupAreaHeight, this.Width, placeHosted: true);
+    }
+
+    /// <summary>
+    /// Positions a tab's groups inside a group area of the given origin, height and width: decides
+    /// which fold into their drop-down button and assigns every group its rectangle. Shared by the
+    /// expanded ribbon (area below the strip, hosting live controls) and the minimized tab-click
+    /// flyout (area at the top of its popup, painting only the item glyphs). Idempotent and
+    /// allocation-free, so the layout pass and the paint path can both run it.
+    /// </summary>
+    private void ArrangeGroupArea(RibbonTab tab, int top, int areaHeight, int width, bool placeHosted)
+    {
+        var groups = tab.Groups;
         var total = 0;
         for (var g = 0; g < groups.Count; ++g)
         {
@@ -401,7 +472,7 @@ public class Ribbon : OwnerDrawnControl
         }
 
         // Office folds the rightmost groups first; each one that goes shrinks to the chevron button.
-        for (var g = groups.Count - 1; g >= 0 && total > available; --g)
+        for (var g = groups.Count - 1; g >= 0 && total > width; --g)
         {
             var natural = this.GroupWidth(groups[g]);
             if (natural <= _CollapsedGroupWidth)
@@ -411,26 +482,24 @@ public class Ribbon : OwnerDrawnControl
             total -= natural - _CollapsedGroupWidth;
         }
 
-        var areaHeight = this.GroupAreaHeight;
-        var top = this.TabStripHeight;
         var x = 0;
         for (var g = 0; g < groups.Count; ++g)
         {
             var group = groups[g];
-            var width = group.IsCollapsed ? _CollapsedGroupWidth : this.GroupWidth(group);
-            group.Bounds = new(x, top, width, areaHeight);
-            x += width + _GroupGap;
+            var groupWidth = group.IsCollapsed ? _CollapsedGroupWidth : this.GroupWidth(group);
+            group.Bounds = new(x, top, groupWidth, areaHeight);
+            x += groupWidth + _GroupGap;
 
-            if (!group.IsCollapsed)
-                this.PlaceHostedControls(group);
+            if (placeHosted && !group.IsCollapsed)
+                this.PlaceHostedControls(group, areaHeight);
         }
     }
 
     /// <summary>Gives every hosted control of a laid-out group its bounds and marks it placed.</summary>
-    private void PlaceHostedControls(RibbonGroup group)
+    private void PlaceHostedControls(RibbonGroup group, int areaHeight)
     {
         Span<int> slots = stackalloc int[_SmallRowsPerColumn];
-        var contentHeight = this.GroupContentHeight();
+        var contentHeight = this.GroupContentHeight(areaHeight);
         var rowHeight = contentHeight / _SmallRowsPerColumn;
         var cursor = 0;
         var x = group.Bounds.X + _GroupPadding;
@@ -492,6 +561,15 @@ public class Ribbon : OwnerDrawnControl
         base.OnUnrealized();
         _dropDown?.CloseAll();
         _dropDown = null;
+
+        _flyoutPopup?.Dispose();
+        _flyoutPopup = null;
+        _flyoutShown = false;
+
+        _gridPopup?.Dispose();
+        _gridPopup = null;
+        _gridCore = null;
+        _gridButton = null;
     }
 
     /// <summary>The lazily created drop-down engine a collapsed group opens into, with its owning
@@ -536,14 +614,15 @@ public class Ribbon : OwnerDrawnControl
         return -1;
     }
 
-    /// <summary>The index of the item within a group under a client point, or -1.</summary>
-    private int HitTestItem(RibbonGroup group, int x, int y)
+    /// <summary>The index of the item within a group under a client point, for a group area of the
+    /// given height, or -1.</summary>
+    private int HitTestItem(RibbonGroup group, int x, int y, int areaHeight)
     {
         if (group.IsCollapsed)
             return -1;
 
         Span<int> slots = stackalloc int[_SmallRowsPerColumn];
-        var contentHeight = this.GroupContentHeight();
+        var contentHeight = this.GroupContentHeight(areaHeight);
         var rowHeight = contentHeight / _SmallRowsPerColumn;
         var cursor = 0;
         var left = group.Bounds.X + _GroupPadding;
@@ -582,10 +661,7 @@ public class Ribbon : OwnerDrawnControl
 
         if (e.Y < this.TabStripHeight)
         {
-            var tab = this.HitTestTab(e.X);
-            if (tab >= 0)
-                this.SelectedIndex = tab;
-
+            this.HandleTabPress(e.X);
             return;
         }
 
@@ -600,7 +676,7 @@ public class Ribbon : OwnerDrawnControl
             return;
         }
 
-        var itemIndex = this.HitTestItem(group, e.X, e.Y);
+        var itemIndex = this.HitTestItem(group, e.X, e.Y, this.GroupAreaHeight);
         if (itemIndex < 0 || group.Items[itemIndex] is RibbonHostItem || !group.Items[itemIndex].Enabled)
             return;
 
@@ -623,7 +699,13 @@ public class Ribbon : OwnerDrawnControl
             return;
 
         var group = selected.Groups[pressedGroup];
-        if (this.HitTestGroup(e.X, e.Y) == pressedGroup && this.HitTestItem(group, e.X, e.Y) == pressedItem)
+        if (this.HitTestGroup(e.X, e.Y) != pressedGroup || this.HitTestItem(group, e.X, e.Y, this.GroupAreaHeight) != pressedItem)
+            return;
+
+        // A grid button opens its Table picker in a popup under the group; everything else clicks.
+        if (group.Items[pressedItem] is RibbonGridButton gridButton)
+            this.OpenGridPicker(gridButton, group);
+        else
             group.Items[pressedItem].PerformClick();
     }
 
@@ -633,7 +715,7 @@ public class Ribbon : OwnerDrawnControl
         var tab = e.Y < this.TabStripHeight ? this.HitTestTab(e.X) : -1;
         var groupIndex = this.HitTestGroup(e.X, e.Y);
         var itemIndex = groupIndex >= 0 && this.SelectedTab is { } selected
-            ? this.HitTestItem(selected.Groups[groupIndex], e.X, e.Y)
+            ? this.HitTestItem(selected.Groups[groupIndex], e.X, e.Y, this.GroupAreaHeight)
             : -1;
 
         if (tab == _hotTab && groupIndex == _hotGroup && itemIndex == _hotItem)
@@ -696,6 +778,249 @@ public class Ribbon : OwnerDrawnControl
         this.Engine.Open(group.Items, this.PointToScreen(new(group.Bounds.X, group.Bounds.Bottom)));
     }
 
+    /// <summary>
+    /// Reacts to a press on the tab strip: a double press on the same tab toggles
+    /// <see cref="Minimized"/> (Office behaviour), a single press selects the tab and — while
+    /// minimized — opens or swaps the tab-click flyout, or closes it when the active tab is pressed
+    /// again.
+    /// </summary>
+    private void HandleTabPress(int x)
+    {
+        var tab = this.HitTestTab(x);
+        if (tab < 0)
+            return;
+
+        var now = Environment.TickCount64;
+
+        // Swallow the trailing GDK_2BUTTON_PRESS a real double-click delivers as an extra press, so a
+        // double-click that minimized the ribbon does not immediately re-open a flyout.
+        if (now - _toggleGuardTicks < _ToggleGuardMs)
+            return;
+
+        if (tab == _lastTabDownTab && now - _lastTabDownTicks <= _DoubleClickMs)
+        {
+            _lastTabDownTab = -1;
+            _lastTabDownTicks = 0;
+            _toggleGuardTicks = now;
+            this.Minimized = !this.Minimized;
+            return;
+        }
+
+        _lastTabDownTicks = now;
+        _lastTabDownTab = tab;
+
+        if (!this.Minimized)
+        {
+            this.SelectedIndex = tab;
+            return;
+        }
+
+        if (_flyoutShown && tab == _selectedIndex)
+        {
+            this.CloseFlyout();
+            return;
+        }
+
+        this.SelectedIndex = tab;
+        this.OpenFlyout();
+    }
+
+    // --- The tab-click flyout ---------------------------------------------------------------------
+
+    /// <summary>Opens (or, when already up, repaints for the newly selected tab) the transient flyout
+    /// that shows the selected tab's groups directly under the strip while the ribbon is minimized.</summary>
+    private void OpenFlyout()
+    {
+        if (this.Backend is null || this.SelectedTab is null)
+            return;
+
+        var areaHeight = this.ExpandedGroupAreaHeight;
+        if (areaHeight <= 0)
+            return;
+
+        if (_flyoutShown)
+        {
+            _flyoutPopup?.InvalidateAll();
+            return;
+        }
+
+        var popup = _flyoutPopup ??= this.CreateFlyoutPopup();
+        _flyoutShown = true;
+        this.OwnsOpenPopup = true;
+        _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
+        popup.ShowAt(this.PointToScreen(new Point(0, this.TabStripHeight)), new Size(this.Width, areaHeight));
+    }
+
+    /// <summary>Takes the flyout down and clears the hover/press it tracked. A no-op while closed.</summary>
+    private void CloseFlyout()
+    {
+        if (!_flyoutShown)
+            return;
+
+        _flyoutShown = false;
+        this.OwnsOpenPopup = false;
+        _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
+        _flyoutPopup?.Hide();
+        this.Invalidate();
+    }
+
+    /// <summary>Builds the flyout's popup surface and wires its paint and input once.</summary>
+    private IPopupPeer CreateFlyoutPopup()
+    {
+        var popup = this.Backend!.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => this.PaintFlyout(e.Graphics);
+        popup.MouseMove += (_, e) => this.OnFlyoutMouseMove(e);
+        popup.MouseDown += (_, e) => this.OnFlyoutMouseDown(e);
+        popup.KeyDown += (_, e) => // backends with a keyboard grab route keys here
+        {
+            if (e.KeyCode is not Keys.Escape)
+                return;
+
+            this.CloseFlyout();
+            e.Handled = true;
+        };
+        popup.Dismissed += (_, _) => this.CloseFlyout();
+        return popup;
+    }
+
+    /// <summary>Lays out the selected tab's groups at the top of the flyout (allocation-free, so a
+    /// paint and a hit test cannot disagree) and returns them with the flyout's group-area height.</summary>
+    private RibbonTab? ArrangeFlyout(out int areaHeight)
+    {
+        areaHeight = this.ExpandedGroupAreaHeight;
+        if (this.SelectedTab is not { } tab)
+            return null;
+
+        this.ArrangeGroupArea(tab, 0, areaHeight, this.Width, placeHosted: false);
+        return tab;
+    }
+
+    /// <summary>Highlights the flyout row under the pointer.</summary>
+    private void OnFlyoutMouseMove(MouseEventArgs e)
+    {
+        if (this.ArrangeFlyout(out var areaHeight) is not { } tab)
+            return;
+
+        var groupIndex = this.FlyoutHitGroup(tab, e.X, e.Y);
+        var itemIndex = groupIndex >= 0 ? this.HitTestItem(tab.Groups[groupIndex], e.X, e.Y, areaHeight) : -1;
+        if (groupIndex == _hotGroup && itemIndex == _hotItem)
+            return;
+
+        _hotGroup = groupIndex;
+        _hotItem = itemIndex;
+        _flyoutPopup?.InvalidateAll();
+    }
+
+    /// <summary>A click inside the flyout activates the item under it and closes the flyout.</summary>
+    private void OnFlyoutMouseDown(MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left || this.ArrangeFlyout(out var areaHeight) is not { } tab)
+            return;
+
+        var groupIndex = this.FlyoutHitGroup(tab, e.X, e.Y);
+        if (groupIndex < 0)
+            return;
+
+        var group = tab.Groups[groupIndex];
+        var itemIndex = this.HitTestItem(group, e.X, e.Y, areaHeight);
+        if (itemIndex < 0 || group.Items[itemIndex] is RibbonHostItem || !group.Items[itemIndex].Enabled)
+            return;
+
+        var item = group.Items[itemIndex];
+        this.CloseFlyout();
+        if (item is not RibbonGridButton)
+            item.PerformClick();
+    }
+
+    /// <summary>The flyout group under a client point, or -1.</summary>
+    private int FlyoutHitGroup(RibbonTab tab, int x, int y)
+    {
+        for (var g = 0; g < tab.Groups.Count; ++g)
+            if (tab.Groups[g].Bounds.Contains(x, y))
+                return g;
+
+        return -1;
+    }
+
+    /// <summary>Paints the flyout: the selected tab's group area, exactly as the expanded ribbon draws
+    /// it, at the top of the popup.</summary>
+    private void PaintFlyout(IGraphics g)
+    {
+        var theme = this.Theme;
+        if (this.ArrangeFlyout(out var areaHeight) is not { } tab)
+            return;
+
+        var size = new Size(this.Width, areaHeight);
+        g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, size.Width, size.Height));
+
+        var contentHeight = this.GroupContentHeight(areaHeight);
+        var captionHeight = this.CaptionStripHeight();
+        for (var i = 0; i < tab.Groups.Count; ++i)
+            this.PaintGroup(g, theme, tab.Groups[i], i, contentHeight, captionHeight);
+
+        g.DrawRectangle(theme.Border, new Rectangle(0, 0, size.Width - 1, size.Height - 1));
+    }
+
+    // --- The Table grid picker --------------------------------------------------------------------
+
+    /// <summary>Opens a <see cref="GridPickerCore"/> in a popup under a grid button's group, and
+    /// reports the chosen dimensions back through the button.</summary>
+    private void OpenGridPicker(RibbonGridButton button, RibbonGroup group)
+    {
+        if (this.Backend is null)
+            return;
+
+        var popup = this.EnsureGridPopup();
+        _gridButton = button;
+        _gridCore!.MaxColumns = button.MaxColumns;
+        _gridCore.MaxRows = button.MaxRows;
+        _gridCore.ClearHover();
+        _gridSize = _gridCore.PreferredSize(this.Theme);
+        this.OwnsOpenPopup = true;
+        popup.ShowAt(this.PointToScreen(new Point(group.Bounds.X, group.Bounds.Bottom)), _gridSize);
+    }
+
+    /// <summary>Builds the grid picker's popup surface and its shared engine once.</summary>
+    private IPopupPeer EnsureGridPopup()
+    {
+        if (_gridPopup is { } existing)
+            return existing;
+
+        var core = _gridCore = new GridPickerCore
+        {
+            Invalidated = () => _gridPopup?.InvalidateAll(),
+            RangeSelected = this.OnGridRangeSelected,
+            Canceled = this.CloseGridPicker,
+        };
+
+        var popup = _gridPopup = this.Backend!.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => core.Paint(e.Graphics, this.Theme, _gridSize);
+        popup.MouseMove += (_, e) => core.HandleMouseMove(this.Theme, _gridSize, e);
+        popup.MouseDown += (_, e) => core.HandleMouseDown(this.Theme, _gridSize, e);
+        popup.KeyDown += (_, e) => core.HandleKeyDown(e); // backends with a keyboard grab route keys here
+        popup.Dismissed += (_, _) => this.CloseGridPicker();
+        return popup;
+    }
+
+    /// <summary>Commits a picked table: closes the popup, then fires the button's event.</summary>
+    private void OnGridRangeSelected(int rows, int columns)
+    {
+        var button = _gridButton;
+        this.CloseGridPicker();
+        button?.RaiseRangeSelected(rows, columns);
+    }
+
+    /// <summary>Takes the grid picker down. A no-op while it is closed.</summary>
+    private void CloseGridPicker()
+    {
+        if (_gridButton is null)
+            return;
+
+        _gridButton = null;
+        this.OwnsOpenPopup = false;
+        _gridPopup?.Hide();
+    }
+
     // --- Painting ---------------------------------------------------------------------------------
 
     /// <inheritdoc/>
@@ -719,7 +1044,7 @@ public class Ribbon : OwnerDrawnControl
         // final. It is idempotent and allocates nothing, so running it here costs only arithmetic.
         this.ArrangeGroups();
 
-        var contentHeight = this.GroupContentHeight();
+        var contentHeight = this.GroupContentHeight(this.GroupAreaHeight);
         var captionHeight = this.CaptionStripHeight();
         for (var i = 0; i < tab.Groups.Count; ++i)
             this.PaintGroup(g, theme, tab.Groups[i], i, contentHeight, captionHeight);

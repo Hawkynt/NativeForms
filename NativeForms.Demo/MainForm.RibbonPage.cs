@@ -63,16 +63,18 @@ internal sealed partial class MainForm
         home.Groups.AddRange(clipboard, font, styles);
 
         var insert = new RibbonTab("Insert");
-        var tables = new RibbonGroup("Tables") { ImageIndex = _IconFile };
-        var table = new RibbonButton("Table") { ImageList = _icons, ImageIndex = _IconFile };
-        table.Click += (_, _) => this.SetStatus("Ribbon: Table clicked.");
-        tables.Items.Add(table);
         var illustrations = new RibbonGroup("Illustrations") { ImageIndex = _IconBlue };
+        var picture = new RibbonButton("Picture") { ImageList = _icons, ImageIndex = _IconBlue };
+        picture.Click += (_, _) => this.SetStatus("Ribbon: Picture clicked.");
         illustrations.Items.AddRange(
-            new RibbonButton("Picture") { ImageList = _icons, ImageIndex = _IconBlue },
+            picture,
             new RibbonButton("Chart", RibbonItemSize.Small) { ImageList = _icons, ImageIndex = _IconGreen },
             new RibbonButton("Shape", RibbonItemSize.Small) { ImageList = _icons, ImageIndex = _IconRed });
-        insert.Groups.AddRange(tables, illustrations);
+        var tables = new RibbonGroup("Tables") { ImageIndex = _IconFile };
+        var table = new RibbonGridButton("Table") { ImageList = _icons, ImageIndex = _IconFile, MaxColumns = 10, MaxRows = 8 };
+        table.RangeSelected += (_, e) => this.SetStatus($"Ribbon: insert {e.Columns} × {e.Rows} table.");
+        tables.Items.Add(table);
+        insert.Groups.AddRange(illustrations, tables);
 
         var view = new RibbonTab("View");
         var zoom = new RibbonGroup("Zoom") { ImageIndex = _IconGear };
@@ -129,6 +131,9 @@ internal sealed partial class MainForm
         var minimize = new CheckBox { Bounds = new(340, 214, 240, 20), Text = "Minimize the ribbon" };
         minimize.CheckedChanged += (_, _) => ribbon.Minimized = minimize.Checked;
 
+        // Keep the switch and the double-click gesture in step: minimizing either way ticks the box.
+        ribbon.MinimizedChanged += (_, _) => minimize.Checked = ribbon.Minimized;
+
         // Wide enough for the caption plus the check square once GTK measures it in the real font;
         // the layout audit fails a box that would elide its own text.
         var multiple = new CheckBox { Bounds = new(340, 240, 280, 20), Text = "Accordion: allow several open" };
@@ -142,14 +147,45 @@ internal sealed partial class MainForm
             this.SetStatus($"Ribbon: width is {ribbon.Width} px — groups collapse as it shrinks.");
         };
 
+        // A standalone GridPicker: the same reusable control the ribbon's Table button pops up, here
+        // dropped straight onto the page to show it composes anywhere.
+        var gridCaption = Caption("Grid picker (reusable table chooser)", 340, 308, 280);
+        var gridPicker = new GridPicker { Bounds = new(340, 332, 120, 128), MaxColumns = 6, MaxRows = 5 };
+        gridPicker.RangeSelected += (_, e) => this.SetStatus($"Grid: insert {e.Columns} × {e.Rows} table.");
+
+        var accordionCaption = Caption("Accordion (Outlook-style navigation pane)", 16, 186, 380);
+
         page.Controls.AddRange(
-            Caption("Ribbon (tabs → groups → large and small items)", 16, 12, 420),
+            Caption("Ribbon (tabs → groups → items; double-click a tab to minimize)", 16, 12, 520),
             ribbon,
-            Caption("Accordion (Outlook-style navigation pane)", 16, 186, 380),
+            accordionCaption,
             accordion,
             minimize,
             multiple,
-            narrow);
+            narrow,
+            gridCaption,
+            gridPicker);
+
+        // The ribbon has no automatic layout owner, so minimizing it — which shrinks it to just its
+        // tab strip — re-flows the content below by hand off PreferredHeightChanged, the honest
+        // contract for a plain container.
+        var baseRibbonHeight = ribbon.Height;
+        (Control Control, int Top)[] below =
+        [
+            (accordionCaption, accordionCaption.Top),
+            (accordion, accordion.Top),
+            (minimize, minimize.Top),
+            (multiple, multiple.Top),
+            (narrow, narrow.Top),
+            (gridCaption, gridCaption.Top),
+            (gridPicker, gridPicker.Top),
+        ];
+        ribbon.PreferredHeightChanged += (_, _) =>
+        {
+            var delta = ribbon.Height - baseRibbonHeight;
+            foreach (var (control, top) in below)
+                control.Top = top + delta;
+        };
 
         // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
         var ribbonTab = ribbon.SelectedIndex;
@@ -185,6 +221,9 @@ internal sealed partial class MainForm
         this.Publish("ribbon.minimize", minimize);
         this.Publish("ribbon.multiple", multiple);
         this.Publish("ribbon.narrow", narrow);
+        this.Publish("ribbon.table", table);
+        this.Publish("ribbon.picture", picture);
+        this.Publish("ribbon.gridPicker", gridPicker);
         this.Publish("ribbon.mailPane", mail);
         this.Publish("ribbon.calendarPane", calendar);
         this.Publish("ribbon.contactsPane", contacts);

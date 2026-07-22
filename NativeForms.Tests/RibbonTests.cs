@@ -404,6 +404,146 @@ internal sealed class RibbonTests
     }
 
     [Test]
+    public void Minimizing_shrinks_the_control_to_the_tab_strip_and_restores_it()
+    {
+        var ribbon = HomeAndInsert(out _, out _, out _);
+        Realize(ribbon, out _);
+        var heights = new List<int>();
+        ribbon.PreferredHeightChanged += (_, _) => heights.Add(ribbon.PreferredHeight);
+
+        ribbon.Minimized = true;
+        Assert.Multiple(() =>
+        {
+            Assert.That(ribbon.Height, Is.EqualTo(_TabStrip), "the control collapses onto its strip");
+            Assert.That(ribbon.PreferredHeight, Is.EqualTo(_TabStrip));
+        });
+
+        ribbon.Minimized = false;
+        Assert.Multiple(() =>
+        {
+            Assert.That(ribbon.Height, Is.EqualTo(120), "and grows back to the height it was minimized from");
+            Assert.That(ribbon.PreferredHeight, Is.EqualTo(120));
+            Assert.That(heights, Is.EqualTo(new[] { _TabStrip, 120 }), "each toggle announces the new preferred height");
+        });
+    }
+
+    [Test]
+    public void Double_clicking_a_tab_toggles_minimized()
+    {
+        var ribbon = HomeAndInsert(out _, out _, out _);
+        var canvas = Realize(ribbon, out _);
+
+        // Two quick presses on the same tab header read as a double-click.
+        canvas.RaiseMouseDown(20, _TabStrip / 2);
+        canvas.RaiseMouseDown(20, _TabStrip / 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ribbon.Minimized, Is.True);
+            Assert.That(ribbon.Height, Is.EqualTo(_TabStrip));
+        });
+    }
+
+    [Test]
+    public void Double_clicking_a_tab_while_minimized_restores_it()
+    {
+        var ribbon = HomeAndInsert(out _, out _, out _);
+        var canvas = Realize(ribbon, out _);
+        ribbon.Minimized = true;
+
+        canvas.RaiseMouseDown(20, _TabStrip / 2);
+        canvas.RaiseMouseDown(20, _TabStrip / 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ribbon.Minimized, Is.False);
+            Assert.That(ribbon.Height, Is.EqualTo(120));
+        });
+    }
+
+    [Test]
+    public void A_tab_click_while_minimized_opens_a_flyout_under_the_strip()
+    {
+        var ribbon = HomeAndInsert(out _, out _, out _);
+        var canvas = Realize(ribbon, out var backend);
+        ribbon.Minimized = true;
+
+        // A single press on the Insert header selects it and floats its groups under the strip.
+        canvas.RaiseMouseDown(60, _TabStrip / 2);
+
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(ribbon.SelectedIndex, Is.EqualTo(1));
+            Assert.That(popup.IsShown, Is.True);
+            Assert.That(popup.ShowCalls.Single().Location, Is.EqualTo(new Point(0, _TabStrip)), "anchored right under the strip");
+            Assert.That(popup.ShowCalls.Single().Size, Is.EqualTo(new Size(600, 120 - _TabStrip)), "full width, a whole group area tall");
+        });
+    }
+
+    [Test]
+    public void Activating_an_item_in_the_flyout_fires_it_and_closes_the_flyout()
+    {
+        var ribbon = HomeAndInsert(out _, out _, out var insert);
+        var canvas = Realize(ribbon, out var backend);
+        var fired = 0;
+        insert.Groups[0].Items[0].Click += (_, _) => ++fired;
+
+        ribbon.Minimized = true;
+        canvas.RaiseMouseDown(60, _TabStrip / 2); // select Insert, open its flyout
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        // The large "Table" item fills the first column of the only group.
+        popup.RaiseMouseDown(20, _ContentHeight / 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fired, Is.EqualTo(1), "the flyout item runs");
+            Assert.That(popup.IsShown, Is.False, "and the flyout closes behind it");
+        });
+    }
+
+    [Test]
+    public void A_dismissed_flyout_closes_without_firing_anything()
+    {
+        var ribbon = HomeAndInsert(out _, out _, out _);
+        var canvas = Realize(ribbon, out var backend);
+        ribbon.Minimized = true;
+        canvas.RaiseMouseDown(60, _TabStrip / 2);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.FireDismiss();
+
+        Assert.That(popup.IsShown, Is.False);
+    }
+
+    [Test]
+    public void A_ribbon_grid_button_opens_a_picker_and_reports_the_chosen_size()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        var home = new RibbonTab("Home");
+        var group = new RibbonGroup("Tables");
+        var table = new RibbonGridButton("Table") { MaxColumns = 10, MaxRows = 8 };
+        group.Items.Add(table);
+        home.Groups.Add(group);
+        ribbon.Tabs.Add(home);
+        var canvas = Realize(ribbon, out var backend);
+        var committed = default((int Rows, int Columns)?);
+        table.RangeSelected += (_, e) => committed = (e.Rows, e.Columns);
+
+        // Click the large Table button; a grid popup opens under its group.
+        canvas.RaiseMouseDown(20, _GroupTop + 4 + (_ContentHeight / 2));
+        canvas.RaiseMouseUp(20, _GroupTop + 4 + (_ContentHeight / 2));
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        Assert.That(popup.IsShown, Is.True);
+
+        // Grid cell (column 2, row 1): centres at 6 + (n-1)*18 + 9.
+        popup.RaiseMouseDown(6 + 18 + 9, 6 + 9);
+
+        Assert.That(committed, Is.EqualTo((1, 2)));
+    }
+
+    [Test]
     public void Removing_a_tab_drops_its_hosted_controls_and_moves_the_selection()
     {
         var ribbon = HomeAndInsert(out _, out _, out var insert);

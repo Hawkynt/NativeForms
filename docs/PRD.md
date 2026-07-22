@@ -490,10 +490,21 @@ strategy (may differ per platform; note exceptions inline).
       full group height) and `Small` items stacked three per column; `RibbonButton`,
       `RibbonToggleButton` and `RibbonHostItem` (hosts a real `Control`), all deriving from
       `ToolStripItem` so `ICommand` wiring and mnemonics come for free; group overflow collapsing
-      right-to-left into a `MenuDropDown` button, `Minimized` state, keyboard tab switching, and
-      per-ribbon font-keyed width caches
+      right-to-left into a `MenuDropDown` button, keyboard tab switching, and per-ribbon font-keyed
+      width caches
+  - [x] `Minimized` collapses the ribbon onto its tab strip (the control shrinks its own `Height` and
+        raises `PreferredHeightChanged` so a plain container re-flows the content below); double-click
+        a tab toggles it; while minimized a tab click floats that tab's groups as a transient
+        light-dismiss flyout (reusing the `IPopupPeer` engine) anchored under the strip
+  - [x] `RibbonGridButton` + `GridPicker` (owner) — Office-style table-size chooser: a themed cell
+        grid, an accent-highlighted hovered `Rows`×`Columns` block, a live "C × R Table" caption,
+        `RangeSelected`, keyboard navigation (arrows/Enter/Escape), zero per-frame paint allocation;
+        the button opens the picker in a popup under itself, and the picker is reusable standalone
+        through one shared `GridPickerCore`
   - [ ] Two-line caption wrapping on large items; Quick Access Toolbar, contextual tab groups and
-        KeyTips (a `MenuStrip` above the ribbon covers the application-menu case)
+        KeyTips (a `MenuStrip` above the ribbon covers the application-menu case); the tab-click
+        flyout shows only item glyphs, not re-parented hosted controls; the grid picker does not grow
+        past its `MaxColumns`/`MaxRows`
 - [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 - [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`
@@ -677,7 +688,8 @@ same commit. `—` = not applicable.
 | `SplitContainer` | ✔ | ✔ | [controls/splitcontainer.md](controls/splitcontainer.md) |
 | `Expander` | ✔ | ✔ | [controls/expander.md](controls/expander.md) |
 | `Accordion` / `AccordionPane` | ✔ | ✔ | [controls/accordion.md](controls/accordion.md) |
-| `Ribbon` (tabs, groups, item model, overflow) | ✔ | ✔ | [controls/ribbon.md](controls/ribbon.md) |
+| `Ribbon` (tabs, groups, item model, overflow, minimize-to-strip + tab flyout) | ✔ | ✔ | [controls/ribbon.md](controls/ribbon.md) |
+| `GridPicker` / `RibbonGridButton` (Office table-size chooser) | ✔ | ✔ | [controls/gridpicker.md](controls/gridpicker.md) |
 | `FlowLayoutPanel` | ✔ | ✔ | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md) |
 | `TableLayoutPanel` | ✔ | ✔ | [controls/tablelayoutpanel.md](controls/tablelayoutpanel.md) |
 | `ListBox` (selection modes, icons) | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |

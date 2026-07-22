@@ -80,6 +80,16 @@ internal sealed class AllocationBudgetTests
         Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
     }
 
+    [Test]
+    public void GridPicker_construction_stays_within_the_owner_drawn_budget()
+    {
+        // The whole state is the shared grid engine and the three callback delegates wiring it back —
+        // no collection, no hosted editor — so it must sit inside the single-surface budget.
+        var perControl = PerInstance(static () => new GridPicker());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
     /// <summary>
     /// §4's second tier. A control that hosts a native editor inside an owner-drawn shell pays for
     /// three things a plain owner-drawn control does not: the child <see cref="TextBox"/> (~296 B on

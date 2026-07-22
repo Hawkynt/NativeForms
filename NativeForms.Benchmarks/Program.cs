@@ -59,6 +59,7 @@ internal static class Program
         Construct("FolderPicker", static () => new FolderPicker(), _CompositeConstructionBudget);
         Construct("Accordion", static () => new Accordion(), _OwnerDrawnConstructionBudget);
         Construct("Ribbon", static () => new Ribbon(), _OwnerDrawnConstructionBudget);
+        Construct("GridPicker", static () => new GridPicker(), _OwnerDrawnConstructionBudget);
 
         // Item models carry no peer, so they have no §4 control budget — but a ribbon is made of
         // hundreds of them, so their per-instance cost is tracked all the same.
@@ -93,6 +94,7 @@ internal static class Program
         PaintThroughput("FilePicker", MakeFilePicker());
         PaintThroughput("Accordion", MakeAccordion());
         PaintThroughput("Ribbon", MakeRibbon());
+        PaintThroughput("GridPicker", MakeGridPicker());
 
         // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
         ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
@@ -379,6 +381,14 @@ internal static class Program
         }
 
         return ribbon;
+    }
+
+    /// <summary>A table-size picker with a live "C × R" caption, so the caption cache is exercised.</summary>
+    private static GridPicker MakeGridPicker()
+    {
+        var picker = new GridPicker { Bounds = new(0, 0, 200, 200), MaxColumns = 8, MaxRows = 6 };
+        picker.SetSelection(3, 4);
+        return picker;
     }
 
     private static DataGridView MakeDataGridView(int rows)

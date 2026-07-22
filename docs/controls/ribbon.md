@@ -3,7 +3,8 @@
 > An Office-style ribbon: tabs across the top, each showing its groups side by side — every group a
 > framed box with its caption along the bottom edge. Items come large (big icon over the caption,
 > full group height) or small (three stacked per column). Groups that no longer fit collapse into a
-> drop-down button; `Minimized` folds the group area away entirely.
+> drop-down button; `Minimized` collapses the ribbon onto its tab strip and a tab click then floats
+> that tab's groups as a transient flyout. A `RibbonGridButton` opens an Office-style table picker.
 
 `Hawkynt.NativeForms.Ribbon` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
@@ -39,6 +40,20 @@ var styles = new RibbonGroup("Styles");
 styles.Items.Add(new RibbonHostItem(styleComboBox) { HostWidth = 140 });
 ```
 
+A `RibbonGridButton` opens an Office-style table-size [`GridPicker`](gridpicker.md) under itself:
+
+```csharp
+var table = new RibbonGridButton("Table") { MaxColumns = 10, MaxRows = 8 };
+table.RangeSelected += (_, e) => InsertTable(e.Rows, e.Columns);
+tables.Items.Add(table);
+```
+
+The ribbon has no automatic layout owner, so re-flow the content below when it minimizes:
+
+```csharp
+ribbon.PreferredHeightChanged += (_, _) => LayoutContentBelow(ribbon.Bottom);
+```
+
 ## API
 
 ### Ribbon properties
@@ -49,9 +64,10 @@ styles.Items.Add(new RibbonHostItem(styleComboBox) { HostWidth = 140 });
 | `ImageList` | `ImageList?` | `null` | The icons the groups' and items' image indices point into. |
 | `SelectedIndex` | `int` | `-1` | Index of the selected tab, `-1` while there are no tabs. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `RibbonTab?` | `null` | The selected tab; setting selects by `IndexOf`. |
-| `Minimized` | `bool` | `false` | Folds the group area away, leaving the tab strip. Hosted controls go with it; the tabs stay clickable. |
+| `Minimized` | `bool` | `false` | Collapses the ribbon onto its tab strip — the control shrinks its own `Height` to `TabStripHeight` (remembering the expanded height to restore) so a plain container re-flows the content below. Hosted controls go with it; the tabs stay clickable and open a flyout. |
 | `TabStripHeight` | `int` (get) | theme row height + 4 | Pixel height of the tab strip. |
 | `GroupAreaHeight` | `int` (get) | remaining height | Pixel height of the group area; `0` while minimized. |
+| `PreferredHeight` | `int` (get) | `Height` | The height the ribbon wants: `TabStripHeight` while minimized, else the strip plus a full group area. Minimizing already shrinks the control to it. |
 
 ### Ribbon events
 
@@ -59,6 +75,7 @@ styles.Items.Add(new RibbonHostItem(styleComboBox) { HostWidth = 140 });
 |---|---|
 | `SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
 | `MinimizedChanged` | Raised after `Minimized` changes. |
+| `PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, so a host can re-flow the content below it. |
 
 ### RibbonTab
 
@@ -98,6 +115,7 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
 | `RibbonButton` | Nothing — a push button. Constructors: `()`, `(string text)`, `(string text, RibbonItemSize size)`. |
 | `RibbonToggleButton` | `Checked` (`bool`) and `CheckedChanged`; a click flips `Checked` and the ribbon paints it held down. Same constructors. |
 | `RibbonHostItem` | `Control` (the hosted control) and `HostWidth` (`int`, default `120`). Constructor: `(Control control)`; defaults to `Small`. |
+| `RibbonGridButton` | `MaxColumns` (`int`, default `10`), `MaxRows` (`int`, default `8`) and `RangeSelected` (`EventHandler<GridRangeEventArgs>`). A click opens a [`GridPicker`](gridpicker.md) in a popup under the button instead of firing a plain click; `RangeSelected` reports the chosen `Rows`×`Columns`. Same constructors as `RibbonButton`. |
 
 ### RibbonItemSize
 
@@ -122,6 +140,16 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
   Office-style — into a fixed-width drop-down button that opens that group's items as a popup menu
   through the shared `MenuDropDown` engine. Widening the ribbon unfolds them again. Because the
   items are `ToolStripItem`s, no translation layer is needed to show them in a menu.
+- **Minimize.** `Minimized` collapses the ribbon onto its tab strip: the control shrinks its own
+  `Height` to `TabStripHeight`, remembers the height to restore, and raises `PreferredHeightChanged`
+  so a plain container can lift the content below (there is no automatic layout owner). Restoring
+  grows it back. Double-clicking a tab toggles `Minimized`.
+- **Tab-click flyout.** While minimized, clicking a tab floats that tab's groups as a transient
+  flyout — a light-dismiss popup (the same `IPopupPeer` engine the menus and drop-downs use)
+  anchored directly under the strip, full ribbon width, painting exactly the group area the expanded
+  ribbon would. It dismisses on an outside click, on Escape, and once an item inside it is activated;
+  selecting a different tab swaps it. Hosted controls are not re-parented into the flyout, so only
+  their item glyphs would show — the flyout is a button surface.
 - **Keyboard** (the control is focusable): Left/Right move the tab selection without wrapping,
   Ctrl+Tab / Ctrl+Shift+Tab cycle with wraparound.
 - **Measurement is cached.** Every caption width is cached and dropped only when the caption changes
@@ -140,5 +168,6 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
 - **No Quick Access Toolbar, no application (File) menu, no contextual tab groups, no KeyTips.**
   A `MenuStrip` above the ribbon covers the application-menu case.
 - **Collapse order is right-to-left**, not priority-driven — there is no per-group priority.
-- **`Minimized` is a property, not a gesture.** Double-clicking a tab does not toggle it; wire that
-  to whatever affordance the app wants.
+- **No auto-layout owner.** Minimizing changes the ribbon's own height and raises
+  `PreferredHeightChanged`; a host re-flows the content below off that, rather than the ribbon
+  pushing a docked layout the way the WinForms `ToolStripContainer` does.

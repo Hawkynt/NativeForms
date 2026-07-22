@@ -160,6 +160,64 @@ internal sealed class PaintAllocationTests
     }
 
     [Test]
+    public void GridPicker_steady_state_repaint_allocates_nothing()
+    {
+        // Hover a cell first so the dynamic "C × R Table" caption is live: a regression that formatted
+        // it per frame rather than caching it on the hover change would show up here.
+        var picker = new GridPicker { Bounds = new(0, 0, 200, 200), MaxColumns = 8, MaxRows = 6 };
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 320, 320) };
+        form.Controls.Add(picker);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.RaiseMouseMove(6 + (2 * 18) + 9, 6 + 18 + 9); // hover a 3×2 block
+
+        var graphics = new NullGraphics();
+        for (var pass = 0; pass < 2; ++pass)
+            canvas.RaisePaint(graphics);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < _Frames; ++i)
+            canvas.RaisePaint(graphics);
+
+        Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
+    }
+
+    [Test]
+    public void Flyout_ribbon_steady_state_repaint_allocates_nothing()
+    {
+        // The minimized tab-click flyout paints the group area onto a popup surface. Open it, then
+        // sweep the popup like a hover-repaint storm would — the flyout paint must allocate nothing.
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        var home = new RibbonTab("Home");
+        var clipboard = new RibbonGroup("Clipboard");
+        clipboard.Items.AddRange(
+            new RibbonButton("Paste"),
+            new RibbonButton("Cut", RibbonItemSize.Small),
+            new RibbonButton("Copy", RibbonItemSize.Small));
+        home.Groups.Add(clipboard);
+        ribbon.Tabs.AddRange(home, new RibbonTab("Insert"));
+
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 640, 480) };
+        form.Controls.Add(ribbon);
+        Application.Run(form, backend);
+        ribbon.Minimized = true;
+        backend.Created.OfType<HeadlessCanvasPeer>().First().RaiseMouseDown(20, 12); // open the flyout
+
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        var graphics = new NullGraphics();
+        for (var pass = 0; pass < 2; ++pass)
+            popup.RaisePaint(graphics);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < _Frames; ++i)
+            popup.RaisePaint(graphics);
+
+        Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
+    }
+
+    [Test]
     public void ComboBox_steady_state_repaint_allocates_nothing()
     {
         var combo = new ComboBox { Bounds = new(0, 0, 140, 24) };

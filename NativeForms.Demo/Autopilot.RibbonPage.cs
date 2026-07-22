@@ -91,26 +91,104 @@ internal sealed partial class Autopilot
             this.ExpectTrue("the hosted combo box should come back too", this.Read(() => combo.Visible));
         });
 
-        this.Check("Ribbon: minimizing folds the group area away and keeps the tabs", () =>
+        this.Check("Ribbon: minimizing collapses it onto the strip and lifts the content below", () =>
         {
             var minimize = _form.Part<CheckBox>("ribbon.minimize");
             var combo = _form.Part<ComboBox>("ribbon.styleCombo");
+            var accordionTop = this.Read(() => accordion.Top);
+            var strip = this.Read(() => ribbon.TabStripHeight);
 
+            this.Do(() => ribbon.SelectedIndex = 0);
             this.Click(minimize, 8, 10);
             this.Expect("the group area height while minimized", this.Read(() => ribbon.GroupAreaHeight), 0);
+            this.Expect("the ribbon collapses to just its strip", this.Read(() => ribbon.Height), strip);
             this.ExpectTrue("a minimized ribbon must hide its hosted controls", !this.Read(() => combo.Visible));
-
-            // The tab strip stays live: a header click still switches tabs.
-            this.Click(ribbon, 80, this.Read(() => ribbon.TabStripHeight) / 2);
-            this.Expect("the selected tab while minimized", this.Read(() => ribbon.SelectedIndex), 1);
+            this.ExpectTrue(
+                "minimizing must lift the content below the ribbon — no dead gap where the group area was",
+                this.Read(() => accordion.Top) < accordionTop);
+            this.Screenshot("state-ribbon-minimized");
 
             this.Click(minimize, 8, 10);
             this.ExpectTrue("restoring the ribbon must bring the group area back", this.Read(() => ribbon.GroupAreaHeight) > 0);
-
-            // The combo lives on the first tab, so the selection has to come back before asking
-            // about it — otherwise this would be testing tab switching, not the minimized state.
-            this.Do(() => ribbon.SelectedIndex = 0);
+            this.Expect("and drop the content back where it was", this.Read(() => accordion.Top), accordionTop);
             this.ExpectTrue("and the hosted combo box with it", this.Read(() => combo.Visible));
+        });
+
+        this.Check("Ribbon: a tab click while minimized opens a flyout whose items fire", () =>
+        {
+            var minimize = _form.Part<CheckBox>("ribbon.minimize");
+            var strip = this.Read(() => ribbon.TabStripHeight);
+
+            this.Click(minimize, 8, 10); // minimize
+            this.Click(ribbon, 80, strip / 2); // click the Insert header
+            this.Expect("the selected tab while minimized", this.Read(() => ribbon.SelectedIndex), 1);
+
+            var flyout = this.WaitForPopup();
+            this.ExpectTrue("a tab click while minimized must float that tab's groups under the strip", flyout != 0);
+            this.Screenshot("state-ribbon-flyout");
+
+            // The large Picture button fills the first column of Insert's first group, so a click near
+            // the flyout's top-left corner lands on it.
+            var spot = this.Read(() => ribbon.PointToScreen(new Point(24, strip + 40)));
+            this.ClickAt(spot);
+            this.Expect("the status line after activating a flyout item", this.Read(() => status.Text), "Ribbon: Picture clicked.");
+            this.ExpectTrue("activating a flyout item must close the flyout", this.Popups().Count == 0);
+
+            this.Click(minimize, 8, 10); // restore
+            this.Do(() => ribbon.SelectedIndex = 0);
+        });
+
+        this.Check("Ribbon: double-clicking a tab toggles minimize", () =>
+        {
+            var strip = this.Read(() => ribbon.TabStripHeight);
+            this.Do(() => ribbon.Minimized = false);
+            this.Settle(700); // clear the double-click window
+
+            this.DoubleClick(ribbon, 20, strip / 2);
+            this.Expect("double-clicking a tab minimizes the ribbon", this.Read(() => ribbon.Minimized), true);
+
+            this.Settle(700);
+            this.DoubleClick(ribbon, 20, strip / 2);
+            this.Expect("double-clicking again restores it", this.Read(() => ribbon.Minimized), false);
+        });
+
+        this.Check("Grid picker: hovering reports the dimensions and a click commits them", () =>
+        {
+            var picker = _form.Part<GridPicker>("ribbon.gridPicker");
+
+            // GridPickerCore: 18px cells, 6px padding. Cell (col 3, row 2) centres at 6+(n-1)*18+9.
+            this.Hover(picker, 6 + (2 * 18) + 9, 6 + 18 + 9);
+            this.Expect("the hovered column count", this.Read(() => picker.Columns), 3);
+            this.Expect("the hovered row count", this.Read(() => picker.Rows), 2);
+            this.Screenshot("state-gridpicker");
+
+            this.Click(picker, 6 + (2 * 18) + 9, 6 + 18 + 9);
+            this.Expect("the status line after committing a block", this.Read(() => status.Text), "Grid: insert 3 × 2 table.");
+        });
+
+        this.Check("Ribbon: the Table button opens the grid picker and inserts a table", () =>
+        {
+            this.Do(() =>
+            {
+                ribbon.Minimized = false;
+                ribbon.SelectedIndex = 1; // Insert
+            });
+
+            var tables = this.Read(() => GroupBounds(ribbon, "Tables"));
+            var contentMid = (this.Read(() => ribbon.GroupAreaHeight) - 24) / 2;
+            this.Click(ribbon, tables.X + 20, tables.Y + 6 + contentMid); // the large Table button
+
+            var popup = this.WaitForPopup();
+            this.ExpectTrue("the Table button must open a grid picker popup", popup != 0);
+
+            // The popup is anchored under the group; commit cell (col 2, row 1) → a 2×1 table.
+            var anchor = this.Read(() => ribbon.PointToScreen(new Point(tables.X, tables.Bottom)));
+            this.ClickAt(new Point(anchor.X + 6 + 18 + 9, anchor.Y + 6 + 9));
+            this.ExpectTrue(
+                $"the picked size should have reached the status line, which reads \"{this.Read(() => status.Text)}\"",
+                this.Read(() => status.Text).StartsWith("Ribbon: insert 2 × 1 table", StringComparison.Ordinal));
+
+            this.Do(() => ribbon.SelectedIndex = 0);
         });
 
         this.Screenshot("state-ribbon");
