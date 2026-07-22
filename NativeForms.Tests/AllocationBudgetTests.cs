@@ -342,4 +342,24 @@ internal sealed class AllocationBudgetTests
         Assert.That(bytes, Is.LessThan(4096), $"{bytes} bytes for a three-pane accordion");
     }
 
+    [Test]
+    public void DockPanel_construction_stays_within_the_owner_drawn_budget()
+    {
+        // An empty manager holds no layout tree, no side lists and no drag overlay — every collection
+        // is null until the first pane or drag, so it must sit inside the single-surface budget.
+        var perControl = PerInstance(static () => new DockPanel());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
+    public void DockContent_construction_stays_within_the_owner_drawn_budget()
+    {
+        // A pane is a container whose options are packed into one byte and whose children/peers are all
+        // lazy, so an unshown pane stays cheap.
+        var perControl = PerInstance(static () => new DockContent());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
 }

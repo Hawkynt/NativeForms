@@ -257,6 +257,14 @@ strategy (may differ per platform; note exceptions inline).
   - [ ] Optional per-tab close button (modern tabbed-UI affordance)
 - [x] `SplitContainer` (owner) — horizontal/vertical orientation, live splitter drag +
       `SplitterMoved`, min-size clamps, keyboard splitter movement
+- [x] `DockPanel` / `DockContent` (owner) — Visual-Studio-style docking manager: a lazy layout tree of
+      splitter regions whose leaves are tab groups, a central document well, panes docked to any edge
+      (tabbed + splittered), `Floating` panes in real top-level windows (secondary windows no longer
+      quit the loop — `IWindowPeer.SetQuitsOnClose`), `AutoHide` edge strips that fly out on hover,
+      drag-to-redock with the diamond overlay guides + translucent landing preview (transient overlay
+      surface, allocation-free at rest), `Ctrl+Tab` document switching, caption close/float/pin
+      buttons, and reflection-free `SaveLayout`/`LoadLayout` round-trip. Empty manager ≈544 B, empty
+      pane ≈368 B, populated repaint 0 B/frame
 - [~] `FlowLayoutPanel` (all four `FlowDirection`s, `WrapContents`, `Control.Margin`,
       AutoScroll interplay) and `TableLayoutPanel` (absolute/percent/auto-size styles, spans,
       auto-placement, cell borders, in-cell Dock/Anchor for explicitly assigned children) done;
@@ -696,6 +704,7 @@ same commit. `—` = not applicable.
 | `Accordion` / `AccordionPane` | ✔ | ✔ | [controls/accordion.md](controls/accordion.md) |
 | `Ribbon` (tabs, groups, item model, overflow, minimize-to-strip + tab flyout) | ✔ | ✔ | [controls/ribbon.md](controls/ribbon.md) |
 | `GridPicker` / `RibbonGridButton` (Office table-size chooser) | ✔ | ✔ | [controls/gridpicker.md](controls/gridpicker.md) |
+| `DockPanel` / `DockContent` (dock, float, tab, split, auto-hide, persistence) | ✔ | ✔ | [controls/dockpanel.md](controls/dockpanel.md) |
 | `FlowLayoutPanel` | ✔ | ✔ | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md) |
 | `TableLayoutPanel` | ✔ | ✔ | [controls/tablelayoutpanel.md](controls/tablelayoutpanel.md) |
 | `ListBox` (selection modes, icons) | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |

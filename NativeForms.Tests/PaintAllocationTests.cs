@@ -41,6 +41,23 @@ internal sealed class PaintAllocationTests
         return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
+    // ---- Docking ----
+
+    [Test]
+    public void DockPanel_populated_layout_steady_state_repaint_allocates_nothing()
+    {
+        // Several docked panes, a document tab well and two splitters: the whole chrome paint path
+        // must recompute geometry from value types and never allocate while no drag is in flight.
+        var dock = new DockPanel { Bounds = new(0, 0, 640, 480) };
+        dock.AddDocument(new DockContent("Doc1") { Name = "d1" });
+        dock.AddDocument(new DockContent("Doc2") { Name = "d2" });
+        dock.Add(new DockContent("Solution") { Name = "sol" }, DockState.Docked, DockEdge.Left);
+        dock.Add(new DockContent("Properties") { Name = "props" }, DockState.Docked, DockEdge.Right);
+        dock.Add(new DockContent("Output") { Name = "out" }, DockState.Docked, DockEdge.Bottom);
+
+        Assert.That(MeasureSteadyStatePaint(dock), Is.Zero);
+    }
+
     // ---- Toggles, indicators, labels ----
 
     [Test]

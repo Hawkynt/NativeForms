@@ -505,6 +505,14 @@ internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : Head
         this.Calls.Add($"topMost={topMost}");
     }
 
+    public bool QuitsOnClose { get; private set; } = true;
+
+    public void SetQuitsOnClose(bool quits)
+    {
+        this.QuitsOnClose = quits;
+        this.Calls.Add($"quitsOnClose={quits}");
+    }
+
     public void SetOpacity(double opacity)
     {
         this.Opacity = opacity;

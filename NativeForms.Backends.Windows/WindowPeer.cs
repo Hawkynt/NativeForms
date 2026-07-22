@@ -37,6 +37,7 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
 
     /// <summary>Whether the modal window was closed (hidden); ends the <see cref="RunModal"/> loop.</summary>
     private bool _modalClosed;
+    private bool _quitsOnClose = true;
 
     /// <summary>Whether <see cref="Show"/> ran; before that, a window-state wish stays buffered.</summary>
     private bool _shown;
@@ -195,6 +196,9 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
             0,
             NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
     }
+
+    /// <inheritdoc/>
+    public void SetQuitsOnClose(bool quits) => _quitsOnClose = quits;
 
     /// <inheritdoc/>
     public void SetOpacity(double opacity)
@@ -584,7 +588,11 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                     if (notify)
                     {
                         destroyedWindow.RaiseClosed();
-                        NativeMethods.PostQuitMessage(0);
+
+                        // A secondary window (a floating docking pane) closing must not end the
+                        // application's loop; only a loop-owning window posts WM_QUIT.
+                        if (destroyedWindow._quitsOnClose)
+                            NativeMethods.PostQuitMessage(0);
                     }
                 }
 

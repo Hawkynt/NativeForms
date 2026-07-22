@@ -60,6 +60,7 @@ each control page carries its own "Differences from WinForms" section where beha
 | `Expander` | owner-drawn | [expander.md](controls/expander.md) |
 | `Accordion` / `AccordionPane` | owner-drawn | [accordion.md](controls/accordion.md) |
 | `Ribbon` (tabs, groups, items) | owner-drawn + popup | [ribbon.md](controls/ribbon.md) |
+| `DockPanel` / `DockContent` | owner-drawn + windows | [dockpanel.md](controls/dockpanel.md) |
 | `FlowLayoutPanel` | owner-drawn layout | [flowlayoutpanel.md](controls/flowlayoutpanel.md) |
 | `TableLayoutPanel` | owner-drawn layout | [tablelayoutpanel.md](controls/tablelayoutpanel.md) |
 | `ListBox` | owner-drawn | [listbox.md](controls/listbox.md) |

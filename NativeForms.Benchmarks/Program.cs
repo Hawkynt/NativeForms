@@ -60,6 +60,8 @@ internal static class Program
         Construct("Accordion", static () => new Accordion(), _OwnerDrawnConstructionBudget);
         Construct("Ribbon", static () => new Ribbon(), _OwnerDrawnConstructionBudget);
         Construct("GridPicker", static () => new GridPicker(), _OwnerDrawnConstructionBudget);
+        Construct("DockPanel", static () => new DockPanel(), _OwnerDrawnConstructionBudget);
+        Construct("DockContent", static () => new DockContent(), _OwnerDrawnConstructionBudget);
 
         // Item models carry no peer, so they have no §4 control budget — but a ribbon is made of
         // hundreds of them, so their per-instance cost is tracked all the same.
@@ -95,6 +97,7 @@ internal static class Program
         PaintThroughput("Accordion", MakeAccordion());
         PaintThroughput("Ribbon", MakeRibbon());
         PaintThroughput("GridPicker", MakeGridPicker());
+        PaintThroughput("DockPanel", MakeDockPanel());
 
         // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
         ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
@@ -389,6 +392,18 @@ internal static class Program
         var picker = new GridPicker { Bounds = new(0, 0, 200, 200), MaxColumns = 8, MaxRows = 6 };
         picker.SetSelection(3, 4);
         return picker;
+    }
+
+    /// <summary>An IDE-shaped dock layout: two document tabs, three docked tool panes and two splitters.</summary>
+    private static DockPanel MakeDockPanel()
+    {
+        var dock = new DockPanel { Bounds = new(0, 0, 900, 600) };
+        dock.AddDocument(new DockContent("Program.cs") { Name = "d1" });
+        dock.AddDocument(new DockContent("Readme.md") { Name = "d2" });
+        dock.Add(new DockContent("Solution") { Name = "sol" }, DockState.Docked, DockEdge.Left);
+        dock.Add(new DockContent("Properties") { Name = "props" }, DockState.Docked, DockEdge.Right);
+        dock.Add(new DockContent("Output") { Name = "out" }, DockState.Docked, DockEdge.Bottom);
+        return dock;
     }
 
     private static DataGridView MakeDataGridView(int rows)

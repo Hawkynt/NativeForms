@@ -76,6 +76,7 @@ internal sealed partial class MainForm : Form
             this.BuildListsPage(),
             this.BuildGridPage(),
             this.BuildLayoutPage(),
+            this.BuildDockingPage(),
             this.BuildPickersPage(),
             this.BuildRibbonPage(),
             this.BuildCalendarPage());

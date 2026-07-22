@@ -20,6 +20,7 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     /// <summary>Whether the modal window was closed (hidden); the "destroy" of the eventual dispose
     /// must then neither re-raise <see cref="Closed"/> nor quit the application loop.</summary>
     private bool _modalClosed;
+    private bool _quitsOnClose = true;
 
     private FormBorderStyle _borderStyle = FormBorderStyle.Sizable;
     private FormWindowState _windowState;
@@ -220,6 +221,9 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     public void SetTopMost(bool topMost) => NativeMethods.gtk_window_set_keep_above(_widget, Bool(topMost));
 
     /// <inheritdoc />
+    public void SetQuitsOnClose(bool quits) => _quitsOnClose = quits;
+
+    /// <inheritdoc />
     public void SetOpacity(double opacity) => NativeMethods.gtk_widget_set_opacity(_widget, opacity);
 
     /// <summary>
@@ -394,6 +398,11 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
                 return;
 
             peer.RaiseClosed();
+
+            // A secondary window (a floating docking pane) closing must not end the application's loop;
+            // only a window that owns the loop quits it.
+            if (!peer._quitsOnClose)
+                return;
         }
 
         NativeMethods.gtk_main_quit();

@@ -118,6 +118,8 @@ internal sealed class BenchWindowPeer : BenchPeer, IWindowPeer
     public void SetSizeLimits(Size minimum, Size maximum) { }
     public void SetIcon(int width, int height, ReadOnlySpan<int> argb) { }
     public void SetTopMost(bool topMost) { }
+
+    public void SetQuitsOnClose(bool quits) { }
     public void SetOpacity(double opacity) { }
 }
 

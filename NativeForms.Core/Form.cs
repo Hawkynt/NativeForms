@@ -34,6 +34,13 @@ public class Form : Control
     internal IWindowPeer? WindowPeer => _window;
 
     /// <summary>
+    /// Whether closing this form quits the application's message loop. A normal top-level form does —
+    /// the program ends with its main window — but a secondary window such as a floating docking pane
+    /// overrides this to <see langword="false"/> so closing it leaves the application running.
+    /// </summary>
+    private protected virtual bool QuitsOnLoopClose => true;
+
+    /// <summary>
     /// Raised after the form is realized and before it is first shown — the moment initialization
     /// code that needs live peers (measuring, focusing) traditionally runs. Fires on every show:
     /// once per <see cref="Application.Run(Form)"/>, <see cref="Show"/> or <see cref="ShowDialog"/>,
@@ -549,6 +556,7 @@ public class Form : Control
 
         _window = window;
         _lastSize = this.Bounds.Size;
+        window.SetQuitsOnClose(this.QuitsOnLoopClose);
         window.CloseRequested += this.OnPeerCloseRequested;
         window.Closed += this.OnPeerClosed;
         window.BoundsChangedByUser += this.OnPeerBoundsChanged;

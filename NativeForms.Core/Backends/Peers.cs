@@ -162,6 +162,14 @@ public interface IWindowPeer : IContainerPeer
     void SetTopMost(bool topMost);
 
     /// <summary>
+    /// Whether closing this window should quit the application's message loop. The main window (and a
+    /// modal dialog's nested loop) leaves this <see langword="true"/>; a secondary top-level such as a
+    /// floating docking pane sets it <see langword="false"/> so the user can close it without ending
+    /// the program. Defaults to <see langword="true"/> so existing single-window apps are unaffected.
+    /// </summary>
+    void SetQuitsOnClose(bool quits);
+
+    /// <summary>
     /// Sets the window's overall opacity, 0 (invisible) … 1 (opaque). Win32 uses a layered window
     /// (<c>WS_EX_LAYERED</c> + <c>SetLayeredWindowAttributes</c>); GTK uses
     /// <c>gtk_widget_set_opacity</c>, which needs a compositing window manager to show through.
