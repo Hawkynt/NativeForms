@@ -425,6 +425,39 @@ internal sealed class FocusModelTests
     // --- Enter/Escape routing ---------------------------------------------------------------------
 
     [Test]
+    public void The_AcceptButton_is_marked_default_on_its_peer_and_the_previous_one_is_cleared()
+    {
+        var form = new Form();
+        var ok = new Button { Text = "OK" };
+        var apply = new Button { Text = "Apply" };
+        form.Controls.Add(ok);
+        form.Controls.Add(apply);
+        Realize(form);
+
+        form.AcceptButton = ok;
+        Assert.That(((HeadlessButtonPeer)ok.Peer!).IsDefault, Is.True);
+
+        form.AcceptButton = apply;
+        Assert.Multiple(() =>
+        {
+            Assert.That(((HeadlessButtonPeer)ok.Peer!).IsDefault, Is.False, "the previous default is cleared");
+            Assert.That(((HeadlessButtonPeer)apply.Peer!).IsDefault, Is.True);
+        });
+    }
+
+    [Test]
+    public void An_AcceptButton_assigned_before_realization_is_default_afterwards()
+    {
+        var form = new Form();
+        var ok = new Button { Text = "OK" };
+        form.Controls.Add(ok);
+        form.AcceptButton = ok; // buffered before the peer exists
+        Realize(form);
+
+        Assert.That(((HeadlessButtonPeer)ok.Peer!).IsDefault, Is.True);
+    }
+
+    [Test]
     public void Enter_clicks_the_AcceptButton()
     {
         var form = new Form();

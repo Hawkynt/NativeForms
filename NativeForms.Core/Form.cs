@@ -86,7 +86,19 @@ public class Form : Control
     /// open drop-down, a grid edit. The chain sees keys from owner-drawn surfaces; a focused native
     /// text widget consumes its keys inside the widget, where no preview exists yet.
     /// </summary>
-    public Button? AcceptButton { get; set; }
+    public Button? AcceptButton
+    {
+        get => field;
+        set
+        {
+            if (ReferenceEquals(field, value))
+                return;
+
+            field?.SetDefault(false);
+            field = value;
+            value?.SetDefault(true);
+        }
+    }
 
     /// <summary>
     /// The button Escape clicks through the form's dialog-key chain. As in WinForms, assigning it

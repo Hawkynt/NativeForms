@@ -129,6 +129,8 @@ internal sealed class BenchButtonPeer : BenchPeer, IButtonPeer
     public event EventHandler? Clicked { add { } remove { } }
 
     public void SetImage(IImage? image, ContentAlignment imageAlign, TextImageRelation relation) { }
+
+    public void SetDefault(bool isDefault) { }
 }
 
 internal sealed class BenchLabelPeer : BenchPeer, ILabelPeer

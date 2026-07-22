@@ -523,8 +523,13 @@ internal abstract class GtkControlPeer : IControlPeer
 
         this.ApplyCursor();
         this.ApplyVisibility();
+        this.OnParented(); // the widget is now inside its container (and so its window)
         return _widget;
     }
+
+    /// <summary>Runs after the widget has been placed into its parent container — the point at which
+    /// operations that need the toplevel window (grabbing the default) are safe. The base does nothing.</summary>
+    private protected virtual void OnParented() { }
 
     /// <summary>
     /// Wires the shared focus-in/out signals on the focus-taking widget. Called once per widget

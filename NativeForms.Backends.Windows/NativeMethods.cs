@@ -55,6 +55,9 @@ internal static partial class NativeMethods
     /// <summary>A standard push button that posts <c>WM_COMMAND</c> when clicked.</summary>
     internal const uint BS_PUSHBUTTON = 0x00000000;
 
+    /// <summary>The window's default push button, painted with the default emphasis.</summary>
+    internal const uint BS_DEFPUSHBUTTON = 0x00000001;
+
     /// <summary>The button displays the bitmap attached via <c>BM_SETIMAGE</c> instead of text.</summary>
     internal const uint BS_BITMAP = 0x00000080;
 

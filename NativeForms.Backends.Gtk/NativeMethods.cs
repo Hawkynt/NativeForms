@@ -530,6 +530,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_grab_focus(nint widget);
 
+    /// <summary>Whether the widget may become its window's default (a precondition of grabbing it).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_set_can_default(nint widget, int canDefault);
+
+    /// <summary>Makes the widget its window's default, so the theme paints the default emphasis.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_widget_grab_default(nint widget);
+
     /// <summary>The widget's toplevel ancestor (a <c>GtkWindow</c> when parented into one).</summary>
     [LibraryImport(Gtk)]
     internal static partial nint gtk_widget_get_toplevel(nint widget);

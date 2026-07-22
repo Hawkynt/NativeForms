@@ -216,6 +216,10 @@ public interface IButtonPeer : IControlPeer
     /// <summary>Raised when the button is activated (click, Space, Enter).</summary>
     event EventHandler? Clicked;
 
+    /// <summary>Marks the button as its window's default so the platform paints the default emphasis
+    /// (Win32 <c>BS_DEFPUSHBUTTON</c>, GTK <c>gtk_widget_grab_default</c>). Clearing it drops the mark.</summary>
+    void SetDefault(bool isDefault);
+
     /// <summary>
     /// Shows <paramref name="image"/> on the button face, or clears it for <see langword="null"/>.
     /// Each backend maps the triple as honestly as its toolkit allows: GTK renders image and text side

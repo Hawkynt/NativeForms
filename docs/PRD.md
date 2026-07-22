@@ -290,8 +290,10 @@ strategy (may differ per platform; note exceptions inline).
 
 ### 7.3 Buttons & simple inputs
 - [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
-  - [~] [x] `DialogResult` (click walks to the owning Form, closes modal); [ ] default/accept
-        styling, [ ] `FlatStyle` pending
+  - [~] [x] `DialogResult` (click walks to the owning Form, closes modal); [x] default/accept styling
+        — `Form.AcceptButton` marks the button on its peer (`IButtonPeer.SetDefault`), painted by the
+        platform (Win32 `BS_DEFPUSHBUTTON`, GTK `gtk_widget_grab_default` when the window chain is
+        ready — theme-dependent emphasis); [ ] `FlatStyle` pending
   - [~] Image (`Image`/`ImageAlign`/`TextImageRelation` peer surface): GTK full image+text
         (`gtk_button_set_image` + position); Win32 `BM_SETIMAGE`/`BS_BITMAP` image-only (classic
         BUTTON cannot render both — documented); owner-drawn image+text fallback pending

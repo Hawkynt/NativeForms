@@ -15,9 +15,34 @@ internal sealed class GtkButtonPeer : GtkControlPeer, IButtonPeer
 {
     private GtkImage? _image;
     private TextImageRelation _relation;
+    private bool _isDefault;
 
     /// <inheritdoc />
     public event EventHandler? Clicked;
+
+    /// <inheritdoc />
+    public void SetDefault(bool isDefault)
+    {
+        _isDefault = isDefault;
+        if (_widget != 0)
+            this.ApplyDefault();
+    }
+
+    /// <summary>
+    /// Pushes the buffered default state: the button becomes able to default, and grabs it when it is
+    /// already inside a toplevel window (grabbing before the window chain is complete only warns). The
+    /// theme paints whatever default emphasis it defines for the grabbed widget.
+    /// </summary>
+    private void ApplyDefault()
+    {
+        NativeMethods.gtk_widget_set_can_default(_widget, Bool(_isDefault));
+        if (!_isDefault)
+            return;
+
+        var toplevel = NativeMethods.gtk_widget_get_toplevel(_widget);
+        if (toplevel != 0 && NativeMethods.gtk_widget_is_toplevel(toplevel) != 0)
+            NativeMethods.gtk_widget_grab_default(_widget);
+    }
 
     /// <inheritdoc />
     protected override nint CreateWidget() => NativeMethods.gtk_button_new_with_label(_text);
@@ -53,6 +78,15 @@ internal sealed class GtkButtonPeer : GtkControlPeer, IButtonPeer
 
         if (_image is not null)
             this.ApplyImage();
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnParented()
+    {
+        // Grabbing the default needs the button already inside its window, which it is only after
+        // parenting — grabbing in OnWidgetRealized warned "widget not within a GtkWindow".
+        if (_isDefault)
+            this.ApplyDefault();
     }
 
     /// <summary>Pushes the buffered image (or its removal) onto the live button.</summary>

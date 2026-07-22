@@ -572,7 +572,12 @@ internal sealed class HeadlessButtonPeer : HeadlessPeer, IButtonPeer
     public ContentAlignment ImageAlign { get; private set; }
     public TextImageRelation ImageRelation { get; private set; }
 
+    /// <summary>Whether the form marked this button as its default (accept) button.</summary>
+    public bool IsDefault { get; private set; }
+
     public event EventHandler? Clicked;
+
+    public void SetDefault(bool isDefault) => this.IsDefault = isDefault;
 
     public void SetImage(IImage? image, ContentAlignment imageAlign, TextImageRelation relation)
     {

@@ -27,13 +27,27 @@ internal sealed class ButtonPeer : Win32ChildPeer, IButtonPeer
             var style = NativeMethods.BS_PUSHBUTTON | NativeMethods.WS_TABSTOP;
             if (_image is not null && _text.Length == 0)
                 style |= NativeMethods.BS_BITMAP;
+            if (_isDefault)
+                style |= NativeMethods.BS_DEFPUSHBUTTON;
 
             return style;
         }
     }
 
+    private bool _isDefault;
+
     /// <inheritdoc/>
     public event EventHandler? Clicked;
+
+    /// <inheritdoc/>
+    public void SetDefault(bool isDefault)
+    {
+        if (_isDefault == isDefault)
+            return;
+
+        _isDefault = isDefault;
+        this.RecreateHandle(); // BS_DEFPUSHBUTTON is a creation-time style, like BS_BITMAP above
+    }
 
     /// <inheritdoc/>
     internal override void CreateChildHandle(nint parent, int controlId)

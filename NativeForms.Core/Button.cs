@@ -130,6 +130,8 @@ public class Button : Control
         _buttonPeer = button;
         button.Clicked += (_, _) => this.OnClick(EventArgs.Empty);
         this.PushImage();
+        if (_isDefault)
+            button.SetDefault(true);
     }
 
     /// <inheritdoc/>
@@ -137,6 +139,22 @@ public class Button : Control
 
     /// <summary>Forwards the buffered image triple to the realized peer.</summary>
     private void PushImage() => _buttonPeer?.SetImage(this.Image, this.ImageAlign, this.TextImageRelation);
+
+    private bool _isDefault;
+
+    /// <summary>
+    /// Whether this is the form's default (accept) button, which the platform paints with its default
+    /// emphasis and which Enter activates. Set by <see cref="Form.AcceptButton"/>; buffered until the
+    /// peer exists, like every other button setting.
+    /// </summary>
+    internal void SetDefault(bool isDefault)
+    {
+        if (_isDefault == isDefault)
+            return;
+
+        _isDefault = isDefault;
+        _buttonPeer?.SetDefault(isDefault);
+    }
 
     /// <summary>The guard's answer may have changed; re-apply it to <see cref="Control.Enabled"/>.</summary>
     private void OnCommandCanExecuteChanged(object? sender, EventArgs e)
