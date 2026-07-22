@@ -49,10 +49,11 @@ Inherits the common members of [`Control`](control.md) plus the owner-drawn surf
 
 - Shares its whole engine with [`FilePicker`](filepicker.md) — the hosted editor, the themed `…` browse button, the commit points and the warning frame are the same code; only the dialog and the existence question differ. See that page for the committed-path-vs-live-text model, which applies here unchanged.
 - **`PathExists` asks about a directory, not a file.** A path that names an existing *file* reports `false`, because it is not a folder.
+- **The committed value is a directory** — the mirror of [`FilePicker`](filepicker.md)'s Open-mode contract. A folder is exactly what this picker stands behind, so an existing directory is *accepted*, never refused; nothing here vetoes a commit. Use `FilePicker` when a file is the wanted value.
 - The committed path seeds the dialog's start location, so browsing twice resumes where the user left off.
 - **`PathExists` is evaluated at commit points only** — Enter, focus leaving the field, a dialog result, or a programmatic assignment — never from `OnPaint` and never per keystroke (PRD §4).
 - Construction costs ~936 B, inside the 1024 B hosted-editor composite tier (PRD §4); a steady-state repaint allocates 0 bytes.
-- `FolderPickerTests` pin the surface headlessly: editor placement, the select-folder dialog kind and its seeded start location, Enter commit, directory-vs-file existence, the read-only field still browsing, the warning frame and the disabled state.
+- `FolderPickerTests` pin the surface headlessly: editor placement, the select-folder dialog kind and its seeded start location, Enter commit, directory-vs-file existence, a real directory committing as the selected path, the read-only field still browsing, the warning frame and the disabled state.
 
 ## Differences from WinForms
 

@@ -363,6 +363,42 @@ internal sealed class PaintAllocationTests
     }
 
     [Test]
+    public void CalendarView_with_an_active_move_preview_steady_state_repaint_allocates_nothing()
+    {
+        // A live reschedule drag left mid-flight: every repaint renders the translucent move ghost from
+        // the reused value-type preview fields, so even an active drag paints allocation-free.
+        var calendar = new CalendarView
+        {
+            Bounds = new(0, 0, 700, 700),
+            SelectedDate = new(2026, 7, 15),
+            Now = new(2026, 7, 15, 10, 30, 0),
+        };
+        calendar.SetAppointments(BusyWeek());
+
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 760, 760) };
+        form.Controls.Add(calendar);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+        var cy = bounds.Y + (bounds.Height / 2);
+        canvas.RaiseMouseDown(cx, cy);
+        canvas.RaiseMouseMove(cx, cy + 44); // past the threshold — the preview is now live, held open
+
+        var graphics = new NullGraphics();
+        for (var pass = 0; pass < 2; ++pass)
+            canvas.RaisePaint(graphics);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < _Frames; ++i)
+            canvas.RaisePaint(graphics);
+
+        Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero, "the active drag preview paints allocation-free");
+    }
+
+    [Test]
     public void A_drilled_out_MonthCalendar_steady_state_repaint_allocates_nothing()
     {
         // The decade page is the worst case: its twelve captions are built strings rather than the

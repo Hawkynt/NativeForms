@@ -15,7 +15,9 @@ public readonly struct Appointment
     private readonly int _argb;
 
     /// <summary>Creates an appointment. When <paramref name="allDay"/> the time-of-day parts of the
-    /// bounds are ignored and the item paints in the all-day band / as a month chip.</summary>
+    /// bounds are ignored and the item paints in the all-day band / as a month chip. When
+    /// <paramref name="movable"/> is <see langword="false"/> the appointment cannot be dragged to a new
+    /// time and shows no move affordance — the hook for a locked entry such as a company holiday.</summary>
     public Appointment(
         string subject,
         DateTime start,
@@ -23,7 +25,8 @@ public readonly struct Appointment
         bool allDay = false,
         string? location = null,
         Color color = default,
-        object? tag = null)
+        object? tag = null,
+        bool movable = true)
     {
         this.Subject = subject ?? string.Empty;
         this.Start = start;
@@ -32,6 +35,7 @@ public readonly struct Appointment
         this.Location = location ?? string.Empty;
         _argb = color.ToArgb();
         this.Tag = tag;
+        this.Movable = movable;
     }
 
     /// <summary>The one-line title shown on the chip.</summary>
@@ -45,6 +49,12 @@ public readonly struct Appointment
 
     /// <summary>Whether the appointment spans whole days rather than a time range.</summary>
     public bool AllDay { get; init; }
+
+    /// <summary>Whether the user may drag this appointment to a new time. <see langword="true"/> by
+    /// default; set it <see langword="false"/> on the entries that must not move — a company holiday, a
+    /// locked booking — so "move all" is the default and "only certain entries" is a matter of locking
+    /// the rest. A non-movable appointment does not drag and paints no move affordance.</summary>
+    public bool Movable { get; init; } = true;
 
     /// <summary>An optional secondary line (a room, a place) shown when the chip is tall enough.</summary>
     public string Location { get; init; }

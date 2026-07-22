@@ -289,13 +289,71 @@ internal sealed class FilePickerTests
     }
 
     [Test]
-    public void A_directory_does_not_count_as_a_file()
+    public void Open_mode_refuses_a_typed_directory_and_keeps_the_previous_file()
     {
+        // A directory can never be a file selection; in Open mode it is vetoed outright, so the
+        // committed path does not move to it and the editor snaps back — WinForms navigates into a
+        // typed folder rather than returning it.
+        var picker = CreatePicker(out _, out _, out var editor);
+        var real = Path.GetTempFileName();
+        try
+        {
+            picker.SelectedPath = real;
+            var changes = 0;
+            picker.PathChanged += (_, _) => ++changes;
+
+            editor.SimulateUserInput(Path.GetTempPath());
+            editor.SimulateKeyDown(Keys.Enter);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(picker.SelectedPath, Is.EqualTo(real), "the directory was refused, the file stands");
+                Assert.That(editor.Text, Is.EqualTo(real), "the editor snapped back to the committed file");
+                Assert.That(changes, Is.Zero, "a refused commit raises nothing");
+            });
+        }
+        finally
+        {
+            File.Delete(real);
+        }
+    }
+
+    [Test]
+    public void Open_mode_accepts_a_real_file()
+    {
+        var real = Path.GetTempFileName();
+        try
+        {
+            var picker = CreatePicker(out _, out _, out _);
+
+            picker.SelectedPath = real;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(picker.SelectedPath, Is.EqualTo(real), "a real file is a valid Open selection");
+                Assert.That(picker.PathExists, Is.True);
+            });
+        }
+        finally
+        {
+            File.Delete(real);
+        }
+    }
+
+    [Test]
+    public void Save_mode_accepts_a_new_name_in_an_existing_folder_even_when_a_directory_shares_it()
+    {
+        // Save vetoes nothing: naming a not-yet-written file is the point, and even a directory path
+        // is a legal target name to save under in the WinForms sense — only Open refuses folders.
         var picker = CreatePicker(out _, out _, out _);
+        picker.Mode = FilePickerMode.Save;
+
+        var newName = Path.Combine(Path.GetTempPath(), "save-target-" + Guid.NewGuid().ToString("N") + ".csv");
+        picker.SelectedPath = newName;
+        Assert.That(picker.SelectedPath, Is.EqualTo(newName), "a fresh name in a real folder commits");
 
         picker.SelectedPath = Path.GetTempPath();
-
-        Assert.That(picker.PathExists, Is.False);
+        Assert.That(picker.SelectedPath, Is.EqualTo(Path.GetTempPath()), "Save does not veto a directory path");
     }
 
     [Test]

@@ -413,8 +413,12 @@ strategy (may differ per platform; note exceptions inline).
       "+n more" overflow; reflection-free `SetAppointments<T>(…, Func<T,Appointment>)` binding into a
       start-sorted snapshot; side-by-side overlap column packing; click select (`SelectionChanged`),
       double-click/Enter `AppointmentActivate`, empty-time drag `TimeRangeSelected` (`DateRangeEventArgs`),
-      keyboard/wheel navigation; virtualized (only visible days laid out, bounded for 100k), cached
-      layout so populated repaints allocate zero (empty ≈ 624 B, `Appointment` ≈ 48 B)
+      drag-to-move/edge-resize of a movable appointment with a live snapped ghost — cancelable
+      `AppointmentMoving` then `AppointmentMoved` (`AppointmentMoveEventArgs`), the app applies + re-binds,
+      per-entry lockable via `Appointment.Movable` (locked entries show a padlock and refuse to drag),
+      Escape cancels; keyboard/wheel navigation; virtualized (only visible days laid out, bounded for
+      100k), cached layout so populated repaints allocate zero — including a live drag preview — (empty
+      ≈ 624 B, `Appointment` ≈ 48 B)
 - [~] `DateTimePicker` (owner field + popup calendar sharing `CalendarCore`) — Long/Short/Time/
       Custom invariant formats, `ShowCheckBox`/`Checked` greying, closed Up/Down day stepping,
       Alt+Down/F4, commit/cancel semantics, drop-down title drill-down done; `BoldedDates` and
@@ -513,8 +517,10 @@ strategy (may differ per platform; note exceptions inline).
       `ITextBoxPeer.KeyDown`, focus loss, dialog result, assignment) so the paint path never stats the
       filesystem; a broken path is framed in the warning colour. `FilePicker` adds `Mode` (Open/Save),
       WinForms `Filter`/`FilterIndex`, `Multiselect` + `SelectedPaths`, `InitialDirectory`, `Title` —
-      and asks for the *folder* rather than the file in Save mode, since naming a file that does not
-      exist yet is the point of saving
+      asks for the *folder* rather than the file in Save mode, since naming a file that does not
+      exist yet is the point of saving, and in Open mode refuses a typed directory outright (the
+      committed value is a file, never a folder — the mirror of `FolderPicker`, which stands behind a
+      directory)
 - [x] `IconLabel` (owner) — image **and** text in one caption through the shared `ContentLayout`
       (`TextImageRelation`, `TextAlign`, `ImageAlign`, `AutoSize`, ambient font/fore colour, RTL
       mirroring). Exists because no platform static widget renders both: Win32 `SS_BITMAP` is

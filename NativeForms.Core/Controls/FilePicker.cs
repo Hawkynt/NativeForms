@@ -12,6 +12,13 @@ namespace Hawkynt.NativeForms;
 /// to the dialog in WinForms syntax, so a filter that works with <see cref="OpenFileDialog"/> works
 /// here unchanged. The dialog object is built per browse rather than held: a picker that is never
 /// clicked costs nothing beyond its own fields (§4).
+/// <para>
+/// The committed <see cref="PathPickerBase.SelectedPath"/> is a <em>file</em>, never a directory. In
+/// <see cref="FilePickerMode.Open"/> a typed or returned path that resolves to an existing directory
+/// is refused — the earlier value stands and the editor snaps back to it — the way WinForms navigates
+/// into a folder rather than returning it. Use <see cref="FolderPicker"/> when a directory is the
+/// wanted value.
+/// </para>
 /// </remarks>
 public class FilePicker : PathPickerBase
 {
@@ -133,6 +140,19 @@ public class FilePicker : PathPickerBase
         var directory = Path.GetDirectoryName(path);
         return string.IsNullOrEmpty(directory) || Directory.Exists(directory);
     }
+
+    /// <summary>
+    /// A directory is not a file selection. In <see cref="FilePickerMode.Open"/> a path that resolves
+    /// to an existing directory is refused outright — it never becomes <see cref="PathPickerBase.SelectedPath"/>,
+    /// the previously committed value stands, and the editor snaps back to it — exactly as WinForms'
+    /// <see cref="OpenFileDialog"/> navigates into a typed folder instead of returning it. A missing
+    /// file path is <em>not</em> vetoed: it commits and is flagged as broken through
+    /// <see cref="PathPickerBase.PathExists"/>, because it may be a typo the user wants to see and fix,
+    /// or a file about to appear. In <see cref="FilePickerMode.Save"/> nothing is vetoed here — naming
+    /// a not-yet-written file, even one whose name happens to match no directory, is the whole point.
+    /// </summary>
+    private protected override bool CanCommit(string path)
+        => this.Mode != FilePickerMode.Open || !Directory.Exists(path);
 
     /// <summary>
     /// Narrows the selection to the committed path. A path that arrived by typing is its own whole

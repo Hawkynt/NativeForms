@@ -9,7 +9,10 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 /// <remarks>
 /// The committed path seeds the dialog's start location, so browsing twice resumes where the user
-/// left off. <see cref="PathPickerBase.PathExists"/> asks about a directory here, not a file.
+/// left off. <see cref="PathPickerBase.PathExists"/> asks about a directory here, not a file, and —
+/// the mirror of <see cref="FilePicker"/> — the committed <see cref="PathPickerBase.SelectedPath"/>
+/// is a <em>directory</em>: a folder is exactly what this picker stands behind, so it is accepted,
+/// never refused. Use <see cref="FilePicker"/> when a file is the wanted value.
 /// </remarks>
 public class FolderPicker : PathPickerBase
 {

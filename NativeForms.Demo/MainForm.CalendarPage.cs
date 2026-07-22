@@ -6,8 +6,9 @@ namespace Hawkynt.NativeForms.Demo;
 internal sealed partial class MainForm
 {
     /// <summary>A meeting row bound into the calendar through a selector, so the demo exercises the
-    /// same reflection-free binding a real application would use.</summary>
-    private sealed record Meeting(string Subject, DateTime Start, DateTime End, Color Category, bool AllDay = false, string Location = "");
+    /// same reflection-free binding a real application would use. <see cref="Movable"/> maps straight to
+    /// <see cref="Appointment.Movable"/>, so a locked entry (a company holiday) cannot be dragged.</summary>
+    private sealed record Meeting(string Subject, DateTime Start, DateTime End, Color Category, bool AllDay = false, string Location = "", bool Movable = true);
 
     // The demo pins "now" to a fixed instant so the week is populated and the captures stay
     // deterministic across runs; the shown week is the one that holds it.
@@ -39,6 +40,8 @@ internal sealed partial class MainForm
             new("Talk prep", mon.AddDays(3).AddHours(16), mon.AddDays(3).AddHours(17), _CatFocus),
             new("Retro", mon.AddDays(4).AddHours(15), mon.AddDays(4).AddHours(16), _CatPersonal),
             new("Gym", mon.AddDays(5).AddHours(8), mon.AddDays(5).AddHours(9), _CatPersonal),
+            // A locked entry: the whole day is off, and it must not be dragged onto another slot.
+            new("Company holiday", mon.AddDays(4), mon.AddDays(5), _CatUrgent, AllDay: true, Movable: false),
         ];
     }
 
@@ -60,7 +63,11 @@ internal sealed partial class MainForm
             Now = _CalendarNow,
             TimeScale = 30,
         };
-        calendar.SetAppointments(BuildMeetings(), static m => new Appointment(m.Subject, m.Start, m.End, m.AllDay, m.Location, m.Category, m));
+        // A mutable model the move events write back into: the control owns no storage, so a dropped
+        // move updates this list and re-binds — exactly the setter/validation idiom a real app uses.
+        var meetings = new List<Meeting>(BuildMeetings());
+        void Rebind() => calendar.SetAppointments(meetings, static m => new Appointment(m.Subject, m.Start, m.End, m.AllDay, m.Location, m.Category, m, m.Movable));
+        Rebind();
 
         calendar.SelectionChanged += (_, _) =>
             this.SetStatus(calendar.SelectedAppointment is { } appt
@@ -70,6 +77,21 @@ internal sealed partial class MainForm
             this.SetStatus($"Calendar: open \"{e.Appointment.Subject}\" for edit.");
         calendar.TimeRangeSelected += (_, e) =>
             this.SetStatus($"Calendar: new appointment {e.Start.ToString("ddd HH:mm", CultureInfo.InvariantCulture)} – {e.End.ToString("HH:mm", CultureInfo.InvariantCulture)}.");
+        calendar.AppointmentMoved += (_, e) =>
+        {
+            // Apply the proposal to the model item the appointment carried, then re-bind. The control
+            // never mutated its own snapshot; the new time only shows once the fresh set is bound.
+            if (e.Appointment.Tag is not Meeting moved)
+                return;
+
+            var i = meetings.IndexOf(moved);
+            if (i < 0)
+                return;
+
+            meetings[i] = moved with { Start = e.Start, End = e.End };
+            Rebind();
+            this.SetStatus($"Calendar: moved \"{moved.Subject}\" to {e.Start.ToString("ddd HH:mm", CultureInfo.InvariantCulture)}.");
+        };
 
         Button ViewButton(string text, int x, int width, CalendarViewMode mode)
         {
@@ -107,7 +129,7 @@ internal sealed partial class MainForm
         };
 
         page.Controls.AddRange(
-            Caption("CalendarView — an Outlook-style scheduler; switch views and drag empty time to add.", 16, 12, 640),
+            Caption("CalendarView — an Outlook-style scheduler; drag empty time to add, drag a movable appointment to move it.", 16, 12, 948),
             day, workWeek, week, month, today, prev, next,
             calendar);
 
@@ -115,7 +137,9 @@ internal sealed partial class MainForm
         {
             calendar.ViewMode = CalendarViewMode.Week;
             calendar.SelectedDate = _CalendarNow.Date;
-            calendar.SetAppointments(BuildMeetings(), static m => new Appointment(m.Subject, m.Start, m.End, m.AllDay, m.Location, m.Category, m));
+            meetings.Clear();
+            meetings.AddRange(BuildMeetings());
+            Rebind();
             calendar.Invalidate();
         });
 

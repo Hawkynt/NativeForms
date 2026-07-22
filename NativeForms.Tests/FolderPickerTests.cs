@@ -129,6 +129,23 @@ internal sealed class FolderPickerTests
     }
 
     [Test]
+    public void A_real_directory_commits_as_the_selected_path()
+    {
+        // The mirror of FilePicker's Open-mode veto: a folder is exactly what this picker stands
+        // behind, so an existing directory is accepted, not refused.
+        var picker = CreatePicker(out _, out _, out var editor);
+
+        editor.SimulateUserInput(Path.GetTempPath());
+        editor.SimulateKeyDown(Keys.Enter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.SelectedPath, Is.EqualTo(Path.GetTempPath()), "a directory is a valid folder selection");
+            Assert.That(picker.PathExists, Is.True);
+        });
+    }
+
+    [Test]
     public void ReadOnlyText_makes_the_field_browse_only()
     {
         var picker = CreatePicker(out var backend, out var canvas, out var editor);

@@ -108,6 +108,14 @@ public abstract class PathPickerBase : OwnerDrawnControl
     /// picker, a directory for a folder picker.</summary>
     private protected abstract bool Exists(string path);
 
+    /// <summary>Whether <paramref name="path"/> is a value this picker may stand behind at all. A veto
+    /// is not the same as "does not exist yet": an empty field and a not-yet-written save target both
+    /// commit and merely flag through <see cref="PathExists"/>, whereas a vetoed value is refused
+    /// outright and never becomes <see cref="SelectedPath"/>. The base picker vetoes nothing; a
+    /// <see cref="FilePicker"/> in Open mode uses it to refuse a directory, which can never be a file
+    /// selection.</summary>
+    private protected virtual bool CanCommit(string path) => true;
+
     /// <summary>Raises <see cref="PathChanged"/>.</summary>
     protected virtual void OnPathChanged(EventArgs e) => this.PathChanged?.Invoke(this, e);
 
@@ -185,6 +193,18 @@ public abstract class PathPickerBase : OwnerDrawnControl
     /// repaints and reports the change. A no-op when nothing actually moved.</summary>
     private protected void Commit(string path)
     {
+        // A vetoed value never becomes the committed path: the earlier one stands and the editor is
+        // pulled back to it, so the field always shows something the picker will actually stand behind
+        // (a file, never a directory, for a FilePicker in Open mode). WinForms' Open dialog does the
+        // same — a folder is navigated into, never returned as the selection.
+        if (path.Length > 0 && !this.CanCommit(path))
+        {
+            if (!string.Equals(_editor.Text, _path, StringComparison.Ordinal))
+                _editor.Text = _path;
+
+            return;
+        }
+
         if (string.Equals(_path, path, StringComparison.Ordinal))
         {
             // The editor may still hold a discarded edit that resolved back to the committed value.

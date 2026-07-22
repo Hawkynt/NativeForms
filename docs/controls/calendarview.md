@@ -21,6 +21,15 @@ calendar.SelectionChanged   += (_, _) => Console.WriteLine(calendar.SelectedAppo
 calendar.AppointmentActivate += (_, e) => OpenEditor((Meeting)e.Appointment.Tag!);   // double-click / Enter
 calendar.TimeRangeSelected  += (_, e) => NewAppointment(e.Start, e.End);             // drag empty time
 
+// Drag a movable appointment to a new time: the control proposes, the app applies and re-binds.
+calendar.AppointmentMoving += (_, e) => e.Cancel = ClashesWithSomething(e.Start, e.End);
+calendar.AppointmentMoved  += (_, e) =>
+{
+    var m = (Meeting)e.Appointment.Tag!;
+    m.Start = e.Start; m.End = e.End;   // update your own model
+    calendar.SetAppointments(meetings, ToAppointment);   // then re-bind
+};
+
 form.Controls.Add(calendar);
 ```
 
@@ -36,6 +45,7 @@ form.Controls.Add(calendar);
 | `Location` | `string` | An optional secondary line, shown when the chip is tall enough. |
 | `Color` | `Color` | The category colour; `Color.Empty` (the default) paints in the theme accent. Stored internally as a packed ARGB int, so the struct stays ~48 B. |
 | `Tag` | `object?` | Whatever the caller carries back through the events — the source model row. |
+| `Movable` | `bool` | Whether the user may drag this appointment to a new time. `true` by default (so "move all" is the default); set it `false` on the locked entries (a company holiday, a fixed booking). A non-movable appointment does not drag and paints a small padlock instead of a move affordance. |
 
 ## Binding
 
@@ -77,6 +87,8 @@ The control does **not** own the caller's storage. `SetAppointments<T>(IEnumerab
 | `SelectionChanged` | Raised when `SelectedAppointment` changes, by click or navigation. |
 | `AppointmentActivate` | Raised on a double-click or Enter on a selected appointment — the open-for-edit hook; carries `AppointmentEventArgs.Appointment`. The control hosts no editor, it only reports the model. |
 | `TimeRangeSelected` | Raised when the user click-drags across empty time (or empty month days), carrying the span as a `DateRangeEventArgs` (`Start`, `End`) — the "new appointment here" hook. |
+| `AppointmentMoving` | Raised while a drag proposes moving or resizing a `Movable` appointment, before it is applied — **cancelable**. Carries the appointment, its `OriginalStart`/`OriginalEnd` and the snapped proposed `Start`/`End` (`AppointmentMoveEventArgs`). Set `Cancel = true` to veto; the snapshot then stays put. |
+| `AppointmentMoved` | Raised after `AppointmentMoving` was not cancelled — the reschedule stands. Apply the proposed `Start`/`End` to your model item and re-bind through `SetAppointments`. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
@@ -86,13 +98,14 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - **Overlap packing**: within a day column, appointments that overlap in time are laid **side by side** — the classic Outlook column packing. Each maximal cluster of mutually overlapping appointments is swept once, every appointment takes the first free column, and all members share the cluster's column count as their width. All-day appointments stack into the band on the first free row across the days they span.
 - **Month overflow**: a day cell shows up to four chips; the rest collapse into a "+n more" marker so a busy day never spills its cell.
 - **Interaction**: a click selects an appointment (`SelectionChanged`); a double-click or Enter raises `AppointmentActivate`; a click-drag on empty time (or empty month days) selects a range and raises `TimeRangeSelected`. The toolbar in the demo switches views and navigates; `SelectedDate`, `Next`/`Previous` and `GoToToday` do it in code. The keyboard moves the day/period (Left/Right, Up/Down, PageUp/PageDown, Home = today) and the wheel scrolls the time grid in Day/Week or pages the Month.
-- **Virtualization & footprint**: appointments are held in one flat, start-sorted array; only the appointments intersecting the visible days are ever laid out, pulled by a binary search bounded by the widest appointment, so a set of a hundred thousand costs the same per frame as a set of ten. The overlap packing and pixel geometry are cached and rebuilt only when the data, the shown period, the view mode or the size changes — a plain repaint (the "now" line ticking, a hover, a vertical scroll) reuses the cached layout and every display string, so it allocates **nothing**. Measured: an empty control ≈ 624 B; an `Appointment` ≈ 48 B; 100 steady-state repaints of a populated week or month allocate 0 B; a 100 000-appointment scroll traversal stays bounded.
+- **Moving appointments**: press on a `Movable` appointment's body and drag past a small threshold to reschedule it — a live translucent ghost shows where it will land, snapped to `TimeScale` in Day/Week and to the whole day in Month, with the original left in place until the drop. In Day/Week the top or bottom **edge** resizes the start or the end instead (Outlook-style). On drop the control raises the cancelable `AppointmentMoving` (a handler may veto or validate), then `AppointmentMoved`; **Escape** during the drag cancels, and a press that never crosses the threshold is a plain click that still selects. The control owns no storage, so it **never mutates the snapshot** — a move is a proposal the app applies to its model and re-binds with `SetAppointments`, exactly the grid's setter/validation idiom. A locked (`Movable = false`) appointment does not drag and shows a small padlock.
+- **Virtualization & footprint**: appointments are held in one flat, start-sorted array; only the appointments intersecting the visible days are ever laid out, pulled by a binary search bounded by the widest appointment, so a set of a hundred thousand costs the same per frame as a set of ten. The overlap packing and pixel geometry are cached and rebuilt only when the data, the shown period, the view mode or the size changes — a plain repaint (the "now" line ticking, a hover, a vertical scroll) reuses the cached layout and every display string, so it allocates **nothing**. A live move/resize drag is allocation-free too: the ghost's geometry is recomputed each frame from reused value-type preview fields, and the drag's only allocation is the one `AppointmentMoveEventArgs` created on the drop. Measured: an empty control ≈ 624 B; an `Appointment` ≈ 48 B (the `Movable` flag packs into the struct's existing padding); 100 steady-state repaints of a populated week or month — with the move preview inactive **and** with an active drag preview on screen — allocate 0 B; a 100 000-appointment scroll traversal stays bounded.
 - Painted with the platform `ITheme` (`FieldBackground` work hours, `HeaderBackground` band, `SelectionBackground`/`SelectionText` today, `Border`/`GridLine` grid, category colours blended toward the field for the chip faces, `Accent` for the selection outline and uncategorized chips).
-- `CalendarViewTests` pin the defaults, the snapshot/sort, the selector binding, the view geometry, click selection and clear, double-click and Enter activation, the overlap packing, the empty-time drag range, Day/Week/Month navigation, the wheel behaviour, the time-grid and month painting, and the bounded layout for 100 000 appointments.
+- `CalendarViewTests` pin the defaults, the snapshot/sort, the selector binding, the view geometry, click selection and clear, double-click and Enter activation, the overlap packing, the empty-time drag range, the movable-appointment move (snapped `AppointmentMoving`/`AppointmentMoved` in Day, Week and day-granularity Month, plus a bottom-edge resize), the locked appointment refusing to drag, a cancelled proposal leaving the snapshot untouched, a sub-threshold press still selecting, Day/Week/Month navigation, the wheel behaviour, the time-grid and month painting, and the bounded layout for 100 000 appointments.
 - Done per [docs/PRD.md](../PRD.md) §7.5.
 
 ## Differences from Outlook / `System.Windows.Forms`
 
 - **No WinForms equivalent** — Windows Forms ships no appointment/scheduling view, so this is a new control shaped to fit the toolkit rather than a port. The binding follows the toolkit's own reflection-free selector idiom (`DataGridView`) rather than a `BindingSource`.
 - **Snapshot binding**: appointments are copied into a start-sorted snapshot on `SetAppointments`; there is no live two-way `Items` collection. Re-call `SetAppointments` after the source changes.
-- **Invariant, Monday-first** — day names come from `Strings.AbbreviatedDayNames` and `FirstDayOfWeek` defaults to `Monday`, like the rest of the toolkit; recurring appointments, reminders and drag-to-move of existing appointments are not implemented.
+- **Invariant, Monday-first** — day names come from `Strings.AbbreviatedDayNames` and `FirstDayOfWeek` defaults to `Monday`, like the rest of the toolkit. Existing appointments **can** be moved (and edge-resized) by drag, per-entry lockable through `Appointment.Movable`; recurring appointments and reminders are not implemented.

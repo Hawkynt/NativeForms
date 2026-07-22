@@ -35,6 +35,8 @@ public class CalendarView : OwnerDrawnControl
     private const int _AllDayMaxRows = 3;
     private const int _MonthMaxChips = 4;
     private const int _WheelMinutes = 60;
+    private const int _MoveThreshold = 4;
+    private const int _EdgeGrab = 5;
 
     /// <summary>One painted appointment: an index into the start-sorted snapshot, the rectangle it
     /// occupies and its pre-formatted chip caption. Timed boxes carry a content-space y (translated by
@@ -46,6 +48,15 @@ public class CalendarView : OwnerDrawnControl
         public Rectangle Rect;
         public bool Timed;
         public string Text;
+    }
+
+    /// <summary>What an armed appointment drag is doing: sliding the whole body to a new time, or
+    /// pulling one edge to change the start or the end (Outlook-style resize, timed views only).</summary>
+    private enum DragKind
+    {
+        Move,
+        ResizeStart,
+        ResizeEnd,
     }
 
     /// <summary>The invariant hour captions "12 AM".."11 PM", materialized once so the time gutter
@@ -102,6 +113,24 @@ public class CalendarView : OwnerDrawnControl
     // Vertical scrollbar thumb drag.
     private bool _scrollDragging;
     private int _scrollDragOffset;
+
+    // Appointment reschedule drag (move the body / resize an edge). The control proposes the change
+    // through the AppointmentMoving/AppointmentMoved events and never mutates the snapshot itself. All
+    // preview geometry is recomputed from these value-type fields on the paint path, so a live drag
+    // preview allocates nothing — only the drop allocates the one event-args object.
+    private DragKind _dragKind;
+    private bool _movePrimed;
+    private bool _moving;
+    private int _moveIndex = -1;
+    private bool _moveFixed;
+    private Point _movePress;
+    private int _moveGrabPixels;
+    private int _moveGrabDays;
+    private int _moveDurationMinutes;
+    private string? _moveSubject;
+    private Color _moveAccent;
+    private DateTime _previewStart;
+    private DateTime _previewEnd;
 
     /// <summary>Creates a week-view scheduler showing the current week.</summary>
     public CalendarView() { }
@@ -234,6 +263,18 @@ public class CalendarView : OwnerDrawnControl
     /// <summary>Raised when the user click-drags across empty time (or empty month days), carrying the
     /// selected span as a <see cref="DateRangeEventArgs"/> — the "new appointment here" hook.</summary>
     public event EventHandler<DateRangeEventArgs>? TimeRangeSelected;
+
+    /// <summary>Raised while a drag proposes moving or resizing a <see cref="Appointment.Movable"/>
+    /// appointment, before it is applied — <em>cancelable</em>. Carries the appointment, its original
+    /// bounds and the snapped proposed bounds. The control mutates nothing: a handler validates the
+    /// proposal, updates its own model and re-binds through <see cref="SetAppointments{T}"/>. Setting
+    /// <see cref="AppointmentMoveEventArgs.Cancel"/> vetoes the move and the snapshot stays put.</summary>
+    public event EventHandler<AppointmentMoveEventArgs>? AppointmentMoving;
+
+    /// <summary>Raised after <see cref="AppointmentMoving"/> was not cancelled — the reschedule stands.
+    /// The application applies the proposed <see cref="AppointmentMoveEventArgs.Start"/>/<see cref="AppointmentMoveEventArgs.End"/>
+    /// to its model item and re-binds; the control does not move the snapshot itself.</summary>
+    public event EventHandler<AppointmentMoveEventArgs>? AppointmentMoved;
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
@@ -795,6 +836,18 @@ public class CalendarView : OwnerDrawnControl
                     this.PaintChip(g, theme, _layout[i], _layout[i].Rect, compact: true);
         }
 
+        // The ghost of an all-day appointment being dragged across day columns (day granularity).
+        if (_moving && _moveFixed)
+        {
+            var col = (int)(_previewStart.Date - first.Date).TotalDays;
+            if (col >= 0 && col < dayCount)
+            {
+                var spanDays = Math.Max(1, (int)(_previewEnd.Date - _previewStart.Date).TotalDays);
+                var endCol = Math.Min(dayCount - 1, col + spanDays - 1);
+                this.PaintGhost(g, theme, new(_GutterWidth + (col * dayWidth) + 1, this.HeaderHeight + 2, Math.Max(1, ((endCol - col + 1) * dayWidth) - 2), this.ChipHeight));
+            }
+        }
+
         // The scrollable body: hour lines, work-hour shading, appointments and the now line. The clip
         // spans the hour gutter too (so the hour labels show) but stops short of the scrollbar column.
         g.PushClip(new Rectangle(0, body.Y, body.Right, body.Height));
@@ -845,6 +898,22 @@ public class CalendarView : OwnerDrawnControl
                 var ry = originY + this.YForMinutes((int)_rangeStart.TimeOfDay.TotalMinutes);
                 var rb = originY + this.YForMinutes((int)(_rangeEnd - _rangeStart.Date).TotalMinutes);
                 g.FillRectangle(Blend(theme.SelectionBackground, theme.FieldBackground), new(_GutterWidth + (col * dayWidth), ry, dayWidth, Math.Max(2, rb - ry)));
+            }
+        }
+
+        // The live move/resize ghost — where a timed appointment will land, snapped, translucent, the
+        // original left in place until the drop. Recomputed from the value-type preview fields, so this
+        // costs no allocation even mid-drag.
+        if (_moving && !_moveFixed)
+        {
+            var col = (int)(_previewStart.Date - first.Date).TotalDays;
+            if (col >= 0 && col < dayCount)
+            {
+                var startMin = (int)(_previewStart - _previewStart.Date).TotalMinutes;
+                var endMin = _previewEnd.Date > _previewStart.Date ? 1440 : (int)(_previewEnd - _previewStart.Date).TotalMinutes;
+                var top = originY + this.YForMinutes(startMin);
+                var bottom = originY + this.YForMinutes(endMin);
+                this.PaintGhost(g, theme, new(_GutterWidth + (col * dayWidth) + 1, top + 1, Math.Max(1, dayWidth - 2), Math.Max(this.ChipHeight, bottom - top - 2)));
             }
         }
 
@@ -924,6 +993,14 @@ public class CalendarView : OwnerDrawnControl
 
         for (var i = 0; i < _layout.Count; ++i)
             this.PaintChip(g, theme, _layout[i], _layout[i].Rect, compact: true);
+
+        // The ghost of an appointment being dragged to another day cell (day granularity).
+        if (_moving && _moveFixed)
+        {
+            var cell = (int)(_previewStart.Date - first.Date).TotalDays;
+            if (cell >= 0 && cell < 42)
+                this.PaintGhost(g, theme, new(((cell % 7) * cellWidth) + 2, top + ((cell / 7) * cellHeight) + this.Theme.RowHeight, Math.Max(1, cellWidth - 4), this.ChipHeight));
+        }
     }
 
     /// <summary>Paints one appointment chip: a category-coloured face, an accent bar down its left,
@@ -956,12 +1033,51 @@ public class CalendarView : OwnerDrawnControl
                 g.DrawText(appt.Location, theme.DefaultFont, theme.DisabledText, new(textLeft, rect.Y + rowH + 2, textWidth, rowH), ContentAlignment.TopLeft);
         }
 
+        // A locked appointment carries no move affordance — a small padlock in its top-right corner
+        // signals it will not drag.
+        if (!appt.Movable)
+            PaintLock(g, new(rect.Right - 12, rect.Y + 2, 8, 8), theme.DisabledText);
+
         g.PopClip();
 
         if (selected)
             g.DrawRectangle(theme.Accent, new(rect.X, rect.Y, rect.Width - 1, rect.Height - 1), 2);
         else
             g.DrawRectangle(Blend(accent, theme.Border), new(rect.X, rect.Y, rect.Width - 1, rect.Height - 1));
+    }
+
+    /// <summary>A tiny padlock glyph — a shackle arc over a body — drawn from primitives so it costs no
+    /// image asset and no per-frame allocation. Marks a non-movable appointment.</summary>
+    private static void PaintLock(IGraphics g, Rectangle bounds, Color color)
+    {
+        if (bounds.Width < 5 || bounds.Height < 5)
+            return;
+
+        var shackleWidth = Math.Max(3, bounds.Width - 2);
+        var shackle = new Rectangle(bounds.X + ((bounds.Width - shackleWidth) / 2), bounds.Y, shackleWidth, bounds.Height / 2 + 1);
+        g.DrawEllipse(color, shackle);
+        g.FillRectangle(color, new(bounds.X, bounds.Y + (bounds.Height / 2), bounds.Width, bounds.Height - (bounds.Height / 2)));
+    }
+
+    /// <summary>Paints the translucent ghost of a dragged appointment at its snapped landing — a
+    /// see-through accent face, the accent bar and outline, and the subject. Uses a real alpha colour
+    /// so it reads as a preview over whatever it covers; allocates nothing.</summary>
+    private void PaintGhost(IGraphics g, ITheme theme, Rectangle rect)
+    {
+        if (rect.Width <= 1 || rect.Height <= 1)
+            return;
+
+        var ghost = Color.FromArgb(120, _moveAccent);
+        g.FillRectangle(ghost, rect);
+        g.FillRectangle(_moveAccent, new(rect.X, rect.Y, 3, rect.Height));
+        if (_moveSubject is { } subject)
+        {
+            g.PushClip(rect);
+            g.DrawText(subject, theme.DefaultFont, theme.ControlText, new(rect.X + 6, rect.Y, rect.Width - 8, rect.Height), ContentAlignment.MiddleLeft);
+            g.PopClip();
+        }
+
+        g.DrawRectangle(_moveAccent, new(rect.X, rect.Y, rect.Width - 1, rect.Height - 1), 2);
     }
 
     private void PaintScrollBar(IGraphics g, ITheme theme)
@@ -1005,8 +1121,10 @@ public class CalendarView : OwnerDrawnControl
 
     // --- Input -------------------------------------------------------------------------------------
 
-    /// <summary>Hit-tests the laid-out appointments, returning the snapshot index under the point or -1.</summary>
-    private int HitTestAppointment(int x, int y)
+    /// <summary>Hit-tests the laid-out appointments, returning the position in <see cref="_layout"/>
+    /// under the point or -1 — the drag path needs the box (its rectangle and whether it is timed), not
+    /// only the snapshot index.</summary>
+    private int HitTestBox(int x, int y)
     {
         var body = this.BodyBounds;
         var point = new Point(x, y);
@@ -1019,7 +1137,7 @@ public class CalendarView : OwnerDrawnControl
                 continue;
 
             if (box.Rect.Contains(point))
-                return box.Index;
+                return i;
         }
 
         if (!body.Contains(point))
@@ -1033,10 +1151,17 @@ public class CalendarView : OwnerDrawnControl
 
             var rect = new Rectangle(box.Rect.X, box.Rect.Y + body.Y - _scrollY, box.Rect.Width, box.Rect.Height);
             if (rect.Contains(point))
-                return box.Index;
+                return i;
         }
 
         return -1;
+    }
+
+    /// <summary>Hit-tests the laid-out appointments, returning the snapshot index under the point or -1.</summary>
+    private int HitTestAppointment(int x, int y)
+    {
+        var box = this.HitTestBox(x, y);
+        return box < 0 ? -1 : _layout[box].Index;
     }
 
     /// <summary>The instant an empty-body point maps to: the day column plus the time-of-day snapped to
@@ -1069,6 +1194,138 @@ public class CalendarView : OwnerDrawnControl
         var col = Math.Clamp(x / cellWidth, 0, 6);
         var row = Math.Clamp((y - top) / cellHeight, 0, 5);
         return this.FirstVisibleDate.AddDays((row * 7) + col);
+    }
+
+    /// <summary>The date of the day column an x maps to, in a timed view.</summary>
+    private DateTime DayColumnDate(int x)
+    {
+        var dayWidth = this.DayColumnWidth;
+        if (dayWidth <= 0)
+            return this.FirstVisibleDate;
+
+        var col = Math.Clamp((x - _GutterWidth) / dayWidth, 0, this.VisibleDayCount - 1);
+        return this.FirstVisibleDate.AddDays(col);
+    }
+
+    /// <summary>Floors a minute-of-day to the <see cref="TimeScale"/> slot a drag snaps to.</summary>
+    private int SnapMinutes(int minutes) => Math.Clamp(minutes / _timeScale * _timeScale, 0, 1440);
+
+    /// <summary>Arms a reschedule on a movable appointment: records the grab and seeds the preview. A
+    /// non-movable appointment is refused here, so it never drags and shows no move affordance.</summary>
+    private void PrimeMove(ApptBox box, int index, MouseEventArgs e)
+    {
+        var appt = _appointments[index];
+        if (!appt.Movable)
+            return;
+
+        _movePrimed = true;
+        _moving = false;
+        _moveIndex = index;
+        _movePress = e.Location;
+        _moveFixed = !box.Timed;
+        _moveSubject = appt.Subject;
+        _moveAccent = appt.Color.IsEmpty ? this.Theme.Accent : appt.Color;
+        _moveDurationMinutes = Math.Max(_timeScale, (int)(appt.End - appt.Start).TotalMinutes);
+
+        if (box.Timed)
+        {
+            var body = this.BodyBounds;
+            var screenTop = box.Rect.Y + body.Y - _scrollY;
+            var screenBottom = screenTop + box.Rect.Height;
+
+            // Only a tall enough box offers edge-resize; a short one is all move so it never becomes
+            // impossible to slide.
+            var resizable = box.Rect.Height >= _EdgeGrab * 3;
+            _dragKind = resizable && e.Y - screenTop <= _EdgeGrab ? DragKind.ResizeStart
+                : resizable && screenBottom - e.Y <= _EdgeGrab ? DragKind.ResizeEnd
+                : DragKind.Move;
+            _moveGrabPixels = e.Y - screenTop;
+        }
+        else
+        {
+            _dragKind = DragKind.Move;
+            var pressDay = this.IsMonth ? this.MonthDayAt(e.X, e.Y) : this.DayColumnDate(e.X);
+            _moveGrabDays = pressDay is { } day ? (int)(day.Date - appt.Start.Date).TotalDays : 0;
+        }
+
+        this.UpdateMovePreview(e);
+    }
+
+    /// <summary>Recomputes the snapped landing bounds of the dragged appointment from the pointer — the
+    /// value-type state the paint path reads to draw the ghost. Allocates nothing.</summary>
+    private void UpdateMovePreview(MouseEventArgs e)
+    {
+        var appt = _appointments[_moveIndex];
+        if (_moveFixed)
+        {
+            // Day granularity: the whole appointment shifts by whole days, preserving its time-of-day
+            // and duration — the same for the all-day band and for month chips.
+            var target = this.IsMonth ? this.MonthDayAt(e.X, e.Y) : this.DayColumnDate(e.X);
+            var landDay = (target ?? appt.Start).Date.AddDays(-_moveGrabDays);
+            var delta = landDay - appt.Start.Date;
+            _previewStart = appt.Start + delta;
+            _previewEnd = appt.End + delta;
+            return;
+        }
+
+        var grid = this.BodyBounds;
+        switch (_dragKind)
+        {
+            case DragKind.ResizeStart:
+            {
+                var endMin = (int)(appt.End - appt.Start.Date).TotalMinutes;
+                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), 0, endMin - _timeScale);
+                _previewStart = appt.Start.Date.AddMinutes(min);
+                _previewEnd = appt.End;
+                break;
+            }
+
+            case DragKind.ResizeEnd:
+            {
+                var startMin = (int)(appt.Start - appt.Start.Date).TotalMinutes;
+                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), startMin + _timeScale, 1440);
+                _previewStart = appt.Start;
+                _previewEnd = appt.Start.Date.AddMinutes(min);
+                break;
+            }
+
+            default:
+            {
+                var startMin = this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY - _moveGrabPixels));
+                _previewStart = this.DayColumnDate(e.X).AddMinutes(startMin);
+                _previewEnd = _previewStart.AddMinutes(_moveDurationMinutes);
+                break;
+            }
+        }
+    }
+
+    /// <summary>Proposes the dropped reschedule: raises the cancelable <see cref="AppointmentMoving"/>
+    /// and, unless a handler vetoes it, <see cref="AppointmentMoved"/>. A no-op move raises nothing.
+    /// The one event-args object is the move's only allocation.</summary>
+    private void CommitMove(int index)
+    {
+        var appt = _appointments[index];
+        if (_previewEnd <= _previewStart)
+            return;
+
+        if (_previewStart == appt.Start && _previewEnd == appt.End)
+            return;
+
+        var args = new AppointmentMoveEventArgs(appt, _previewStart, _previewEnd);
+        this.AppointmentMoving?.Invoke(this, args);
+        if (args.Cancel)
+            return;
+
+        this.AppointmentMoved?.Invoke(this, args);
+    }
+
+    /// <summary>Clears the reschedule-drag state.</summary>
+    private void ResetMove()
+    {
+        _movePrimed = false;
+        _moving = false;
+        _moveIndex = -1;
+        _moveSubject = null;
     }
 
     /// <inheritdoc/>
@@ -1105,9 +1362,12 @@ public class CalendarView : OwnerDrawnControl
             }
         }
 
-        var hit = this.HitTestAppointment(e.X, e.Y);
-        if (hit >= 0)
+        var hitBox = this.HitTestBox(e.X, e.Y);
+        if (hitBox >= 0)
         {
+            var box = _layout[hitBox];
+            var hit = box.Index;
+
             // A second press on the same appointment inside the double-click window opens it for edit,
             // the honest double-click moment on a surface the core owns (like the grid's cell double
             // click) — there is no separate native double-click event to wait for.
@@ -1117,8 +1377,14 @@ public class CalendarView : OwnerDrawnControl
             _lastClickIndex = hit;
             this.SelectIndex(hit);
             if (isDouble)
+            {
                 this.AppointmentActivate?.Invoke(this, new AppointmentEventArgs(_appointments[hit]));
+                return;
+            }
 
+            // Arm a move: past a small threshold the press turns into a reschedule drag; a click that
+            // never crosses the threshold falls through to the plain selection made just above.
+            this.PrimeMove(box, hit, e);
             return;
         }
 
@@ -1164,6 +1430,23 @@ public class CalendarView : OwnerDrawnControl
             return;
         }
 
+        // An armed appointment drag becomes a live move/resize once it clears the threshold; before
+        // that a press-and-release is a plain click and keeps the selection it already made.
+        if (_movePrimed)
+        {
+            if (!_moving)
+            {
+                if (Math.Abs(e.X - _movePress.X) <= _MoveThreshold && Math.Abs(e.Y - _movePress.Y) <= _MoveThreshold)
+                    return;
+
+                _moving = true;
+            }
+
+            this.UpdateMovePreview(e);
+            this.Invalidate();
+            return;
+        }
+
         if (!_rangeDragging)
             return;
 
@@ -1205,6 +1488,22 @@ public class CalendarView : OwnerDrawnControl
         {
             _scrollDragging = false;
             this.Invalidate();
+            return;
+        }
+
+        // A reschedule drag drops here: propose the snapped move, then clear the drag state. A press
+        // that never moved (sub-threshold) resets silently — its selection already stood.
+        if (_movePrimed)
+        {
+            var moved = _moving;
+            var index = _moveIndex;
+            this.ResetMove();
+            if (moved)
+            {
+                this.Invalidate();
+                this.CommitMove(index);
+            }
+
             return;
         }
 
@@ -1295,6 +1594,14 @@ public class CalendarView : OwnerDrawnControl
                 if (this.SelectedAppointment is { } appt)
                     this.AppointmentActivate?.Invoke(this, new AppointmentEventArgs(appt));
 
+                e.Handled = true;
+                break;
+
+            case Keys.Escape when _movePrimed:
+                // Bail out of an in-flight reschedule: the preview vanishes and the snapshot is left
+                // exactly where it was, so a subsequent mouse-up proposes nothing.
+                this.ResetMove();
+                this.Invalidate();
                 e.Handled = true;
                 break;
         }
