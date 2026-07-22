@@ -200,8 +200,11 @@ public class TableLayoutPanel : Panel
         this.ResolvePlacements(columns, rows, children);
 
         var border = this.CellBorderStyle == TableLayoutPanelCellBorderStyle.Single ? 1 : 0;
-        this.SizeAxis(horizontal: true, columns, children, border);
-        this.SizeAxis(horizontal: false, rows, children, border);
+        // DisplayRectangle, not Width/Height: it deflates Padding and — through Panel's override — the
+        // band a visible AutoScroll scrollbar occupies, so tracks never lay out under the bar.
+        var display = this.DisplayRectangle;
+        this.SizeAxis(horizontal: true, columns, children, border, display);
+        this.SizeAxis(horizontal: false, rows, children, border, display);
 
         _layingOut = true;
         try
@@ -338,12 +341,12 @@ public class TableLayoutPanel : Panel
     /// tracks split what is left by weight — the last one absorbing the rounding remainder.
     /// Unstyled tracks act as equal percent shares.
     /// </summary>
-    private void SizeAxis(bool horizontal, int tracks, int children, int border)
+    private void SizeAxis(bool horizontal, int tracks, int children, int border, Rectangle display)
     {
         var sizes = horizontal ? _columnWidths : _rowHeights;
         var weights = horizontal ? _columnWeights : _rowWeights;
         var styled = horizontal ? this.ColumnStyles.Count : this.RowStyles.Count;
-        var available = (horizontal ? this.Width : this.Height) - ((tracks + 1) * border);
+        var available = (horizontal ? display.Width : display.Height) - ((tracks + 1) * border);
 
         for (var i = 0; i < tracks; ++i)
         {
@@ -403,7 +406,7 @@ public class TableLayoutPanel : Panel
         }
 
         var offsets = horizontal ? _columnOffsets : _rowOffsets;
-        var position = border;
+        var position = (horizontal ? display.X : display.Y) + border;
         for (var i = 0; i < tracks; ++i)
         {
             offsets[i] = position;
@@ -503,6 +506,7 @@ public class TableLayoutPanel : Panel
         var columns = this.ColumnCount;
         var rows = this.RowCount;
         var scroll = this.AutoScrollPosition; // negative offsets shift the grid with the content
+        var origin = this.DisplayRectangle.Location; // Padding/scrollbar inset the grid, so start there
 
         var totalWidth = columns + 1;
         for (var i = 0; i < columns; ++i)
@@ -512,18 +516,20 @@ public class TableLayoutPanel : Panel
         for (var i = 0; i < rows; ++i)
             totalHeight += _rowHeights[i];
 
-        var x = scroll.X;
+        var left = origin.X + scroll.X;
+        var top = origin.Y + scroll.Y;
+        var x = left;
         for (var i = 0; i <= columns; ++i)
         {
-            g.DrawLine(borderColor, x, scroll.Y, x, scroll.Y + totalHeight - 1);
+            g.DrawLine(borderColor, x, top, x, top + totalHeight - 1);
             if (i < columns)
                 x += _columnWidths[i] + 1;
         }
 
-        var y = scroll.Y;
+        var y = top;
         for (var i = 0; i <= rows; ++i)
         {
-            g.DrawLine(borderColor, scroll.X, y, scroll.X + totalWidth - 1, y);
+            g.DrawLine(borderColor, left, y, left + totalWidth - 1, y);
             if (i < rows)
                 y += _rowHeights[i] + 1;
         }

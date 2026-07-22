@@ -594,9 +594,9 @@ strategy (may differ per platform; note exceptions inline).
       surrender it to the next focusable sibling. Found while adding the pickers and worked around in
       the walkthrough, not solved.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
-- [ ] `TableLayoutPanel` lays its cells out from `Width`/`Height` and never reads
-      `DisplayRectangle`, so cells still sit under a visible `AutoScroll` scrollbar — the same
-      class of defect `Panel` was fixed for.
+- [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
+      `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect
+      `Panel` was fixed for.
 - [ ] The Win32 halves of the native-tooltip support (child window subclassing, `TOOLTIPS_CLASS`)
       are compile-verified only; they have never executed, since the sweep ran on GTK.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,

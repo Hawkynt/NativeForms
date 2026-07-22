@@ -303,4 +303,38 @@ internal sealed class TableLayoutPanelTests
 
         Assert.That(g.Operations.Exists(o => o.StartsWith(_TrackFill)), Is.True);
     }
+
+    [Test]
+    public void Percent_column_stays_left_of_a_visible_vertical_scrollbar()
+    {
+        var table = MakeGrid(1, 3, 200, 90);
+        table.AutoScroll = true;
+        table.RowStyles.Add(new(SizeType.Absolute, 60));
+        table.RowStyles.Add(new(SizeType.Absolute, 60));
+        table.RowStyles.Add(new(SizeType.Absolute, 60)); // 180 px of rows overflows the 90 px viewport
+        table.ColumnStyles.Add(new(SizeType.Percent, 100));
+        table.Controls.AddRange(MakeChild(), MakeChild(), MakeChild());
+        Realize(table, out _);
+
+        var display = table.DisplayRectangle;
+        Assert.Multiple(() =>
+        {
+            Assert.That(display.Width, Is.LessThan(200), "a visible vertical scrollbar takes a band");
+            Assert.That(table.Controls[0].Bounds.Width, Is.EqualTo(display.Width),
+                "the percent column must not reach under the scrollbar");
+        });
+    }
+
+    [Test]
+    public void Padding_insets_the_grid_origin_and_extent()
+    {
+        var table = MakeGrid(1, 1, 200, 100);
+        table.Padding = new(10);
+        table.ColumnStyles.Add(new(SizeType.Percent, 100));
+        table.RowStyles.Add(new(SizeType.Percent, 100));
+        table.Controls.Add(MakeChild());
+        Realize(table, out _);
+
+        Assert.That(table.Controls[0].Bounds, Is.EqualTo(new Rectangle(10, 10, 180, 80)));
+    }
 }
