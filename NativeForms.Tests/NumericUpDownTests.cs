@@ -114,6 +114,40 @@ internal sealed class NumericUpDownTests
     }
 
     [Test]
+    public void Enter_inside_the_editor_commits_a_pending_edit()
+    {
+        var upDown = new NumericUpDown { Minimum = 0, Maximum = 10, Bounds = new(0, 0, 120, 24) };
+        var backend = Realize(upDown);
+        var editor = EditorOf(backend);
+
+        editor.SimulateUserInput("25"); // out of range, not yet committed
+        var handled = editor.SimulateKeyDown(Keys.Enter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handled, Is.True, "Enter is consumed so the editor never sees it");
+            Assert.That(upDown.Value, Is.EqualTo(10m), "the edit is committed and clamped");
+            Assert.That(editor.Text, Is.EqualTo("10"), "the editor is rewritten to the clamped value");
+        });
+    }
+
+    [Test]
+    public void Arrows_inside_the_editor_step_the_value()
+    {
+        var upDown = new NumericUpDown { Minimum = 0, Maximum = 10, Bounds = new(0, 0, 120, 24) };
+        var backend = Realize(upDown);
+        var editor = EditorOf(backend);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(editor.SimulateKeyDown(Keys.Up), Is.True);
+            Assert.That(upDown.Value, Is.EqualTo(1m));
+            Assert.That(editor.SimulateKeyDown(Keys.Down), Is.True);
+            Assert.That(upDown.Value, Is.EqualTo(0m));
+        });
+    }
+
+    [Test]
     public void Clicking_the_spinner_buttons_steps_the_value()
     {
         var upDown = new NumericUpDown { Bounds = new(0, 0, 120, 24) };

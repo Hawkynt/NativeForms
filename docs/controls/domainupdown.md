@@ -45,7 +45,7 @@ The inherited `Text` property is the hosted editor's content; assigning it count
 
 - Built on the shared `UpDownBase` engine (also behind [`NumericUpDown`](numericupdown.md)): hosted native editor, themed spinner column, click-and-hold autorepeat (500 ms initial delay, then every 50 ms), Up/Down key stepping.
 - **Commit points, honestly.** A pending edit is committed before any step and when the surface loses focus: the text is matched case-insensitively against `Items` — a hit selects that item and normalizes the editor to the item's casing, a miss reverts the editor to the current item. `DomainUpDownTests` pin both paths headlessly.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.5 and §7.1): an Enter commit from *inside* the hosted native editor. The focus model routes keys for owner-drawn surfaces, but a native text widget cannot preview them yet — that needs a key seam on `ITextBoxPeer`.
+- **Enter and arrows from inside the editor.** The `ITextBoxPeer.KeyDown` seam forwards the hosted editor's keys to the spinner: Enter commits the pending edit and Up/Down step the selection, consumed before the native editor sees them.
 
 ## Differences from System.Windows.Forms.DomainUpDown
 

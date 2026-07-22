@@ -11,12 +11,13 @@ namespace Hawkynt.NativeForms;
 /// autorepeats (500 ms initial delay, then every 50 ms); the Up/Down keys step as well.
 /// </summary>
 /// <remarks>
-/// Keys typed inside the hosted native editor are not observable from the core (the peer exposes
-/// text changes, not key events), so a typed edit has no Enter-key moment to commit at. Instead, a
-/// pending edit is committed — parsed by <see cref="ValidateEditText"/>, which clamps or
-/// reverts — at the honest points available: before any step (buttons, keys, autorepeat, exactly
-/// like the classic control validates before stepping) and when the surface loses focus. Subclasses
-/// may add further commit points, as <see cref="NumericUpDown"/> does on <c>Value</c> reads.
+/// The hosted editor forwards its keys through <see cref="ITextBoxPeer.KeyDown"/>, so the spinner
+/// gets first refusal on the keys that belong to it even while the caret lives in the native editor:
+/// Enter commits the pending edit, and Up/Down step the value. A pending edit is also committed —
+/// parsed by <see cref="ValidateEditText"/>, which clamps or reverts — at the other honest points:
+/// before any step (buttons, autorepeat, exactly like the classic control validates before stepping)
+/// and when the surface loses focus. Subclasses may add further commit points, as
+/// <see cref="NumericUpDown"/> does on <c>Value</c> reads.
 /// </remarks>
 public abstract class UpDownBase : OwnerDrawnControl
 {
@@ -30,6 +31,7 @@ public abstract class UpDownBase : OwnerDrawnControl
     {
         _editor = new() { TabStop = false };
         _editor.TextChanged += this.OnEditorTextChanged;
+        _editor.KeyDown += this.OnEditorKeyDown; // Enter/Up/Down while the caret lives in the editor
         this.Controls.Add(_editor);
     }
 
@@ -142,8 +144,21 @@ public abstract class UpDownBase : OwnerDrawnControl
                 this.DownButton();
                 e.Handled = true;
                 break;
+
+            case Keys.Enter:
+                this.CommitEdit();
+                e.Handled = true;
+                break;
         }
     }
+
+    /// <summary>
+    /// Routes a key the hosted editor reported into the shared <see cref="OnKeyDown"/> handling, so
+    /// Enter commits and Up/Down step even though the caret — and thus the key — lives in the native
+    /// editor rather than on this owner-drawn surface. A handled key is consumed before the editor
+    /// acts on it.
+    /// </summary>
+    private void OnEditorKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
 
     /// <inheritdoc/>
     protected override void OnLostFocus(EventArgs e)

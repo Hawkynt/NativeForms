@@ -303,10 +303,11 @@ strategy (may differ per platform; note exceptions inline).
         GtkTextView has no native limit, documented), `CharacterCasing` (core-side, all backends)
   - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live
   - [ ] Owner-drawn grey placeholder for multiline (no native support in EDIT or GtkTextView)
-  - [~] `ITextBoxPeer.KeyDown` seam now exists (Win32 EDIT subclass, GTK pre-connected
-        `key-press-event`, headless fake) — wired for `SearchBox`; it unblocks
-        `AcceptsReturn`/`AcceptsTab`, `NumericUpDown`/`DomainUpDown` Enter commits and grid-editor
-        Enter/Escape, none of which are wired yet. Word-wrap control and undo API still pending.
+  - [~] `ITextBoxPeer.KeyDown` seam exists (Win32 EDIT subclass, GTK pre-connected
+        `key-press-event`, headless fake) — wired for `SearchBox` and now for
+        `NumericUpDown`/`DomainUpDown` (Enter commits the pending edit, Up/Down step from inside the
+        editor). `AcceptsReturn`/`AcceptsTab`, grid-editor Enter/Escape, word-wrap control and the
+        undo API are still pending.
 - [x] `MaskedTextBox` (core mask engine over the native TextBox: 0/9/L/?/A/a/&/C + literals +
       escapes, `PromptChar`, transactional whole-text validation with revert, `MaskCompleted`,
       `MaskedTextChanged`, raw-text extraction; whole-text transitions documented — no per-key
