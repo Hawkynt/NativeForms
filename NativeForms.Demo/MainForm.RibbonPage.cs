@@ -60,7 +60,13 @@ internal sealed partial class MainForm
         clearStyle.Click += (_, _) => this.SetStatus("Ribbon: Clear formatting clicked.");
         styles.Items.Add(clearStyle);
 
-        home.Groups.AddRange(clipboard, font, styles);
+        // A large button with a long caption, to show two-line wrapping keeping the column compact.
+        var editing = new RibbonGroup("Editing") { ImageIndex = _IconGear };
+        var findReplace = new RibbonButton("Find and Replace") { ImageList = _icons, ImageIndex = _IconPurple };
+        findReplace.Click += (_, _) => this.SetStatus("Ribbon: Find and Replace clicked.");
+        editing.Items.Add(findReplace);
+
+        home.Groups.AddRange(clipboard, font, styles, editing);
 
         var insert = new RibbonTab("Insert");
         var illustrations = new RibbonGroup("Illustrations") { ImageIndex = _IconBlue };

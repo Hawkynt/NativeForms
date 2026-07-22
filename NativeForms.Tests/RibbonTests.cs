@@ -602,6 +602,54 @@ internal sealed class RibbonTests
         Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16")), Is.True);
     }
 
+    // --- Two-line large captions -------------------------------------------------------------------
+
+    [Test]
+    public void A_long_large_caption_wraps_onto_two_balanced_lines_and_stays_compact()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        var home = new RibbonTab("Home");
+        var group = new RibbonGroup("Edit");
+        var wide = new RibbonButton("Paste Special Formatting"); // 24 chars — far past the wrap cap
+        group.Items.Add(wide);
+        home.Groups.Add(group);
+        ribbon.Tabs.Add(home);
+        var canvas = Realize(ribbon, out var backend);
+        canvas.RaisePaint();
+
+        var font = backend.Theme.DefaultFont;
+        var (line1, line2, width) = wide.WrapLarge(backend, font, 60);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(line2, Is.Not.Null, "the long caption wrapped");
+            Assert.That($"{line1} {line2}", Is.EqualTo("Paste Special Formatting"), "no words are lost");
+            Assert.That(width, Is.LessThan(wide.TextWidth(backend, font)), "the wrapped column is narrower than one line");
+        });
+    }
+
+    [Test]
+    public void A_short_large_caption_stays_on_one_line()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        var home = new RibbonTab("Home");
+        var group = new RibbonGroup("Edit");
+        var paste = new RibbonButton("Paste");
+        group.Items.Add(paste);
+        home.Groups.Add(group);
+        ribbon.Tabs.Add(home);
+        var canvas = Realize(ribbon, out var backend);
+        canvas.RaisePaint();
+
+        var (line1, line2, _) = paste.WrapLarge(backend, backend.Theme.DefaultFont, 60);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(line1, Is.EqualTo("Paste"));
+            Assert.That(line2, Is.Null, "a caption within the cap is not wrapped");
+        });
+    }
+
     // --- Contextual tab groups ---------------------------------------------------------------------
 
     private static Ribbon WithContextualTools(out RibbonContextualTabGroup tools, out RibbonTab design)

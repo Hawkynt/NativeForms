@@ -165,9 +165,10 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
 
 ## Differences from the Office ribbon
 
-- **No caption wrapping on large items.** Office breaks a long large-item caption over two lines;
-  here it stays on one and the column widens. Keeps the paint path measurement-light.
-- **No Quick Access Toolbar, no application (File) menu, no contextual tab groups, no KeyTips.**
+- **Two-line captions on large items.** A large-item caption past `_MaxLargeCaptionWidth` wraps at
+  the space split that makes the wider line narrowest, keeping the column compact; the split lines are
+  cached (one lazy object per wrapping item) so the paint path allocates nothing once warm.
+- **No application (File) menu and no KeyTips.**
   A `MenuStrip` above the ribbon covers the application-menu case.
 - **Collapse order is right-to-left**, not priority-driven — there is no per-group priority.
 - **No auto-layout owner.** Minimizing changes the ribbon's own height and raises

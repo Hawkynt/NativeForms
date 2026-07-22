@@ -57,6 +57,10 @@ public class Ribbon : OwnerDrawnControl
     /// <summary>The narrowest a large item may be, so a one-word caption still reads as a column.</summary>
     private const int _MinLargeItemWidth = 44;
 
+    /// <summary>The caption width past which a large item's multi-word caption wraps onto two lines,
+    /// keeping the button compact instead of stretching it to the full single-line width.</summary>
+    private const int _MaxLargeCaptionWidth = 60;
+
     /// <summary>How many small items stack into one column.</summary>
     private const int _SmallRowsPerColumn = 3;
 
@@ -381,10 +385,11 @@ public class Ribbon : OwnerDrawnControl
         if (item is RibbonHostItem host)
             return host.HostWidth + (2 * _ItemPadding);
 
+        if (item.ItemSize == RibbonItemSize.Large)
+            return Math.Max(_MinLargeItemWidth, item.WrapLarge(this.Backend, font, _MaxLargeCaptionWidth).Width + (2 * _ItemPadding));
+
         var text = item.TextWidth(this.Backend, font);
-        return item.ItemSize == RibbonItemSize.Large
-            ? Math.Max(_MinLargeItemWidth, text + (2 * _ItemPadding))
-            : (2 * _ItemPadding) + _SmallIconSize + _ItemPadding + text;
+        return (2 * _ItemPadding) + _SmallIconSize + _ItemPadding + text;
     }
 
     /// <summary>
@@ -1324,12 +1329,17 @@ public class Ribbon : OwnerDrawnControl
                 g.DrawImage(icon, new Rectangle(bounds.X + ((bounds.Width - _LargeIconSize) / 2), bounds.Y + 2, _LargeIconSize, _LargeIconSize));
 
             var textTop = bounds.Y + 2 + (icon is not null ? _LargeIconSize + 2 : 0);
-            g.DrawText(
-                item.DisplayText,
-                font,
-                textColor,
-                new Rectangle(bounds.X, textTop, bounds.Width, Math.Max(0, bounds.Bottom - textTop)),
-                ContentAlignment.TopCenter);
+            var captionHeight = Math.Max(0, bounds.Bottom - textTop);
+            var (line1, line2, _) = item.WrapLarge(this.Backend, font, _MaxLargeCaptionWidth);
+            if (line2 is null)
+            {
+                g.DrawText(line1, font, textColor, new Rectangle(bounds.X, textTop, bounds.Width, captionHeight), ContentAlignment.TopCenter);
+                return;
+            }
+
+            var half = captionHeight / 2;
+            g.DrawText(line1, font, textColor, new Rectangle(bounds.X, textTop, bounds.Width, half), ContentAlignment.TopCenter);
+            g.DrawText(line2, font, textColor, new Rectangle(bounds.X, textTop + half, bounds.Width, captionHeight - half), ContentAlignment.TopCenter);
             return;
         }
 
