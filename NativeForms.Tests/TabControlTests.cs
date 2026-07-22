@@ -173,6 +173,75 @@ internal sealed class TabControlTests
         Assert.That(tabs.ShowsOverflowArrows, Is.False);
     }
 
+    // --- Alignment ---------------------------------------------------------------------------------
+
+    [Test]
+    public void Alignment_defaults_to_top()
+        => Assert.That(new TabControl().Alignment, Is.EqualTo(TabAlignment.Top));
+
+    [Test]
+    public void Bottom_alignment_seats_the_content_above_the_strip()
+    {
+        var tabs = TwoPages(out var one, out _);
+        tabs.Alignment = TabAlignment.Bottom;
+        Realize(tabs, out _);
+
+        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(0, 0, 300, 200 - _HeaderHeight)));
+    }
+
+    [Test]
+    public void Click_on_a_bottom_strip_selects_its_tab()
+    {
+        var tabs = TwoPages(out _, out _);
+        tabs.Alignment = TabAlignment.Bottom;
+        var canvas = Realize(tabs, out _);
+        canvas.RaisePaint();
+
+        canvas.RaiseMouseDown((2 * _TabPadding) + (3 * _CharWidth) + 4, 200 - (_HeaderHeight / 2));
+
+        Assert.That(tabs.SelectedIndex, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Left_alignment_seats_the_content_right_of_a_vertical_strip()
+    {
+        var tabs = TwoPages(out var one, out _);
+        tabs.Alignment = TabAlignment.Left;
+        Realize(tabs, out _);
+
+        var stripWidth = (2 * _TabPadding) + (3 * _CharWidth); // widest caption "One"/"Two"
+        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(stripWidth, 0, 300 - stripWidth, 200)));
+    }
+
+    [Test]
+    public void Click_on_a_left_strip_row_selects_its_tab()
+    {
+        var tabs = TwoPages(out _, out _);
+        tabs.Alignment = TabAlignment.Left;
+        var canvas = Realize(tabs, out _);
+        canvas.RaisePaint();
+
+        // Rows stack by header height: row 1 spans y in [28, 56).
+        canvas.RaiseMouseDown(10, _HeaderHeight + (_HeaderHeight / 2));
+
+        Assert.That(tabs.SelectedIndex, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Right_alignment_seats_the_strip_on_the_right_edge()
+    {
+        var tabs = TwoPages(out var one, out _);
+        tabs.Alignment = TabAlignment.Right;
+        var canvas = Realize(tabs, out _);
+
+        var stripWidth = (2 * _TabPadding) + (3 * _CharWidth);
+        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(0, 0, 300 - stripWidth, 200)));
+
+        canvas.RaisePaint();
+        canvas.RaiseMouseDown(300 - 10, _HeaderHeight + (_HeaderHeight / 2));
+        Assert.That(tabs.SelectedIndex, Is.EqualTo(1));
+    }
+
     [Test]
     public void Ctrl_Tab_cycles_forward_and_back_with_wraparound()
     {

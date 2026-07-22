@@ -13,9 +13,12 @@ namespace Hawkynt.NativeForms;
 /// a time; switching flips page visibility and re-applies the content-area bounds.
 /// </summary>
 /// <remarks>
-/// The header sits at the top only for now; <c>Alignment</c> (bottom/left/right) and per-tab close
-/// buttons are pending. Header hit zones come from the most recent paint, which is also when tab
-/// captions are measured through <see cref="IGraphics.MeasureText"/>.
+/// The strip sits on any edge through <see cref="Alignment"/>. Top and bottom lay the tabs out
+/// horizontally, their widths measured from the captions; left and right run a vertical strip whose
+/// width is the widest caption and stack the tabs as themed rows with horizontal captions (the
+/// toolkit has no rotated-text primitive, so side tabs read left-to-right rather than rotated — a
+/// documented deviation from Windows Forms). Header hit zones come from the most recent paint, which
+/// is also when tab captions are measured through <see cref="IGraphics.MeasureText"/>.
 /// </remarks>
 public class TabControl : OwnerDrawnControl
 {
@@ -25,8 +28,11 @@ public class TabControl : OwnerDrawnControl
     private const int _UnderlineThickness = 2;
     private const int _ArrowWidth = 16;
     private const int _ArrowGlyphSize = 8;
+    private const int _MinVerticalStripWidth = 24;
 
-    private readonly List<int> _tabWidths = [];
+    private readonly List<int> _tabWidths = []; // per-tab size along the flow axis
+    private TabAlignment _alignment = TabAlignment.Top;
+    private int _verticalStripWidth = _MinVerticalStripWidth;
     private int _selectedIndex = -1;
     private int _firstVisibleTab;
     private int _hotTab = -1;
@@ -48,6 +54,21 @@ public class TabControl : OwnerDrawnControl
                 return;
 
             field = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>Which edge the header strip is painted along; <see cref="TabAlignment.Top"/> by default.</summary>
+    public TabAlignment Alignment
+    {
+        get => _alignment;
+        set
+        {
+            if (_alignment == value)
+                return;
+
+            _alignment = value;
+            this.PerformLayout(); // the content area moved to a different edge
             this.Invalidate();
         }
     }
@@ -85,8 +106,52 @@ public class TabControl : OwnerDrawnControl
     /// <summary>Raised when <see cref="SelectedIndex"/> changes.</summary>
     public event EventHandler? SelectedIndexChanged;
 
-    /// <summary>The pixel height of the header strip.</summary>
+    /// <summary>The pixel height of a horizontal header strip (and the height of each stacked side tab).</summary>
     public int HeaderHeight => this.Theme.RowHeight + _HeaderChrome;
+
+    /// <summary>Whether the strip runs down a side edge (tabs stacked) rather than along top/bottom.</summary>
+    private bool Vertical => _alignment is TabAlignment.Left or TabAlignment.Right;
+
+    /// <summary>The cross-axis thickness of the strip: the header height, or the vertical strip width.</summary>
+    private int StripThickness => this.Vertical ? _verticalStripWidth : this.HeaderHeight;
+
+    /// <summary>The length of the axis the tabs flow along: the width (horizontal) or the height (vertical).</summary>
+    private int FlowExtent => this.Vertical ? this.Height : this.Width;
+
+    /// <summary>The header strip rectangle on its aligned edge.</summary>
+    private Rectangle GetHeaderRect()
+    {
+        var t = this.StripThickness;
+        return _alignment switch
+        {
+            TabAlignment.Top => new(0, 0, this.Width, t),
+            TabAlignment.Bottom => new(0, this.Height - t, this.Width, t),
+            TabAlignment.Left => new(0, 0, t, this.Height),
+            _ => new(this.Width - t, 0, t, this.Height),
+        };
+    }
+
+    /// <summary>Remeasures the vertical strip width from the widest caption; a no-op while horizontal.</summary>
+    private void RefreshStripWidth()
+    {
+        if (!this.Vertical || this.Backend is not { } backend)
+            return;
+
+        var font = this.Theme.DefaultFont;
+        var iconWidth = this.ImageList is { } images ? images.ImageSize.Width + _IconGap : 0;
+        var widest = _MinVerticalStripWidth;
+        for (var i = 0; i < this.TabPages.Count; ++i)
+        {
+            var page = this.TabPages[i];
+            var caption = (2 * _TabPadding) + backend.MeasureText(page.Text, font).Width;
+            if (iconWidth > 0 && page.ImageIndex >= 0)
+                caption += iconWidth;
+
+            widest = Math.Max(widest, caption);
+        }
+
+        _verticalStripWidth = widest;
+    }
 
     /// <summary>Whether the last paint needed the header scroll arrows (tabs overflow the width).</summary>
     internal bool ShowsOverflowArrows => _overflow;
@@ -100,8 +165,18 @@ public class TabControl : OwnerDrawnControl
     /// <summary>Raises <see cref="SelectedIndexChanged"/>.</summary>
     protected virtual void OnSelectedIndexChanged(EventArgs e) => this.SelectedIndexChanged?.Invoke(this, e);
 
-    /// <summary>The client rectangle below the header strip that pages fill.</summary>
-    private Rectangle GetContentArea() => new(0, this.HeaderHeight, this.Width, Math.Max(0, this.Height - this.HeaderHeight));
+    /// <summary>The client rectangle beside the header strip that pages fill.</summary>
+    private Rectangle GetContentArea()
+    {
+        var t = this.StripThickness;
+        return _alignment switch
+        {
+            TabAlignment.Top => new(0, t, this.Width, Math.Max(0, this.Height - t)),
+            TabAlignment.Bottom => new(0, 0, this.Width, Math.Max(0, this.Height - t)),
+            TabAlignment.Left => new(t, 0, Math.Max(0, this.Width - t), this.Height),
+            _ => new(0, 0, Math.Max(0, this.Width - t), this.Height),
+        };
+    }
 
     /// <summary>Makes the selected page visible with up-to-date content-area bounds.</summary>
     private void ShowSelectedPage()
@@ -119,8 +194,9 @@ public class TabControl : OwnerDrawnControl
     {
         base.OnRealized(peer);
 
-        // The theme (and with it the header height) is only known now — refresh the page bounds
+        // The theme (and with it the strip thickness) is only known now — refresh the page bounds
         // before the pages themselves realize.
+        this.RefreshStripWidth();
         for (var i = 0; i < this.TabPages.Count; ++i)
             this.TabPages[i].Bounds = this.GetContentArea();
     }
@@ -130,6 +206,7 @@ public class TabControl : OwnerDrawnControl
     /// own children per their Anchor/Dock like any plain container.</summary>
     private protected override void OnLayout()
     {
+        this.RefreshStripWidth();
         for (var i = 0; i < this.TabPages.Count; ++i)
             this.TabPages[i].Bounds = this.GetContentArea();
 
@@ -204,7 +281,10 @@ public class TabControl : OwnerDrawnControl
         this.Invalidate();
     }
 
-    /// <summary>Recomputes the cached per-tab header widths from the current captions and icons.</summary>
+    /// <summary>
+    /// Recomputes each tab's size along the flow axis: the measured caption width when the strip runs
+    /// horizontally, or one themed row height when it stacks down a side.
+    /// </summary>
     private void MeasureTabs(IGraphics g)
     {
         _tabWidths.Clear();
@@ -212,6 +292,12 @@ public class TabControl : OwnerDrawnControl
         var iconWidth = this.ImageList is { } images ? images.ImageSize.Width + _IconGap : 0;
         for (var i = 0; i < this.TabPages.Count; ++i)
         {
+            if (this.Vertical)
+            {
+                _tabWidths.Add(this.HeaderHeight);
+                continue;
+            }
+
             var page = this.TabPages[i];
             var width = (2 * _TabPadding) + g.MeasureText(page.Text, font).Width;
             if (iconWidth > 0 && page.ImageIndex >= 0)
@@ -221,42 +307,46 @@ public class TabControl : OwnerDrawnControl
         }
     }
 
-    /// <summary>The x-coordinate where the tab strip ends (arrows start there when overflowing).</summary>
-    private int GetTabStripRight() => _overflow ? Math.Max(0, this.Width - (2 * _ArrowWidth)) : this.Width;
+    /// <summary>The flow coordinate where the tab area ends (arrows start there when overflowing).</summary>
+    private int TabStripEnd => _overflow ? Math.Max(0, this.FlowExtent - (2 * _ArrowWidth)) : this.FlowExtent;
 
-    /// <summary>The tab index under the given header x-coordinate, from the last paint's widths.</summary>
-    private int HitTestTab(int x)
+    /// <summary>The tab index under the given flow coordinate, from the last paint's sizes.</summary>
+    private int HitTestTab(int flow)
     {
-        if (x >= this.GetTabStripRight())
+        if (flow >= this.TabStripEnd)
             return -1;
 
-        var right = 0;
+        var end = 0;
         for (var i = _firstVisibleTab; i < _tabWidths.Count; ++i)
         {
-            right += _tabWidths[i];
-            if (x < right)
+            end += _tabWidths[i];
+            if (flow < end)
                 return i;
         }
 
         return -1;
     }
 
+    /// <summary>The flow coordinate (x horizontally, y vertically) of a header-strip point.</summary>
+    private int FlowOf(Point p) => this.Vertical ? p.Y : p.X;
+
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
     {
         this.Focus();
-        if (e.Button != MouseButtons.Left || e.Y >= this.HeaderHeight)
+        if (e.Button != MouseButtons.Left || !this.GetHeaderRect().Contains(e.Location))
             return;
 
-        if (_overflow && e.X >= this.GetTabStripRight())
+        var flow = this.FlowOf(e.Location);
+        if (_overflow && flow >= this.TabStripEnd)
         {
-            var scrollRight = e.X >= this.Width - _ArrowWidth;
-            _firstVisibleTab = Math.Clamp(_firstVisibleTab + (scrollRight ? 1 : -1), 0, Math.Max(0, this.TabPages.Count - 1));
+            var scrollForward = flow >= this.FlowExtent - _ArrowWidth;
+            _firstVisibleTab = Math.Clamp(_firstVisibleTab + (scrollForward ? 1 : -1), 0, Math.Max(0, this.TabPages.Count - 1));
             this.Invalidate();
             return;
         }
 
-        var hit = this.HitTestTab(e.X);
+        var hit = this.HitTestTab(flow);
         if (hit >= 0)
             this.SelectedIndex = hit;
     }
@@ -264,7 +354,7 @@ public class TabControl : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        var hit = e.Y < this.HeaderHeight ? this.HitTestTab(e.X) : -1;
+        var hit = this.GetHeaderRect().Contains(e.Location) ? this.HitTestTab(this.FlowOf(e.Location)) : -1;
         if (hit == _hotTab)
             return;
 
@@ -313,73 +403,110 @@ public class TabControl : OwnerDrawnControl
     {
         var g = e.Graphics;
         var theme = this.Theme;
-        var headerHeight = this.HeaderHeight;
+        var header = this.GetHeaderRect();
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
-        g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, this.Width, headerHeight));
-        g.DrawLine(theme.Border, 0, headerHeight - 1, this.Width - 1, headerHeight - 1);
+        g.FillRectangle(theme.HeaderBackground, header);
+        this.PaintStripBorder(g, theme, header);
 
         this.MeasureTabs(g);
-        var totalWidth = 0;
+        var totalFlow = 0;
         for (var i = 0; i < _tabWidths.Count; ++i)
-            totalWidth += _tabWidths[i];
+            totalFlow += _tabWidths[i];
 
-        _overflow = totalWidth > this.Width;
+        _overflow = totalFlow > this.FlowExtent;
         if (!_overflow)
             _firstVisibleTab = 0;
 
-        var stripRight = this.GetTabStripRight();
-        g.PushClip(new Rectangle(0, 0, stripRight, headerHeight));
-        var x = 0;
-        for (var i = _firstVisibleTab; i < _tabWidths.Count && x < stripRight; ++i)
+        var stripEnd = this.TabStripEnd;
+        g.PushClip(this.Vertical
+            ? new Rectangle(header.X, 0, header.Width, stripEnd)
+            : new Rectangle(0, header.Y, stripEnd, header.Height));
+
+        var flow = 0;
+        for (var i = _firstVisibleTab; i < _tabWidths.Count && flow < stripEnd; ++i)
         {
-            this.PaintTab(g, theme, i, x, headerHeight);
-            x += _tabWidths[i];
+            this.PaintTab(g, theme, i, this.TabRectAt(header, flow, _tabWidths[i]));
+            flow += _tabWidths[i];
         }
 
         g.PopClip();
 
         if (_overflow)
-            this.PaintOverflowArrows(g, theme, stripRight, headerHeight);
+            this.PaintOverflowArrows(g, theme, header, stripEnd);
     }
 
-    private void PaintTab(IGraphics g, ITheme theme, int index, int x, int headerHeight)
+    /// <summary>The rectangle a tab of the given flow size occupies at the given flow offset in the strip.</summary>
+    private Rectangle TabRectAt(Rectangle header, int flowStart, int flowSize)
+        => this.Vertical
+            ? new(header.X, flowStart, header.Width, flowSize)
+            : new(flowStart, header.Y, flowSize, header.Height);
+
+    /// <summary>Draws the divider between the strip and the content, along the strip's content-facing edge.</summary>
+    private void PaintStripBorder(IGraphics g, ITheme theme, Rectangle header)
     {
-        var width = _tabWidths[index];
+        switch (_alignment)
+        {
+            case TabAlignment.Top:
+                g.DrawLine(theme.Border, 0, header.Bottom - 1, this.Width - 1, header.Bottom - 1);
+                break;
+            case TabAlignment.Bottom:
+                g.DrawLine(theme.Border, 0, header.Y, this.Width - 1, header.Y);
+                break;
+            case TabAlignment.Left:
+                g.DrawLine(theme.Border, header.Right - 1, 0, header.Right - 1, this.Height - 1);
+                break;
+            default:
+                g.DrawLine(theme.Border, header.X, 0, header.X, this.Height - 1);
+                break;
+        }
+    }
+
+    private void PaintTab(IGraphics g, ITheme theme, int index, Rectangle tab)
+    {
         var active = index == _selectedIndex;
         if (active || index == _hotTab)
-            g.FillRectangle(theme.ControlBackground, new Rectangle(x, 0, width, headerHeight));
+            g.FillRectangle(theme.ControlBackground, tab);
 
         if (active)
-            g.FillRectangle(theme.Accent, new Rectangle(x, headerHeight - _UnderlineThickness, width, _UnderlineThickness));
+            g.FillRectangle(theme.Accent, this.AccentRect(tab));
 
         var page = this.TabPages[index];
-        var textLeft = x + _TabPadding;
+        var textLeft = tab.X + _TabPadding;
         if (this.ImageList is { } images && page.ImageIndex >= 0 && page.ImageIndex < images.Count && this.Backend is { } backend)
         {
             var iconSize = images.ImageSize;
-            var iconTop = (headerHeight - iconSize.Height) / 2;
+            var iconTop = tab.Y + ((tab.Height - iconSize.Height) / 2);
             g.DrawImage(images.GetImage(page.ImageIndex, backend), new Rectangle(textLeft, iconTop, iconSize.Width, iconSize.Height));
             textLeft += iconSize.Width + _IconGap;
         }
 
-        var textRect = new Rectangle(textLeft, 0, x + width - _TabPadding - textLeft, headerHeight);
+        var textRect = new Rectangle(textLeft, tab.Y, tab.Right - _TabPadding - textLeft, tab.Height);
         g.DrawText(page.Text, theme.DefaultFont, active ? theme.ControlText : theme.HeaderText, textRect, ContentAlignment.MiddleLeft);
     }
 
-    private void PaintOverflowArrows(IGraphics g, ITheme theme, int stripRight, int headerHeight)
+    /// <summary>The accent bar for the active tab, on the edge that faces the content area.</summary>
+    private Rectangle AccentRect(Rectangle tab) => _alignment switch
     {
-        var glyphTop = (headerHeight - _ArrowGlyphSize) / 2;
+        TabAlignment.Top => new(tab.X, tab.Bottom - _UnderlineThickness, tab.Width, _UnderlineThickness),
+        TabAlignment.Bottom => new(tab.X, tab.Y, tab.Width, _UnderlineThickness),
+        TabAlignment.Left => new(tab.Right - _UnderlineThickness, tab.Y, _UnderlineThickness, tab.Height),
+        _ => new(tab.X, tab.Y, _UnderlineThickness, tab.Height),
+    };
+
+    private void PaintOverflowArrows(IGraphics g, ITheme theme, Rectangle header, int stripEnd)
+    {
+        var (back, forward) = this.Vertical ? (GlyphDirection.Up, GlyphDirection.Down) : (GlyphDirection.Left, GlyphDirection.Right);
+        Glyphs.PaintTriangle(g, theme.ControlText, this.ArrowGlyphRect(header, stripEnd), back);
+        Glyphs.PaintTriangle(g, theme.ControlText, this.ArrowGlyphRect(header, stripEnd + _ArrowWidth), forward);
+    }
+
+    /// <summary>Centers an arrow glyph in the <see cref="_ArrowWidth"/> cell that begins at the given flow offset.</summary>
+    private Rectangle ArrowGlyphRect(Rectangle header, int flowStart)
+    {
         var glyphInset = (_ArrowWidth - _ArrowGlyphSize) / 2;
-        Glyphs.PaintTriangle(
-            g,
-            theme.ControlText,
-            new Rectangle(stripRight + glyphInset, glyphTop, _ArrowGlyphSize, _ArrowGlyphSize),
-            GlyphDirection.Left);
-        Glyphs.PaintTriangle(
-            g,
-            theme.ControlText,
-            new Rectangle(stripRight + _ArrowWidth + glyphInset, glyphTop, _ArrowGlyphSize, _ArrowGlyphSize),
-            GlyphDirection.Right);
+        return this.Vertical
+            ? new(header.X + ((header.Width - _ArrowGlyphSize) / 2), flowStart + glyphInset, _ArrowGlyphSize, _ArrowGlyphSize)
+            : new(flowStart + glyphInset, header.Y + ((header.Height - _ArrowGlyphSize) / 2), _ArrowGlyphSize, _ArrowGlyphSize);
     }
 }
 

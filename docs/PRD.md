@@ -251,7 +251,10 @@ strategy (may differ per platform; note exceptions inline).
 - [~] `TabControl` / `TabPage` (owner, themed header strip; pages host real nested children)
   - [x] Tab headers with **icon + text** (`ImageList` + per-page `ImageIndex`), accent underline
         on the active tab, hover feedback
-  - [~] Header overflow scroll arrows done; `Alignment` bottom/left/right pending
+  - [x] `Alignment` Top/Bottom/Left/Right — horizontal strips (top/bottom) measure tab widths from
+        the captions; vertical strips (left/right) stack tabs as themed rows with horizontal captions
+        (no rotated-text primitive, a documented WinForms deviation). Overflow scroll arrows follow
+        the flow axis on every edge
   - [x] `SelectedIndex`/`SelectedTab`, `SelectedIndexChanged`, keyboard nav (Ctrl+Tab wrap,
         arrows), content area auto-applied to pages on resize/switch
   - [ ] Optional per-tab close button (modern tabbed-UI affordance)

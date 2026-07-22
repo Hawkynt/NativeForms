@@ -111,6 +111,23 @@ internal sealed partial class MainForm
             Caption("Panel (AutoScroll, 464×200 content)", 500, 198),
             scrollPanel);
 
+        // --- Column 3: tab-strip alignment ------------------------------------------------------
+
+        TabControl AlignedTabs(TabAlignment alignment, int y)
+        {
+            var tc = new TabControl { Bounds = new(812, y, 172, 104), Alignment = alignment };
+            tc.TabPages.AddRange(new TabPage("One"), new TabPage("Two"), new TabPage("Tri"));
+            tc.TabPages[0].Controls.Add(new Label { Bounds = new(10, 10, 110, 20), Text = $"{alignment} strip" });
+            return tc;
+        }
+
+        page.Controls.AddRange(
+            Caption("TabControl.Alignment", 812, 12, 172),
+            AlignedTabs(TabAlignment.Top, 36),
+            AlignedTabs(TabAlignment.Bottom, 152),
+            AlignedTabs(TabAlignment.Left, 268),
+            AlignedTabs(TabAlignment.Right, 384));
+
         // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
         var splitterDistance = split.SplitterDistance;
         var expanderOpen = expander.Expanded;

@@ -37,7 +37,8 @@ tabs.ImageList = icons;
 | `ImageList` | `ImageList?` | `null` | The icons referenced by each page's `ImageIndex`. |
 | `SelectedIndex` | `int` | `-1` | Index of the visible page, `-1` while there are no pages. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `TabPage?` | `null` | The visible page; setting selects by `IndexOf`. |
-| `HeaderHeight` | `int` (get) | theme row height + 6 | Pixel height of the header strip. |
+| `Alignment` | `TabAlignment` | `Top` | Which edge the header strip runs along — `Top`, `Bottom`, `Left` or `Right`. |
+| `HeaderHeight` | `int` (get) | theme row height + 6 | Pixel height of a horizontal header strip (and the height of each stacked side tab). |
 
 ### Events
 
@@ -66,9 +67,14 @@ the tab control's content area. Constructors: `TabPage()` and `TabPage(string te
 - The tab control owns each page's bounds: the content area below the header is re-applied on
   realization, on resize and on every switch. Changing a page's `Text` or `ImageIndex` repaints the
   header.
-- When the tabs outgrow the width, two arrow buttons appear at the right edge of the header and
-  scroll the strip one tab per click; the strip snaps back to the first tab once everything fits
-  again.
+- `Alignment` moves the strip to any edge. `Top`/`Bottom` lay the tabs out horizontally with widths
+  measured from the captions; `Left`/`Right` run a vertical strip whose width is the widest caption
+  and stack the tabs as themed rows, drawing each caption horizontally (the toolkit has no
+  rotated-text primitive, so side tabs read left-to-right rather than rotated). The active tab's
+  accent bar always sits on the edge that faces the content.
+- When the tabs outgrow the strip they appear with two arrow buttons at its trailing end — left/right
+  for a horizontal strip, up/down for a vertical one — that scroll one tab per click; the strip snaps
+  back to the first tab once everything fits again.
 - Keyboard (the control is focusable): Ctrl+Tab / Ctrl+Shift+Tab cycle with wraparound, Left/Right
   move the selection without wrapping. A left-click on a header selects its tab; clicks below the
   header go to the page.
@@ -76,14 +82,14 @@ the tab control's content area. Constructors: `TabPage()` and `TabPage(string te
 - Painted with the platform `ITheme` (`HeaderBackground`, `ControlBackground`, `Accent`, `Border`,
   `HeaderText`, `ControlText`, `DefaultFont`); testable headlessly through the test backend's
   recording canvas.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.2): `Alignment` (bottom/left/right headers)
-  and per-tab close buttons.
+- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.2): per-tab close buttons.
 
 ## Differences from System.Windows.Forms.TabControl
 
 - **No `Selecting`/`Deselecting`** — page switches cannot be vetoed; `SelectedIndexChanged` is the
   only selection event.
-- **No `Alignment`, no `Multiline`** (the header is always a single top strip that scrolls on
+- **`Alignment` covers all four edges but `Left`/`Right` draw captions horizontally** rather than
+  rotating them (no rotated-text primitive); **no `Multiline`** (a single strip that scrolls on
   overflow) and **no `GetTabRect`** — header hit zones are internal.
 - **`Controls.Add` routes into `TabPages`**: adding a `TabPage` through either collection keeps both
   in sync, and adding a non-`TabPage` child throws `InvalidOperationException` — put content on a
