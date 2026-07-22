@@ -70,6 +70,13 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
                 _window, "button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowButtonPress, data, 0, 0);
             NativeMethods.g_signal_connect_data(
                 _window, "key-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowKeyPress, data, 0, 0);
+
+            // A window manager stealing the pointer/keyboard — Alt-Tab to another application, another
+            // app taking a grab — breaks our seat grab and fires grab-broken. That is the one focus
+            // change a light-dismiss surface must honor, the way Windows Forms closes a drop-down when
+            // its owner deactivates; the grab-shadow focus-out the owner reports meanwhile is not it.
+            NativeMethods.g_signal_connect_data(
+                _window, "grab-broken-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowGrabBroken, data, 0, 0);
         }
     }
 
@@ -118,6 +125,11 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     /// <inheritdoc />
     public void Hide()
     {
+        // Cleared before the grabs are released: releasing the GDK seat grab can itself deliver a
+        // grab-broken event, and the handler must see the surface as already gone rather than dismiss
+        // it a second time.
+        _shown = false;
+
         if (_grabbed)
         {
             NativeMethods.gtk_grab_remove(_window);
@@ -125,7 +137,6 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
             _grabbed = false;
         }
 
-        _shown = false;
         NativeMethods.gtk_widget_hide(_window);
     }
 
@@ -192,6 +203,19 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
 
         peer.Dismiss();
         return 1;
+    }
+
+    /// <summary>
+    /// Native "grab-broken-event" handler on the popup top-level: an external grab took over — a
+    /// genuine window-manager focus change — so the surface dismisses. Our own <see cref="Hide"/>
+    /// clears <c>_shown</c> before it releases the grabs, so the ungrab it performs cannot re-enter
+    /// this as a dismissal.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnWindowGrabBroken(nint widget, nint eventPtr, nint userData)
+    {
+        PopupFromData(userData)?.Dismiss();
+        return 0; // let the event propagate; dismissal is a side effect, not a consumption
     }
 
     /// <summary>Native "key-press-event" handler on the popup top-level: Escape dismisses.</summary>

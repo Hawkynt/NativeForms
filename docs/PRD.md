@@ -611,11 +611,14 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `GtkPopupPeer.IsOutside` maps the press through `XRoot`/`YRoot` and the popup's own origin,
       so a grab-redirected click no longer reads as "inside" (was latent until drop-downs began
       staying open, which made it reachable).
-- [ ] A drop-down ignores **all** reported focus loss while open — including a genuine
-      window-manager focus change (Alt-Tab away), where WinForms would close it. Telling a
-      grab-shadow focus-out from a real one needs a reason code GTK3's `GdkEventFocus` does not
-      carry, so it means tracking grab state in the peer and reporting the cause across
-      `IControlPeer`.
+- [x] A drop-down now tells a grab-shadow focus-out from a genuine window-manager focus change by
+      the grab itself: `GtkPopupPeer` listens for `grab-broken-event`, which fires only when an
+      external grab (Alt-Tab to another application, another app grabbing) takes the seat grab away,
+      and dismisses there — the way WinForms closes a drop-down when its owner deactivates. The
+      spurious owner focus-out is still ignored. The no-spurious-dismiss path is verified on real GTK
+      (the gallery's drop-down captures stay open); the Alt-Tab positive path needs a full window
+      manager, which the rootless Xwayland test display cannot provide (same limit as interactive
+      GUI in CI).
 - [x] **Demo gallery**: `NativeForms.Demo` is a tabbed showcase of every shipped control with
       representative property settings; every new control lands with a gallery section
       (coverage tracked in §11).
