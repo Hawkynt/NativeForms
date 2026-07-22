@@ -181,8 +181,9 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       enforced by the no-reflection rule, exercised by the binding and column-type tests).
 - [ ] Source-generated `[Bindable]`/property-accessor generator so `DataSource`+`DisplayMember`
       resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe).
-- [~] `ObservableList<T>` with granular change events (add/remove/replace/reset) for virtualized
-      list controls done; `Move` change type + `IReadOnlyObservableList<T>` pending.
+- [x] `ObservableList<T>` with granular change events — add/remove/replace/reset, plus `Move`
+      (`ListChangeType.Moved` carrying `OldIndex` + `Index`) and the read-only `IReadOnlyObservableList<T>`
+      view for consumers that observe but do not mutate.
 - [x] Format/parse converters: `PropertyBinding<TSource, TTarget>` delegate pairs, two-way.
 - [x] Binding fallbacks (`BindingFallback<T>`): default value when the source read throws,
       null-replacement when it yields `null` — source→target path, per binding, reflection-free.

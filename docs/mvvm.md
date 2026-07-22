@@ -256,9 +256,14 @@ list.ListChanged += (_, e) => Console.WriteLine($"{e.ChangeType} at {e.Index}");
 
 list.Add("c");    // Added at 2
 list[0] = "A";    // Replaced at 0
+list.Move(2, 0);  // Moved from OldIndex 2 to Index 0
 list.RemoveAt(1); // Removed at 1
 list.Clear();     // Reset at -1
 ```
+
+`Move(oldIndex, newIndex)` reports `ListChangeType.Moved` carrying both `OldIndex` and `Index`, so a
+bound control can reorder in place. Consumers that should observe but not mutate take the list as
+`IReadOnlyObservableList<T>` — an `IReadOnlyList<T>` that still exposes `ListChanged`.
 
 Appending with **no listener allocates nothing** beyond the underlying array's growth: the
 null-conditional event raise short-circuits before the `ListChangedEventArgs` is constructed. The

@@ -14,18 +14,49 @@ public enum ListChangeType
     /// <summary>The item at the index was replaced.</summary>
     Replaced,
 
+    /// <summary>An item moved from <see cref="ListChangedEventArgs.OldIndex"/> to <see cref="ListChangedEventArgs.Index"/>.</summary>
+    Moved,
+
     /// <summary>The whole list changed (clear/bulk).</summary>
     Reset,
 }
 
 /// <summary>Describes a change to an <see cref="ObservableList{T}"/>.</summary>
-public sealed class ListChangedEventArgs(ListChangeType changeType, int index) : EventArgs
+public sealed class ListChangedEventArgs : EventArgs
 {
-    /// <summary>What happened.</summary>
-    public ListChangeType ChangeType { get; } = changeType;
+    /// <summary>A single-index change (add/remove/replace/reset).</summary>
+    public ListChangedEventArgs(ListChangeType changeType, int index)
+    {
+        this.ChangeType = changeType;
+        this.Index = index;
+        this.OldIndex = -1;
+    }
 
-    /// <summary>The affected index, or -1 for <see cref="ListChangeType.Reset"/>.</summary>
-    public int Index { get; } = index;
+    /// <summary>A <see cref="ListChangeType.Moved"/> change, carrying both source and destination.</summary>
+    public ListChangedEventArgs(ListChangeType changeType, int oldIndex, int newIndex)
+    {
+        this.ChangeType = changeType;
+        this.Index = newIndex;
+        this.OldIndex = oldIndex;
+    }
+
+    /// <summary>What happened.</summary>
+    public ListChangeType ChangeType { get; }
+
+    /// <summary>The affected (or destination) index, or -1 for <see cref="ListChangeType.Reset"/>.</summary>
+    public int Index { get; }
+
+    /// <summary>The source index for a <see cref="ListChangeType.Moved"/> change; -1 otherwise.</summary>
+    public int OldIndex { get; }
+}
+
+/// <summary>A read-only view of an <see cref="ObservableList{T}"/> that still reports its changes —
+/// handed to consumers that should observe but not mutate the list.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+public interface IReadOnlyObservableList<out T> : IReadOnlyList<T>
+{
+    /// <summary>Raised after every structural change.</summary>
+    event EventHandler<ListChangedEventArgs>? ListChanged;
 }
 
 /// <summary>
@@ -34,7 +65,7 @@ public sealed class ListChangedEventArgs(ListChangeType changeType, int index) :
 /// repaints only what changed instead of rebuilding.
 /// </summary>
 /// <typeparam name="T">The element type.</typeparam>
-public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
+public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>, IReadOnlyObservableList<T>
 {
     private readonly List<T> _items;
 
@@ -109,6 +140,27 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
     {
         _items.Clear();
         this.OnListChanged(ListChangeType.Reset, -1);
+    }
+
+    /// <summary>
+    /// Moves the item at <paramref name="oldIndex"/> to <paramref name="newIndex"/>, raising a single
+    /// <see cref="ListChangeType.Moved"/> notification so a bound control can reorder in place rather
+    /// than rebuild. A move to the same index is a no-op.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Either index is outside the list.</exception>
+    public void Move(int oldIndex, int newIndex)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(oldIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(oldIndex, _items.Count);
+        ArgumentOutOfRangeException.ThrowIfNegative(newIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(newIndex, _items.Count);
+        if (oldIndex == newIndex)
+            return;
+
+        var item = _items[oldIndex];
+        _items.RemoveAt(oldIndex);
+        _items.Insert(newIndex, item);
+        this.ListChanged?.Invoke(this, new ListChangedEventArgs(ListChangeType.Moved, oldIndex, newIndex));
     }
 
     /// <summary>
