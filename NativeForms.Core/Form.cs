@@ -313,6 +313,30 @@ public class Form : Control
     }
 
     /// <summary>
+    /// Reconciles focus after a visibility change: when the <see cref="ActiveControl"/> has been
+    /// hidden or disabled out from under focus — a switched-away <see cref="TabPage"/>, a collapsed
+    /// <see cref="Expander"/> or a directly hidden control — it surrenders focus to the next focusable
+    /// tab stop, exactly like Windows Forms. If nothing else can take focus the record is cleared and
+    /// the control abandons its <see cref="Control.Focused"/> flag, so a later click places focus
+    /// fresh rather than finding the platform's focus stranded on an unmapped widget.
+    /// </summary>
+    internal void ReconcileActiveControlVisibility()
+    {
+        if (_activeControl is not { } active || (active.Visible && active.Enabled))
+            return;
+
+        this.MoveFocus(active, forward: true);
+
+        // MoveFocus re-points ActiveControl through the gaining control's peer focus event; if it is
+        // still the hidden one, no other tab stop could take it.
+        if (!ReferenceEquals(_activeControl, active))
+            return;
+
+        _activeControl = null;
+        active.AbandonFocus();
+    }
+
+    /// <summary>
     /// The form-level dialog-key chain, run by a focused owner-drawn control before its own key
     /// handling: registered menu shortcuts, Alt+mnemonics, Tab/Shift+Tab navigation, Enter →
     /// <see cref="AcceptButton"/> and Escape → <see cref="CancelButton"/>. Returns whether the key

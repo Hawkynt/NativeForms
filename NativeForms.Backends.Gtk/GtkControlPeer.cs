@@ -259,8 +259,34 @@ internal abstract class GtkControlPeer : IControlPeer
     /// <summary>Pushes <see cref="IsEffectivelyVisible"/> to the widget.</summary>
     private void ApplyVisibility()
     {
-        if (_widget != 0)
-            NativeMethods.gtk_widget_set_visible(_widget, Bool(this.IsEffectivelyVisible));
+        if (_widget == 0)
+            return;
+
+        var visible = this.IsEffectivelyVisible;
+
+        // Unmapping a widget that holds the toplevel's focus strands GTK's focus pointer on it: later
+        // clicks land but move no focus, and a grab_focus onto another widget only recovers it
+        // intermittently. Clearing the window focus first releases the stranded widget so the core's
+        // move to the next tab stop (or a later click) grabs focus reliably.
+        if (!visible)
+            this.SurrenderNativeFocusIfHeld();
+
+        NativeMethods.gtk_widget_set_visible(_widget, Bool(visible));
+    }
+
+    /// <summary>Clears the toplevel focus when it rests on this widget or a descendant about to unmap.</summary>
+    private void SurrenderNativeFocusIfHeld()
+    {
+        var toplevel = NativeMethods.gtk_widget_get_toplevel(_widget);
+        if (toplevel == 0 || NativeMethods.gtk_widget_is_toplevel(toplevel) == 0)
+            return;
+
+        var focus = NativeMethods.gtk_window_get_focus(toplevel);
+        if (focus == 0)
+            return;
+
+        if (focus == _widget || NativeMethods.gtk_widget_is_ancestor(focus, _widget) != 0)
+            NativeMethods.gtk_window_set_focus(toplevel, 0);
     }
 
     /// <inheritdoc />

@@ -522,6 +522,26 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_widget_grab_focus(nint widget);
 
+    /// <summary>The widget's toplevel ancestor (a <c>GtkWindow</c> when parented into one).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_widget_get_toplevel(nint widget);
+
+    /// <summary>Whether the widget is a toplevel (has no parent) — the guard before treating it as a window.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_widget_is_toplevel(nint widget);
+
+    /// <summary>Whether <paramref name="widget"/> is a descendant of <paramref name="ancestor"/>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_widget_is_ancestor(nint widget, nint ancestor);
+
+    /// <summary>The widget that currently holds focus within the window, or <c>NULL</c>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_window_get_focus(nint window);
+
+    /// <summary>Sets the window's focus widget; <c>NULL</c> clears it so a later grab starts clean.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_window_set_focus(nint window, nint widget);
+
     /// <summary>Returns the widget's current allocated width in pixels.</summary>
     [LibraryImport(Gtk)]
     internal static partial int gtk_widget_get_allocated_width(nint widget);

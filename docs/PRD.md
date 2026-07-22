@@ -588,11 +588,11 @@ strategy (may differ per platform; note exceptions inline).
       developer with a display gets real coverage — `GtkNativeSizingTests` is the first.
       XTEST is unusable here (`:1` is Xwayland `-rootless`; the compositor swallows injected
       pointer events), which is why injection happens in-process.
-- [ ] `!` A focused owner-drawn control whose page is then hidden **strands the GTK toplevel's focus
-      widget**: later clicks land correctly but move no focus, and a programmatic `Focus()` only
-      recovers it intermittently (a synthesized click does). Hiding a control that holds focus should
-      surrender it to the next focusable sibling. Found while adding the pickers and worked around in
-      the walkthrough, not solved.
+- [x] A focused owner-drawn control whose page is then hidden no longer **strands the GTK toplevel's
+      focus widget**: `Form.ReconcileActiveControlVisibility` surrenders focus to the next focusable
+      tab stop after any visibility push (all backends, headless-tested), and the GTK peer clears the
+      toplevel focus when it unmaps the widget that held it so the move lands reliably. The Pickers
+      walkthrough workaround was removed and the text-entry sweep passes across repeated runs.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
       `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect

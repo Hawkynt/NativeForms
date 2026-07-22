@@ -761,6 +761,22 @@ public abstract class Control
     }
 
     /// <summary>
+    /// Gives up focus the control can no longer hold because it was hidden or disabled and nothing
+    /// else took it — the form's last resort in <see cref="Form.ReconcileActiveControlVisibility"/>.
+    /// Guarded by the flag so it is a no-op when the platform already reported the loss (a real
+    /// backend fires focus-out as the widget unmaps), which keeps the crossing events single.
+    /// </summary>
+    internal void AbandonFocus()
+    {
+        if ((_state & State.Focused) == 0)
+            return;
+
+        _state &= ~State.Focused;
+        this.OnLostFocus(EventArgs.Empty);
+        this.OnLeave(EventArgs.Empty);
+    }
+
+    /// <summary>
     /// Whether this control currently owns a shown <see cref="Backends.IPopupPeer"/>. Every popup
     /// owner sets it across the surface's lifetime — from just before <c>ShowAt</c> until the surface
     /// is hidden or light-dismissed — which is what keeps the grab's spurious focus loss from closing
@@ -1344,12 +1360,22 @@ public abstract class Control
     /// </summary>
     internal void PushPeerVisibleTree()
     {
+        this.PushPeerVisibleSubtree();
+
+        // A hide may have pulled the mapped widget out from under keyboard focus; let the form move
+        // focus to the next tab stop before anyone reads a stranded ActiveControl.
+        this.FindForm()?.ReconcileActiveControlVisibility();
+    }
+
+    /// <summary>Pushes effective visibility across the whole subtree without reconciling focus — the recursion body.</summary>
+    private void PushPeerVisibleSubtree()
+    {
         this.PushPeerVisible();
         if (_controls is not { } children)
             return;
 
         for (var i = 0; i < children.Count; ++i)
-            children[i].PushPeerVisibleTree();
+            children[i].PushPeerVisibleSubtree();
     }
 
     /// <summary>

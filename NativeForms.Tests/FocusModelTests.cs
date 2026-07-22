@@ -130,6 +130,78 @@ internal sealed class FocusModelTests
     }
 
     [Test]
+    public void Hiding_the_focused_control_surrenders_focus_to_the_next_tab_stop()
+    {
+        var form = new Form();
+        var first = new TextBox();
+        var second = new TextBox();
+        form.Controls.Add(first);
+        form.Controls.Add(second);
+        Realize(form);
+
+        first.Focus();
+        Assert.That(form.ActiveControl, Is.SameAs(first));
+
+        first.Visible = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Focused, Is.False, "the hidden control must not keep focus");
+            Assert.That(second.Focused, Is.True, "focus moves to the next focusable tab stop");
+            Assert.That(form.ActiveControl, Is.SameAs(second));
+        });
+    }
+
+    [Test]
+    public void Hiding_the_page_that_holds_focus_surrenders_it_outside_the_page()
+    {
+        var form = new Form();
+        var outside = new TextBox();
+        var tabs = new TabControl();
+        var pageA = new TabPage();
+        var pageB = new TabPage();
+        var onA = new TextBox();
+        pageA.Controls.Add(onA);
+        tabs.TabPages.Add(pageA);
+        tabs.TabPages.Add(pageB);
+        form.Controls.Add(outside);
+        form.Controls.Add(tabs);
+        Realize(form);
+
+        onA.Focus();
+        Assert.That(form.ActiveControl, Is.SameAs(onA));
+
+        tabs.SelectedIndex = 1; // hides page A, and the focused control with it
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(onA.Focused, Is.False, "a control on a switched-away page must not keep focus");
+            Assert.That(form.ActiveControl, Is.Not.SameAs(onA));
+            Assert.That(form.ActiveControl, Is.Not.Null, "focus lands on a still-visible tab stop");
+        });
+    }
+
+    [Test]
+    public void Hiding_the_only_focusable_control_drops_the_active_record()
+    {
+        var form = new Form();
+        var only = new TextBox();
+        form.Controls.Add(only);
+        Realize(form);
+
+        only.Focus();
+        Assert.That(form.ActiveControl, Is.SameAs(only));
+
+        only.Visible = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(only.Focused, Is.False);
+            Assert.That(form.ActiveControl, Is.Null, "nothing else can hold focus, so the record clears");
+        });
+    }
+
+    [Test]
     public void Setting_ActiveControl_focuses_the_control()
     {
         var form = new Form();

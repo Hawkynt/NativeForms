@@ -123,41 +123,10 @@ internal sealed partial class Autopilot
             this.ExpectTrue("Space did not select the focused tile", this.Read(() => system.Selected));
         });
 
-        this.HandKeyboardBackToANativeEditor();
-    }
-
-    /// <summary>
-    /// Leaves the page with the keyboard on a real native editor rather than on an owner-drawn canvas.
-    /// </summary>
-    /// <remarks>
-    /// The Space check above deliberately parks the focus on a bare canvas — that is what it tests.
-    /// Switching tabs then hides the widget holding the toplevel's focus, and GTK does not re-home it:
-    /// every later click still lands on the right entry, yet none of them moves the focus, so the
-    /// whole text-entry sweep fails with "did not take the focus from a click". Every other page
-    /// happens to end on a native editor, which is why the sweep passes after them.
-    /// <para>
-    /// A programmatic <see cref="Control.Focus"/> proved to only *mostly* fix it — the sweep failed
-    /// about one run in two. The focus has to arrive the way a user's would, from a synthesized click
-    /// that produces a real focus-in, and the walkthrough has to see it land before moving on rather
-    /// than assume it did.
-    /// </para>
-    /// <para>
-    /// This is a workaround for a backend-level gap, not a fix: a focused control whose page is being
-    /// hidden should surrender the focus rather than strand it. The tab visibility/focus seam is not
-    /// this change's to alter.
-    /// </para>
-    /// </remarks>
-    private void HandKeyboardBackToANativeEditor()
-    {
-        var folder = _form.Part<FolderPicker>("pickers.folder");
-        this.Click(folder, 40, this.Read(() => folder.Height) / 2);
-
-        var deadline = Environment.TickCount64 + 2000;
-        while (Environment.TickCount64 < deadline && !this.HoldsFocus(folder))
-            this.Settle(50);
-
-        if (!this.HoldsFocus(folder))
-            this.Fail("the keyboard could not be handed back to a native editor before leaving the Pickers page");
+        // The Space check above deliberately parks focus on a bare owner-drawn canvas. Leaving the page
+        // that way is the point: switching tabs hides the focused widget, and the backend now surrenders
+        // the toplevel's focus to the next tab stop rather than stranding it, so the downstream
+        // text-entry sweep still takes focus from a click. No manual hand-back is needed.
     }
 
     /// <summary>
