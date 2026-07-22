@@ -541,8 +541,10 @@ strategy (may differ per platform; note exceptions inline).
         space split that makes the wider line narrowest, keeping the column compact; the two lines are
         cached (one lazy object per wrapping item, off the per-instance budget) so the paint path stays
         allocation-free
-  - [ ] KeyTips (a `MenuStrip` above the ribbon covers the application-menu case); the tab-click
-        flyout shows only item glyphs, not re-parented hosted controls
+  - [x] The tab-click flyout shows only item glyphs — a hosted control never re-parents into the
+        popup; its slot paints a recessed placeholder box instead, while the live control stays put
+        under the expanded ribbon
+  - [ ] KeyTips (deferred — a `MenuStrip` above the ribbon already covers the application-menu case)
 - [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 - [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`

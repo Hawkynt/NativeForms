@@ -316,6 +316,28 @@ internal sealed class RibbonTests
     }
 
     [Test]
+    public void The_minimized_flyout_does_not_re_parent_a_hosted_control()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        var combo = new ComboBox();
+        var home = new RibbonTab("Home");
+        var group = new RibbonGroup("Styles");
+        group.Items.Add(new RibbonHostItem(combo) { HostWidth = 120 });
+        home.Groups.Add(group);
+        ribbon.Tabs.Add(home);
+        var canvas = Realize(ribbon, out _);
+
+        ribbon.Minimized = true;
+        Assert.That(combo.Visible, Is.False);
+
+        // Clicking the Home tab while minimized floats the flyout; the hosted control stays hidden —
+        // the flyout paints a placeholder glyph rather than moving the live control into the popup.
+        canvas.RaiseMouseDown(20, _TabStrip / 2);
+
+        Assert.That(combo.Visible, Is.False);
+    }
+
+    [Test]
     public void A_resize_that_collapses_a_group_takes_its_hosted_control_off_screen()
     {
         // The regression this guards was invisible to a property assertion: Visible asks the veto

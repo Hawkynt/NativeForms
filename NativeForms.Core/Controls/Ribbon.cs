@@ -1055,9 +1055,25 @@ public class Ribbon : OwnerDrawnControl
         var contentHeight = this.GroupContentHeight(areaHeight);
         var captionHeight = this.CaptionStripHeight();
         for (var i = 0; i < tab.Groups.Count; ++i)
-            this.PaintGroup(g, theme, tab.Groups[i], i, contentHeight, captionHeight);
+            this.PaintGroup(g, theme, tab.Groups[i], i, contentHeight, captionHeight, flyout: true);
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, size.Width - 1, size.Height - 1));
+    }
+
+    /// <summary>Paints a recessed placeholder box where a hosted control would sit, so the flyout
+    /// shows a glyph for the item rather than a gap — the control itself never moves into the popup.</summary>
+    private void PaintHostPlaceholder(IGraphics g, ITheme theme, Rectangle rect)
+    {
+        var box = new Rectangle(
+            rect.X + _ItemPadding,
+            rect.Y + 2,
+            Math.Max(0, rect.Width - (2 * _ItemPadding)),
+            Math.Max(0, rect.Height - 4));
+        if (box.Width <= 0 || box.Height <= 0)
+            return;
+
+        g.FillRectangle(theme.HeaderBackground, box);
+        g.DrawRectangle(theme.Border, new Rectangle(box.X, box.Y, box.Width - 1, box.Height - 1));
     }
 
     // --- The Table grid picker --------------------------------------------------------------------
@@ -1239,7 +1255,7 @@ public class Ribbon : OwnerDrawnControl
     }
 
     /// <summary>Paints one group: its frame, its items (or its collapsed button) and its caption strip.</summary>
-    private void PaintGroup(IGraphics g, ITheme theme, RibbonGroup group, int groupIndex, int contentHeight, int captionHeight)
+    private void PaintGroup(IGraphics g, ITheme theme, RibbonGroup group, int groupIndex, int contentHeight, int captionHeight, bool flyout = false)
     {
         var bounds = group.Bounds;
         if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -1270,12 +1286,23 @@ public class Ribbon : OwnerDrawnControl
 
             for (var j = 0; j < count; ++j)
             {
-                if (group.Items[slots[j]] is not RibbonItem item || item is RibbonHostItem)
+                if (group.Items[slots[j]] is not RibbonItem item)
                     continue;
 
                 var rect = isLarge
                     ? new Rectangle(x, top, width, contentHeight)
                     : new Rectangle(x, top + (j * rowHeight), width, rowHeight);
+
+                // A hosted control never re-parents into the flyout — it stays where it is placed under
+                // the expanded ribbon. The flyout shows a placeholder glyph in its slot instead; the
+                // expanded ribbon skips it, because the live control sits there.
+                if (item is RibbonHostItem)
+                {
+                    if (flyout)
+                        this.PaintHostPlaceholder(g, theme, rect);
+
+                    continue;
+                }
 
                 this.PaintItem(g, theme, item, groupIndex, slots[j], rect, isLarge);
             }
