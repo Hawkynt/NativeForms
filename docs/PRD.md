@@ -535,9 +535,11 @@ strategy (may differ per platform; note exceptions inline).
         and keyboard nav otherwise, and marked in the group colour while shown; hiding the group that
         holds the selection hands it to the nearest shown tab. (The Office-style banner spanning the
         group's tabs is a future refinement; the colour marker stands in for it.)
-  - [ ] Two-line caption wrapping on large items; KeyTips (a `MenuStrip` above the ribbon covers the
-        application-menu case); the tab-click flyout shows only item glyphs, not re-parented hosted
-        controls; the grid picker does not grow past its `MaxColumns`/`MaxRows`
+  - [x] The grid picker never grows past its `MaxColumns`/`MaxRows` — the cell hit-test rejects
+        out-of-grid points, the arrow keys `Math.Min`-cap, and `SetSelection` clamps
+  - [ ] Two-line caption wrapping on large items (needs a capped large-item width + rebalanced
+        measurement); KeyTips (a `MenuStrip` above the ribbon covers the application-menu case); the
+        tab-click flyout shows only item glyphs, not re-parented hosted controls
 - [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 - [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`
