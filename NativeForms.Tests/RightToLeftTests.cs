@@ -8,8 +8,9 @@ namespace Hawkynt.NativeForms.Tests;
 /// <summary>
 /// The right-to-left honest subset (PRD §8): the ambient <see cref="Control.RightToLeft"/> property
 /// resolving through the parent chain, the shared mirroring helper, and the mirrored painting of
-/// the adopted owner-drawn faces (CheckBox, RadioButton, ToggleSwitch, LinkLabel). Container
-/// layout deliberately does not mirror yet.
+/// the adopted owner-drawn faces (CheckBox, RadioButton, ToggleSwitch, LinkLabel), and container
+/// layout mirroring — a right-to-left container flips where its children's peers physically sit
+/// while their logical bounds stay left-to-right.
 /// </summary>
 [TestFixture]
 internal sealed class RightToLeftTests
@@ -174,5 +175,65 @@ internal sealed class RightToLeftTests
         canvas.RaiseMouseUp(110, 12); // inside the mirrored text extent
 
         Assert.That(clicks, Is.EqualTo(1));
+    }
+
+    // --- Container layout mirroring ---------------------------------------------------------------
+
+    private static HeadlessBackend RealizeForm(Form form)
+    {
+        var backend = new HeadlessBackend();
+        Application.Run(form, backend);
+        return backend;
+    }
+
+    [Test]
+    public void A_right_to_left_container_mirrors_its_children_peer_placement()
+    {
+        var form = new Form { Bounds = new(0, 0, 400, 300) };
+        var panel = new Panel { Bounds = new(0, 0, 200, 100), RightToLeft = RightToLeft.Yes };
+        var button = new Button { Bounds = new(10, 20, 30, 40) };
+        panel.Controls.Add(button);
+        form.Controls.Add(panel);
+        var backend = RealizeForm(form);
+        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(button.Bounds, Is.EqualTo(new Rectangle(10, 20, 30, 40)), "logical bounds stay left-to-right");
+            Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(160, 20, 30, 40)), "the peer is mirrored to 200 - 10 - 30");
+        });
+    }
+
+    [Test]
+    public void A_left_to_right_container_places_children_unmirrored()
+    {
+        var form = new Form { Bounds = new(0, 0, 400, 300) };
+        var panel = new Panel { Bounds = new(0, 0, 200, 100) };
+        var button = new Button { Bounds = new(10, 20, 30, 40) };
+        panel.Controls.Add(button);
+        form.Controls.Add(panel);
+        var backend = RealizeForm(form);
+        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+
+        Assert.That(buttonPeer.Bounds, Is.EqualTo(new Rectangle(10, 20, 30, 40)));
+    }
+
+    [Test]
+    public void Toggling_RightToLeft_re_mirrors_existing_children()
+    {
+        var form = new Form { Bounds = new(0, 0, 400, 300) };
+        var panel = new Panel { Bounds = new(0, 0, 200, 100) };
+        var button = new Button { Bounds = new(10, 20, 30, 40) };
+        panel.Controls.Add(button);
+        form.Controls.Add(panel);
+        var backend = RealizeForm(form);
+        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+        Assert.That(buttonPeer.Bounds.X, Is.EqualTo(10));
+
+        panel.RightToLeft = RightToLeft.Yes;
+        Assert.That(buttonPeer.Bounds.X, Is.EqualTo(160), "flipping to RTL mirrors the child");
+
+        panel.RightToLeft = RightToLeft.No;
+        Assert.That(buttonPeer.Bounds.X, Is.EqualTo(10), "flipping back restores it");
     }
 }

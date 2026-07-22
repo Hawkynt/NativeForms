@@ -552,7 +552,9 @@ strategy (may differ per platform; note exceptions inline).
       per-monitor v2 rescale-on-move (Windows), GDK scale and macOS backing-scale pending
 - [x] Dark mode / high contrast with live theme-change notifications — see §5
 - [ ] Accessibility (UIA on Windows, ATK/AT-SPI on GTK, NSAccessibility on macOS)
-- [~] Right-to-left: ambient `Control.RightToLeft` + mirrored owner-drawn painting done; container layout mirroring pending
+- [x] Right-to-left: ambient `Control.RightToLeft`, mirrored owner-drawn painting, and container
+      layout mirroring — a right-to-left container flips where its children's peers sit across the
+      client width while their logical `Bounds` stay left-to-right (verified in pixels)
 - [x] Localization: `NativeForms.Strings` providers cover every built-in string (OS dialogs localize themselves)
 - [~] Drag & drop: in-process `DoDragDrop`/`AllowDrop`/`Drag*` events (mouse-capture session,
       all backends incl. headless) done; OS-level OLE/GTK DnD pending (COM vtables excluded by

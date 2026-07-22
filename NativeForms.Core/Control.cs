@@ -443,9 +443,10 @@ public abstract class Control
     /// <summary>
     /// The text direction, <see cref="NativeForms.RightToLeft.Inherit"/> by default: the effective
     /// value comes from the nearest ancestor with an explicit setting, falling back to
-    /// <see cref="NativeForms.RightToLeft.No"/>. Owner-drawn controls mirror their glyph/text
-    /// painting when it resolves to <see cref="NativeForms.RightToLeft.Yes"/>; containers do not
-    /// mirror their child layout yet (tracked in <c>docs/PRD.md</c> §8).
+    /// <see cref="NativeForms.RightToLeft.No"/>. When it resolves to
+    /// <see cref="NativeForms.RightToLeft.Yes"/> owner-drawn controls mirror their glyph/text
+    /// painting and a container mirrors where its children physically sit — the logical
+    /// <see cref="Bounds"/> stay left-to-right, only the peer placement flips across the client width.
     /// </summary>
     public RightToLeft RightToLeft
     {
@@ -468,8 +469,13 @@ public abstract class Control
             return;
 
         for (var i = 0; i < children.Count; ++i)
+        {
+            // Re-place every child under this container's (now flipped) mirroring — the child's own
+            // direction only governs its descendants, not where this container puts it.
+            children[i].PushPeerBounds();
             if (children[i].RightToLeft == RightToLeft.Inherit)
                 children[i].NotifyRightToLeftChanged();
+        }
     }
 
     /// <summary>The resolved text direction: walks the <see cref="Parent"/> chain past
@@ -1341,7 +1347,34 @@ public abstract class Control
 
     /// <summary>Re-applies this control's effective bounds to its peer through the parent's mapping.</summary>
     internal void PushPeerBounds()
-        => _peer?.SetBounds(this.Parent is { } parent ? parent.GetChildPeerBounds(this) : this.Bounds);
+    {
+        if (_peer is null)
+            return;
+
+        if (this.Parent is not { } parent)
+        {
+            _peer.SetBounds(this.Bounds);
+            return;
+        }
+
+        var bounds = parent.GetChildPeerBounds(this);
+
+        // A right-to-left container mirrors where its children physically sit: the logical Bounds stay
+        // left-to-right (so app code reads the same coordinates either way), only the peer placement
+        // flips across the container's client width — the way Windows Forms mirrors a container's
+        // layout under RightToLeft.
+        if (parent.IsRightToLeft)
+            bounds = parent.MirrorChildHorizontally(bounds);
+
+        _peer.SetBounds(bounds);
+    }
+
+    /// <summary>Reflects a child's peer rectangle across this container's client width.</summary>
+    private Rectangle MirrorChildHorizontally(Rectangle bounds)
+    {
+        var display = this.DisplayRectangle;
+        return new Rectangle(display.Left + display.Right - bounds.Right, bounds.Y, bounds.Width, bounds.Height);
+    }
 
     /// <summary>Re-applies this control's local visibility to its peer through the parent's veto.</summary>
     internal void PushPeerVisible()
