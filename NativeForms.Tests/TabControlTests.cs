@@ -242,6 +242,66 @@ internal sealed class TabControlTests
         Assert.That(tabs.SelectedIndex, Is.EqualTo(1));
     }
 
+    // --- Close buttons -----------------------------------------------------------------------------
+
+    [Test]
+    public void ShowCloseButtons_defaults_to_false()
+        => Assert.That(new TabControl().ShowCloseButtons, Is.False);
+
+    [Test]
+    public void Clicking_a_close_button_removes_the_tab_and_raises_closed()
+    {
+        var tabs = new TabControl { Bounds = new(0, 0, 300, 200), ShowCloseButtons = true };
+        var one = new TabPage("One");
+        var two = new TabPage("Two");
+        tabs.TabPages.AddRange(one, two);
+        TabPage? closed = null;
+        tabs.TabClosed += (_, e) => closed = e.Page;
+        var canvas = Realize(tabs, out _);
+        canvas.RaisePaint(); // measures tab widths incl. the close zone
+
+        canvas.RaiseMouseDown(50, _HeaderHeight / 2); // the first tab's close box
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tabs.TabPages, Has.Count.EqualTo(1));
+            Assert.That(tabs.TabPages[0], Is.SameAs(two));
+            Assert.That(closed, Is.SameAs(one));
+        });
+    }
+
+    [Test]
+    public void A_handler_can_cancel_a_tab_close()
+    {
+        var tabs = new TabControl { Bounds = new(0, 0, 300, 200), ShowCloseButtons = true };
+        tabs.TabPages.AddRange(new TabPage("One"), new TabPage("Two"));
+        tabs.TabClosing += (_, e) => e.Cancel = true;
+        var canvas = Realize(tabs, out _);
+        canvas.RaisePaint();
+
+        canvas.RaiseMouseDown(50, _HeaderHeight / 2);
+
+        Assert.That(tabs.TabPages, Has.Count.EqualTo(2), "a canceled close keeps the page");
+    }
+
+    [Test]
+    public void Clicking_the_caption_still_selects_when_close_buttons_are_shown()
+    {
+        var tabs = new TabControl { Bounds = new(0, 0, 300, 200), ShowCloseButtons = true };
+        tabs.TabPages.AddRange(new TabPage("One"), new TabPage("Two"));
+        var canvas = Realize(tabs, out _);
+        canvas.RaisePaint();
+
+        // The second tab's caption area (past the first tab), clear of its close box.
+        canvas.RaiseMouseDown((2 * _TabPadding) + (3 * _CharWidth) + 18 + _TabPadding + 2, _HeaderHeight / 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tabs.SelectedIndex, Is.EqualTo(1));
+            Assert.That(tabs.TabPages, Has.Count.EqualTo(2), "selecting must not close");
+        });
+    }
+
     [Test]
     public void Ctrl_Tab_cycles_forward_and_back_with_wraparound()
     {

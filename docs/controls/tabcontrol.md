@@ -38,6 +38,7 @@ tabs.ImageList = icons;
 | `SelectedIndex` | `int` | `-1` | Index of the visible page, `-1` while there are no pages. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `TabPage?` | `null` | The visible page; setting selects by `IndexOf`. |
 | `Alignment` | `TabAlignment` | `Top` | Which edge the header strip runs along — `Top`, `Bottom`, `Left` or `Right`. |
+| `ShowCloseButtons` | `bool` | `false` | Whether each tab paints an × close button that the caption makes room for. |
 | `HeaderHeight` | `int` (get) | theme row height + 6 | Pixel height of a horizontal header strip (and the height of each stacked side tab). |
 
 ### Events
@@ -45,6 +46,8 @@ tabs.ImageList = icons;
 | Event | Description |
 |---|---|
 | `SelectedIndexChanged` | Raised when `SelectedIndex` changes — including when removing the selected page hands the selection to a neighbor. Not raised when re-assigning the current index. |
+| `TabClosing` | Raised when a tab's close button is pressed, before the page is removed; a handler can veto by setting `Cancel`. |
+| `TabClosed` | Raised after a close button removed its page. |
 
 `TabPageCollection` is an `IReadOnlyList<TabPage>` with `Add`, `AddRange`, `Remove`, `Clear` and
 `IndexOf`. Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of
@@ -82,7 +85,9 @@ the tab control's content area. Constructors: `TabPage()` and `TabPage(string te
 - Painted with the platform `ITheme` (`HeaderBackground`, `ControlBackground`, `Accent`, `Border`,
   `HeaderText`, `ControlText`, `DefaultFont`); testable headlessly through the test backend's
   recording canvas.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.2): per-tab close buttons.
+- `ShowCloseButtons` gives every tab an × the caption reserves room for; a click raises the
+  cancelable `TabClosing`, and unless a handler vetoes it the page is removed and `TabClosed` follows.
+  The close box is hit-tested ahead of selection, so clicking the × closes rather than selects.
 
 ## Differences from System.Windows.Forms.TabControl
 

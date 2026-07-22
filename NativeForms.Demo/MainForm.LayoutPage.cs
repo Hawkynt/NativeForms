@@ -113,17 +113,20 @@ internal sealed partial class MainForm
 
         // --- Column 3: tab-strip alignment ------------------------------------------------------
 
-        TabControl AlignedTabs(TabAlignment alignment, int y)
+        TabControl AlignedTabs(TabAlignment alignment, int y, bool closable = false)
         {
-            var tc = new TabControl { Bounds = new(812, y, 172, 104), Alignment = alignment };
+            var tc = new TabControl { Bounds = new(812, y, 172, 104), Alignment = alignment, ShowCloseButtons = closable };
             tc.TabPages.AddRange(new TabPage("One"), new TabPage("Two"), new TabPage("Tri"));
             tc.TabPages[0].Controls.Add(new Label { Bounds = new(10, 10, 110, 20), Text = $"{alignment} strip" });
+            if (closable)
+                tc.TabClosed += (_, e) => this.SetStatus($"TabControl: closed tab \"{e.Page.Text}\".");
+
             return tc;
         }
 
         page.Controls.AddRange(
             Caption("TabControl.Alignment", 812, 12, 172),
-            AlignedTabs(TabAlignment.Top, 36),
+            AlignedTabs(TabAlignment.Top, 36, closable: true),
             AlignedTabs(TabAlignment.Bottom, 152),
             AlignedTabs(TabAlignment.Left, 268),
             AlignedTabs(TabAlignment.Right, 384));

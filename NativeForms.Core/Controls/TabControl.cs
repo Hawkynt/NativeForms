@@ -29,6 +29,8 @@ public class TabControl : OwnerDrawnControl
     private const int _ArrowWidth = 16;
     private const int _ArrowGlyphSize = 8;
     private const int _MinVerticalStripWidth = 24;
+    private const int _CloseZone = 18;
+    private const int _CloseGlyphSize = 8;
 
     private readonly List<int> _tabWidths = []; // per-tab size along the flow axis
     private TabAlignment _alignment = TabAlignment.Top;
@@ -103,8 +105,35 @@ public class TabControl : OwnerDrawnControl
         set => this.SelectedIndex = value is null ? -1 : this.TabPages.IndexOf(value);
     }
 
+    /// <summary>Whether each tab paints a close (×) button; off by default.</summary>
+    public bool ShowCloseButtons
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.PerformLayout(); // the reserved close zone changes a vertical strip's width
+            this.Invalidate();
+        }
+    }
+
     /// <summary>Raised when <see cref="SelectedIndex"/> changes.</summary>
     public event EventHandler? SelectedIndexChanged;
+
+    /// <summary>Raised when a tab's close button is pressed, before the page is removed; cancelable.</summary>
+    public event EventHandler<TabPageCancelEventArgs>? TabClosing;
+
+    /// <summary>Raised after a tab's close button removed its page.</summary>
+    public event EventHandler<TabPageEventArgs>? TabClosed;
+
+    /// <summary>Raises <see cref="TabClosing"/>.</summary>
+    protected virtual void OnTabClosing(TabPageCancelEventArgs e) => this.TabClosing?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="TabClosed"/>.</summary>
+    protected virtual void OnTabClosed(TabPageEventArgs e) => this.TabClosed?.Invoke(this, e);
 
     /// <summary>The pixel height of a horizontal header strip (and the height of each stacked side tab).</summary>
     public int HeaderHeight => this.Theme.RowHeight + _HeaderChrome;
@@ -146,6 +175,8 @@ public class TabControl : OwnerDrawnControl
             var caption = (2 * _TabPadding) + backend.MeasureText(page.Text, font).Width;
             if (iconWidth > 0 && page.ImageIndex >= 0)
                 caption += iconWidth;
+            if (this.ShowCloseButtons)
+                caption += _CloseZone;
 
             widest = Math.Max(widest, caption);
         }
@@ -302,6 +333,8 @@ public class TabControl : OwnerDrawnControl
             var width = (2 * _TabPadding) + g.MeasureText(page.Text, font).Width;
             if (iconWidth > 0 && page.ImageIndex >= 0)
                 width += iconWidth;
+            if (this.ShowCloseButtons)
+                width += _CloseZone;
 
             _tabWidths.Add(width);
         }
@@ -347,8 +380,54 @@ public class TabControl : OwnerDrawnControl
         }
 
         var hit = this.HitTestTab(flow);
-        if (hit >= 0)
-            this.SelectedIndex = hit;
+        if (hit < 0)
+            return;
+
+        if (this.ShowCloseButtons && CloseBox(this.TabRectOf(hit)).Contains(e.Location))
+        {
+            this.CloseTab(hit);
+            return;
+        }
+
+        this.SelectedIndex = hit;
+    }
+
+    /// <summary>The on-screen rectangle of a currently visible tab, or <see cref="Rectangle.Empty"/>.</summary>
+    private Rectangle TabRectOf(int index)
+    {
+        if (index < _firstVisibleTab || index >= _tabWidths.Count)
+            return Rectangle.Empty;
+
+        var header = this.GetHeaderRect();
+        var flow = 0;
+        for (var i = _firstVisibleTab; i < index; ++i)
+            flow += _tabWidths[i];
+
+        return this.TabRectAt(header, flow, _tabWidths[index]);
+    }
+
+    /// <summary>The close-button glyph box at the trailing edge of a tab.</summary>
+    private static Rectangle CloseBox(Rectangle tab)
+    {
+        if (tab.IsEmpty)
+            return Rectangle.Empty;
+
+        var x = tab.Right - _CloseZone + ((_CloseZone - _CloseGlyphSize) / 2);
+        var y = tab.Y + ((tab.Height - _CloseGlyphSize) / 2);
+        return new(x, y, _CloseGlyphSize, _CloseGlyphSize);
+    }
+
+    /// <summary>Fires the cancelable close for the tab and removes its page when nothing vetoes it.</summary>
+    private void CloseTab(int index)
+    {
+        var page = this.TabPages[index];
+        var closing = new TabPageCancelEventArgs(page, index);
+        this.OnTabClosing(closing);
+        if (closing.Cancel)
+            return;
+
+        this.TabPages.Remove(page);
+        this.OnTabClosed(new TabPageEventArgs(page, index));
     }
 
     /// <inheritdoc/>
@@ -480,8 +559,17 @@ public class TabControl : OwnerDrawnControl
             textLeft += iconSize.Width + _IconGap;
         }
 
-        var textRect = new Rectangle(textLeft, tab.Y, tab.Right - _TabPadding - textLeft, tab.Height);
+        var textRight = tab.Right - _TabPadding - (this.ShowCloseButtons ? _CloseZone : 0);
+        var textRect = new Rectangle(textLeft, tab.Y, textRight - textLeft, tab.Height);
         g.DrawText(page.Text, theme.DefaultFont, active ? theme.ControlText : theme.HeaderText, textRect, ContentAlignment.MiddleLeft);
+
+        if (this.ShowCloseButtons)
+        {
+            var box = CloseBox(tab);
+            var ink = active ? theme.ControlText : theme.HeaderText;
+            g.DrawLine(ink, box.Left, box.Top, box.Right, box.Bottom);
+            g.DrawLine(ink, box.Left, box.Bottom, box.Right, box.Top);
+        }
     }
 
     /// <summary>The accent bar for the active tab, on the edge that faces the content area.</summary>

@@ -257,7 +257,8 @@ strategy (may differ per platform; note exceptions inline).
         the flow axis on every edge
   - [x] `SelectedIndex`/`SelectedTab`, `SelectedIndexChanged`, keyboard nav (Ctrl+Tab wrap,
         arrows), content area auto-applied to pages on resize/switch
-  - [ ] Optional per-tab close button (modern tabbed-UI affordance)
+  - [x] Optional per-tab close button (`ShowCloseButtons`): each tab paints an × the caption makes
+        room for; a click raises cancelable `TabClosing` then removes the page and raises `TabClosed`
 - [x] `SplitContainer` (owner) — horizontal/vertical orientation, live splitter drag +
       `SplitterMoved`, min-size clamps, keyboard splitter movement
 - [x] `DockPanel` / `DockContent` (owner) — Visual-Studio-style docking manager: a lazy layout tree of
