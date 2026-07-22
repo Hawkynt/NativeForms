@@ -127,7 +127,15 @@ internal sealed partial class Autopilot
             return;
 
         var available = control.DisplayRectangle.Width - ReservedWidth(control);
-        var needed = BackendRegistry.Resolve().MeasureText(text, control.Font).Width;
+        // A multi-line caption stacks vertically; only its widest line contends for horizontal room.
+        var backend = BackendRegistry.Resolve();
+        var needed = 0;
+        foreach (var line in text.Split('\n'))
+        {
+            var lineWidth = backend.MeasureText(line, control.Font).Width;
+            if (lineWidth > needed)
+                needed = lineWidth;
+        }
         if (needed > available + _TextSlack)
             findings.Add(
                 $"truncated caption: {Name(control)} needs {needed} px for \"{text}\""

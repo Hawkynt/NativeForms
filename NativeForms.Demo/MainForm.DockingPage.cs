@@ -43,7 +43,7 @@ internal sealed partial class MainForm
         var editor2 = MakeDockPane("doc.readme", "Readme.md", _IconFile,
             "# NativeForms\n\nA tiny, native, trim-friendly UI toolkit.\nThis pane lives in the document tab well.");
         var solution = MakeDockPane("tool.solution", "Solution Explorer", _IconFolder,
-            "Solution 'NativeForms'\n  NativeForms.Core\n  NativeForms.Backends.Gtk\n  NativeForms.Demo");
+            "Solution 'NativeForms'\n  Core\n  Backends.Gtk\n  Demo");
         var properties = MakeDockPane("tool.properties", "Properties", _IconGear,
             "(Name)      dockPanel1\nDock        Fill\nBackColor   Control\nTabIndex    0");
         var output = MakeDockPane("tool.output", "Output", _IconRun,
