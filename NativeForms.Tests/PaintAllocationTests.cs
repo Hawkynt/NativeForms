@@ -221,6 +221,35 @@ internal sealed class PaintAllocationTests
         Assert.That(MeasureSteadyStatePaint(picker), Is.Zero);
     }
 
+    [Test]
+    public void ClockFace_steady_state_repaint_allocates_nothing_at_every_stage()
+    {
+        // The ring numbers and the readout come from shared static string tables and the hand endpoint
+        // is cached, so painting the dial — the two-ring 24-hour hour page, the 12-hour ring, and the
+        // minute and seconds pages — must allocate nothing once warmed up, at every stage.
+        (bool Use24Hour, ClockFaceStage Stage)[] cases =
+        [
+            (true, ClockFaceStage.Hour),
+            (false, ClockFaceStage.Hour),
+            (true, ClockFaceStage.Minute),
+            (true, ClockFaceStage.Second),
+        ];
+
+        foreach (var (use24Hour, stage) in cases)
+        {
+            var clock = new ClockFace
+            {
+                Bounds = new(0, 0, 192, 236),
+                Use24HourClock = use24Hour,
+                ShowSeconds = true,
+                Value = new(9, 30, 15),
+                Stage = stage,
+            };
+
+            Assert.That(MeasureSteadyStatePaint(clock), Is.Zero, $"24h={use24Hour} stage={stage}");
+        }
+    }
+
     private static Appointment[] BusyWeek()
     {
         var list = new List<Appointment>();

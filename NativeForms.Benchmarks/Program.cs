@@ -50,6 +50,7 @@ internal static class Program
         Construct("DataGridView", static () => new DataGridView(), _OwnerDrawnConstructionBudget);
         Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
         Construct("TimePicker", static () => new TimePicker(), _OwnerDrawnConstructionBudget);
+        Construct("ClockFace", static () => new ClockFace(), _OwnerDrawnConstructionBudget);
         Construct("MonthCalendar", static () => new MonthCalendar(), _OwnerDrawnConstructionBudget);
         Construct("CalendarView", static () => new CalendarView(), _OwnerDrawnConstructionBudget);
         Construct("IconLabel", static () => new IconLabel(), _OwnerDrawnConstructionBudget);
@@ -82,6 +83,7 @@ internal static class Program
         PaintThroughput("DataGridView", MakeDataGridView(1000));
         PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
         PaintThroughput("TimePicker", MakeTimePicker());
+        PaintThroughput("ClockFace", MakeClockFace());
         PaintThroughput("MonthCalendar", MakeMonthCalendar());
         PaintThroughput("CalendarViewDay", MakeCalendarView(CalendarViewMode.Day, 1000));
         PaintThroughput("CalendarViewWeek", MakeCalendarView(CalendarViewMode.Week, 1000));
@@ -311,6 +313,11 @@ internal static class Program
 
     private static MonthCalendar MakeMonthCalendar()
         => new() { Bounds = new(0, 0, 240, 200), TodayDate = new(2026, 7, 19) };
+
+    /// <summary>The busiest dial: twelve-hour, seconds shown, minute stage so a full labelled ring
+    /// and the AM/PM header paint every frame.</summary>
+    private static ClockFace MakeClockFace()
+        => new() { Bounds = new(0, 0, 192, 236), Value = new(14, 30, 5), Use24HourClock = false, ShowSeconds = true, Stage = ClockFaceStage.Minute };
 
     /// <summary>A scheduler bound to <paramref name="rows"/> appointments spread across time, centred on
     /// a week that holds a busy day — the paint and scroll benchmarks' populated instance.</summary>

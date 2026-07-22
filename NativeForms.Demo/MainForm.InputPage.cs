@@ -9,7 +9,8 @@ internal sealed partial class MainForm
     /// with a phone mask, a rich text box pre-styled through <see cref="RichTextBox.Rtf"/>, both
     /// up-down spinners, a search box, a track bar and both scroll bars each echoing their value
     /// into a label, a date-time picker, a month calendar whose title drills out to months, years
-    /// and decades, and both shapes of time picker (24-hour with seconds, 12-hour without).
+    /// and decades, and both shapes of time picker (24-hour with seconds, 12-hour without) whose
+    /// field opens an analog clock face on a double-click.
     /// </summary>
     private TabPage BuildInputPage()
     {
@@ -132,6 +133,7 @@ internal sealed partial class MainForm
 
         var time = new TimePicker { Bounds = new(664, 356, 200, 26), Value = new(9, 30, 0) };
         time.ValueChanged += (_, _) => this.SetStatus($"TimePicker: {time.Value:hh\\:mm\\:ss}");
+        _toolTip.SetToolTip(time, "Double-click the field to pick the time on an analog clock.");
 
         var time12 = new TimePicker
         {
@@ -146,7 +148,7 @@ internal sealed partial class MainForm
             shortPicker, customPicker,
             Caption("MonthCalendar (title drills to years)", 664, 100),
             calendar,
-            Caption("TimePicker (24h with seconds + 12h)", 664, 332),
+            Caption("TimePicker (double-click for clock)", 664, 332),
             time, time12);
 
         // Snapshotted the instant each value was authored, so the restore cannot drift away from it.

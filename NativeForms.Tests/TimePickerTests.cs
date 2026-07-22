@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
@@ -337,6 +338,144 @@ internal sealed class TimePickerTests
             Assert.That(up, Is.EqualTo(new TimeSpan(9, 31, 0)));
             Assert.That(picker.Value, Is.EqualTo(new TimeSpan(9, 30, 0)));
         });
+    }
+
+    // --- The double-click clock face --------------------------------------------------------------
+
+    // The clock's PreferredSize under the default theme is 192x236 (see ClockFaceTests): centre at
+    // (96, 118), the outer 24-hour ring at radius 67 so three o'clock — hour 15 — is at (163, 118),
+    // and the OK affordance in the footer around (151, 219).
+    private static TimePicker CreateClockPicker(out HeadlessCanvasPeer canvas, out HeadlessBackend backend, TimeSpan? value = null)
+    {
+        var picker = new TimePicker { Bounds = new(10, 10, 160, 24), Value = value ?? new(9, 30, 15) };
+        backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(picker);
+        Application.Run(form, backend);
+        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        return picker;
+    }
+
+    private static HeadlessPopupPeer PopupOf(HeadlessBackend backend)
+        => backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+    private static void DoubleClickField(HeadlessCanvasPeer canvas, int x = _HourX)
+    {
+        canvas.RaiseMouseDown(x, 12);
+        canvas.RaiseMouseDown(x, 12); // the second press inside the double-click window opens the clock
+    }
+
+    [Test]
+    public void A_double_click_on_the_field_opens_the_clock_below_it()
+    {
+        var picker = CreateClockPicker(out var canvas, out var backend);
+        canvas.ScreenOrigin = new(300, 400);
+
+        DoubleClickField(canvas);
+
+        var popup = PopupOf(backend);
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.ClockDroppedDown, Is.True);
+            Assert.That(popup.ShowCalls, Is.EqualTo(new[] { (new Point(300, 424), new Size(192, 236)) }));
+        });
+    }
+
+    [Test]
+    public void A_double_click_on_the_spinner_does_not_open_the_clock()
+    {
+        var picker = CreateClockPicker(out var canvas, out _);
+
+        canvas.RaiseMouseDown(_SpinnerX, 4);
+        canvas.RaiseMouseDown(_SpinnerX, 4);
+
+        Assert.That(picker.ClockDroppedDown, Is.False, "the spinner steps, it does not open the clock");
+    }
+
+    [Test]
+    public void Picking_an_hour_on_the_clock_previews_into_the_field_and_raises_ValueChanged()
+    {
+        var picker = CreateClockPicker(out var canvas, out var backend);
+        var changes = 0;
+        picker.ValueChanged += (_, _) => ++changes;
+        DoubleClickField(canvas);
+        var popup = PopupOf(backend);
+
+        popup.RaiseMouseDown(163, 118); // the outer three-o'clock number: hour 15
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.Value, Is.EqualTo(new TimeSpan(15, 30, 15)), "the hour previews live into the field");
+            Assert.That(changes, Is.EqualTo(1));
+            Assert.That(picker.ClockDroppedDown, Is.True, "picking the hour advances the stage, it does not close");
+        });
+    }
+
+    [Test]
+    public void The_OK_affordance_commits_the_previewed_value_and_closes()
+    {
+        var picker = CreateClockPicker(out var canvas, out var backend);
+        DoubleClickField(canvas);
+        var popup = PopupOf(backend);
+
+        popup.RaiseMouseDown(163, 118); // hour 15
+        popup.RaiseMouseUp(163, 118);
+        popup.RaiseMouseDown(151, 219); // OK
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.Value, Is.EqualTo(new TimeSpan(15, 30, 15)));
+            Assert.That(picker.ClockDroppedDown, Is.False);
+            Assert.That(popup.IsShown, Is.False);
+        });
+    }
+
+    [Test]
+    public void An_outside_click_cancels_the_clock_reverting_the_field()
+    {
+        var picker = CreateClockPicker(out var canvas, out var backend);
+        DoubleClickField(canvas);
+        var popup = PopupOf(backend);
+
+        popup.RaiseMouseDown(163, 118); // preview hour 15
+        popup.FireDismiss();            // a click outside the surface
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.Value, Is.EqualTo(new TimeSpan(9, 30, 15)), "dismissal reverts to the opening value");
+            Assert.That(picker.ClockDroppedDown, Is.False);
+        });
+    }
+
+    [Test]
+    public void Escape_on_the_clock_cancels_reverting_the_field()
+    {
+        var picker = CreateClockPicker(out var canvas, out var backend);
+        DoubleClickField(canvas);
+        var popup = PopupOf(backend);
+
+        popup.RaiseMouseDown(163, 118); // preview hour 15
+        popup.RaiseKeyDown(Keys.Escape);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.Value, Is.EqualTo(new TimeSpan(9, 30, 15)));
+            Assert.That(picker.ClockDroppedDown, Is.False);
+            Assert.That(popup.IsShown, Is.False);
+        });
+    }
+
+    [Test]
+    public void The_committed_clock_value_is_clamped_into_the_window()
+    {
+        var picker = CreateClockPicker(out var canvas, out var backend, new(9, 0, 0));
+        picker.MaxTime = new(12, 0, 0);
+        DoubleClickField(canvas);
+        var popup = PopupOf(backend);
+
+        popup.RaiseMouseDown(163, 118); // hour 15 is past MaxTime
+
+        Assert.That(picker.Value, Is.EqualTo(new TimeSpan(12, 0, 0)), "the preview clamps into [MinTime, MaxTime]");
     }
 
     [Test]

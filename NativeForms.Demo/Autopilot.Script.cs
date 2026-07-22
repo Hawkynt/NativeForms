@@ -574,6 +574,45 @@ internal sealed partial class Autopilot
                 $"stepping the meridiem should move the value 12 hours, observed {before} then {after}",
                 (after - before).Duration() == TimeSpan.FromHours(12));
         });
+
+        this.Check("TimePicker: a double-click opens the analog clock face below the field", () =>
+        {
+            var height = this.Read(() => time.Height);
+            var screen = this.ScreenOf(time, 20, height / 2); // on the field, left of the spinner
+            this.ClickAt(screen);
+            var phases = this.ProbeOpen(screen, () => time.ClockDroppedDown); // the second press opens it
+            this.ExpectTrue(DropDownPhases("clock", phases), phases.AfterRelease);
+            this.ExpectTrue("no popup toplevel is on screen for the clock", this.Popups().Count > 0);
+            this.CheckProgrammaticOpen("the clock", () => time.ClockDroppedDown, time.OpenClock);
+        });
+
+        this.Check("TimePicker: the clock surface lands directly below the field", () =>
+            this.CheckPopupAnchored("the clock", time, () => time.ClockDroppedDown, time.OpenClock));
+
+        this.Screenshot("state-input-timepicker-clock");
+
+        this.Check("TimePicker: clicking a clock number previews the hour into the field and dismissal reverts it", () =>
+        {
+            var popups = this.Reopen(() => time.ClockDroppedDown, time.OpenClock);
+            if (popups.Count == 0)
+            {
+                this.Fail("the clock face could not be opened at all");
+                return;
+            }
+
+            var bounds = this.Read(() => Injection.WindowBounds(popups[0]));
+            var before = this.Read(() => time.Value);
+            this.ClickAt(new(bounds.X + bounds.Width - 22, bounds.Y + (bounds.Height / 2))); // an outer afternoon hour
+            var picked = this.Read(() => time.Value);
+            this.ExpectChanged("TimePicker.Value after clicking a clock number", before, picked);
+            this.ExpectTrue(
+                "the status line did not report the new time",
+                this.Read(() => status.Text).StartsWith("TimePicker: ", StringComparison.Ordinal));
+
+            this.KeyInto(popups[0], KeySym.Escape); // Escape cancels the dial
+            this.ExpectTrue("the clock face is still open after Escape", !this.Read(() => time.ClockDroppedDown));
+            this.Expect("Escape reverted the field to the value it opened on", this.Read(() => time.Value), before);
+        });
     }
 
     // --- Lists ----------------------------------------------------------------------------------

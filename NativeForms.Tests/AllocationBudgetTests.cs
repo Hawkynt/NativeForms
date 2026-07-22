@@ -130,6 +130,17 @@ internal sealed class AllocationBudgetTests
     }
 
     [Test]
+    public void ClockFace_construction_stays_within_the_owner_drawn_budget()
+    {
+        // The analog dial's whole state is the value, the stage, the layout flags and the cached hand
+        // endpoint: no collections, no hosted editor, and the string/trig tables are shared statics —
+        // so a bare dial sits well inside the owner-drawn budget.
+        var perControl = PerInstance(static () => new ClockFace());
+
+        Assert.That(perControl, Is.LessThan(768), $"~{perControl:F0} bytes/control");
+    }
+
+    [Test]
     public void MonthCalendar_construction_stays_within_the_owner_drawn_budget()
     {
         // The drill-down levels must not cost an unused calendar anything: the period captions are

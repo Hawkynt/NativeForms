@@ -40,6 +40,7 @@ time.UpButton();   // 09:30:00 -> 09:31:00
 |---|---|
 | `UpButton()` / `DownButton()` | Steps `SelectedField` one increment up/down. |
 | `SelectPreviousField()` / `SelectNextField()` | Moves the caret one visible part left/right, stopping at the ends. |
+| `OpenClock()` / `CloseClock()` | Opens/closes the analog [`ClockFace`](clockface.md) popup below the field (also opened by a double-click). `ClockDroppedDown` reports whether it is up. |
 
 ### Events
 
@@ -51,6 +52,7 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 ## Notes
 
+- **Double-click opens an analog clock.** A double-click anywhere in the field (not on the spinner buttons) opens the material-style [`ClockFace`](clockface.md) in a light-dismiss popup anchored directly below the field — the same `IPopupPeer` mechanism `DateTimePicker` opens its calendar with. The dial walks the user through stages: pick the **hour**, then the **minute** (five-minute labels, single-minute snapping), then the **seconds** while `ShowSeconds` is on; a 12-hour field carries an AM/PM toggle. The picked value **previews live** into the field (clamped into [`MinTime`, `MaxTime`], raising `ValueChanged`); the OK affordance or Enter on the final stage commits, and **Escape or an outside click cancels, reverting** to the value the field held when it opened. Inside the dial, arrows nudge the active hand, Tab/Enter walk the stages, Escape cancels. The per-part caret keeps working exactly as before for keyboard and spinner users — the clock is an addition, not a replacement. The dial is only created on the first open, so a field never opened costs nothing for it.
 - **No hosted editor, on purpose.** [`NumericUpDown`](numericupdown.md) hosts a native `TextBox` so caret and clipboard stay platform-native; a per-part caret cannot work that way, because a hosted native editor never reports back *where inside the text* a click landed. The field is therefore drawn and hit-tested here, part by part. The upside is that there is no free-form typed edit to validate: every change goes through a step, so `Value` is always well-formed and `ValueChanged` never fires for garbage.
 - **Layout.** Parts sit left to right at the field's padding — `HH`, `:`, `mm`, then `:` `ss` while `ShowSeconds`, then a blank and `AM`/`PM` while `Use24HourClock` is off. Widths come from the platform text engine (`MeasureText`), which the peer contract binds to the same engine painting uses, so hit-testing and painting agree pixel for pixel. The two-digit strings `00`–`59` are materialized once statically, so painting allocates nothing per frame.
 - **Stepping wraps within the part, without a carry** — `23:59` stepped up on the minute becomes `23:00`, not `00:00` of the next day — matching the Win32 date/time control. Stepping the AM/PM part moves the value by twelve hours either way.
@@ -59,7 +61,7 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 - **Keyboard**: Left/Right move the caret between the visible parts (skipping hidden seconds or AM/PM, stopping at the ends), Up/Down step the selected part, Home/End jump to `MinTime`/`MaxTime`. The wheel steps the selected part too.
 - **24-hour by default, explicitly.** The repository builds with `InvariantGlobalization`, and the invariant culture's short-time pattern is the 24-hour `HH:mm`, so `Use24HourClock` defaults to `true`. The default is spelled out in the control rather than probed from `Strings.DateTimeFormat`, so swapping that provider after a control was built cannot silently reshape an existing field.
 - Painted with the platform `ITheme` (`FieldBackground` field, `SelectionBackground`/`SelectionText` for the part under the caret, `ControlText`/`DisabledText` for the rest, `Border` frame and seams). The part highlight shows only while the control has focus.
-- `TimePickerTests` pin the defaults, the 12/24-hour and seconds layouts, part hit-testing, spinner stepping and autorepeat, the caret keys, wrap-without-carry, the clamp refusal, Home/End, the wheel and the hidden-part fallback. `AllocationBudgetTests` holds construction inside the owner-drawn budget and `PaintAllocationTests` pins zero bytes over 100 steady-state repaints.
+- `TimePickerTests` pin the defaults, the 12/24-hour and seconds layouts, part hit-testing, spinner stepping and autorepeat, the caret keys, wrap-without-carry, the clamp refusal, Home/End, the wheel and the hidden-part fallback, plus the double-click clock: opening below the field, the live preview and its clamp, OK/commit, and Escape/outside-click cancel-and-revert. `ClockFaceTests` cover the dial itself. `AllocationBudgetTests` holds construction inside the owner-drawn budget and `PaintAllocationTests` pins zero bytes over 100 steady-state repaints.
 - Done per [docs/PRD.md](../PRD.md) §7.5.
 
 ## Differences from System.Windows.Forms

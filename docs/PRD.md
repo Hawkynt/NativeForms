@@ -423,6 +423,13 @@ strategy (may differ per platform; note exceptions inline).
       `Min`/`MaxTime` window, `ShowSeconds`/`Use24HourClock` layouts, per-part caret (click,
       Left/Right) with the spinner buttons, Up/Down and the wheel stepping the part under it,
       wrap-without-carry, timer-driven autorepeat via the shared `AutoRepeat` engine
+  - [x] Double-click opens the analog `ClockFace` in a light-dismiss popup (the `IPopupPeer`
+        mechanism `DateTimePicker` uses): staged hour → minute → seconds dial, live preview into
+        the field clamped to `Min`/`MaxTime`, OK/Enter commit, Escape/outside-click cancel-and-revert
+- [x] `ClockFace` (owner dial, reusable stand-alone or popup-hosted like `CalendarCore`) — themed
+      analog picker: 12-hour ring + AM/PM toggle or two-ring 00–23 dial, minute/seconds rings snapping
+      to a single unit, click/drag/keyboard, stage machine with `Committed`/`Cancelled` callbacks,
+      allocation-free repaint at every stage (cached strings, shared trig table, cached hand endpoint)
 - [x] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill), `Style.Marquee`
       (timer-driven sweep, allocation-free per tick), `Step`/`PerformStep`, vertical orientation
 
@@ -661,7 +668,8 @@ same commit. `—` = not applicable.
 | `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` (title drill-down) | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
 | `CalendarView` (Day/WorkWeek/Week/Month scheduler) | ✔ | ✔ | [controls/calendarview.md](controls/calendarview.md) |
-| `TimePicker` | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
+| `TimePicker` (double-click analog clock) | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
+| `ClockFace` (analog dial, stand-alone or popup) | ✔ | ✔ | [controls/clockface.md](controls/clockface.md) |
 | `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
 | `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
 | `GroupBox` (caption image, nesting) | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |

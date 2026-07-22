@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Globalization;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
@@ -41,6 +42,12 @@ public class TimePicker : OwnerDrawnControl
     private bool _focused;
     private int _pressedDirection; // +1 up button held, -1 down button held, 0 none
     private AutoRepeat? _autoRepeat;
+
+    // The double-click-opened analog clock face. Created lazily on the first open, hosted in a
+    // light-dismiss popup exactly as DateTimePicker hosts its calendar.
+    private ClockFace? _clock;
+    private IPopupPeer? _popup;
+    private long _lastClickTime;
 
     /// <summary>
     /// The picked time of day — whole seconds, clamped into [<see cref="MinTime"/>,
@@ -197,6 +204,93 @@ public class TimePicker : OwnerDrawnControl
         _pressedDirection = 0;
         _autoRepeat?.Dispose();
         _autoRepeat = null;
+        this.OwnsOpenPopup = false;
+        _popup?.Dispose();
+        _popup = null;
+        _clock = null;
+    }
+
+    // --- The analog clock face ---------------------------------------------------------------------
+
+    /// <summary>Whether the double-click clock face is currently open.</summary>
+    public bool ClockDroppedDown => this.OwnsOpenPopup;
+
+    /// <summary>
+    /// Opens the analog clock face below the field, its hand on <see cref="Value"/> and its first
+    /// stage the hour. A no-op while already open or before the control is realized (only a live
+    /// widget knows its screen position). Committing keeps the picked value; Escape or an outside
+    /// click reverts to the value the field held when it opened.
+    /// </summary>
+    public void OpenClock()
+    {
+        if (this.OwnsOpenPopup)
+            return;
+
+        var backend = this.Backend;
+        if (backend is null)
+            return;
+
+        var popup = _popup ??= this.CreateClockPopup(backend);
+        var clock = _clock!;
+        clock.Use24HourClock = this.Use24HourClock;
+        clock.ShowSeconds = this.ShowSeconds;
+        clock.Stage = ClockFaceStage.Hour;
+        clock.OriginalValue = _value;
+        clock.Value = _value;
+
+        this.OwnsOpenPopup = true;
+        popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), ClockFace.PreferredSize(this.Theme));
+        this.Invalidate();
+    }
+
+    /// <summary>Closes the clock face, keeping whatever value is showing. A no-op while closed.</summary>
+    public void CloseClock()
+    {
+        if (!this.OwnsOpenPopup)
+            return;
+
+        this.OwnsOpenPopup = false;
+        _popup?.Hide();
+        this.Invalidate();
+    }
+
+    private IPopupPeer CreateClockPopup(IPlatformBackend backend)
+    {
+        var clock = new ClockFace();
+        clock.Invalidated = () => _popup?.InvalidateAll();
+        clock.ValueChanged += (_, _) => this.Value = _clock!.Value; // live preview into the field
+        clock.Committed = this.CloseClock;
+        clock.Cancelled = this.OnClockCancelled;
+        _clock = clock;
+
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => clock.Paint(e.Graphics, this.Theme, ClockFace.PreferredSize(this.Theme));
+        popup.MouseDown += (_, e) => clock.HandleMouseDown(this.Theme, ClockFace.PreferredSize(this.Theme), e);
+        popup.MouseMove += (_, e) => clock.HandleMouseMove(this.Theme, ClockFace.PreferredSize(this.Theme), e);
+        popup.MouseUp += (_, e) => clock.HandleMouseUp(e);
+        popup.MouseWheel += (_, e) => clock.HandleMouseWheel(e.Delta);
+        popup.KeyDown += (_, e) => this.OnKeyDown(e); // backends with a keyboard grab route keys here
+        popup.Dismissed += (_, _) => this.OnPopupDismissed();
+        return popup;
+    }
+
+    /// <summary>Escape on the dial: revert to the value the field opened on, then close.</summary>
+    private void OnClockCancelled()
+    {
+        this.Value = _clock!.OriginalValue;
+        this.CloseClock();
+    }
+
+    /// <summary>Reacts to light dismissal (outside click, grab loss): the surface is already hidden,
+    /// so revert to the value the field opened on and reset the open flag.</summary>
+    private void OnPopupDismissed()
+    {
+        if (!this.OwnsOpenPopup)
+            return;
+
+        this.OwnsOpenPopup = false;
+        this.Value = _clock!.OriginalValue;
+        this.Invalidate();
     }
 
     // --- Painting ----------------------------------------------------------------------------------
@@ -292,8 +386,17 @@ public class TimePicker : OwnerDrawnControl
             return;
         }
 
+        // Everything left of the spinner is the field: a click parks the caret on the part under it,
+        // and a second click inside the double-click window opens the analog clock face.
+        var now = Environment.TickCount64;
+        var isDouble = !this.ClockDroppedDown && now - _lastClickTime <= this.Theme.DoubleClickTime;
+        _lastClickTime = isDouble ? 0 : now; // reset so a triple click is not two doubles
+
         if (this.FieldAt(e.X) is { } part)
             this.SelectedField = part;
+
+        if (isDouble)
+            this.OpenClock();
     }
 
     /// <inheritdoc/>
@@ -314,6 +417,14 @@ public class TimePicker : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // While the clock is up it owns the keyboard — arrows nudge the hand, Tab/Enter walk the
+        // stages and commit, Escape cancels — routed through the popup's key grab into the dial.
+        if (this.ClockDroppedDown)
+        {
+            _clock?.HandleKeyDown(e);
+            return;
+        }
+
         switch (e.KeyCode)
         {
             case Keys.Up:

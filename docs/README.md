@@ -51,7 +51,8 @@ each control page carries its own "Differences from WinForms" section where beha
 | `DateTimePicker` | owner-drawn + popup calendar | [datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
 | `CalendarView` | owner-drawn | [calendarview.md](controls/calendarview.md) |
-| `TimePicker` | owner-drawn | [timepicker.md](controls/timepicker.md) |
+| `TimePicker` | owner-drawn + popup clock | [timepicker.md](controls/timepicker.md) |
+| `ClockFace` | owner-drawn + popup dial | [clockface.md](controls/clockface.md) |
 | `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
 | `GroupBox` | owner-drawn | [groupbox.md](controls/groupbox.md) |
 | `TabControl` / `TabPage` | owner-drawn | [tabcontrol.md](controls/tabcontrol.md) |
