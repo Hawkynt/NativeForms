@@ -916,7 +916,12 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
         => this.MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
     public void RaiseMouseMove(int x, int y)
-        => this.MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+    {
+        // Mirrors the real canvas peers, which bridge a move onto the shared pointer channel so a
+        // control's MouseMove/MouseEnter surface for owner-drawn surfaces exactly as for native ones.
+        this.MouseMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+        this.RaisePointerMove(x, y);
+    }
 
     public void RaiseMouseWheel(int delta, int x = 0, int y = 0, KeyModifiers modifiers = KeyModifiers.None)
         => this.MouseWheel?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, delta, modifiers));
@@ -929,7 +934,11 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
 
     public void RaiseKeyPress(char c) => this.KeyPress?.Invoke(this, new KeyPressEventArgs(c));
 
-    public void RaiseMouseLeave() => this.MouseLeave?.Invoke(this, EventArgs.Empty);
+    public void RaiseMouseLeave()
+    {
+        this.MouseLeave?.Invoke(this, EventArgs.Empty);
+        this.RaisePointerLeave();
+    }
 }
 
 /// <summary>A popup peer that records every ShowAt/Hide and lets tests trigger light dismissal.</summary>

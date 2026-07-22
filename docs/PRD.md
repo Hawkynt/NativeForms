@@ -218,7 +218,12 @@ strategy (may differ per platform; note exceptions inline).
 - [~] Keyboard — `KeyDown`/`KeyUp`/`KeyPress` on owner-drawn surfaces, mnemonics/accelerators
       via the form dialog-key chain done; native-widget key preview (peer key seam: Enter inside
       a native TextBox → AcceptButton, native Tab handling, button-mnemonic clicks) pending
-- [ ] Mouse (`MouseDown`/`Up`/`Move`/`Enter`/`Leave`/`Wheel`, `DoubleClick`)
+- [~] Mouse events on `Control`: `MouseMove`/`MouseEnter`/`MouseLeave` ride the shared pointer
+      channel for every control (native widgets and owner-drawn surfaces alike);
+      `MouseDown`/`MouseUp`/`MouseWheel`/`MouseDoubleClick`/`DoubleClick` fire for owner-drawn controls
+      (double-click detected in core from press timing + slop). Native widgets consume their own
+      button/wheel events, so those do not surface for them — the same platform limit as native key
+      preview. Event slots ride the lazy pointer relay, so an unhooked control keeps its footprint.
 - [x] `Font`/`ForeColor`/`BackColor` (ambient chain, one lazy `AppearanceState`, peer forwarding
       + owner-drawn adoption), `Padding` (+`DisplayRectangle`), `Margin`, `Anchor`, `Dock`
       (flag-packed, zero-cost defaults)

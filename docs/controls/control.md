@@ -110,6 +110,9 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 | Event | Description |
 |---|---|
 | `Click` | Raised when the control is activated by the user (native click, checkbox toggle, `PerformClick`) |
+| `MouseMove` / `MouseEnter` / `MouseLeave` | Raised as the pointer moves over, enters and leaves the control — for every control, native or owner-drawn |
+| `MouseDown` / `MouseUp` / `MouseWheel` | Raised on button presses, releases and wheel turns over an **owner-drawn** control; native widgets consume these themselves |
+| `MouseDoubleClick` / `DoubleClick` | Raised on a double-click over an owner-drawn control (detected from press timing and slop) |
 | `TextChanged` | Raised after `Text` changes to a different value (realized or not) |
 | `Enter` / `GotFocus` | Raised when focus arrives, in that order (the WinForms order). Containers along the way raise `Enter` when focus enters their subtree from outside, outermost first |
 | `LostFocus` / `Leave` | Raised when focus departs — **`LostFocus` first, then `Leave`**, mirroring the WinForms firing order on the departing control. Containers raise `Leave` when focus leaves their subtree entirely, innermost first |
@@ -152,7 +155,7 @@ Input and event-argument types (used chiefly by [owner-drawn controls](../custom
 
 ## Differences from System.Windows.Forms.Control
 
-- **No public mouse/keyboard events on `Control`.** WinForms exposes `MouseDown`/`MouseUp`/`MouseMove`/`MouseWheel`/`KeyDown`/`KeyUp`/`KeyPress` on every control; here raw input reaches only owner-drawn controls, as `protected virtual` `OnMouse…`/`OnKey…` overrides on `OwnerDrawnControl` (see [../custom-controls.md](../custom-controls.md)). Native widgets consume their input inside the widget.
+- **Mouse events, partly.** `Control` exposes `MouseMove`/`MouseEnter`/`MouseLeave` for every control, and `MouseDown`/`MouseUp`/`MouseWheel`/`MouseDoubleClick`/`DoubleClick` for owner-drawn controls; native widgets consume their own button/wheel input, so those do not surface for them (the same limit as native key preview). Public keyboard events (`KeyDown`/`KeyUp`/`KeyPress`) remain owner-drawn-only, as `protected virtual` `OnKey…` overrides on `OwnerDrawnControl` (see [../custom-controls.md](../custom-controls.md)).
 - **No `MouseDoubleClick` and no click counts** — `MouseEventArgs` carries no `Clicks`; controls that need a double-click gesture (e.g. the grid) detect it themselves.
 - **No validation pipeline**: `Validating`/`Validated`/`CausesValidation` do not exist. Controls with a commit step (grid editing, spin boxes) offer their own `…Validating` events instead.
 - **No `Handle`, no `CreateControl()`** — there is no exposed native handle and no manual handle creation; the realization lifecycle above replaces both.

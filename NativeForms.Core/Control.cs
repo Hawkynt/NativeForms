@@ -931,10 +931,126 @@ public abstract class Control
     {
         public EventHandler<MouseEventArgs>? Move;
         public EventHandler? Leave;
+        public EventHandler? Enter;
+        public EventHandler<MouseEventArgs>? Down;
+        public EventHandler<MouseEventArgs>? Up;
+        public EventHandler<MouseEventArgs>? Wheel;
+        public EventHandler<MouseEventArgs>? DoubleClickArgs;
+        public EventHandler? DoubleClick;
         public bool Hooked;
+        public bool Inside;
+        public long LastPressTicks;
+        public Point LastPressLocation;
     }
 
+    /// <summary>The double-click window in milliseconds and the pixel slop — a second left press
+    /// within both of the previous one is a double-click, mirroring the classic control.</summary>
+    private const int _DoubleClickMs = 500;
+    private const int _DoubleClickSlop = 4;
+
     private PointerRelay? _pointer;
+
+    /// <summary>Raised when the pointer enters this control's bounds (the first move after a leave).</summary>
+    public event EventHandler? MouseEnter
+    {
+        add { (_pointer ??= new()).Enter += value; this.HookPeerPointer(); }
+        remove { if (_pointer is { } relay) relay.Enter -= value; }
+    }
+
+    /// <summary>Raised while the pointer moves over this control — native widgets and owner-drawn surfaces alike.</summary>
+    public event EventHandler<MouseEventArgs>? MouseMove
+    {
+        add { (_pointer ??= new()).Move += value; this.HookPeerPointer(); }
+        remove { if (_pointer is { } relay) relay.Move -= value; }
+    }
+
+    /// <summary>Raised when the pointer leaves this control — the counterpart of <see cref="MouseEnter"/>.</summary>
+    public event EventHandler? MouseLeave
+    {
+        add { (_pointer ??= new()).Leave += value; this.HookPeerPointer(); }
+        remove { if (_pointer is { } relay) relay.Leave -= value; }
+    }
+
+    /// <summary>
+    /// Raised when a mouse button goes down over this control. Delivered for owner-drawn controls
+    /// (buttons, lists, custom surfaces); native widgets consume their own presses, so the button
+    /// press does not surface for them — the same platform limit documented for native key preview.
+    /// </summary>
+    public event EventHandler<MouseEventArgs>? MouseDown
+    {
+        add => (_pointer ??= new()).Down += value;
+        remove { if (_pointer is { } relay) relay.Down -= value; }
+    }
+
+    /// <summary>Raised when a mouse button is released over this control (owner-drawn controls).</summary>
+    public event EventHandler<MouseEventArgs>? MouseUp
+    {
+        add => (_pointer ??= new()).Up += value;
+        remove { if (_pointer is { } relay) relay.Up -= value; }
+    }
+
+    /// <summary>Raised when the mouse wheel turns over this control (owner-drawn controls).</summary>
+    public event EventHandler<MouseEventArgs>? MouseWheel
+    {
+        add => (_pointer ??= new()).Wheel += value;
+        remove { if (_pointer is { } relay) relay.Wheel -= value; }
+    }
+
+    /// <summary>Raised on a double-click over this control, carrying the pointer location (owner-drawn controls).</summary>
+    public event EventHandler<MouseEventArgs>? MouseDoubleClick
+    {
+        add => (_pointer ??= new()).DoubleClickArgs += value;
+        remove { if (_pointer is { } relay) relay.DoubleClickArgs -= value; }
+    }
+
+    /// <summary>Raised on a double-click over this control (owner-drawn controls).</summary>
+    public event EventHandler? DoubleClick
+    {
+        add => (_pointer ??= new()).DoubleClick += value;
+        remove { if (_pointer is { } relay) relay.DoubleClick -= value; }
+    }
+
+    /// <summary>
+    /// Raises <see cref="MouseDown"/> from the owner-drawn input path and folds in double-click
+    /// recognition — the timing state rides the lazy relay, so a control nobody subscribed to keeps
+    /// its per-instance footprint. A second left press close in time and place to the first raises
+    /// <see cref="MouseDoubleClick"/>/<see cref="DoubleClick"/>.
+    /// </summary>
+    internal void RaiseMouseDown(MouseEventArgs e)
+    {
+        if (_pointer is not { } relay)
+            return;
+
+        relay.Down?.Invoke(this, e);
+        if (e.Button != MouseButtons.Left)
+            return;
+
+        var now = Environment.TickCount64;
+        if (now - relay.LastPressTicks <= _DoubleClickMs
+            && Math.Abs(e.X - relay.LastPressLocation.X) <= _DoubleClickSlop
+            && Math.Abs(e.Y - relay.LastPressLocation.Y) <= _DoubleClickSlop)
+        {
+            relay.LastPressTicks = 0; // consumed; a third press begins a fresh pair
+            this.RaiseMouseDoubleClick(e);
+            return;
+        }
+
+        relay.LastPressTicks = now;
+        relay.LastPressLocation = e.Location;
+    }
+
+    /// <summary>Raises <see cref="MouseUp"/> from the owner-drawn input path.</summary>
+    internal void RaiseMouseUp(MouseEventArgs e) => _pointer?.Up?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="MouseWheel"/> from the owner-drawn input path.</summary>
+    internal void RaiseMouseWheel(MouseEventArgs e) => _pointer?.Wheel?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="MouseDoubleClick"/> and <see cref="DoubleClick"/> from the owner-drawn input path.</summary>
+    internal void RaiseMouseDoubleClick(MouseEventArgs e)
+    {
+        _pointer?.DoubleClickArgs?.Invoke(this, e);
+        _pointer?.DoubleClick?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// Raised while the pointer moves over this control, wherever the control is realized — the
@@ -983,9 +1099,28 @@ public abstract class Control
         peer.PointerLeave += this.OnPeerPointerLeave;
     }
 
-    private void OnPeerPointerMove(object? sender, MouseEventArgs e) => _pointer?.Move?.Invoke(this, e);
+    private void OnPeerPointerMove(object? sender, MouseEventArgs e)
+    {
+        if (_pointer is not { } relay)
+            return;
 
-    private void OnPeerPointerLeave(object? sender, EventArgs e) => _pointer?.Leave?.Invoke(this, e);
+        if (!relay.Inside)
+        {
+            relay.Inside = true;
+            relay.Enter?.Invoke(this, EventArgs.Empty);
+        }
+
+        relay.Move?.Invoke(this, e);
+    }
+
+    private void OnPeerPointerLeave(object? sender, EventArgs e)
+    {
+        if (_pointer is not { } relay)
+            return;
+
+        relay.Inside = false;
+        relay.Leave?.Invoke(this, e);
+    }
 
     /// <summary>Creates the backend peer specific to this control kind (button, label, window …).</summary>
     private protected abstract IControlPeer CreatePeer(IPlatformBackend backend);

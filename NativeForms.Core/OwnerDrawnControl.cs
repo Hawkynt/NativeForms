@@ -122,6 +122,7 @@ public abstract class OwnerDrawnControl : Control
 
             this.OnMouseDown(e);
             this.CanvasMouseDown?.Invoke(this, e);
+            this.RaiseMouseDown(e); // also detects and raises DoubleClick/MouseDoubleClick
             if (e.Button == MouseButtons.Right && this.ContextMenuStrip is { } menu)
                 menu.Show(this, e.Location);
         };
@@ -139,6 +140,7 @@ public abstract class OwnerDrawnControl : Control
                 return;
 
             this.OnMouseUp(e);
+            this.RaiseMouseUp(e);
         };
         canvas.MouseMove += (_, e) =>
         {
@@ -153,8 +155,11 @@ public abstract class OwnerDrawnControl : Control
         };
         canvas.MouseWheel += (_, e) =>
         {
-            if (this.Enabled)
-                this.OnMouseWheel(e);
+            if (!this.Enabled)
+                return;
+
+            this.OnMouseWheel(e);
+            this.RaiseMouseWheel(e);
         };
         canvas.MouseLeave += (_, _) =>
         {
