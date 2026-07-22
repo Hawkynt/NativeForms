@@ -54,6 +54,10 @@ public sealed class ListViewItem
     /// <summary>The index into the owner's image list (large or small, per view), or -1 for no icon.</summary>
     public int ImageIndex { get; set; } = -1;
 
+    /// <summary>The key of this item's icon in the owning <c>ListView.SmallImageList</c>/<c>LargeImageList</c>,
+    /// used when <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? ImageKey { get; set; }
+
     /// <summary>The group this item is rendered under, or <see langword="null"/> for the default section.</summary>
     public ListViewGroup? Group
     {

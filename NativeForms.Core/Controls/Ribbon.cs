@@ -1129,11 +1129,12 @@ public class Ribbon : OwnerDrawnControl
     private void PaintCollapsedGroup(IGraphics g, ITheme theme, RibbonGroup group, Rectangle bounds, int contentHeight)
     {
         var face = new Rectangle(bounds.X + _GroupPadding, bounds.Y + _GroupPadding, bounds.Width - (2 * _GroupPadding), contentHeight);
-        if (this.ImageList is { } images && group.ImageIndex >= 0 && group.ImageIndex < images.Count && this.Backend is { } backend)
+        var groupImage = ImageList.ResolveIndex(this.ImageList, group.ImageIndex, group.ImageKey);
+        if (this.ImageList is { } images && groupImage >= 0 && groupImage < images.Count && this.Backend is { } backend)
         {
             var size = images.ImageSize;
             g.DrawImage(
-                images.GetImage(group.ImageIndex, backend),
+                images.GetImage(groupImage, backend),
                 new Rectangle(face.X + ((face.Width - _LargeIconSize) / 2), face.Y + 2, _LargeIconSize, _LargeIconSize));
         }
 

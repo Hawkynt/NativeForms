@@ -140,7 +140,7 @@ public class StatusStrip : OwnerDrawnControl
             return progress.Width;
 
         var width = 2 * PanelPadding;
-        if (item.Image is not null || (item.ImageList is not null && item.ImageIndex >= 0))
+        if (item.HasIcon)
             width += IconSize + (item.DisplayText.Length > 0 ? PanelPadding : 0);
 
         if (item.DisplayText.Length > 0)

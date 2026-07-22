@@ -78,4 +78,49 @@ internal sealed class ImageListTests
         list.Dispose(); // drops realized images only
         Assert.That(list.GetImage(index, new HeadlessBackend()).Width, Is.EqualTo(1));
     }
+
+    [Test]
+    public void Keyed_add_resolves_through_IndexOfKey_case_insensitively()
+    {
+        using var list = new ImageList(1);
+        list.Add(Pixels(1));               // 0, no key
+        var keyed = list.Add("Save", Pixels(1)); // 1
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(keyed, Is.EqualTo(1));
+            Assert.That(list.IndexOfKey("Save"), Is.EqualTo(1));
+            Assert.That(list.IndexOfKey("save"), Is.EqualTo(1), "keys match case-insensitively");
+            Assert.That(list.ContainsKey("SAVE"), Is.True);
+            Assert.That(list.IndexOfKey("missing"), Is.EqualTo(-1));
+            Assert.That(list.IndexOfKey(""), Is.EqualTo(-1));
+            Assert.That(list.IndexOfKey(null), Is.EqualTo(-1));
+        });
+    }
+
+    [Test]
+    public void ResolveIndex_prefers_an_explicit_index_over_the_key()
+    {
+        using var list = new ImageList(1);
+        list.Add("a", Pixels(1)); // 0
+        list.Add("b", Pixels(1)); // 1
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ImageList.ResolveIndex(list, 0, "b"), Is.EqualTo(0), "a non-negative index wins");
+            Assert.That(ImageList.ResolveIndex(list, -1, "b"), Is.EqualTo(1), "the key resolves when the index is unset");
+            Assert.That(ImageList.ResolveIndex(list, -1, "missing"), Is.EqualTo(-1));
+            Assert.That(ImageList.ResolveIndex(null, -1, "b"), Is.EqualTo(-1), "no list resolves to nothing");
+        });
+    }
+
+    [Test]
+    public void Clear_drops_keys_too()
+    {
+        using var list = new ImageList(1);
+        list.Add("x", Pixels(1));
+        list.Clear();
+
+        Assert.That(list.IndexOfKey("x"), Is.EqualTo(-1));
+    }
 }

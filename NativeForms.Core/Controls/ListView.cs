@@ -1144,7 +1144,7 @@ public class ListView : OwnerDrawnControl
         if (list is null || backend is null)
             return null;
 
-        var index = item.ImageIndex;
+        var index = ImageList.ResolveIndex(list, item.ImageIndex, item.ImageKey);
         return index >= 0 && index < list.Count ? list.GetImage(index, backend) : null;
     }
 

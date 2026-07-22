@@ -97,11 +97,12 @@ public partial class DockPanel
 
         var buttonsWidth = this.CaptionButtonsWidth(active);
         var textLeft = bounds.X + _CaptionInset;
-        if (this.ImageList is { } images && active.ImageIndex >= 0 && active.ImageIndex < images.Count && this.Backend is { } backend)
+        var activeImage = ImageList.ResolveIndex(this.ImageList, active.ImageIndex, active.ImageKey);
+        if (this.ImageList is { } images && activeImage >= 0 && activeImage < images.Count && this.Backend is { } backend)
         {
             var size = images.ImageSize;
             var top = bounds.Y + ((bounds.Height - size.Height) / 2);
-            g.DrawImage(images.GetImage(active.ImageIndex, backend), new Rectangle(textLeft, top, size.Width, size.Height));
+            g.DrawImage(images.GetImage(activeImage, backend), new Rectangle(textLeft, top, size.Width, size.Height));
             textLeft += size.Width + _IconGap;
         }
 
@@ -217,11 +218,12 @@ public partial class DockPanel
             g.DrawRectangle(theme.Border, new Rectangle(cell.X, cell.Y, cell.Width - 1, cell.Height - 1));
 
             var iconLeft = cell.X + 4;
-            if (this.ImageList is { } images && pane.ImageIndex >= 0 && pane.ImageIndex < images.Count && this.Backend is { } backend)
+            var paneImage = ImageList.ResolveIndex(this.ImageList, pane.ImageIndex, pane.ImageKey);
+            if (this.ImageList is { } images && paneImage >= 0 && paneImage < images.Count && this.Backend is { } backend)
             {
                 var size = images.ImageSize;
                 var top = cell.Y + ((cell.Height - size.Height) / 2);
-                g.DrawImage(images.GetImage(pane.ImageIndex, backend), new Rectangle(iconLeft, top, size.Width, size.Height));
+                g.DrawImage(images.GetImage(paneImage, backend), new Rectangle(iconLeft, top, size.Width, size.Height));
                 iconLeft += size.Width + _IconGap;
             }
 

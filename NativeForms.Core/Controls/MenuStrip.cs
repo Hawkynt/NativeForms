@@ -359,7 +359,7 @@ public class MenuStrip : OwnerDrawnControl
     private int MeasureItemWidth(ToolStripItem item)
     {
         var width = (2 * ItemPadding) + this.MeasureItemText(item);
-        if (item.Image is not null || (item.ImageList is not null && item.ImageIndex >= 0))
+        if (item.HasIcon)
             width += 20;
 
         return width;

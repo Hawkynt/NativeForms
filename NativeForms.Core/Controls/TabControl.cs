@@ -173,7 +173,7 @@ public class TabControl : OwnerDrawnControl
         {
             var page = this.TabPages[i];
             var caption = (2 * _TabPadding) + backend.MeasureText(page.Text, font).Width;
-            if (iconWidth > 0 && page.ImageIndex >= 0)
+            if (iconWidth > 0 && page.ResolveImageIndex(this.ImageList) >= 0)
                 caption += iconWidth;
             if (this.ShowCloseButtons)
                 caption += _CloseZone;
@@ -331,7 +331,7 @@ public class TabControl : OwnerDrawnControl
 
             var page = this.TabPages[i];
             var width = (2 * _TabPadding) + g.MeasureText(page.Text, font).Width;
-            if (iconWidth > 0 && page.ImageIndex >= 0)
+            if (iconWidth > 0 && page.ResolveImageIndex(this.ImageList) >= 0)
                 width += iconWidth;
             if (this.ShowCloseButtons)
                 width += _CloseZone;
@@ -551,11 +551,12 @@ public class TabControl : OwnerDrawnControl
 
         var page = this.TabPages[index];
         var textLeft = tab.X + _TabPadding;
-        if (this.ImageList is { } images && page.ImageIndex >= 0 && page.ImageIndex < images.Count && this.Backend is { } backend)
+        var imageIndex = page.ResolveImageIndex(this.ImageList);
+        if (this.ImageList is { } images && imageIndex >= 0 && imageIndex < images.Count && this.Backend is { } backend)
         {
             var iconSize = images.ImageSize;
             var iconTop = tab.Y + ((tab.Height - iconSize.Height) / 2);
-            g.DrawImage(images.GetImage(page.ImageIndex, backend), new Rectangle(textLeft, iconTop, iconSize.Width, iconSize.Height));
+            g.DrawImage(images.GetImage(imageIndex, backend), new Rectangle(textLeft, iconTop, iconSize.Width, iconSize.Height));
             textLeft += iconSize.Width + _IconGap;
         }
 

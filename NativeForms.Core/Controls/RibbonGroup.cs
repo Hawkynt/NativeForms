@@ -57,6 +57,21 @@ public class RibbonGroup
         }
     } = -1;
 
+    /// <summary>The key of this group's icon in the owning <see cref="Ribbon.ImageList"/>, used when
+    /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? ImageKey
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.NotifyOwner();
+        }
+    }
+
     /// <summary>Whether the group is currently folded into its drop-down button because the ribbon
     /// ran out of width. Recomputed on every layout pass.</summary>
     public bool IsCollapsed { get; internal set; }

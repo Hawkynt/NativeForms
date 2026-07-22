@@ -346,7 +346,7 @@ public class ToolStrip : OwnerDrawnControl
             return SeparatorWidth;
 
         var width = 2 * ButtonPadding;
-        var hasIcon = item.Image is not null || (item.ImageList is not null && item.ImageIndex >= 0);
+        var hasIcon = item.HasIcon;
         if (hasIcon)
             width += IconSize;
 

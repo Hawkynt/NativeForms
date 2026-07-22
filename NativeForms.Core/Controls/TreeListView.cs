@@ -462,7 +462,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         if (images is null || backend is null)
             return x;
 
-        var index = selected && node.SelectedImageIndex >= 0 ? node.SelectedImageIndex : node.ImageIndex;
+        var index = node.ResolveIconIndex(images, selected);
         if (index < 0 || index >= images.Count)
             return x;
 

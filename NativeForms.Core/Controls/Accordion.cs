@@ -602,11 +602,12 @@ public class Accordion : OwnerDrawnControl
             pane.IsExpanded ? GlyphDirection.Down : GlyphDirection.Right);
 
         var textLeft = bounds.X + _GlyphInset + _GlyphSize + _Gap;
-        if (this.ImageList is { } images && pane.ImageIndex >= 0 && pane.ImageIndex < images.Count && this.Backend is { } backend)
+        var paneImage = ImageList.ResolveIndex(this.ImageList, pane.ImageIndex, pane.ImageKey);
+        if (this.ImageList is { } images && paneImage >= 0 && paneImage < images.Count && this.Backend is { } backend)
         {
             var size = images.ImageSize;
             var iconTop = bounds.Y + ((bounds.Height - size.Height) / 2);
-            g.DrawImage(images.GetImage(pane.ImageIndex, backend), new Rectangle(textLeft, iconTop, size.Width, size.Height));
+            g.DrawImage(images.GetImage(paneImage, backend), new Rectangle(textLeft, iconTop, size.Width, size.Height));
             textLeft += size.Width + _Gap;
         }
 

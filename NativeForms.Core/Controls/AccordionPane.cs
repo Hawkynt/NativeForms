@@ -58,6 +58,21 @@ public class AccordionPane : Panel
         }
     } = -1;
 
+    /// <summary>The key of this pane's icon in the owning <see cref="Accordion.ImageList"/>, used when
+    /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? ImageKey
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            (this.Parent as Accordion)?.Invalidate();
+        }
+    }
+
     /// <inheritdoc/>
     protected override void OnTextChanged(EventArgs e)
     {

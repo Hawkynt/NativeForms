@@ -87,6 +87,21 @@ public abstract class ToolStripItem
         }
     } = -1;
 
+    /// <summary>The key of this item's icon in the owning toolbar's <c>ImageList</c>, used when
+    /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? ImageKey
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.NotifyOwner();
+        }
+    }
+
     /// <summary>
     /// Whether the item reacts to the user. With a <see cref="Command"/> attached the command's
     /// <see cref="ICommand.CanExecute"/> gates the effective value on top of the assigned one, so a
@@ -166,18 +181,22 @@ public abstract class ToolStripItem
     protected virtual void OnClick(EventArgs e) => this.Click?.Invoke(this, e);
 
     /// <summary>The effective icon: <see cref="Image"/> first, then <see cref="ImageList"/> +
-    /// <see cref="ImageIndex"/> materialized against <paramref name="backend"/>.</summary>
+    /// <see cref="ImageIndex"/>/<see cref="ImageKey"/> materialized against <paramref name="backend"/>.</summary>
     internal IImage? ResolveImage(IPlatformBackend? backend)
     {
         if (this.Image is { } direct)
             return direct;
 
         var images = this.ImageList;
-        var index = this.ImageIndex;
+        var index = ImageList.ResolveIndex(images, this.ImageIndex, this.ImageKey);
         return images is not null && backend is not null && index >= 0 && index < images.Count
             ? images.GetImage(index, backend)
             : null;
     }
+
+    /// <summary>Whether this item shows any icon — a direct <see cref="Image"/> or a resolvable
+    /// <see cref="ImageIndex"/>/<see cref="ImageKey"/> in the owning <see cref="ImageList"/>.</summary>
+    internal bool HasIcon => this.Image is not null || ImageList.ResolveIndex(this.ImageList, this.ImageIndex, this.ImageKey) >= 0;
 
     /// <summary>Tells the owning collection (and thus the hosting strip) that this item changed.</summary>
     private protected void NotifyOwner() => this.Owner?.NotifyItemChanged();

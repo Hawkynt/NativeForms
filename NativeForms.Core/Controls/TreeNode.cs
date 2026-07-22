@@ -49,6 +49,21 @@ public sealed class TreeNode
         }
     } = -1;
 
+    /// <summary>The key of the node's icon in the owning tree's <c>ImageList</c>, used when
+    /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? ImageKey
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            _host?.Invalidate();
+        }
+    }
+
     /// <summary>The icon index used while the node is selected, or -1 to reuse <see cref="ImageIndex"/>.</summary>
     public int SelectedImageIndex
     {
@@ -62,6 +77,35 @@ public sealed class TreeNode
             _host?.Invalidate();
         }
     } = -1;
+
+    /// <summary>The key of the icon shown while selected, used when <see cref="SelectedImageIndex"/> is
+    /// unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? SelectedImageKey
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            _host?.Invalidate();
+        }
+    }
+
+    /// <summary>The concrete icon index for this node, resolving the selected pair first when
+    /// <paramref name="selected"/> and falling back to the normal image, all against <paramref name="images"/>.</summary>
+    internal int ResolveIconIndex(ImageList? images, bool selected)
+    {
+        if (selected)
+        {
+            var chosen = ImageList.ResolveIndex(images, this.SelectedImageIndex, this.SelectedImageKey);
+            if (chosen >= 0)
+                return chosen;
+        }
+
+        return ImageList.ResolveIndex(images, this.ImageIndex, this.ImageKey);
+    }
 
     /// <summary>
     /// Whether the node's check box is ticked. On an attached control changing it raises the

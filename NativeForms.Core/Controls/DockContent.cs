@@ -64,6 +64,21 @@ public class DockContent : Panel
         }
     }
 
+    /// <summary>The key of this content's icon in the owning <see cref="DockPanel.ImageList"/>, used when
+    /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+    public string? ImageKey
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.DockPanel?.InvalidateChrome();
+        }
+    }
+
     /// <summary>Where this pane currently lives. Read freely; assign to move it (the owning
     /// <see cref="DockPanel"/> performs the move so the layout stays consistent). Before a manager
     /// owns the pane the setter only records the wish.</summary>

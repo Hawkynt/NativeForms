@@ -566,10 +566,13 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `ImageDecoder`: pure-managed PNG subset (8-bit, all filters, non-interlaced) + ICO
       (PNG/32-bit/24-bit+mask entries) with `ImageList.AddPng`/`AddIco` (nearest-neighbor resample);
       encoder lives only in the test project
-- [ ] **Uniform image API across all controls**: either a direct `Image` property (Button, Label,
-      CheckBox, RadioButton, GroupBox, PictureBox) or `ImageList` + `ImageIndex`/`ImageKey`
-      (ComboBox, ListBox, ListView, TreeView, TreeListView, TabControl, toolbars) — same pattern,
-      same rendering path (§5 shared icon+text layout), everywhere
+- [x] **Uniform image API across all controls**: a direct `Image` property (Button, Label, CheckBox,
+      RadioButton, GroupBox, PictureBox) or `ImageList` + `ImageIndex`/`ImageKey` — the latter now on
+      every item class (TabPage, ToolStripItem, ListViewItem, TreeNode+`SelectedImageKey`, RibbonGroup,
+      AccordionPane, DockContent), resolved through the shared `ImageList.ResolveIndex`/`IndexOfKey`
+      (index wins, key falls back, case-insensitive). Arbitrary-object lists (ComboBox, ListBox) reach
+      the same `ImageList` through their `ImageIndexSelector`/`ImageSelector` lambdas. Same rendering
+      path everywhere
 - [x] Threading: loop-thread affinity, `Control.Invoke`/`BeginInvoke` (PostMessage dispatcher /
       `g_idle_add`), `NativeFormsSynchronizationContext` installed by `Run`
 

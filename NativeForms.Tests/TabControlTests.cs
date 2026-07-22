@@ -146,6 +146,22 @@ internal sealed class TabControlTests
     }
 
     [Test]
+    public void Header_paints_the_page_icon_referenced_by_ImageKey()
+    {
+        var tabs = TwoPages(out var one, out _);
+        using var images = new ImageList(8);
+        images.Add(new int[64]);          // 0, unrelated
+        images.Add("home", new int[64]);  // 1, keyed
+        one.ImageKey = "home";            // no ImageIndex set — resolves through the key
+        tabs.ImageList = images;
+        var canvas = Realize(tabs, out _);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8")), Is.True);
+    }
+
+    [Test]
     public void Overflowing_tabs_show_scroll_arrows_that_shift_the_strip()
     {
         var tabs = new TabControl { Bounds = new(0, 0, 100, 150) };

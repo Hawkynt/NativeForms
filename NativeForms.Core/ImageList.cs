@@ -15,6 +15,7 @@ public sealed class ImageList : IDisposable
 {
     private readonly List<int[]> _pixels = [];
     private readonly List<IImage?> _realized = [];
+    private readonly List<string?> _keys = [];
     private IPlatformBackend? _backend;
 
     /// <summary>Creates a list whose images are all <paramref name="imageSize"/> pixels.</summary>
@@ -49,8 +50,54 @@ public sealed class ImageList : IDisposable
 
         _pixels.Add(argb.ToArray());
         _realized.Add(null);
+        _keys.Add(null);
         return _pixels.Count - 1;
     }
+
+    /// <summary>Adds an image under a lookup <paramref name="key"/> and returns its index — the keyed
+    /// counterpart of <see cref="Add(ReadOnlySpan{int})"/>, so controls can reference it by
+    /// <c>ImageKey</c> as well as index.</summary>
+    public int Add(string key, ReadOnlySpan<int> argb) => this.SetKey(this.Add(argb), key);
+
+    /// <summary>Adds a decoded PNG under a lookup <paramref name="key"/>; see <see cref="AddPng(ReadOnlySpan{byte})"/>.</summary>
+    public int AddPng(string key, ReadOnlySpan<byte> png) => this.SetKey(this.AddPng(png), key);
+
+    /// <summary>Adds a decoded ICO under a lookup <paramref name="key"/>; see <see cref="AddIco(ReadOnlySpan{byte})"/>.</summary>
+    public int AddIco(string key, ReadOnlySpan<byte> ico) => this.SetKey(this.AddIco(ico), key);
+
+    /// <summary>Records the lookup key for an entry and returns its index.</summary>
+    private int SetKey(int index, string? key)
+    {
+        _keys[index] = key;
+        return index;
+    }
+
+    /// <summary>
+    /// The index of the image stored under <paramref name="key"/>, or <c>-1</c> when the key is empty
+    /// or unknown. Keys are matched case-insensitively, exactly like the Windows Forms namesake.
+    /// </summary>
+    public int IndexOfKey(string? key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return -1;
+
+        for (var i = 0; i < _keys.Count; ++i)
+            if (string.Equals(_keys[i], key, StringComparison.OrdinalIgnoreCase))
+                return i;
+
+        return -1;
+    }
+
+    /// <summary>Whether an image is stored under <paramref name="key"/>.</summary>
+    public bool ContainsKey(string? key) => this.IndexOfKey(key) >= 0;
+
+    /// <summary>
+    /// Resolves a control's image reference to a concrete index: an explicit <paramref name="imageIndex"/>
+    /// (&gt;= 0) wins; otherwise <paramref name="imageKey"/> is looked up in <paramref name="images"/>.
+    /// Returns <c>-1</c> when neither resolves — the shared rule behind every control's <c>ImageKey</c>.
+    /// </summary>
+    internal static int ResolveIndex(ImageList? images, int imageIndex, string? imageKey)
+        => imageIndex >= 0 ? imageIndex : images?.IndexOfKey(imageKey) ?? -1;
 
     /// <summary>
     /// Adds an image from encoded PNG bytes (the <see cref="ImageDecoder"/> subset: 8-bit
@@ -148,6 +195,7 @@ public sealed class ImageList : IDisposable
 
         _pixels.Add(pixels);
         _realized.Add(null);
+        _keys.Add(null);
         return _pixels.Count - 1;
     }
 
@@ -187,6 +235,7 @@ public sealed class ImageList : IDisposable
         this.DisposeRealized();
         _pixels.Clear();
         _realized.Clear();
+        _keys.Clear();
     }
 
     /// <summary>
