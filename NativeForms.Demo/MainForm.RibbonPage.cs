@@ -97,6 +97,19 @@ internal sealed partial class MainForm
         qatRedo.Click += (_, _) => this.SetStatus("Ribbon: Quick Access Redo.");
         ribbon.QuickAccessItems.AddRange(qatSave, qatUndo, qatRedo);
 
+        // Contextual tab group: a colour-coded "Table Tools" family shown only in context.
+        var design = new RibbonTab("Design");
+        var tableStyles = new RibbonGroup("Table Styles");
+        tableStyles.Items.AddRange(
+            new RibbonButton("Banded", RibbonItemSize.Small) { ImageList = _icons, ImageIndex = _IconBlue },
+            new RibbonButton("Header", RibbonItemSize.Small) { ImageList = _icons, ImageIndex = _IconGreen });
+        design.Groups.Add(tableStyles);
+        ribbon.Tabs.Add(design);
+        var tableTools = new RibbonContextualTabGroup("Table Tools", Color.FromArgb(0xFF, 0x00, 0x80, 0x00));
+        ribbon.ContextualTabGroups.Add(tableTools);
+        tableTools.Add(design);
+        tableTools.Visible = true;
+
         // --- The accordion ----------------------------------------------------------------------
 
         var accordion = new Accordion

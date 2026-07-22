@@ -22,6 +22,13 @@ public class RibbonTab
     /// <summary>The ribbon currently holding this tab, or <see langword="null"/> while detached.</summary>
     internal Ribbon? Owner { get; set; }
 
+    /// <summary>The contextual group this tab belongs to, or <see langword="null"/> for an always-shown tab.</summary>
+    internal RibbonContextualTabGroup? ContextualGroup { get; set; }
+
+    /// <summary>Whether this tab currently appears in the strip: always, unless it belongs to a hidden
+    /// contextual group.</summary>
+    internal bool IsStripVisible => this.ContextualGroup is not { Visible: false };
+
     /// <summary>The groups shown while this tab is selected, left to right.</summary>
     public RibbonGroupCollection Groups { get; }
 

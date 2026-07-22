@@ -62,6 +62,7 @@ ribbon.PreferredHeightChanged += (_, _) => LayoutContentBelow(ribbon.Bottom);
 |---|---|---|---|
 | `Tabs` | `RibbonTabCollection` | empty | The tabs, left to right. The first tab added becomes the selected one. |
 | `QuickAccessItems` | `RibbonQuickAccessCollection` | empty | Icon-only `RibbonButton` commands painted at the right of the tab strip, reachable from any tab. Each button's `Click`/`Command`, `Enabled` and icon behave as anywhere else; the tabs are clipped so they never run under the toolbar. |
+| `ContextualTabGroups` | `RibbonContextualTabGroupCollection` | empty | Colour-coded tab families (`RibbonContextualTabGroup(text, color)`) shown only while `Visible` is set. Their tabs live in `Tabs` but are filtered out of the strip, hit-test and keyboard navigation while hidden, and wear the group colour while shown; hiding the group holding the selection hands it to the nearest shown tab. |
 | `ImageList` | `ImageList?` | `null` | The icons the groups' and items' image indices point into. |
 | `SelectedIndex` | `int` | `-1` | Index of the selected tab, `-1` while there are no tabs. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `RibbonTab?` | `null` | The selected tab; setting selects by `IndexOf`. |

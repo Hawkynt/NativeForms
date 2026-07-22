@@ -99,11 +99,15 @@ public class Ribbon : OwnerDrawnControl
     private int _pressedGroup = -1;
     private int _pressedItem = -1;
 
+    /// <summary>Edge thickness of the colour marker on a visible contextual tab.</summary>
+    private const int _ContextualMarkerHeight = 3;
+
     /// <summary>Creates an empty ribbon.</summary>
     public Ribbon()
     {
         this.Tabs = new(this);
         this.QuickAccessItems = new(this);
+        this.ContextualTabGroups = new(this);
     }
 
     /// <summary>The tabs, left to right. The first one added becomes the selected one.</summary>
@@ -115,6 +119,31 @@ public class Ribbon : OwnerDrawnControl
 
     /// <summary>Repaints the tab strip after a quick-access change.</summary>
     internal void OnQuickAccessChanged() => this.Invalidate();
+
+    /// <summary>The contextual tab groups — colour-coded tab families shown only in context.</summary>
+    public RibbonContextualTabGroupCollection ContextualTabGroups { get; }
+
+    /// <summary>
+    /// A contextual group's visibility changed: if the selected tab is now hidden, hand the selection
+    /// to the nearest still-shown tab (or none), then repaint.
+    /// </summary>
+    internal void OnContextualVisibilityChanged()
+    {
+        if (this.SelectedTab is { IsStripVisible: false })
+            this.SelectedIndex = this.FirstVisibleTab();
+
+        this.Invalidate();
+    }
+
+    /// <summary>The index of the first strip-visible tab, or -1 when none is shown.</summary>
+    private int FirstVisibleTab()
+    {
+        for (var i = 0; i < this.Tabs.Count; ++i)
+            if (this.Tabs[i].IsStripVisible)
+                return i;
+
+        return -1;
+    }
 
     /// <summary>The icons <see cref="RibbonGroup.ImageIndex"/> and the items' image indices point
     /// into, or <see langword="null"/>.</summary>
@@ -609,6 +638,9 @@ public class Ribbon : OwnerDrawnControl
         var right = 0;
         for (var i = 0; i < this.Tabs.Count; ++i)
         {
+            if (!this.Tabs[i].IsStripVisible)
+                continue;
+
             right += this.Tabs[i].TextWidth(this.Backend, font) + (2 * _TabPadding);
             if (x < right)
                 return i;
@@ -777,22 +809,58 @@ public class Ribbon : OwnerDrawnControl
         switch (e.KeyCode)
         {
             case Keys.Tab when e.Control:
-                this.SelectedIndex = e.Shift
-                    ? (_selectedIndex - 1 + count) % count
-                    : (_selectedIndex + 1) % count;
+            {
+                var target = this.StepVisibleTab(_selectedIndex, e.Shift ? -1 : 1, wrap: true);
+                if (target >= 0)
+                    this.SelectedIndex = target;
                 break;
-            case Keys.Left when _selectedIndex > 0:
-                this.SelectedIndex = _selectedIndex - 1;
+            }
+
+            case Keys.Left:
+            {
+                var target = this.StepVisibleTab(_selectedIndex, -1, wrap: false);
+                if (target >= 0)
+                    this.SelectedIndex = target;
+                else
+                    handled = false;
                 break;
-            case Keys.Right when _selectedIndex < count - 1:
-                this.SelectedIndex = _selectedIndex + 1;
+            }
+
+            case Keys.Right:
+            {
+                var target = this.StepVisibleTab(_selectedIndex, 1, wrap: false);
+                if (target >= 0)
+                    this.SelectedIndex = target;
+                else
+                    handled = false;
                 break;
+            }
+
             default:
                 handled = false;
                 break;
         }
 
         e.Handled = handled;
+    }
+
+    /// <summary>The next strip-visible tab from <paramref name="from"/> in the given direction,
+    /// wrapping when asked, or -1 when the walk runs off the end (or nothing else is shown).</summary>
+    private int StepVisibleTab(int from, int step, bool wrap)
+    {
+        var count = this.Tabs.Count;
+        var i = from;
+        for (var n = 0; n < count; ++n)
+        {
+            i = wrap ? ((((i + step) % count) + count) % count) : i + step;
+            if (i < 0 || i >= count)
+                return -1;
+
+            if (this.Tabs[i].IsStripVisible)
+                return i;
+        }
+
+        return -1;
     }
 
     /// <summary>Opens a collapsed group's items as a popup menu under its button.</summary>
@@ -1088,13 +1156,22 @@ public class Ribbon : OwnerDrawnControl
         for (var i = 0; i < this.Tabs.Count && x < qatLeft; ++i)
         {
             var tab = this.Tabs[i];
+            if (!tab.IsStripVisible)
+                continue;
+
             var width = tab.TextWidth(this.Backend, font) + (2 * _TabPadding);
             var active = i == _selectedIndex;
             if (active || i == _hotTab)
                 g.FillRectangle(theme.ControlBackground, new Rectangle(x, 0, width, stripHeight));
 
+            // A visible contextual tab wears a colour marker at the top edge in its group's colour.
+            if (tab.ContextualGroup is { } contextual)
+                g.FillRectangle(contextual.Color, new Rectangle(x, 0, width, _ContextualMarkerHeight));
+
             if (active)
-                g.FillRectangle(theme.Accent, new Rectangle(x, stripHeight - _UnderlineThickness, width, _UnderlineThickness));
+                g.FillRectangle(
+                    tab.ContextualGroup?.Color ?? theme.Accent,
+                    new Rectangle(x, stripHeight - _UnderlineThickness, width, _UnderlineThickness));
 
             g.DrawText(
                 tab.Text,

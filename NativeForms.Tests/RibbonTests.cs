@@ -602,6 +602,77 @@ internal sealed class RibbonTests
         Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16")), Is.True);
     }
 
+    // --- Contextual tab groups ---------------------------------------------------------------------
+
+    private static Ribbon WithContextualTools(out RibbonContextualTabGroup tools, out RibbonTab design)
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        ribbon.Tabs.Add(new RibbonTab("Home"));
+        design = new RibbonTab("Design");
+        ribbon.Tabs.Add(design);
+        tools = new RibbonContextualTabGroup("Table Tools", Color.FromArgb(0xFF, 0x00, 0x80, 0x00));
+        ribbon.ContextualTabGroups.Add(tools);
+        tools.Add(design);
+        return ribbon;
+    }
+
+    [Test]
+    public void A_hidden_contextual_tab_is_not_hit_tested_in_the_strip()
+    {
+        var ribbon = WithContextualTools(out var tools, out _);
+        var canvas = Realize(ribbon, out _);
+        canvas.RaisePaint();
+        Assert.That(tools.Visible, Is.False, "contextual groups start hidden");
+
+        // "Home" is 4 chars: 2*12 padding + 4*7 = 52 px; x=60 is past it, where "Design" would sit.
+        canvas.RaiseMouseDown(60, _TabStrip / 2);
+
+        Assert.That(ribbon.SelectedIndex, Is.Zero, "the hidden Design tab cannot be selected by a click");
+    }
+
+    [Test]
+    public void Showing_a_contextual_group_reveals_its_tab_for_selection()
+    {
+        var ribbon = WithContextualTools(out var tools, out var design);
+        var canvas = Realize(ribbon, out _);
+
+        tools.Visible = true;
+        canvas.RaisePaint();
+        canvas.RaiseMouseDown(60, _TabStrip / 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ribbon.SelectedTab, Is.SameAs(design));
+            Assert.That(design.IsStripVisible, Is.True);
+        });
+    }
+
+    [Test]
+    public void Hiding_a_contextual_group_that_holds_the_selection_falls_back_to_a_visible_tab()
+    {
+        var ribbon = WithContextualTools(out var tools, out var design);
+        Realize(ribbon, out _);
+        tools.Visible = true;
+        ribbon.SelectedTab = design;
+        Assert.That(ribbon.SelectedTab, Is.SameAs(design));
+
+        tools.Visible = false;
+
+        Assert.That(ribbon.SelectedIndex, Is.Zero, "selection falls back to the Home tab");
+    }
+
+    [Test]
+    public void A_visible_contextual_tab_paints_its_group_colour_marker()
+    {
+        var ribbon = WithContextualTools(out var tools, out _);
+        tools.Visible = true;
+        var canvas = Realize(ribbon, out _);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF008000")), Is.True, "the Design tab wears the green marker");
+    }
+
     [Test]
     public void A_disabled_quick_access_button_ignores_a_click()
     {
