@@ -131,6 +131,16 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     }
 
     /// <inheritdoc />
+    public void RemoveChild(IControlPeer child)
+    {
+        // Drop the managed entry only; the child peer's own Dispose destroys the widget (which also
+        // removes it from this GtkFixed). Leaving the entry would have a canvas re-realization re-add
+        // a disposed peer.
+        if (child is GtkControlPeer peer)
+            _children?.Remove(peer);
+    }
+
+    /// <inheritdoc />
     public void Invalidate(Rectangle bounds)
     {
         if (_widget != 0)

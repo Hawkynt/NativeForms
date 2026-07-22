@@ -51,6 +51,7 @@ public sealed class ControlCollection : IReadOnlyList<Control>
             return false;
 
         control.Parent = null;
+        _owner.UnrealizeChildPeer(control);
         control.DisposePeerTree();
         _owner.NotifyChildRemoved(control);
         return true;
@@ -65,6 +66,7 @@ public sealed class ControlCollection : IReadOnlyList<Control>
         foreach (var control in _items)
         {
             control.Parent = null;
+            _owner.UnrealizeChildPeer(control);
             control.DisposePeerTree();
             _owner.NotifyChildRemoved(control);
         }

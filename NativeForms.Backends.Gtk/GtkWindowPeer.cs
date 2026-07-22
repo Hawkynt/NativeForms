@@ -99,6 +99,11 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
             peer.Realize(_fixed);
     }
 
+    /// <inheritdoc />
+    /// <remarks>The window keeps no child bookkeeping of its own — the <c>GtkFixed</c> holds the
+    /// widgets and the child peer's <c>Dispose</c> destroys them — so there is nothing to drop.</remarks>
+    public void RemoveChild(IControlPeer child) { }
+
     /// <summary>
     /// Maps the window and its content area, and nothing else.
     /// </summary>

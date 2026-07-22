@@ -108,6 +108,7 @@ internal sealed class BenchWindowPeer : BenchPeer, IWindowPeer
     public event EventHandler<FormWindowState>? WindowStateChanged { add { } remove { } }
 
     public void AddChild(IControlPeer child) { }
+    public void RemoveChild(IControlPeer child) { }
     public void Show() { }
     public void RunModal(IWindowPeer? owner) { }
     public void Close() { }
@@ -190,6 +191,7 @@ internal class BenchCanvasPeer : BenchPeer, ICanvasPeer
     public event EventHandler<KeyPressEventArgs>? KeyPress;
 
     public void AddChild(IControlPeer child) { }
+    public void RemoveChild(IControlPeer child) { }
     public void Invalidate(Rectangle bounds) { }
     public void InvalidateAll() { }
     public void SetFocusable(bool focusable) { }

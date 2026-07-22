@@ -458,6 +458,8 @@ internal sealed class HeadlessWindowPeer(HeadlessBackend? backend = null) : Head
         (child as HeadlessPeer)?.AttachTo(this);
     }
 
+    public void RemoveChild(IControlPeer child) => this.Children.Remove(child);
+
     public void Show() => this.Shown = true;
 
     public void SetBorderStyle(FormBorderStyle borderStyle)
@@ -844,6 +846,8 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
         this.Children.Add(child);
         (child as HeadlessPeer)?.AttachTo(this);
     }
+
+    public void RemoveChild(IControlPeer child) => this.Children.Remove(child);
 
     public event EventHandler<PaintEventArgs>? Paint;
     public event EventHandler<MouseEventArgs>? MouseDown;

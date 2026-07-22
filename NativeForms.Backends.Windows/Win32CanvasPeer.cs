@@ -115,6 +115,22 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     }
 
     /// <inheritdoc/>
+    public void RemoveChild(IControlPeer child)
+    {
+        // Drop the id → peer entry so notifications never reach a disposed child; the child window is
+        // destroyed by the child peer's own Dispose.
+        if (this._children is null || child is not Win32ChildPeer childPeer)
+            return;
+
+        foreach (var (id, peer) in this._children)
+            if (ReferenceEquals(peer, childPeer))
+            {
+                this._children.Remove(id);
+                return;
+            }
+    }
+
+    /// <inheritdoc/>
     public void Invalidate(Rectangle bounds)
     {
         if (this.Handle == 0)

@@ -96,6 +96,14 @@ public interface IContainerPeer : IControlPeer
 {
     /// <summary>Re-parents a child peer into this container's client area, creating its native widget.</summary>
     void AddChild(IControlPeer child);
+
+    /// <summary>
+    /// Drops the container's bookkeeping entry for a child that is about to be disposed, so a native
+    /// container never re-realizes, routes input to, or otherwise touches a peer that is gone. Called
+    /// before the child's own peer tree is disposed; implementations must not destroy the child widget
+    /// themselves — that is the child peer's own <see cref="System.IDisposable.Dispose"/>.
+    /// </summary>
+    void RemoveChild(IControlPeer child);
 }
 
 /// <summary>A top-level window peer — the native side of a <see cref="Form"/>.</summary>

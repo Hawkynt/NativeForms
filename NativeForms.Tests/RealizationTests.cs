@@ -165,6 +165,44 @@ internal sealed class RealizationTests
     }
 
     [Test]
+    public void Remove_drops_the_container_peers_bookkeeping_entry_for_the_child()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        var button = new Button { Text = "OK", Bounds = new(5, 5, 80, 30) };
+        form.Controls.Add(button);
+        Application.Run(form, backend);
+        var window = backend.Created.OfType<HeadlessWindowPeer>().Single();
+        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+        Assert.That(window.Children, Does.Contain(buttonPeer), "the child peer was added to the container");
+
+        form.Controls.Remove(button);
+
+        Assert.That(window.Children, Does.Not.Contain(buttonPeer),
+            "the container must drop the removed child before its peer is disposed");
+    }
+
+    [Test]
+    public void Remove_drops_a_canvas_container_entry_before_the_canvas_re_realizes()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        var panel = new Panel { Bounds = new(10, 10, 150, 100) };
+        var button = new Button { Text = "OK", Bounds = new(5, 5, 80, 30) };
+        panel.Controls.Add(button);
+        form.Controls.Add(panel);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+        Assert.That(canvas.Children, Does.Contain(buttonPeer));
+
+        panel.Controls.Remove(button);
+
+        Assert.That(canvas.Children, Does.Not.Contain(buttonPeer),
+            "a canvas container must forget a removed child, not re-realize a disposed peer");
+    }
+
+    [Test]
     public void Remove_disposes_the_peer_tree_and_the_control_can_realize_again()
     {
         var backend = new HeadlessBackend();

@@ -1432,6 +1432,16 @@ public abstract class Control
     }
 
     /// <summary>
+    /// Tells this container's peer to forget a child it hosts, before the child's peer tree is
+    /// disposed. A no-op when unrealized or when the child has no peer to drop.
+    /// </summary>
+    internal void UnrealizeChildPeer(Control child)
+    {
+        if (_peer is IContainerPeer container && child._peer is { } childPeer)
+            container.RemoveChild(childPeer);
+    }
+
+    /// <summary>
     /// Disposes this control's peer and every descendant peer, children first. The managed state
     /// (text, bounds, children …) stays intact, so the control is back to its unrealized shape and
     /// can be realized again — for example after being re-added to a live container.

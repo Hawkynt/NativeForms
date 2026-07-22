@@ -100,6 +100,22 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     }
 
     /// <inheritdoc/>
+    public void RemoveChild(IControlPeer child)
+    {
+        // Drop the id → peer entry so WM_COMMAND/notify routing never reaches a disposed child; the
+        // child window itself is destroyed by the child peer's own Dispose.
+        if (child is not Win32ChildPeer childPeer)
+            return;
+
+        foreach (var (id, peer) in _children)
+            if (ReferenceEquals(peer, childPeer))
+            {
+                _children.Remove(id);
+                return;
+            }
+    }
+
+    /// <inheritdoc/>
     public void Show()
     {
         _shown = true;

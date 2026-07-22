@@ -230,8 +230,9 @@ strategy (may differ per platform; note exceptions inline).
       `Control.RealizeSelf` realizes recursively with parent-relative coordinates; late
       `Controls.Add` realizes immediately; `Remove`/`Clear` dispose the peer tree and the control
       re-realizes from buffered state
-  - [ ] `IContainerPeer.RemoveChild` so Win32/GTK containers drop their bookkeeping entry for a
-        removed child before the container itself dies (today the stale entry is harmless)
+  - [x] `IContainerPeer.RemoveChild` — `Controls.Remove`/`Clear` tell the container peer to drop its
+        bookkeeping entry (GTK canvas child list, Win32 id→peer map) before the child's peer tree is
+        disposed, so no container re-realizes, routes input to, or re-adds a gone peer
 - [~] `Form` (native) — title, client area, close event, Show *(realize/show done; below pending)*
   - [x] Realize + show + close event
   - [x] `StartPosition` (core-side against `GetScreenSize`/owner), `FormBorderStyle` (live
