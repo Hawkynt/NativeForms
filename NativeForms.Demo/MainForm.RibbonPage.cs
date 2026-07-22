@@ -88,6 +88,15 @@ internal sealed partial class MainForm
         ribbon.SelectedIndexChanged += (_, _)
             => this.SetStatus($"Ribbon: the {ribbon.SelectedTab?.Text} tab is showing.");
 
+        // Quick Access Toolbar: icon-only commands at the right of the tab strip, reachable from any tab.
+        var qatSave = new RibbonButton("Save") { ImageList = _icons, ImageIndex = _IconOpen };
+        qatSave.Click += (_, _) => this.SetStatus("Ribbon: Quick Access Save.");
+        var qatUndo = new RibbonButton("Undo") { ImageList = _icons, ImageIndex = _IconRed };
+        qatUndo.Click += (_, _) => this.SetStatus("Ribbon: Quick Access Undo.");
+        var qatRedo = new RibbonButton("Redo") { ImageList = _icons, ImageIndex = _IconGreen };
+        qatRedo.Click += (_, _) => this.SetStatus("Ribbon: Quick Access Redo.");
+        ribbon.QuickAccessItems.AddRange(qatSave, qatUndo, qatRedo);
+
         // --- The accordion ----------------------------------------------------------------------
 
         var accordion = new Accordion

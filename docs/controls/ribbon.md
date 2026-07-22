@@ -61,6 +61,7 @@ ribbon.PreferredHeightChanged += (_, _) => LayoutContentBelow(ribbon.Bottom);
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `Tabs` | `RibbonTabCollection` | empty | The tabs, left to right. The first tab added becomes the selected one. |
+| `QuickAccessItems` | `RibbonQuickAccessCollection` | empty | Icon-only `RibbonButton` commands painted at the right of the tab strip, reachable from any tab. Each button's `Click`/`Command`, `Enabled` and icon behave as anywhere else; the tabs are clipped so they never run under the toolbar. |
 | `ImageList` | `ImageList?` | `null` | The icons the groups' and items' image indices point into. |
 | `SelectedIndex` | `int` | `-1` | Index of the selected tab, `-1` while there are no tabs. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `RibbonTab?` | `null` | The selected tab; setting selects by `IndexOf`. |

@@ -528,10 +528,12 @@ strategy (may differ per platform; note exceptions inline).
         `RangeSelected`, keyboard navigation (arrows/Enter/Escape), zero per-frame paint allocation;
         the button opens the picker in a popup under itself, and the picker is reusable standalone
         through one shared `GridPickerCore`
-  - [ ] Two-line caption wrapping on large items; Quick Access Toolbar, contextual tab groups and
-        KeyTips (a `MenuStrip` above the ribbon covers the application-menu case); the tab-click
-        flyout shows only item glyphs, not re-parented hosted controls; the grid picker does not grow
-        past its `MaxColumns`/`MaxRows`
+  - [x] Quick Access Toolbar (`QuickAccessItems`): icon-only `RibbonButton` commands painted at the
+        right of the tab strip, hover-highlit, hit-tested ahead of the tabs, reachable from any tab
+  - [ ] Two-line caption wrapping on large items; contextual tab groups and KeyTips (a `MenuStrip`
+        above the ribbon covers the application-menu case); the tab-click flyout shows only item
+        glyphs, not re-parented hosted controls; the grid picker does not grow past its
+        `MaxColumns`/`MaxRows`
 - [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 - [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`

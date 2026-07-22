@@ -47,6 +47,10 @@ public class Ribbon : OwnerDrawnControl
     /// <summary>Edge length of the icon on a small item.</summary>
     private const int _SmallIconSize = 16;
 
+    /// <summary>Width of one Quick Access Toolbar button in the tab strip, and its icon edge.</summary>
+    private const int _QatButtonSize = 22;
+    private const int _QatIconSize = 16;
+
     /// <summary>Horizontal padding inside an item, and the gap between its icon and caption.</summary>
     private const int _ItemPadding = 4;
 
@@ -89,16 +93,28 @@ public class Ribbon : OwnerDrawnControl
 
     private int _selectedIndex = -1;
     private int _hotTab = -1;
+    private int _hotQat = -1;
     private int _hotGroup = -1;
     private int _hotItem = -1;
     private int _pressedGroup = -1;
     private int _pressedItem = -1;
 
     /// <summary>Creates an empty ribbon.</summary>
-    public Ribbon() => this.Tabs = new(this);
+    public Ribbon()
+    {
+        this.Tabs = new(this);
+        this.QuickAccessItems = new(this);
+    }
 
     /// <summary>The tabs, left to right. The first one added becomes the selected one.</summary>
     public RibbonTabCollection Tabs { get; }
+
+    /// <summary>The Quick Access Toolbar — icon-only command buttons at the right of the tab strip,
+    /// reachable from any tab.</summary>
+    public RibbonQuickAccessCollection QuickAccessItems { get; }
+
+    /// <summary>Repaints the tab strip after a quick-access change.</summary>
+    internal void OnQuickAccessChanged() => this.Invalidate();
 
     /// <summary>The icons <see cref="RibbonGroup.ImageIndex"/> and the items' image indices point
     /// into, or <see langword="null"/>.</summary>
@@ -661,6 +677,13 @@ public class Ribbon : OwnerDrawnControl
 
         if (e.Y < this.TabStripHeight)
         {
+            var qat = this.HitTestQuickAccess(e.X);
+            if (qat >= 0)
+            {
+                this.QuickAccessItems[qat].PerformClick();
+                return;
+            }
+
             this.HandleTabPress(e.X);
             return;
         }
@@ -712,16 +735,19 @@ public class Ribbon : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        var tab = e.Y < this.TabStripHeight ? this.HitTestTab(e.X) : -1;
+        var inStrip = e.Y < this.TabStripHeight;
+        var qat = inStrip ? this.HitTestQuickAccess(e.X) : -1;
+        var tab = inStrip && qat < 0 ? this.HitTestTab(e.X) : -1;
         var groupIndex = this.HitTestGroup(e.X, e.Y);
         var itemIndex = groupIndex >= 0 && this.SelectedTab is { } selected
             ? this.HitTestItem(selected.Groups[groupIndex], e.X, e.Y, this.GroupAreaHeight)
             : -1;
 
-        if (tab == _hotTab && groupIndex == _hotGroup && itemIndex == _hotItem)
+        if (tab == _hotTab && qat == _hotQat && groupIndex == _hotGroup && itemIndex == _hotItem)
             return;
 
         _hotTab = tab;
+        _hotQat = qat;
         _hotGroup = groupIndex;
         _hotItem = itemIndex;
         this.Invalidate();
@@ -730,10 +756,10 @@ public class Ribbon : OwnerDrawnControl
     /// <inheritdoc/>
     protected override void OnMouseLeave(EventArgs e)
     {
-        if (_hotTab < 0 && _hotGroup < 0 && _hotItem < 0 && _pressedGroup < 0)
+        if (_hotTab < 0 && _hotQat < 0 && _hotGroup < 0 && _hotItem < 0 && _pressedGroup < 0)
             return;
 
-        _hotTab = _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
+        _hotTab = _hotQat = _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
         this.Invalidate();
     }
 
@@ -1056,8 +1082,10 @@ public class Ribbon : OwnerDrawnControl
         // The strip paints before the groups are arranged, so this is the first measuring call of the
         // frame — it has to be the one that notices a font change.
         var font = this.MeasurementFont();
+        var qatLeft = this.QuickAccessLeft(); // tabs stop short of the quick-access buttons
+        g.PushClip(new Rectangle(0, 0, qatLeft, stripHeight));
         var x = 0;
-        for (var i = 0; i < this.Tabs.Count; ++i)
+        for (var i = 0; i < this.Tabs.Count && x < qatLeft; ++i)
         {
             var tab = this.Tabs[i];
             var width = tab.TextWidth(this.Backend, font) + (2 * _TabPadding);
@@ -1077,6 +1105,55 @@ public class Ribbon : OwnerDrawnControl
 
             x += width;
         }
+
+        g.PopClip();
+        this.PaintQuickAccess(g, theme, stripHeight);
+    }
+
+    /// <summary>The x where the Quick Access Toolbar starts, or the full width when it is empty.</summary>
+    private int QuickAccessLeft()
+    {
+        var count = this.QuickAccessItems.Count;
+        return count == 0 ? this.Width : Math.Max(0, this.Width - (count * _QatButtonSize));
+    }
+
+    /// <summary>Paints the quick-access buttons — a hover highlight and each item's icon.</summary>
+    private void PaintQuickAccess(IGraphics g, ITheme theme, int stripHeight)
+    {
+        var count = this.QuickAccessItems.Count;
+        if (count == 0)
+            return;
+
+        var left = this.QuickAccessLeft();
+        for (var i = 0; i < count; ++i)
+        {
+            var item = this.QuickAccessItems[i];
+            var rect = new Rectangle(left + (i * _QatButtonSize), 0, _QatButtonSize, stripHeight);
+            if (i == _hotQat && item.Enabled)
+                g.FillRectangle(theme.HeaderBackground, rect);
+
+            if (item.ResolveImage(this.Backend) is { } icon)
+                g.DrawImage(icon, new Rectangle(
+                    rect.X + ((_QatButtonSize - _QatIconSize) / 2),
+                    rect.Y + ((stripHeight - _QatIconSize) / 2),
+                    _QatIconSize,
+                    _QatIconSize));
+        }
+    }
+
+    /// <summary>The quick-access button index under a tab-strip x, or -1.</summary>
+    private int HitTestQuickAccess(int x)
+    {
+        var count = this.QuickAccessItems.Count;
+        if (count == 0)
+            return -1;
+
+        var left = this.QuickAccessLeft();
+        if (x < left)
+            return -1;
+
+        var index = (x - left) / _QatButtonSize;
+        return index >= 0 && index < count ? index : -1;
     }
 
     /// <summary>Paints one group: its frame, its items (or its collapsed button) and its caption strip.</summary>

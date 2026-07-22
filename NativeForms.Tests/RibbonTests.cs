@@ -558,4 +558,64 @@ internal sealed class RibbonTests
             Assert.That(ribbon.SelectedIndex, Is.Zero);
         });
     }
+
+    // --- Quick Access Toolbar ----------------------------------------------------------------------
+
+    [Test]
+    public void Clicking_a_quick_access_button_at_the_right_of_the_strip_runs_it()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        ribbon.Tabs.Add(new RibbonTab("Home"));
+        var save = new RibbonButton("Save");
+        var undo = new RibbonButton("Undo");
+        var saves = 0;
+        var undos = 0;
+        save.Click += (_, _) => ++saves;
+        undo.Click += (_, _) => ++undos;
+        ribbon.QuickAccessItems.AddRange(save, undo);
+        var canvas = Realize(ribbon, out _);
+        canvas.RaisePaint();
+
+        // Two 22 px buttons right-aligned in a 600 px strip: Save at [556,578), Undo at [578,600).
+        canvas.RaiseMouseDown(567, _TabStrip / 2);
+        canvas.RaiseMouseDown(589, _TabStrip / 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(saves, Is.EqualTo(1));
+            Assert.That(undos, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void A_quick_access_button_paints_its_icon()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        ribbon.Tabs.Add(new RibbonTab("Home"));
+        using var images = new ImageList(16);
+        var save = new RibbonButton("Save") { ImageList = images, ImageIndex = images.Add(new int[256]) };
+        ribbon.QuickAccessItems.Add(save);
+        var canvas = Realize(ribbon, out _);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16")), Is.True);
+    }
+
+    [Test]
+    public void A_disabled_quick_access_button_ignores_a_click()
+    {
+        var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+        ribbon.Tabs.Add(new RibbonTab("Home"));
+        var save = new RibbonButton("Save") { Enabled = false };
+        var clicks = 0;
+        save.Click += (_, _) => ++clicks;
+        ribbon.QuickAccessItems.Add(save);
+        var canvas = Realize(ribbon, out _);
+        canvas.RaisePaint();
+
+        canvas.RaiseMouseDown(600 - 11, _TabStrip / 2); // the single button, right-aligned
+
+        Assert.That(clicks, Is.Zero);
+    }
 }
