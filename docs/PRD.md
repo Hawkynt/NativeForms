@@ -174,9 +174,11 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 ## 6. Data binding internals — `[ ]` planned beyond the primitive
 
 - [x] `PropertyBinding<T>` primitive (delegates, no reflection).
-- [ ] **Lambdas everywhere**: every binding/configuration surface (bindings, column value/image/
-      style selectors, read-only predicates, display-text/tooltip providers) accepts plain
-      `Func<>`/`Action<>` lambdas — never string member names, never `Expression<>` trees.
+- [x] **Lambdas everywhere**: every binding/configuration surface accepts plain `Func<>`/`Action<>`
+      lambdas — `ValueSelector`, `ImageSelector`/`ImageIndexSelector`/`ImagesSelector`,
+      `CellStyleSelector`, `ReadOnlyCellSelector`, `EnabledSelector`, `DisplaySelector`,
+      `TooltipSelector` — never string member names, never `Expression<>` trees (none exist in Core;
+      enforced by the no-reflection rule, exercised by the binding and column-type tests).
 - [ ] Source-generated `[Bindable]`/property-accessor generator so `DataSource`+`DisplayMember`
       resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe).
 - [~] `ObservableList<T>` with granular change events (add/remove/replace/reset) for virtualized
