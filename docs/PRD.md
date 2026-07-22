@@ -307,7 +307,9 @@ strategy (may differ per platform; note exceptions inline).
   - [x] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength` (GTK: entry only —
         GtkTextView has no native limit, documented), `CharacterCasing` (core-side, all backends)
   - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live
-  - [ ] Owner-drawn grey placeholder for multiline (no native support in EDIT or GtkTextView)
+  - [~] Owner-drawn grey placeholder for multiline: GTK paints the hint after the `GtkTextView`'s own
+        draw while the buffer is empty (verified in pixels); the Win32 multiline `EDIT` half is not
+        wired yet
   - [~] `ITextBoxPeer.KeyDown` seam exists (Win32 EDIT subclass, GTK pre-connected
         `key-press-event`, headless fake) — wired for `SearchBox` and now for
         `NumericUpDown`/`DomainUpDown` (Enter commits the pending edit, Up/Down step from inside the

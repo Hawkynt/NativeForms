@@ -43,6 +43,9 @@ internal abstract class GtkControlPeer : IControlPeer
     /// <summary>Buffered font override, or null while the theme font applies.</summary>
     private Font? _font;
 
+    /// <summary>The buffered font override, for subclasses that paint their own text (the multiline placeholder).</summary>
+    private protected Font? BufferedFont => _font;
+
     /// <summary>Buffered text color; <see cref="Color.Empty"/> while the theme color applies.</summary>
     private Color _foreColor;
 

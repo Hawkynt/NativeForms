@@ -102,7 +102,54 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
             var keyPressed = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnKeyPress;
             NativeMethods.g_signal_connect_data(
                 _multiline ? _textView : _widget, "key-press-event", keyPressed, GCHandle.ToIntPtr(_selfHandle), 0, 0);
+
+            // GtkTextView has no native placeholder, so paint one after its own draw when the buffer is
+            // empty — the multiline counterpart of GtkEntry's gtk_entry_set_placeholder_text.
+            if (_multiline)
+            {
+                var draw = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnTextViewDraw;
+                NativeMethods.g_signal_connect_data(
+                    _textView, "draw", draw, GCHandle.ToIntPtr(_selfHandle), 0, NativeMethods.G_CONNECT_AFTER);
+            }
         }
+    }
+
+    /// <summary>
+    /// Native "draw" handler (after the view's own) that paints the grey placeholder while the
+    /// multiline buffer is empty. Nothing is drawn once a character is typed; GTK repaints the view on
+    /// every buffer change, so the hint appears and disappears on its own.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnTextViewDraw(nint widget, nint cr, nint userData)
+    {
+        if (GCHandle.FromIntPtr(userData).Target is not GtkTextBoxPeer peer)
+            return 0;
+
+        var placeholder = peer._placeholder;
+        if (placeholder.Length == 0)
+            return 0;
+
+        var buffer = NativeMethods.gtk_text_view_get_buffer(widget);
+        if (buffer == 0 || NativeMethods.gtk_text_buffer_get_char_count(buffer) > 0)
+            return 0;
+
+        var layout = NativeMethods.pango_cairo_create_layout(cr);
+        NativeMethods.pango_layout_set_text(layout, placeholder, -1);
+        if (peer.BufferedFont is { } font)
+        {
+            var description = GtkGraphics.CreateFontDescription(font);
+            NativeMethods.pango_layout_set_font_description(layout, description);
+            NativeMethods.pango_font_description_free(description);
+        }
+
+        NativeMethods.cairo_save(cr);
+        NativeMethods.cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 1.0); // themed text dimmed to a hint
+        var left = NativeMethods.gtk_text_view_get_left_margin(widget) + 2;
+        NativeMethods.cairo_move_to(cr, left, 1);
+        NativeMethods.pango_cairo_show_layout(cr, layout);
+        NativeMethods.cairo_restore(cr);
+        NativeMethods.g_object_unref(layout);
+        return 0; // propagate; the placeholder is an overlay, not a replacement
     }
 
     /// <summary>Ahead of event dispatch, so a corrected caret is in place before the next keystroke.</summary>
@@ -137,7 +184,12 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     public void SetPlaceholder(string placeholder)
     {
         _placeholder = placeholder ?? string.Empty;
-        if (_widget != 0 && !_multiline)
+        if (_widget == 0)
+            return;
+
+        if (_multiline)
+            NativeMethods.gtk_widget_queue_draw(_textView); // repaint the owner-drawn hint
+        else
             NativeMethods.gtk_entry_set_placeholder_text(_widget, _placeholder);
     }
 

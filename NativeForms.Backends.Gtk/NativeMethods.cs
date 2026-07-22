@@ -439,6 +439,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial nint gtk_text_view_get_buffer(nint textView);
 
+    /// <summary>The number of characters in the buffer — zero marks an empty multiline editor.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_text_buffer_get_char_count(nint buffer);
+
+    /// <summary>The left inset (in pixels) where the view starts drawing text.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_text_view_get_left_margin(nint textView);
+
     /// <summary>Toggles whether the user can edit the view's buffer.</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_text_view_set_editable(nint textView, int setting);

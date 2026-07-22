@@ -57,10 +57,10 @@ Inherits the common members of [`Control`](control.md).
 
 - Every setting is buffered until realization and flushed into the peer when the native widget is created; writes afterwards forward immediately. `TextBoxTests` pin the whole surface headlessly against the test backend's text-box peer.
 - **Multiline recreates the widget.** Win32 `ES_MULTILINE` is a creation-time style, so flipping `Multiline` on a live control destroys and recreates the HWND (same control id, so `WM_COMMAND` routing survives); GTK swaps between a `GtkEntry` and a `GtkTextView` in a `GtkScrolledWindow`. Peers buffer their state and re-flush it into the fresh widget, so the swap is invisible — text and selection survive.
-- **Platform limits, documented honestly.** The placeholder is a single-line feature: Win32's cue banner (`EM_SETCUEBANNER`) only exists on single-line `EDIT` controls, and `GtkTextView` has no placeholder. `MaxLength` and password masking are also entry-only on GTK (`GtkTextView` has no native limit or masking).
+- **Platform limits, documented honestly.** Multiline placeholders are owner-drawn: neither Win32's cue banner (`EM_SETCUEBANNER`, single-line `EDIT` only) nor `GtkTextView` offers a native one, so on GTK the hint is painted after the view's own draw while the buffer is empty. The Win32 multiline half is not wired yet. `MaxLength` and password masking are also entry-only on GTK (`GtkTextView` has no native limit or masking).
 - `CharacterCasing` is normalized in the core — on assignment and on user input alike (a corrective push rewrites the widget when it disagrees) — so it behaves identically on every backend; no `ES_UPPERCASE`/`ES_LOWERCASE` style bits.
 - [`MaskedTextBox`](maskedtextbox.md) and [`RichTextBox`](richtextbox.md) build on this control; [`SearchBox`](searchbox.md), [`ComboBox`](combobox.md) (editable style) and the spinners host one as their editor.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): an owner-drawn placeholder for multiline boxes, the `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, and an undo API.
+- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.3): the Win32 half of the multiline placeholder (GTK is done), the `AcceptsReturn`/`AcceptsTab` key behavior (`WM_GETDLGCODE`), word-wrap control, and an undo API.
 
 ## Differences from System.Windows.Forms.TextBox
 

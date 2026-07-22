@@ -41,13 +41,22 @@ internal sealed partial class MainForm
             Rtf = @"{\rtf1\ansi\deff0{\fonttbl{\f0\fnil;}}{\colortbl ;\red200\green80\blue0;}\pard\ql {\b Bold}, {\i italic} and {\cf1\fs28 colored} rich text.}",
         };
 
+        var multilineHint = new TextBox
+        {
+            Bounds = new(16, 430, 300, 80),
+            Multiline = true,
+            PlaceholderText = "Owner-drawn multiline placeholder…",
+        };
+
         page.Controls.AddRange(
             Caption("TextBox", 16, 12),
             single, placeholder, password, multiline,
             Caption("MaskedTextBox (phone mask)", 16, 210),
             masked,
             Caption("RichTextBox (pre-styled Rtf)", 16, 266),
-            rich);
+            rich,
+            Caption("Multiline placeholder (empty)", 16, 406),
+            multilineHint);
 
         // --- Column 2: spinners, search, sliders ------------------------------------------------
 
