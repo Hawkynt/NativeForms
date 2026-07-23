@@ -286,15 +286,23 @@ internal sealed partial class MainForm : Form
         run.DropDownItems.Add(runTests);
         run.DropDownItems.Add(runProfiled);
 
-        // A real control hosted in the toolbar (ToolStripControlHost), the toolbar counterpart of the
-        // ribbon's RibbonHostItem: date/time pickers, combo boxes and the like drop straight in.
+        // Real controls hosted in the toolbar (ToolStripControlHost), the toolbar counterpart of the
+        // ribbon's RibbonHostItem: date pickers, combo boxes, a colour swatch — all drop straight in.
         var toolDate = new DateTimePicker { Format = DateTimePickerFormat.Short };
         toolDate.ValueChanged += (_, _) => this.SetStatus($"Toolbar: date set to {toolDate.Value:d}.");
+        var toolColor = new ColorPicker { SelectedColor = Color.OrangeRed };
+        toolColor.SelectedColorChanged += (_, _) => this.SetStatus($"Toolbar: colour {toolColor.SelectedColor.Name}.");
+        var toolZoom = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        toolZoom.Items.AddRange(["100 %", "125 %", "150 %", "200 %"]);
+        toolZoom.SelectedIndex = 0;
+        toolZoom.SelectedIndexChanged += (_, _) => this.SetStatus($"Toolbar: zoom {toolZoom.Text}.");
 
         strip.Items.AddRange(
             newButton, openButton, saveButton, new ToolStripSeparator(),
             pin, new ToolStripSeparator(), run, new ToolStripSeparator(),
-            new ToolStripControlHost(toolDate) { HostWidth = 120 });
+            new ToolStripControlHost(toolDate) { HostWidth = 120 },
+            new ToolStripControlHost(toolColor) { HostWidth = 44 },
+            new ToolStripControlHost(toolZoom) { HostWidth = 90 });
 
         var pinChecked = pin.Checked;
         this.OnReset(() => pin.Checked = pinChecked);

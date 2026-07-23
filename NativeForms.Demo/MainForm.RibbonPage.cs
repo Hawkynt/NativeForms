@@ -89,10 +89,20 @@ internal sealed partial class MainForm
         insertTime.ValueChanged += (_, _) => this.SetStatus($"Ribbon: time field {insertTime.Value:hh\\:mm}.");
         var trackChanges = new CheckBox { Text = "Track changes" };
         trackChanges.CheckedChanged += (_, _) => this.SetStatus($"Ribbon: track changes {(trackChanges.Checked ? "on" : "off")}.");
+        var fieldColor = new ColorPicker { SelectedColor = Color.RoyalBlue };
+        fieldColor.SelectedColorChanged += (_, _) => this.SetStatus($"Ribbon: colour {fieldColor.SelectedColor.Name}.");
+        var fieldState = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        fieldState.Items.AddRange(["Draft", "Final", "Archived"]);
+        fieldState.SelectedIndex = 0;
+        fieldState.SelectedIndexChanged += (_, _) => this.SetStatus($"Ribbon: state \"{fieldState.Text}\".");
+        var fieldNote = new TextBox { Text = "note" };
         fields.Items.AddRange(
             new RibbonHostItem(insertDate) { HostWidth = 130 },
             new RibbonHostItem(insertTime) { HostWidth = 90 },
-            new RibbonHostItem(trackChanges) { HostWidth = 130 });
+            new RibbonHostItem(trackChanges) { HostWidth = 130 },
+            new RibbonHostItem(fieldColor) { HostWidth = 60 },
+            new RibbonHostItem(fieldState) { HostWidth = 120 },
+            new RibbonHostItem(fieldNote) { HostWidth = 120 });
 
         insert.Groups.AddRange(illustrations, tables, fields);
 

@@ -174,7 +174,22 @@ internal sealed partial class MainForm
             picture.Image = null;
             this.SetStatus("PictureBox: image cleared.");
         };
-        pictureMenu.Items.AddRange(spin, cool, warm, new ToolStripSeparator(), clear);
+        // Rich context-menu items: a check-on-click toggle and a colour submenu with swatch icons.
+        var border = new ToolStripMenuItem("Fixed border") { CheckOnClick = true, Checked = true };
+        border.CheckedChanged += (_, _) =>
+        {
+            picture.BorderStyle = border.Checked ? BorderStyle.FixedSingle : BorderStyle.None;
+            this.SetStatus($"PictureBox: border {(border.Checked ? "on" : "off")}.");
+        };
+        var tint = new ToolStripMenuItem("Accent colour");
+        foreach (var (name, swatch) in new (string, Color)[] { ("Red", Color.Red), ("Green", Color.SeaGreen), ("Blue", Color.RoyalBlue), ("Gold", Color.Goldenrod) })
+        {
+            var choice = new ToolStripMenuItem(name) { Image = this.SquareImage(swatch) };
+            choice.Click += (_, _) => this.SetStatus($"PictureBox: accent set to {name}.");
+            tint.DropDownItems.Add(choice);
+        }
+
+        pictureMenu.Items.AddRange(spin, cool, warm, new ToolStripSeparator(), clear, new ToolStripSeparator(), border, tint);
         picture.ContextMenuStrip = pictureMenu;
         _toolTip.SetToolTip(picture, "Right-click to switch between the animation and gradients.");
 
