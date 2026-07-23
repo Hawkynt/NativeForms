@@ -18,7 +18,8 @@ form.Controls.Add(group);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Image` | `IImage?` | `null` | An optional icon rendered before the caption in the frame gap; the caption shifts right to make room. Changing it invalidates the control. |
+| `Image` | `IImage?` | `null` | An optional icon rendered with the caption in the frame gap; `TextImageRelation` places it before or after the text. Changing it invalidates the control. |
+| `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | Where the `Image` sits relative to the caption; `TextBeforeImage` puts the icon after the text. The header is one horizontal strip, so the before/after values are the meaningful ones. |
 
 The caption itself is the inherited `Text` property. Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 

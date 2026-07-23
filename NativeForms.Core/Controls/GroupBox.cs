@@ -15,8 +15,8 @@ public class GroupBox : OwnerDrawnControl
     private const int _CaptionPadding = 4;
 
     /// <summary>
-    /// An optional icon rendered before the caption in the frame gap through the shared content
-    /// layout; the caption shifts right to make room.
+    /// An optional icon rendered with the caption in the frame gap through the shared content layout;
+    /// <see cref="TextImageRelation"/> places it before or after the text.
     /// </summary>
     public IImage? Image
     {
@@ -30,6 +30,25 @@ public class GroupBox : OwnerDrawnControl
             this.Invalidate();
         }
     }
+
+    /// <summary>
+    /// Where the <see cref="Image"/> sits relative to the caption. Defaults to
+    /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
+    /// to put the icon after the text. The header is a single horizontal strip, so the before/after
+    /// values are the meaningful ones.
+    /// </summary>
+    public TextImageRelation TextImageRelation
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    } = TextImageRelation.ImageBeforeText;
 
     /// <summary>
     /// The area available to children: the client area inside the frame line and the caption
@@ -88,7 +107,7 @@ public class GroupBox : OwnerDrawnControl
             new Rectangle(_CaptionInset + _CaptionPadding, 0, contentWidth, contentHeight),
             imageSize,
             captionSize,
-            TextImageRelation.ImageBeforeText,
+            this.TextImageRelation,
             ContentAlignment.MiddleLeft,
             out var imageRect,
             out var textRect);

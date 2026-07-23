@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms;
+using Hawkynt.NativeForms.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
@@ -66,6 +67,36 @@ internal sealed class GroupBoxImageTests
             Assert.That(g.Operations.Exists(o => o.StartsWith("image ")), Is.False);
             Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Cap\"") && o.EndsWith("@12,0")), Is.True);
         });
+    }
+
+    private static int AtX(RecordingGraphics g, string prefix)
+    {
+        var op = g.Operations.First(o => o.StartsWith(prefix));
+        return int.Parse(op[(op.IndexOf('@') + 1)..].Split(',')[0]);
+    }
+
+    [Test]
+    public void TextBeforeImage_puts_the_icon_after_the_caption()
+    {
+        var box = new GroupBox
+        {
+            Text = "Cap",
+            Bounds = new(0, 0, 200, 100),
+            Image = new HeadlessImage(16, 16),
+            TextImageRelation = TextImageRelation.TextBeforeImage,
+        };
+        var g = Realize(box).RaisePaint();
+
+        Assert.That(AtX(g, "text \"Cap\""), Is.LessThan(AtX(g, "image 16x16")), "the caption comes first, the icon after it");
+    }
+
+    [Test]
+    public void ImageBeforeText_is_the_default_order()
+    {
+        var box = new GroupBox { Text = "Cap", Bounds = new(0, 0, 200, 100), Image = new HeadlessImage(16, 16) };
+        var g = Realize(box).RaisePaint();
+
+        Assert.That(AtX(g, "image 16x16"), Is.LessThan(AtX(g, "text \"Cap\"")), "the icon precedes the caption by default");
     }
 
     [Test]
