@@ -38,6 +38,7 @@ public sealed partial class GtkBackend : IPlatformBackend
                 return;
 
             NativeMethods.gtk_init(0, 0);
+            NormalizeFontDpi();
             HookThemeNotifications();
             _initialized = true;
         }
@@ -55,6 +56,25 @@ public sealed partial class GtkBackend : IPlatformBackend
         => _measureContext != 0
             ? _measureContext
             : _measureContext = NativeMethods.pango_font_map_create_context(NativeMethods.pango_cairo_font_map_get_default());
+
+    /// <summary><c>gtk-xft-dpi</c> value that renders native text at 96 DPI (in 1/1024 point units).</summary>
+    private const int _baselineFontDpi = 96 * 1024;
+
+    /// <summary>
+    /// Pins native widgets to 96-DPI text so they match the owner-drawn controls. Owner-drawn text is
+    /// laid out through the default PangoCairo font map, whose resolution is a fixed 96 DPI, while
+    /// native GTK widgets follow the desktop's <c>gtk-xft-dpi</c> — which on a HiDPI display is far
+    /// higher (163 DPI on a 4K screen), so a native control's caption comes out visibly larger than the
+    /// label beside it. The toolkit lays out in device pixels at 96 DPI (100% scaling; DPI-aware
+    /// coordinate scaling is tracked in <c>docs/PRD.md</c> §4), so the honest, consistent baseline is to
+    /// render every widget at that same resolution rather than let the two surfaces diverge.
+    /// </summary>
+    private static void NormalizeFontDpi()
+    {
+        var settings = NativeMethods.gtk_settings_get_default();
+        if (settings != 0)
+            NativeMethods.g_object_set_int(settings, "gtk-xft-dpi", _baselineFontDpi, 0);
+    }
 
     /// <summary>
     /// Subscribes to <c>notify::gtk-theme-name</c> and <c>notify::gtk-application-prefer-dark-theme</c>

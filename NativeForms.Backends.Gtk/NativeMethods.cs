@@ -605,6 +605,14 @@ internal static partial class NativeMethods
     [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void g_object_get_int(nint @object, string firstPropertyName, out int value, nint terminator);
 
+    /// <summary>
+    /// Writes a single <c>gint</c> object property (used to pin <c>gtk-xft-dpi</c>) through the same
+    /// fixed-signature variadic mapping as the readers; GObject reads exactly <c>sizeof(gint)</c> bytes
+    /// from the value slot before the trailing <c>NULL</c> terminator.
+    /// </summary>
+    [LibraryImport(GObject, EntryPoint = "g_object_set", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void g_object_set_int(nint @object, string firstPropertyName, int value, nint terminator);
+
     /// <summary>Drops one reference to a <c>GObject</c>.</summary>
     [LibraryImport(GObject)]
     internal static partial void g_object_unref(nint @object);

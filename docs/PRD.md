@@ -164,8 +164,9 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] Light/dark mode + high-contrast follow-the-OS: `IPlatformBackend.ThemeChanged`
       (WM_THEMECHANGED family / GtkSettings notify), theme-cache invalidation, realized
       owner-drawn controls repaint, `ITheme.IsHighContrast`.
-- [~] DPI: `GetDpiScale` + `Control.LogicalToDevice` groundwork done; per-monitor
-      rescale-on-move pending.
+- [~] DPI: `GetDpiScale` + `Control.LogicalToDevice` groundwork done; GTK pins native
+      widget text to the owner-drawn 96-DPI font-map baseline so labels match native
+      controls on HiDPI screens; per-monitor rescale-on-move pending.
 - [x] Double-buffered Win32 canvas (memory-DC blit; GTK cairo-buffered by design),
       invalidation regions honored end-to-end, `HitTest` helper; steady-state repaint allocates
       0 bytes (asserted) after de-allocating the GDI/Pango paint paths (cached brushes/pens/
