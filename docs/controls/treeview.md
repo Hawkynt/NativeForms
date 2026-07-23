@@ -44,6 +44,8 @@ Inherits the common members of [`Control`](control.md).
 | `ShowLines` | `bool` | `true` | Whether connector lines are drawn between nodes. |
 | `ShowPlusMinus` | `bool` | `true` | Whether expand/collapse glyphs are drawn for parent nodes. |
 | `ShowRootLines` | `bool` | `true` | Whether root nodes get their own glyph/line cell. When `false`, everything shifts one indent level left and roots lose their glyphs. |
+| `AllowReorder` | `bool` | `false` | Whether nodes can be dragged within the tree to reorder or reparent them, with a live insertion marker. Intra-tree movement, distinct from the cross-control `Control.AllowDrop` data drag. |
+| `AutoExpandDelay` | `int` | `700` | Milliseconds the pointer must dwell on a collapsed node while dragging before it auto-expands; `0` disables hover-expansion. |
 | `TopIndex` | `int` (get) | `0` | Index of the first visible row in the flattened tree (scroll position). |
 | `VisibleNodeCount` | `int` (get) | `0` | The number of rows the expanded part of the tree currently occupies. |
 
@@ -59,8 +61,13 @@ Inherits the common members of [`Control`](control.md).
 | `AfterCollapse` | Raised after a node collapsed. |
 | `BeforeCheck` | Raised before a node's `Checked` state flips; set `Cancel` to veto. |
 | `AfterCheck` | Raised after a node's `Checked` state changed. |
+| `ItemDrag` | Raised when a node starts being dragged (the pointer crossed the drag threshold). Carries the node in `Node`. |
+| `NodeDragOver` | Raised continuously as the drop target changes during a drag; set `TreeNodeDragEventArgs.Cancel` to reject the current target (no marker, no drop). |
+| `NodeDrop` | Raised when a dragged node is released over a valid target; set `Cancel` to abort the move. |
 
-All event args carry the affected node in `Node`.
+The Before/After/expand/collapse/check args carry the affected node in `Node`. The drag args
+(`TreeNodeDragEventArgs`) carry `DraggedNode`, `TargetNode`, a `Location` of `Above` / `Onto` /
+`Below`, and a `Cancel` flag.
 
 ### Methods
 
@@ -126,8 +133,17 @@ node is selected. Nodes without an index paint no icon.
 `IGraphics` seam has no dashed strokes, so the classic dotted look is approximated. Expand glyphs
 appear only on nodes that actually have children.
 
+**Drag reorder.** With `AllowReorder` on, pressing a node and dragging past a few pixels begins a
+drag (`ItemDrag`). Which third of the row under the pointer it is in decides the drop: the top
+quarter inserts the node as a sibling above the target, the bottom quarter below it, and the middle
+half reparents it as a child. An above/below drop paints an indented insertion line with end ticks;
+an onto drop outlines the whole target row. `NodeDragOver` can reject a target (the marker hides and
+the drop is refused) and `NodeDrop` can veto the release; neither vetoing nor a drop into the node's
+own subtree is ever allowed. Hovering an onto-target that is a collapsed parent for `AutoExpandDelay`
+milliseconds auto-expands it. A completed drop selects the moved node and scrolls it into view.
+
 **Not yet implemented** (per `docs/PRD.md` §7.4): label editing (waits on the text-box overlay) and
-state images; multi-selection, drag and drop and a virtual-mode node API are further open TODOs.
+state images; multi-selection and a virtual-mode node API are further open TODOs.
 
 ## Differences from System.Windows.Forms.TreeView
 

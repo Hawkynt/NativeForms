@@ -532,4 +532,196 @@ internal sealed class TreeViewTests
             Assert.That(tree.Nodes[0].Nodes[0].IsExpanded, Is.False, "descendants folded too");
         });
     }
+
+    // --- Drag-and-drop reorder (AllowReorder) --------------------------------------------------
+
+    private const int _DragX = 100; // well right of the glyph/check cells, so a press lands on the label
+
+    /// <summary>Presses the given visible row and drags to a band of the target row, returning the peer.</summary>
+    private static HeadlessBackend BeginDrag(TreeView tree, int fromRow, int toRow, TreeViewDropLocation where, out HeadlessCanvasPeer canvas)
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(tree);
+        Application.Run(form, backend);
+        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.RaisePaint();
+
+        var h = tree.ItemHeight;
+        canvas.RaiseMouseDown(_DragX, (fromRow * h) + (h / 2));
+        var y = where switch
+        {
+            TreeViewDropLocation.Above => (toRow * h) + 1,
+            TreeViewDropLocation.Below => (toRow * h) + h - 1,
+            _ => (toRow * h) + (h / 2),
+        };
+        canvas.RaiseMouseMove(_DragX, y);
+        return backend;
+    }
+
+    [Test]
+    public void Dragging_a_node_above_another_reorders_it_as_a_sibling()
+    {
+        var tree = MakeTree();          // root0(child00,child01), root1
+        tree.AllowReorder = true;
+        // rows: root0(0), root1(1)
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+
+        var preview = tree.DropPreview;
+        Assert.Multiple(() =>
+        {
+            Assert.That(preview.Dragging, Is.True);
+            Assert.That(preview.Target, Is.SameAs(tree.Nodes[0]));
+            Assert.That(preview.Location, Is.EqualTo(TreeViewDropLocation.Above));
+            Assert.That(preview.Valid, Is.True);
+        });
+
+        canvas.RaiseMouseUp(_DragX, 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.Nodes[0].Text, Is.EqualTo("root1"), "root1 moved before root0");
+            Assert.That(tree.Nodes[1].Text, Is.EqualTo("root0"));
+            Assert.That(tree.DropPreview.Dragging, Is.False, "the drag ended");
+        });
+    }
+
+    [Test]
+    public void Dragging_a_node_onto_another_reparents_it_as_a_child()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        tree.Nodes[0].Expand(); // rows: root0(0), child00(1), child01(2), root1(3)
+        BeginDrag(tree, fromRow: 2, toRow: 3, TreeViewDropLocation.Onto, out var canvas);
+
+        Assert.That(tree.DropPreview.Location, Is.EqualTo(TreeViewDropLocation.Onto));
+        canvas.RaiseMouseUp(_DragX, (3 * tree.ItemHeight) + (tree.ItemHeight / 2));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.Nodes[0].Nodes.Count, Is.EqualTo(1), "child01 left root0");
+            Assert.That(tree.Nodes[1].Nodes.Count, Is.EqualTo(1), "child01 is now under root1");
+            Assert.That(tree.Nodes[1].Nodes[0].Text, Is.EqualTo("child01"));
+            Assert.That(tree.Nodes[1].IsExpanded, Is.True, "the target expanded to reveal the drop");
+        });
+    }
+
+    [Test]
+    public void A_node_cannot_be_dropped_into_its_own_subtree()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        tree.Nodes[0].Expand();
+        tree.Nodes[0].Nodes[0].Expand(); // rows: root0(0), child00(1), leaf000(2), child01(3), root1(4)
+        BeginDrag(tree, fromRow: 0, toRow: 2, TreeViewDropLocation.Onto, out var canvas); // root0 onto its own leaf000
+
+        Assert.That(tree.DropPreview.Valid, Is.False, "an own-subtree target is rejected");
+
+        canvas.RaiseMouseUp(_DragX, (2 * tree.ItemHeight) + (tree.ItemHeight / 2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(tree.Nodes[0].Text, Is.EqualTo("root0"), "root0 stayed put");
+            Assert.That(tree.Nodes[0].Nodes.Count, Is.EqualTo(2), "its children are intact");
+        });
+    }
+
+    [Test]
+    public void NodeDragOver_can_reject_a_target()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        tree.NodeDragOver += (_, e) => e.Cancel = true;
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+
+        Assert.That(tree.DropPreview.Valid, Is.False, "the handler rejected the target");
+        canvas.RaiseMouseUp(_DragX, 1);
+        Assert.That(tree.Nodes[0].Text, Is.EqualTo("root0"), "no move happened");
+    }
+
+    [Test]
+    public void NodeDrop_can_veto_the_release()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        var dropRaised = false;
+        tree.NodeDrop += (_, e) => { dropRaised = true; e.Cancel = true; };
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+
+        canvas.RaiseMouseUp(_DragX, 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(dropRaised, Is.True, "NodeDrop fired on release over a valid target");
+            Assert.That(tree.Nodes[0].Text, Is.EqualTo("root0"), "the veto kept the order");
+        });
+    }
+
+    [Test]
+    public void ItemDrag_is_raised_once_the_threshold_is_crossed()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        TreeNode? dragged = null;
+        tree.ItemDrag += (_, e) => dragged = e.Node;
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out _);
+
+        Assert.That(dragged, Is.SameAs(tree.Nodes[1]).Or.SameAs(tree.Nodes[0]));
+        Assert.That(dragged!.Text, Is.EqualTo("root1"));
+    }
+
+    [Test]
+    public void Hovering_onto_a_collapsed_parent_auto_expands_it()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true; // rows: root0(0, collapsed with children), root1(1)
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Onto, out _);
+
+        Assert.That(tree.Nodes[0].IsExpanded, Is.False, "not expanded before the dwell elapses");
+        tree.AutoExpandTick(); // the dwell timer would call this
+        Assert.That(tree.Nodes[0].IsExpanded, Is.True, "the hovered collapsed parent expanded");
+    }
+
+    [Test]
+    public void A_drag_with_no_reorder_permission_never_starts()
+    {
+        var tree = MakeTree(); // AllowReorder stays false
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+
+        Assert.That(tree.DropPreview.Dragging, Is.False);
+        Assert.DoesNotThrow(() => canvas.RaisePaint());
+    }
+
+    [Test]
+    public void An_above_drop_paints_an_insertion_line_at_the_row_boundary()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+        var g = canvas.RaisePaint();
+
+        var h = tree.ItemHeight;
+        // Above row 0: the marker line runs from the content indent (one level in) to the right edge,
+        // clamped to y=1. Width 300 → right edge 298.
+        Assert.That(
+            g.Operations.Exists(o => o.StartsWith("line") && o.Contains($"{h},1-298,1")),
+            Is.True,
+            "an indented horizontal insertion line is drawn at the top of the target row");
+    }
+
+    [Test]
+    public void An_onto_drop_outlines_the_target_row()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        tree.Nodes[0].Expand(); // rows: root0(0), child00(1), child01(2), root1(3)
+        BeginDrag(tree, fromRow: 2, toRow: 3, TreeViewDropLocation.Onto, out var canvas);
+        var g = canvas.RaisePaint();
+
+        var h = tree.ItemHeight;
+        var y = 3 * h;
+        // The onto marker outlines the whole target row (width 300 → 299 wide, row height − 1 tall),
+        // which is distinct from the full-height border rectangle.
+        Assert.That(
+            g.Operations.Exists(o => o.StartsWith("rect") && o.Contains($"0,{y},299,{h - 1}")),
+            Is.True,
+            "the reparent target row is outlined");
+    }
 }

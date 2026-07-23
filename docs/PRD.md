@@ -376,7 +376,9 @@ strategy (may differ per platform; note exceptions inline).
       Before/After pipeline), per-node icons (`ImageIndex`/`SelectedImageIndex` via `ImageList`,
       lazily materialized), checkboxes (`AfterCheck`, shared `CheckGlyph`), full keyboard nav
       (arrows walk rows, Right into child, Left to parent, +/−/*/Space), `EnsureVisible`,
-      virtualized paint over the lazily re-flattened visible-node list (100k nodes bounded) done;
+      virtualized paint over the lazily re-flattened visible-node list (100k nodes bounded), drag
+      reorder/reparent (`AllowReorder`, `ItemDrag`/`NodeDragOver`/`NodeDrop`, above/onto/below
+      insertion marker, own-subtree guard, hover auto-expand) done;
       label editing (TextBox overlay) and state images pending
 - [~] `TreeListView` (owner) — TreeView × ListView-Details hybrid done: hierarchy in the first
       column + selector-driven sub-item columns (`TreeListViewColumn`), shared engine pieces

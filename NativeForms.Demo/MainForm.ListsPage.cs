@@ -155,6 +155,7 @@ internal sealed partial class MainForm
             CheckBoxes = true,
             ImageList = _icons,
             ItemHeight = 22,
+            AllowReorder = true,
         };
         var solution = new TreeNode("Solution") { ImageIndex = _IconFolder };
         var core = new TreeNode("Core") { ImageIndex = _IconFolder };
@@ -175,6 +176,7 @@ internal sealed partial class MainForm
         tree.AfterCheck += (_, e)
             => this.SetStatus($"TreeView: \"{e.Node?.Text}\" is {(e.Node?.Checked == true ? "checked" : "unchecked")}.");
         tree.AfterSelect += (_, e) => this.SetStatus($"TreeView: \"{e.Node?.Text}\" selected.");
+        tree.NodeDrop += (_, e) => this.SetStatus($"TreeView: dropped \"{e.DraggedNode.Text}\" {e.Location} \"{e.TargetNode?.Text}\".");
 
         var treeList = new TreeListView
         {

@@ -13,7 +13,7 @@ namespace Hawkynt.NativeForms;
 /// <remarks>
 /// Connector lines are drawn solid in the theme's disabled-text color because <see cref="IGraphics"/>
 /// has no dashed strokes. TODO: label editing (<c>BeginEdit</c>, waits on the text-box overlay),
-/// multi-selection, drag and drop, and a virtual-mode node API.
+/// multi-selection, and a virtual-mode node API.
 /// </remarks>
 public class TreeView : OwnerDrawnControl, ITreeNodeHost
 {
@@ -21,11 +21,23 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     private const int _IconGap = 4;
     private const int _TextPad = 2;
 
+    private const int _DragThreshold = 4;   // pixels the pointer must travel before a press becomes a drag
+
     private readonly TreeRowList _rows;
     private TreeNode? _selectedNode;
     private int? _itemHeight;
     private TreeNode? _lastClickNode;
     private long _lastClickTicks;
+
+    // Drag-and-drop state. All null/zero until a press on a node with AllowDrop on.
+    private TreeNode? _pressedNode;   // node under the last left mouse-down — a drag candidate
+    private int _pressX, _pressY;
+    private TreeNode? _dragNode;      // the node being dragged (non-null iff a drag is in flight)
+    private TreeNode? _dropTarget;    // node the pointer is over this frame
+    private int _dropRow;             // its flattened row index, for placing the marker
+    private TreeViewDropLocation _dropLocation;
+    private bool _dropValid;          // whether the current target accepts the drop (drawn + droppable)
+    private Timer? _autoExpandTimer;
 
     /// <summary>Creates a tree view.</summary>
     public TreeView()
@@ -152,6 +164,49 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         }
     } = true;
 
+    /// <summary>
+    /// Whether nodes can be dragged within the tree to reorder or reparent them, with a live insertion
+    /// marker. Off by default. While on, pressing a node and dragging past a few pixels starts a drag
+    /// (<see cref="ItemDrag"/>); the pointer's position within the target row picks above / onto / below;
+    /// <see cref="NodeDragOver"/> can reject a target and <see cref="NodeDrop"/> can veto the release. A
+    /// node is never droppable into its own subtree. This is intra-tree node movement, distinct from the
+    /// cross-control <see cref="Control.AllowDrop"/> data drag.
+    /// </summary>
+    public bool AllowReorder
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            if (!value)
+                this.CancelDrag();
+        }
+    }
+
+    /// <summary>
+    /// How long the pointer must dwell on a collapsed node while dragging before it auto-expands, in
+    /// milliseconds. Defaults to 700; set to 0 to disable hover-expansion. Only active during a drag.
+    /// </summary>
+    public int AutoExpandDelay
+    {
+        get => field;
+        set => field = Math.Max(0, value);
+    } = 700;
+
+    /// <summary>Raised when a node starts being dragged (the pointer crossed the drag threshold).</summary>
+    public event EventHandler<TreeViewEventArgs>? ItemDrag;
+
+    /// <summary>Raised continuously as the drop target changes during a drag; set
+    /// <see cref="TreeNodeDragEventArgs.Cancel"/> to reject the current target (no marker, no drop).</summary>
+    public event EventHandler<TreeNodeDragEventArgs>? NodeDragOver;
+
+    /// <summary>Raised when a dragged node is released over a valid target; set
+    /// <see cref="TreeNodeDragEventArgs.Cancel"/> to abort the move.</summary>
+    public event EventHandler<TreeNodeDragEventArgs>? NodeDrop;
+
     /// <summary>The index of the first visible row in the flattened tree (scroll position).</summary>
     public int TopIndex => _rows.TopIndex;
 
@@ -232,6 +287,15 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>Raises <see cref="AfterCheck"/>.</summary>
     protected virtual void OnAfterCheck(TreeViewEventArgs e) => this.AfterCheck?.Invoke(this, e);
 
+    /// <summary>Raises <see cref="ItemDrag"/>.</summary>
+    protected virtual void OnItemDrag(TreeViewEventArgs e) => this.ItemDrag?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="NodeDragOver"/>.</summary>
+    protected virtual void OnNodeDragOver(TreeNodeDragEventArgs e) => this.NodeDragOver?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="NodeDrop"/>.</summary>
+    protected virtual void OnNodeDrop(TreeNodeDragEventArgs e) => this.NodeDrop?.Invoke(this, e);
+
     void ITreeNodeHost.OnBeforeCheck(TreeViewCancelEventArgs e) => this.OnBeforeCheck(e);
     void ITreeNodeHost.OnBeforeExpand(TreeViewCancelEventArgs e) => this.OnBeforeExpand(e);
     void ITreeNodeHost.OnAfterExpand(TreeViewEventArgs e) => this.OnAfterExpand(e);
@@ -305,6 +369,13 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
 
         this.SelectedNode = node;
 
+        if (this.AllowReorder)
+        {
+            _pressedNode = node;
+            _pressX = e.X;
+            _pressY = e.Y;
+        }
+
         var now = Environment.TickCount64;
         if (ReferenceEquals(node, _lastClickNode) && now - _lastClickTicks <= this.Theme.DoubleClickTime)
         {
@@ -316,6 +387,218 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         _lastClickNode = node;
         _lastClickTicks = now;
     }
+
+    /// <inheritdoc/>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_dragNode is not null)
+        {
+            this.UpdateDropTarget(e.Y);
+            return;
+        }
+
+        // The press flag, not the move's button field, is the "button is down" signal — platform
+        // motion events don't reliably carry it, so tracking it from the down/up pair is portable.
+        if (_pressedNode is null)
+            return;
+
+        if (Math.Abs(e.X - _pressX) < _DragThreshold && Math.Abs(e.Y - _pressY) < _DragThreshold)
+            return;
+
+        _dragNode = _pressedNode;
+        this.OnItemDrag(new TreeViewEventArgs(_dragNode));
+        this.UpdateDropTarget(e.Y);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _pressedNode = null;
+        var dragged = _dragNode;
+        if (dragged is null)
+            return;
+
+        var target = _dropTarget;
+        var location = _dropLocation;
+        var valid = _dropValid;
+        this.CancelDrag();
+
+        if (!valid)
+            return;
+
+        var e2 = new TreeNodeDragEventArgs(dragged, target, location);
+        this.OnNodeDrop(e2);
+        if (e2.Cancel)
+            return;
+
+        this.PerformDrop(dragged, target, location);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        if (_dragNode is null)
+            _pressedNode = null;
+    }
+
+    /// <summary>Recomputes the drop target/location from a client y, validates it, and repaints.</summary>
+    private void UpdateDropTarget(int y)
+    {
+        this.ComputeDrop(y, out var target, out var row, out var location);
+        var changed = !ReferenceEquals(target, _dropTarget) || location != _dropLocation;
+        _dropTarget = target;
+        _dropRow = row;
+        _dropLocation = location;
+
+        var valid = IsDroppable(_dragNode!, target, location);
+        if (valid)
+        {
+            var e = new TreeNodeDragEventArgs(_dragNode!, target, location);
+            this.OnNodeDragOver(e);
+            valid = !e.Cancel;
+        }
+
+        _dropValid = valid;
+        if (changed)
+            this.RestartAutoExpand();
+
+        this.Invalidate();
+    }
+
+    /// <summary>Maps a client y to the row under it and which third of that row the pointer is in.</summary>
+    private void ComputeDrop(int y, out TreeNode? target, out int row, out TreeViewDropLocation location)
+    {
+        var count = _rows.Count;
+        if (count == 0)
+        {
+            target = null;
+            row = 0;
+            location = TreeViewDropLocation.Below;
+            return;
+        }
+
+        if (y < 0)
+            y = 0;
+
+        var rowHeight = this.ItemHeight;
+        row = _rows.TopIndex + (y / rowHeight);
+        if (row >= count)
+        {
+            // Past the last visible row: land after the last node.
+            row = count - 1;
+            target = _rows[row];
+            location = TreeViewDropLocation.Below;
+            return;
+        }
+
+        target = _rows[row];
+        var offset = y - ((row - _rows.TopIndex) * rowHeight);
+        var band = rowHeight / 4;
+        location = offset < band ? TreeViewDropLocation.Above
+            : offset >= rowHeight - band ? TreeViewDropLocation.Below
+            : TreeViewDropLocation.Onto;
+    }
+
+    /// <summary>Whether <paramref name="dragged"/> may land on <paramref name="target"/>: never onto
+    /// itself and never into its own subtree.</summary>
+    private static bool IsDroppable(TreeNode dragged, TreeNode? target, TreeViewDropLocation location)
+    {
+        if (target is null)
+            return location == TreeViewDropLocation.Below; // append to the root's end
+
+        if (ReferenceEquals(target, dragged))
+            return false;
+
+        for (var ancestor = target.Parent; ancestor is not null; ancestor = ancestor.Parent)
+            if (ReferenceEquals(ancestor, dragged))
+                return false;
+
+        return true;
+    }
+
+    /// <summary>Reparents/reorders the dragged node at the resolved target and selects it.</summary>
+    private void PerformDrop(TreeNode dragged, TreeNode? target, TreeViewDropLocation location)
+    {
+        dragged.OwnerCollection?.Remove(dragged);
+
+        if (target is null)
+            this.Nodes.Add(dragged);
+        else if (location == TreeViewDropLocation.Onto)
+        {
+            target.Nodes.Add(dragged);
+            target.Expand();
+        }
+        else
+        {
+            // The collection reindexes on the removal above, so the target's index is already current.
+            var siblings = target.OwnerCollection ?? this.Nodes;
+            var index = target.SiblingIndex + (location == TreeViewDropLocation.Below ? 1 : 0);
+            siblings.Insert(index, dragged);
+        }
+
+        this.SelectedNode = dragged;
+        dragged.EnsureVisible();
+    }
+
+    private Timer EnsureAutoExpandTimer()
+    {
+        if (_autoExpandTimer is not null)
+            return _autoExpandTimer;
+
+        _autoExpandTimer = new Timer();
+        _autoExpandTimer.Tick += (_, _) => this.AutoExpandTick();
+        return _autoExpandTimer;
+    }
+
+    /// <summary>Restarts the hover-expand dwell for a fresh target; only a collapsed parent under an
+    /// "onto" drop arms it.</summary>
+    private void RestartAutoExpand()
+    {
+        var timer = _autoExpandTimer;
+        if (timer is not null)
+            timer.Enabled = false;
+
+        if (this.AutoExpandDelay <= 0 || _dropLocation != TreeViewDropLocation.Onto)
+            return;
+
+        if (_dropTarget is not { IsExpanded: false, HasChildren: true })
+            return;
+
+        timer = this.EnsureAutoExpandTimer();
+        timer.Interval = this.AutoExpandDelay;
+        timer.Enabled = true;
+    }
+
+    /// <summary>Expands the hovered collapsed target once its dwell elapses. Internal so a headless
+    /// test can drive it without the platform timer ticking.</summary>
+    internal void AutoExpandTick()
+    {
+        _autoExpandTimer?.Stop();
+        if (_dragNode is null || _dropLocation != TreeViewDropLocation.Onto)
+            return;
+
+        if (_dropTarget is { IsExpanded: false, HasChildren: true } target)
+        {
+            target.Expand();
+            this.UpdateDropTarget((this._dropRow - _rows.TopIndex) * this.ItemHeight + (this.ItemHeight / 2));
+        }
+    }
+
+    /// <summary>Ends any in-flight drag and clears the preview.</summary>
+    private void CancelDrag()
+    {
+        _autoExpandTimer?.Stop();
+        var wasDragging = _dragNode is not null;
+        _dragNode = null;
+        _dropTarget = null;
+        _dropValid = false;
+        if (wasDragging)
+            this.Invalidate();
+    }
+
+    /// <summary>The current drop preview, exposed for headless drag tests.</summary>
+    internal (bool Dragging, TreeNode? Target, TreeViewDropLocation Location, bool Valid) DropPreview
+        => (_dragNode is not null, _dropTarget, _dropLocation, _dropValid);
 
     /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -341,7 +624,32 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         for (var i = top; i < last; ++i)
             this.PaintRow(g, theme, _rows[i], (i - top) * rowHeight, rowHeight);
 
+        if (_dragNode is not null && _dropValid)
+            this.PaintDropMarker(g, theme, rowHeight);
+
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+    }
+
+    /// <summary>Paints the drag preview: an outline around an "onto" target, or an indented insertion
+    /// line with end ticks between rows for a sibling drop.</summary>
+    private void PaintDropMarker(IGraphics g, ITheme theme, int rowHeight)
+    {
+        var color = theme.Accent;
+        var y = (_dropRow - _rows.TopIndex) * rowHeight;
+
+        if (_dropLocation == TreeViewDropLocation.Onto)
+        {
+            g.DrawRectangle(color, new Rectangle(0, y, this.Width - 1, rowHeight - 1));
+            return;
+        }
+
+        var left = Math.Max(0, this.GlyphCellLeft(_dropTarget!) + rowHeight);
+        var markerY = _dropLocation == TreeViewDropLocation.Above ? y : y + rowHeight;
+        markerY = Math.Clamp(markerY, 1, this.Height - 2);
+        var right = this.Width - 2;
+        g.DrawLine(color, left, markerY, right, markerY);
+        g.DrawLine(color, left, markerY - 2, left, markerY + 2);
+        g.DrawLine(color, right, markerY - 2, right, markerY + 2);
     }
 
     private void PaintRow(IGraphics g, ITheme theme, TreeNode node, int y, int rowHeight)

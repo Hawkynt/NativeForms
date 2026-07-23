@@ -772,6 +772,32 @@ internal sealed partial class Autopilot
                 this.Read(() => status.Text).StartsWith("TreeView: \"Form.cs\" is ", StringComparison.Ordinal));
         });
 
+        this.Check("TreeView: dragging a node onto another reparents it, with a live drop marker", () =>
+        {
+            // Rows: Solution(0), Core(1), Control.cs(2), Form.cs(3), Backends(4).
+            var height = this.Read(() => tree.ItemHeight);
+            var core = _form.Part<TreeNode>("lists.treeCore");
+            var formNode = this.Read(() => core.Nodes[1]); // "Form.cs"
+            var backends = this.Read(() => tree.Nodes[0].Nodes[1]); // "Backends"
+            this.ExpectTrue("Core starts with two children", this.Read(() => core.Nodes.Count) == 2);
+
+            // Drag "Form.cs" onto the middle of "Backends" — the onto band reparents it.
+            this.Drag(tree, new Point(140, (height * 3) + (height / 2)), new Point(140, (height * 4) + (height / 2)));
+
+            this.Expect("Core's children after the drop", this.Read(() => core.Nodes.Count), 1);
+            this.Expect("Backends' children after the drop", this.Read(() => backends.Nodes.Count), 3);
+            this.Expect("the reparented node", this.Read(() => backends.Nodes[2].Text), "Form.cs");
+            // The drop fires NodeDrop and then selects the moved node, so the selection is the last word.
+            this.Expect("the status line", this.Read(() => status.Text), "TreeView: \"Form.cs\" selected.");
+
+            // Put it back so later checks and captures see the authored tree.
+            this.Do(() =>
+            {
+                (formNode.Parent?.Nodes ?? tree.Nodes).Remove(formNode);
+                core.Nodes.Insert(1, formNode);
+            });
+        });
+
         this.Check("TreeListView: a row click selects it and the columns carry their cell text", () =>
         {
             var treeList = _form.Part<TreeListView>("lists.treeList");
