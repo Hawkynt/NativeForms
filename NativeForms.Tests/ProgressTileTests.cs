@@ -300,7 +300,7 @@ internal sealed class ProgressTileTests
             Assert.That(g.Operations.Exists(o => o.StartsWith("image 32x32")), Is.True, "the icon still paints");
             Assert.That(g.DrewText("45.2 GB free of 128 GB"), Is.False, "the secondary line is dropped in compact mode");
             Assert.That(caption.X, Is.GreaterThan(32), "the caption sits to the right of the icon");
-            Assert.That(caption.Y, Is.EqualTo(8), "the caption is top-aligned to the icon top");
+            Assert.That(caption.Y, Is.EqualTo(10), "the caption + bar block is centred down the content (8..40, block 28 → top 10)");
             Assert.That(AccentFillY(g), Is.GreaterThan(caption.Y), "the usage bar sits below the caption");
             Assert.That(AccentFillY(g), Is.LessThan(40), "and within the icon's vertical band");
         });

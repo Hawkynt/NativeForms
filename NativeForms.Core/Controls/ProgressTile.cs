@@ -273,8 +273,9 @@ public class ProgressTile : OwnerDrawnControl
         g.PopClip();
     }
 
-    /// <summary>The compact tile: icon on the left (centred), the caption top-aligned and the usage bar
-    /// bottom-aligned, laid out down the content height so the bar always sits below the caption.</summary>
+    /// <summary>The compact tile: the caption stacked over the usage bar as one block, centred down the
+    /// content height, with the icon centred vertically beside it — so a tile taller than the caption
+    /// plus bar sits balanced rather than stranding the caption at the top.</summary>
     private void PaintCompactContent(IGraphics g, ITheme theme, Rectangle content, Color textColor, Font font, int lineHeight)
     {
         var iconWidth = 0;
@@ -290,15 +291,15 @@ public class ProgressTile : OwnerDrawnControl
         if (rightW <= 0)
             return;
 
-        // Clip and lay out down the full content height, not the icon's: an icon shorter than the
-        // caption once clipped the bar away entirely, since the bar sits below a caption taller than it.
+        // Measure the caption and bar together as one block, then centre it down the content height —
+        // the same band the icon is centred in — so the two line up whatever the tile's height.
         g.PushClip(new Rectangle(rightX, content.Y, rightW, content.Height));
 
-        g.DrawText(this.Text, font, textColor, new Rectangle(rightX, content.Y, rightW, lineHeight), ContentAlignment.TopLeft);
+        var blockHeight = lineHeight + _BarGap + _BarHeight;
+        var blockTop = content.Y + Math.Max(0, (content.Height - blockHeight) / 2);
 
-        // Bottom-align the bar to the content; never let it climb over the caption.
-        var barTop = Math.Max(content.Y + lineHeight + _BarGap, content.Bottom - _BarHeight);
-        GlyphRenderer.DrawProgressBar(g, theme, new Rectangle(rightX, barTop, rightW, _BarHeight), _value, 0, _maximum, this.IsWarning ? this.WarningColor : theme.Accent);
+        g.DrawText(this.Text, font, textColor, new Rectangle(rightX, blockTop, rightW, lineHeight), ContentAlignment.TopLeft);
+        GlyphRenderer.DrawProgressBar(g, theme, new Rectangle(rightX, blockTop + lineHeight + _BarGap, rightW, _BarHeight), _value, 0, _maximum, this.IsWarning ? this.WarningColor : theme.Accent);
 
         g.PopClip();
     }
