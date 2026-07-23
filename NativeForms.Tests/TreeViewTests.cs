@@ -707,6 +707,32 @@ internal sealed class TreeViewTests
     }
 
     [Test]
+    public void A_drag_paints_a_translucent_drag_image_by_default()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+        var g = canvas.RaisePaint();
+
+        Assert.That(
+            g.Operations.Exists(o => o.StartsWith("fill #80")),
+            Is.True,
+            "a half-alpha (0x80) chip is painted under the pointer as the drag image");
+    }
+
+    [Test]
+    public void ShowDragImage_off_suppresses_the_drag_image()
+    {
+        var tree = MakeTree();
+        tree.AllowReorder = true;
+        tree.ShowDragImage = false;
+        BeginDrag(tree, fromRow: 1, toRow: 0, TreeViewDropLocation.Above, out var canvas);
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #80")), Is.False, "no drag chip when disabled");
+    }
+
+    [Test]
     public void An_onto_drop_outlines_the_target_row()
     {
         var tree = MakeTree();

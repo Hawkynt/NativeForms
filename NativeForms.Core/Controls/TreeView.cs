@@ -37,6 +37,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     private int _dropRow;             // its flattened row index, for placing the marker
     private TreeViewDropLocation _dropLocation;
     private bool _dropValid;          // whether the current target accepts the drop (drawn + droppable)
+    private Point _dragPoint;         // the pointer, for the translucent drag image
     private Timer? _autoExpandTimer;
 
     /// <summary>Creates a tree view.</summary>
@@ -195,6 +196,12 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         get => field;
         set => field = Math.Max(0, value);
     } = 700;
+
+    /// <summary>
+    /// Whether a drag carries a translucent image of the dragged node (its icon and label) under the
+    /// pointer, MWTreeView-style. On by default; set to <see langword="false"/> for a marker-only drag.
+    /// </summary>
+    public bool ShowDragImage { get; set; } = true;
 
     /// <summary>Raised when a node starts being dragged (the pointer crossed the drag threshold).</summary>
     public event EventHandler<TreeViewEventArgs>? ItemDrag;
@@ -393,6 +400,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     {
         if (_dragNode is not null)
         {
+            _dragPoint = new Point(e.X, e.Y);
             this.UpdateDropTarget(e.Y);
             return;
         }
@@ -406,6 +414,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
             return;
 
         _dragNode = _pressedNode;
+        _dragPoint = new Point(e.X, e.Y);
         this.OnItemDrag(new TreeViewEventArgs(_dragNode));
         this.UpdateDropTarget(e.Y);
     }
@@ -627,7 +636,42 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         if (_dragNode is not null && _dropValid)
             this.PaintDropMarker(g, theme, rowHeight);
 
+        if (_dragNode is not null && this.ShowDragImage)
+            this.PaintDragImage(g, theme, rowHeight);
+
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+    }
+
+    /// <summary>Paints a translucent image of the dragged node — its icon and label — under the
+    /// pointer, so the drag reads like it is carrying the row.</summary>
+    private void PaintDragImage(IGraphics g, ITheme theme, int rowHeight)
+    {
+        var node = _dragNode!;
+        var font = theme.DefaultFont;
+        var iconSize = rowHeight - 4;
+
+        var images = this.ImageList;
+        var iconIndex = images is not null ? node.ResolveIconIndex(images, selected: false) : -1;
+        var hasIcon = images is not null && this.Backend is not null && iconIndex >= 0 && iconIndex < images.Count;
+        var iconWidth = hasIcon ? iconSize + _IconGap : 0;
+
+        var width = _TextPad + iconWidth + g.MeasureText(node.Text, font).Width + (2 * _TextPad);
+        var x = Math.Max(0, Math.Min(_dragPoint.X + 12, this.Width - width - 2));
+        var y = Math.Max(0, Math.Min(_dragPoint.Y + 4, this.Height - rowHeight - 2));
+        var rect = new Rectangle(x, y, width, rowHeight);
+
+        // A half-alpha chip so the rows beneath still read through it, MWTreeView-style.
+        g.FillRectangle(Color.FromArgb(128, theme.SelectionBackground), rect);
+        g.DrawRectangle(Color.FromArgb(160, theme.Accent), new Rectangle(rect.X, rect.Y, rect.Width - 1, rect.Height - 1));
+
+        var contentX = x + _TextPad;
+        if (hasIcon)
+        {
+            g.DrawImage(images!.GetImage(iconIndex, this.Backend!), new Rectangle(contentX, y + 2, iconSize, iconSize));
+            contentX += iconSize + _IconGap;
+        }
+
+        g.DrawText(node.Text, font, Color.FromArgb(200, theme.ControlText), new Rectangle(contentX, y, Math.Max(0, rect.Right - _TextPad - contentX), rowHeight), ContentAlignment.MiddleLeft);
     }
 
     /// <summary>Paints the drag preview: an outline around an "onto" target, or an indented insertion
