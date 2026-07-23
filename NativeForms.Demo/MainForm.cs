@@ -79,7 +79,10 @@ internal sealed partial class MainForm : Form
             this.BuildDockingPage(),
             this.BuildPickersPage(),
             this.BuildRibbonPage(),
-            this.BuildCalendarPage());
+            this.BuildCalendarPage(),
+            this.BuildMenusPage(),
+            this.BuildToolbarsPage(),
+            this.BuildDateTimePage());
 
         // Building the pages set initial selections, and those raised the same change events a user
         // click does — so the status line already carried a grid message before anyone touched
