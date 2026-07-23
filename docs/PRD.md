@@ -621,9 +621,12 @@ strategy (may differ per platform; note exceptions inline).
 - [~] Drag & drop: in-process `DoDragDrop`/`AllowDrop`/`Drag*` events (mouse-capture session,
       all backends incl. headless) done; OS-level OLE/GTK DnD pending (COM vtables excluded by
       the interop rules). Clipboard: text set/get seams done (DGV copy/paste)
-- [x] `ImageDecoder`: pure-managed PNG subset (8-bit, all filters, non-interlaced) + ICO
-      (PNG/32-bit/24-bit+mask entries) with `ImageList.AddPng`/`AddIco` (nearest-neighbor resample);
-      encoder lives only in the test project
+- [x] `ImageDecoder`: pure-managed multi-format decode into a frame model (`DecodedImage`/`ImageFrame`,
+      ARGB + per-frame delay + loop count) via a magic-byte `Decode` dispatcher — PNG (8-bit, all
+      filters, non-interlaced), BMP (8/24/32-bit BI_RGB), PCX (8-bit palette / 24-bit planes),
+      ICO/CUR (PNG/32-bit/24-bit+mask entries), animated GIF (LZW, disposal/transparency, NETSCAPE
+      loop) and ANI (RIFF/ACON icon frames + rate/seq) — with `ImageList.AddPng`/`AddIco`
+      (nearest-neighbor resample); the encoders live only in the test project
 - [x] **Uniform image API across all controls**: a direct `Image` property (Button, Label, CheckBox,
       RadioButton, GroupBox, PictureBox) or `ImageList` + `ImageIndex`/`ImageKey` — the latter now on
       every item class (TabPage, ToolStripItem, ListViewItem, TreeNode+`SelectedImageKey`, RibbonGroup,
