@@ -171,6 +171,22 @@ internal sealed partial class MainForm
         solution.Nodes.Add(core);
         solution.Nodes.Add(backends);
         tree.Nodes.Add(solution);
+
+        // A lazily-populated node: its children are produced by a delegate the first time it expands,
+        // the pattern a filesystem/archive browser uses to avoid walking the whole tree up front.
+        var lazy = new TreeNode("Packages (lazy)") { ImageIndex = _IconFolder };
+        lazy.SetChildLoader(node =>
+        {
+            this.SetStatus($"TreeView: populating \"{node.Text}\" on demand.");
+            return
+            [
+                new TreeNode("Newtonsoft.Json") { ImageIndex = _IconFile },
+                new TreeNode("NUnit") { ImageIndex = _IconFile },
+                new TreeNode("Serilog") { ImageIndex = _IconFile },
+            ];
+        });
+        tree.Nodes.Add(lazy);
+
         solution.Expand();
         core.Expand();
         tree.AfterCheck += (_, e)

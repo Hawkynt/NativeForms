@@ -108,7 +108,12 @@ internal sealed partial class MainForm
 
         // --- Column 3: grouped radios, progress bars, picture box -------------------------------
 
-        var group = new GroupBox { Bounds = new(664, 36, 300, 108), Text = "Size" };
+        var group = new GroupBox
+        {
+            Bounds = new(664, 36, 300, 108),
+            Text = "Size",
+            Image = this.DiscImage(Color.SteelBlue), // a header icon, before the caption by default
+        };
         var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small" };
         var medium = new RadioButton { Bounds = new(16, 52, 260, 20), Text = "Medium" };
         var large = new RadioButton { Bounds = new(16, 78, 260, 20), Text = "Large" };

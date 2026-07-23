@@ -66,9 +66,31 @@ internal sealed partial class MainForm
         folderPicker.PathChanged += (_, _) => this.SetStatus($"FolderPicker: {folderPicker.SelectedPath}");
         _toolTip.SetToolTip(folderPicker, "Type a path and press Enter, or browse with the … button.");
 
-        var breadcrumb = new Breadcrumb { Bounds = new(16, 368, 320, 26) };
+        var breadcrumb = new Breadcrumb { Bounds = new(16, 368, 320, 26), Editable = true };
         breadcrumb.Items.AddRange("Computer", "Documents", "Projects", "NativeForms", "docs");
         breadcrumb.ItemClicked += (_, e) => this.SetStatus($"Breadcrumb: navigated to \"{e.Item.Text}\".");
+
+        // Folder walk: each chevron drops down that segment's children — a virtual listing here, so it
+        // would serve an archive or a remote tree just as well.
+        breadcrumb.SubItemsProvider = parent =>
+        {
+            var stem = parent?.Text ?? "root";
+            return [new BreadcrumbItem($"{stem}·one"), new BreadcrumbItem($"{stem}·two"), new BreadcrumbItem($"{stem}·three")];
+        };
+        breadcrumb.SubItemSelected += (_, e) => this.SetStatus($"Breadcrumb: opened \"{e.Item.Text}\".");
+
+        // Click the empty space to type a path; a delegate autocompletes it against a small virtual set.
+        breadcrumb.AutoCompleteSource = text =>
+        {
+            var pool = new[] { "Computer/Documents", "Computer/Downloads", "Computer/Music", "Computer/Pictures" };
+            var hits = new List<string>();
+            foreach (var candidate in pool)
+                if (candidate.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+                    hits.Add(candidate);
+
+            return hits;
+        };
+        breadcrumb.PathEntered += (_, e) => this.SetStatus($"Breadcrumb: entered path \"{e.Path}\".");
 
         page.Controls.AddRange(
             Caption("FilePicker (open, filtered)", 16, 12),
@@ -81,7 +103,7 @@ internal sealed partial class MainForm
             brokenPicker, brokenNote,
             Caption("FolderPicker", 16, 292),
             folderPicker,
-            Caption("Breadcrumb (click a segment to navigate up)", 16, 344, 320),
+            Caption("Breadcrumb (segment · chevron · edit)", 16, 344, 320),
             breadcrumb);
 
         // --- Column 2: icon labels ---------------------------------------------------------------

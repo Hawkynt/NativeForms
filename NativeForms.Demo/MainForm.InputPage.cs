@@ -152,13 +152,24 @@ internal sealed partial class MainForm
             ShowSeconds = false,
         };
 
+        // Hours-only precision: no minute or second part, and the clock commits on the first pick.
+        var timeHours = new TimePicker
+        {
+            Bounds = new(664, 444, 200, 26),
+            Value = new(8, 0, 0),
+            ShowMinutes = false,
+        };
+        timeHours.ValueChanged += (_, _) => this.SetStatus($"TimePicker (hours only): {timeHours.Value:hh}h");
+
         page.Controls.AddRange(
             Caption("DateTimePicker (Short + Custom)", 664, 12),
             shortPicker, customPicker,
             Caption("MonthCalendar (title drills to years)", 664, 100),
             calendar,
-            Caption("TimePicker (double-click for clock)", 664, 332),
-            time, time12);
+            Caption("TimePicker (full · 12h no-seconds · hours-only)", 664, 332),
+            time, time12,
+            Caption("TimePicker (hours only)", 664, 420),
+            timeHours);
 
         // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
         var singleText = single.Text;

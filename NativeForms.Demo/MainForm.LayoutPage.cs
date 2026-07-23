@@ -82,6 +82,7 @@ internal sealed partial class MainForm
         {
             Bounds = new(500, 36, 300, 150),
             Text = "Connection details",
+            Image = this.SquareImage(Color.MediumSeaGreen), // a header icon beside the caption
         };
         expander.Controls.Add(new Label { Bounds = new(12, 36, 80, 20), Text = "Host:" });
         expander.Controls.Add(new TextBox { Bounds = new(96, 34, 190, 24), Text = "localhost" });

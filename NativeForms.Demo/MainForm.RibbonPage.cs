@@ -80,7 +80,21 @@ internal sealed partial class MainForm
         var table = new RibbonGridButton("Table") { ImageList = _icons, ImageIndex = _IconFile, MaxColumns = 10, MaxRows = 8 };
         table.RangeSelected += (_, e) => this.SetStatus($"Ribbon: insert {e.Columns} × {e.Rows} table.");
         tables.Items.Add(table);
-        insert.Groups.AddRange(illustrations, tables);
+        // Hosted controls in a ribbon group: a date picker, a time picker (no seconds) and a check box,
+        // the same RibbonHostItem route the Styles combo uses.
+        var fields = new RibbonGroup("Fields") { ImageIndex = _IconGear };
+        var insertDate = new DateTimePicker { Format = DateTimePickerFormat.Short };
+        insertDate.ValueChanged += (_, _) => this.SetStatus($"Ribbon: date field {insertDate.Value:d}.");
+        var insertTime = new TimePicker { ShowSeconds = false };
+        insertTime.ValueChanged += (_, _) => this.SetStatus($"Ribbon: time field {insertTime.Value:hh\\:mm}.");
+        var trackChanges = new CheckBox { Text = "Track changes" };
+        trackChanges.CheckedChanged += (_, _) => this.SetStatus($"Ribbon: track changes {(trackChanges.Checked ? "on" : "off")}.");
+        fields.Items.AddRange(
+            new RibbonHostItem(insertDate) { HostWidth = 130 },
+            new RibbonHostItem(insertTime) { HostWidth = 90 },
+            new RibbonHostItem(trackChanges) { HostWidth = 130 });
+
+        insert.Groups.AddRange(illustrations, tables, fields);
 
         var view = new RibbonTab("View");
         var zoom = new RibbonGroup("Zoom") { ImageIndex = _IconGear };
