@@ -1939,6 +1939,10 @@ public class DataGridView : OwnerDrawnControl
         var alignment = style.Alignment ?? column.Alignment;
         var foreColor = style.ForeColor ?? (selected ? theme.SelectionText : theme.ControlText);
 
+        // Clip content to the cell so a value wider than its column — a long link and its full-width
+        // underline especially — cannot bleed into the neighbouring column. The background fill above
+        // is deliberately outside the clip so it still paints the whole cell.
+        g.PushClip(cellRect);
         switch (column.Kind)
         {
             case DataGridViewColumnKind.Check:
@@ -2053,6 +2057,8 @@ public class DataGridView : OwnerDrawnControl
                 break;
             }
         }
+
+        g.PopClip();
     }
 
     /// <summary>Paints the row-header column: themed strip, per-row separators and the marker
