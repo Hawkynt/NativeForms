@@ -124,7 +124,13 @@ Targets (measured by the `NativeForms.Benchmarks` project; treat as CI-guarded g
       display-text recomputation in the grid were found and removed (display text now cached
       per row, invalidated on data/selector changes).
 - [x] No boxing on the event hot path; `EventHandler` slots are null until subscribed.
-- [ ] Startup (cold) to first window shown: **< 50 ms** on a trimmed self-contained build.
+- [~] Startup (cold) to first window shown, measured on the Linux/GTK AOT self-contained build via
+      the demo's `--measure-startup`: **~90 ms** floor, of which the toolkit itself is negligible —
+      backend registration ~0 ms, a bare form constructs in ~0.3 ms, and the whole gallery (hundreds
+      of controls across nine tabs) adds only ~40 ms. The floor is **`gtk_init`** (the X connection,
+      theme CSS and fontconfig on the first GTK call), a GTK cost the toolkit cannot shrink; the
+      **< 50 ms** target is a Win32-class figure, unreachable under `gtk_init` on GTK. Construction
+      and realize allocate the budgeted kilobytes; no toolkit hotspot remains to remove.
 - [x] Backend linking: `NativeForms.TrimProbe` (GTK-only) publishes without the Windows/macOS
       assemblies (asserted in nightly CI); AOT probe 1.4 MB vs 2.4 MB all-backends demo.
 - [x] Data structures: Span at the pixel/text seams, LINQ eliminated from all paint/input/
