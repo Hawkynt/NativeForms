@@ -277,4 +277,34 @@ internal sealed class DockPanelTests
         dock.AddDocument(Pane("doc"));
         Assert.That(dock.SaveLayout(), Does.StartWith("NFDOCK1|"));
     }
+
+    [Test]
+    public void A_long_caption_title_is_clipped_so_it_cannot_overpaint_the_buttons()
+    {
+        var dock = new DockPanel();
+        dock.Add(new DockContent("Solution Explorer with a very long caption") { Name = "p" }, DockState.Docked, DockEdge.Left);
+        var (_, _, canvas) = Realize(dock);
+
+        var g = canvas.RaisePaint();
+        var titleIdx = g.Operations.FindIndex(o => o.StartsWith("text") && o.Contains("very long caption"));
+
+        Assert.That(titleIdx, Is.GreaterThan(0), "the caption title is painted");
+        Assert.That(g.Operations[titleIdx - 1], Does.StartWith("clip"),
+            "the caption title draws immediately inside a clip, so an overlong title cannot spill onto the caption buttons");
+    }
+
+    [Test]
+    public void A_long_tab_title_is_clipped_to_its_cell()
+    {
+        var dock = new DockPanel();
+        dock.AddDocument(new DockContent("A document with a very long tab caption") { Name = "a" });
+        dock.AddDocument(new DockContent("Second") { Name = "b" }); // two documents → a tab strip appears
+        var (_, _, canvas) = Realize(dock);
+
+        var g = canvas.RaisePaint();
+        var tabIdx = g.Operations.FindIndex(o => o.StartsWith("text") && o.Contains("very long tab caption"));
+
+        Assert.That(tabIdx, Is.GreaterThan(0), "the tab caption is painted");
+        Assert.That(g.Operations[tabIdx - 1], Does.StartWith("clip"), "each tab caption draws inside its own clip");
+    }
 }

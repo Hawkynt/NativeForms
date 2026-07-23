@@ -108,7 +108,11 @@ public partial class DockPanel
 
         var textRight = bounds.Right - buttonsWidth - _CaptionInset;
         var textRect = new Rectangle(textLeft, bounds.Y, Math.Max(0, textRight - textLeft), bounds.Height);
+        // Clip the caption to its text cell so a long title's glyphs never spill over the icon or the
+        // caption buttons that follow it.
+        g.PushClip(textRect);
         g.DrawText(active.Title, theme.DefaultFont, fore, textRect, ContentAlignment.MiddleLeft);
+        g.PopClip();
 
         this.PaintCaptionButtons(g, theme, group, active, fore);
     }
@@ -178,7 +182,9 @@ public partial class DockPanel
                 g.FillRectangle(theme.Accent, new Rectangle(cell.X, cell.Y, cell.Width, 2));
 
             var text = new Rectangle(cell.X + 6, cell.Y, cell.Width - 12, cell.Height);
+            g.PushClip(text);
             g.DrawText(pane.Title, theme.DefaultFont, theme.ControlText, text, ContentAlignment.MiddleLeft);
+            g.PopClip();
         }
     }
 
