@@ -51,9 +51,13 @@ public class ProgressTile : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.Invalidate();
         }
     }
+
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <summary>
     /// The line under the primary caption — "45.2 GB free of 128 GB" and the like. Formatted by the
@@ -238,7 +242,7 @@ public class ProgressTile : OwnerDrawnControl
         if (this.Image is { } image)
         {
             var iconTop = content.Y + Math.Max(0, (content.Height - image.Height) / 2);
-            g.DrawImage(image, new Rectangle(content.X, iconTop, image.Width, image.Height));
+            g.DrawImage(this.CurrentFrameOf(image)!, new Rectangle(content.X, iconTop, image.Width, image.Height));
             var shift = image.Width + _IconGap;
             content = new(content.X + shift, content.Y, Math.Max(0, content.Width - shift), content.Height);
         }
@@ -282,7 +286,7 @@ public class ProgressTile : OwnerDrawnControl
         if (this.Image is { } image)
         {
             var iconTop = content.Y + Math.Max(0, (content.Height - image.Height) / 2);
-            g.DrawImage(image, new Rectangle(content.X, iconTop, image.Width, image.Height));
+            g.DrawImage(this.CurrentFrameOf(image)!, new Rectangle(content.X, iconTop, image.Width, image.Height));
             iconWidth = image.Width + _IconGap;
         }
 

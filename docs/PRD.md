@@ -642,7 +642,12 @@ strategy (may differ per platform; note exceptions inline).
       been on screen; one shared `Timer` repaints only the visible subscribers, a hidden one shows the
       exact frame it would have when revealed. `PictureBox.AnimatedImage` hosts still or animated images;
       a disabled box freezes the animation (resuming exactly where it stopped when re-enabled) and paints
-      the frame grayscale
+      the frame grayscale. `AnimatedImage` implements `IImage`, so it can be assigned to any control's
+      plain `Image` property — the same interface a still image uses — and animates there: owner-drawn
+      consumers (CheckBox, RadioButton, IconLabel, GroupBox, Expander, DropDownButton/SplitButton,
+      ProgressTile) resolve the current frame each repaint through `OwnerDrawnControl`, and native-widget
+      Button/Label re-push the current frame to their peer as the shared clock advances; all freeze and
+      grey while disabled
 - [x] **Uniform image API across all controls**: a direct `Image` property (Button, Label, CheckBox,
       RadioButton, GroupBox, PictureBox) or `ImageList` + `ImageIndex`/`ImageKey` — the latter now on
       every item class (TabPage, ToolStripItem, ListViewItem, TreeNode+`SelectedImageKey`, RibbonGroup,

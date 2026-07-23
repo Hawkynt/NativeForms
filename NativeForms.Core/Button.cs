@@ -28,6 +28,7 @@ public class Button : Control
                 return;
 
             field = value;
+            this.TrackImageAnimation(value, this.PushImage);
             this.PushImage();
         }
     }
@@ -130,6 +131,7 @@ public class Button : Control
         _buttonPeer = button;
         button.Clicked += (_, _) => this.OnClick(EventArgs.Empty);
         this.PushImage();
+        this.TrackImageAnimation(this.Image, this.PushImage); // subscribe now that a backend exists
         if (_isDefault)
             button.SetDefault(true);
     }
@@ -137,8 +139,9 @@ public class Button : Control
     /// <inheritdoc/>
     private protected override void OnUnrealized() => _buttonPeer = null;
 
-    /// <summary>Forwards the buffered image triple to the realized peer.</summary>
-    private void PushImage() => _buttonPeer?.SetImage(this.Image, this.ImageAlign, this.TextImageRelation);
+    /// <summary>Forwards the buffered image triple to the realized peer, resolving an animated image to
+    /// its current frame — the shared clock calls this again as the frame advances.</summary>
+    private void PushImage() => _buttonPeer?.SetImage(this.CurrentFrameOf(this.Image), this.ImageAlign, this.TextImageRelation);
 
     private bool _isDefault;
 

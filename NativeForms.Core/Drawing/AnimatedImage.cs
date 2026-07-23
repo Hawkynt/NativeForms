@@ -9,7 +9,14 @@ namespace Hawkynt.NativeForms.Drawing;
 /// whether or not it has been on screen: a control that was hidden and comes back paints the exact
 /// frame it would have shown had it never been hidden (the elapsed time is taken modulo the loop).
 /// </summary>
-public sealed class AnimatedImage : IDisposable
+/// <remarks>
+/// It implements <see cref="IImage"/> so it can be assigned to any control's plain image property —
+/// the "same interface" a still image uses. Painting is what makes it animate: an owner-drawn control
+/// resolves the current frame each repaint (<c>OwnerDrawnControl.CurrentFrameOf</c>) and subscribes to
+/// the shared <see cref="AnimationClock"/> so the frame advances; drawn as a raw <see cref="IImage"/>
+/// with no subscriber it simply shows the frame current at paint time.
+/// </remarks>
+public sealed class AnimatedImage : IImage
 {
     private readonly DecodedImage _decoded;
     private IPlatformBackend? _backend;

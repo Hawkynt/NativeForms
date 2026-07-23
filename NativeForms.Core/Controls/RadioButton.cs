@@ -44,9 +44,13 @@ public class RadioButton : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.Invalidate();
         }
     }
+
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <summary>Raised when <see cref="Checked"/> changes.</summary>
     public event EventHandler? CheckedChanged;
@@ -156,7 +160,7 @@ public class RadioButton : OwnerDrawnControl
                 alignment,
                 out var imageRect,
                 out var textRect);
-            g.DrawImage(image, imageRect);
+            g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
             g.DrawText(this.Text, font, textColor, textRect, alignment);
         }
         else

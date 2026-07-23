@@ -782,6 +782,42 @@ public abstract class Control
     }
 
     /// <summary>
+    /// (Re)subscribes an image to the shared <see cref="AnimationClock"/> when it is an animated image
+    /// and the control is realized, invoking <paramref name="onFrame"/> as each frame advances, and
+    /// unsubscribes otherwise. Owner-drawn controls pass <see cref="Invalidate"/>; native-widget
+    /// controls pass their peer re-push. The subscription is dropped centrally when the control
+    /// unrealizes, so callers only re-track when the image or realized state changes.
+    /// </summary>
+    private protected void TrackImageAnimation(IImage? image, Action onFrame)
+    {
+        if (image is AnimatedImage { IsAnimated: true } animated && this.IsRealized)
+            AnimationClock.Instance.Register(this, animated, () => this.Visible, onFrame);
+        else
+            AnimationClock.Instance.Unregister(this);
+    }
+
+    /// <summary>
+    /// Resolves an image to the frame to paint now: an <see cref="AnimatedImage"/> yields its current
+    /// frame — frozen and greyed while the control is disabled — and a still image yields itself. Draw
+    /// or push this rather than the raw image so an animated image assigned to a plain image property
+    /// animates.
+    /// </summary>
+    private protected IImage? CurrentFrameOf(IImage? image)
+    {
+        if (image is not AnimatedImage animated || this.Backend is not { } backend)
+            return image;
+
+        var now = Environment.TickCount64;
+        if (this.Enabled && animated.IsPaused)
+            animated.Resume(now);
+        else if (!this.Enabled && !animated.IsPaused)
+            animated.Pause(now);
+
+        var index = animated.CurrentFrameIndex(now);
+        return this.Enabled ? animated.FrameImage(backend, index) : animated.FrameImageGray(backend, index);
+    }
+
+    /// <summary>
     /// Gives up focus the control can no longer hold because it was hidden or disabled and nothing
     /// else took it — the form's last resort in <see cref="Form.ReconcileActiveControlVisibility"/>.
     /// Guarded by the flag so it is a no-op when the platform already reported the loss (a real
@@ -1661,6 +1697,11 @@ public abstract class Control
         // The popup bit goes with the peer: unrealizing tears every owned surface down, and leaving it
         // set would have the control swallow every focus loss it is ever told about again.
         _state &= ~(State.Focused | State.PopupOpen);
+
+        // Any animation subscription goes with the peer, for native-widget and owner-drawn controls
+        // alike, so the shared clock never ticks a control whose backend is gone.
+        AnimationClock.Instance.Unregister(this);
+
         _peer.Dispose();
         _peer = null;
         _backend = null;

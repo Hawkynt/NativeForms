@@ -169,4 +169,73 @@ internal sealed class AnimatedImageTests
 
         Assert.That(g.Operations.Exists(o => o.StartsWith("image 2x2")), Is.True, "the 2×2 frame is blitted");
     }
+
+    // --- Animated image through any control's plain IImage property --------------------------------
+    // AnimatedImage implements IImage, so it can be assigned to a control's ordinary Image property —
+    // "the same interface" a still image uses — and the owner-drawn base animates it uniformly.
+
+    private static CheckBox RealizedCheckBox(AnimatedImage image, out HeadlessCanvasPeer canvas)
+    {
+        var box = new CheckBox { Bounds = new(0, 0, 80, 24), Text = "Go", Image = image };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(box);
+        Application.Run(form, backend);
+        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        return box;
+    }
+
+    [Test]
+    public void An_animated_image_on_a_plain_Image_property_draws_the_current_frame()
+    {
+        RealizedCheckBox(ThreeFrames(0), out var canvas);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image 2x2")), Is.True,
+            "the CheckBox blits the animated image's frame through its plain Image property, not nothing");
+    }
+
+    [Test]
+    public void An_animated_image_on_a_plain_Image_property_subscribes_to_the_shared_clock()
+    {
+        var image = ThreeFrames(0);
+        RealizedCheckBox(image, out var canvas);
+        var before = canvas.InvalidateCount;
+
+        AnimationClock.Instance.Advance(image.StartTick + 150); // frame 0 → 1
+
+        Assert.That(canvas.InvalidateCount, Is.GreaterThan(before),
+            "advancing the shared clock repaints the control, so an animated image on a plain property actually animates");
+    }
+
+    [Test]
+    public void A_disabled_control_freezes_an_animated_image_on_its_plain_property()
+    {
+        var image = ThreeFrames(0);
+        var box = RealizedCheckBox(image, out var canvas);
+
+        box.Enabled = false;
+        canvas.RaisePaint();
+
+        Assert.That(image.IsPaused, Is.True, "a disabled control freezes the animation on a plain Image property, like PictureBox");
+    }
+
+    [Test]
+    public void An_animated_image_on_a_native_button_pushes_a_resolved_frame_to_the_peer()
+    {
+        var button = new Button { Bounds = new(0, 0, 80, 26), Text = "Go", Image = ThreeFrames(0) };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(button);
+        Application.Run(form, backend);
+        var peer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(peer.Image, Is.Not.Null, "the native button pushed the animated image's current frame");
+            Assert.That(peer.Image, Is.Not.InstanceOf<AnimatedImage>(), "it pushed a resolved frame, not the animated image itself");
+            Assert.That(peer.Image!.Width, Is.EqualTo(2), "the pushed frame is the 2×2 image");
+        });
+    }
 }

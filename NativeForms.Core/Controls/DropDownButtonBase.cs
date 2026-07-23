@@ -52,9 +52,13 @@ public abstract class DropDownButtonBase : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.Invalidate();
         }
     }
+
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
@@ -128,7 +132,7 @@ public abstract class DropDownButtonBase : OwnerDrawnControl
             out var imageRect,
             out var textRect);
         if (image is not null)
-            g.DrawImage(image, imageRect);
+            g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
 
         if (this.Text.Length > 0)
             g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleCenter);

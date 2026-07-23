@@ -28,10 +28,14 @@ public class IconLabel : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.ApplyAutoSize();
             this.Invalidate();
         }
     }
+
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <summary>
     /// Where the whole image+text block anchors within the control's bounds. Defaults to
@@ -134,7 +138,7 @@ public class IconLabel : OwnerDrawnControl
             out var imageRect,
             out var textRect);
 
-        g.DrawImage(image, imageRect);
+        g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
         if (text.Length > 0)
             g.DrawText(text, font, color, textRect, ContentAlignment.MiddleCenter);
     }

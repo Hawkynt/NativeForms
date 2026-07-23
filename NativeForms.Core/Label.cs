@@ -104,7 +104,8 @@ public class Label : Control
                 return;
 
             field = value;
-            _labelPeer?.SetImage(value, this.ImageAlign);
+            this.TrackImageAnimation(value, this.PushImage);
+            this.PushImage();
         }
     }
 
@@ -122,7 +123,7 @@ public class Label : Control
                 return;
 
             field = value;
-            _labelPeer?.SetImage(this.Image, value);
+            this.PushImage();
         }
     } = ContentAlignment.MiddleCenter;
 
@@ -169,9 +170,14 @@ public class Label : Control
         label.SetTextAlign(this.TextAlign);
         label.SetBorderStyle(this.BorderStyle);
         label.SetUseMnemonic(this.UseMnemonic);
-        label.SetImage(this.Image, this.ImageAlign);
+        this.PushImage();
+        this.TrackImageAnimation(this.Image, this.PushImage); // subscribe now that a backend exists
         this.ApplyAutoSize();
     }
+
+    /// <summary>Pushes the image to the peer, resolving an animated image to its current frame — the
+    /// shared clock calls this again as the frame advances.</summary>
+    private void PushImage() => _labelPeer?.SetImage(this.CurrentFrameOf(this.Image), this.ImageAlign);
 
     /// <inheritdoc/>
     private protected override void OnUnrealized() => _labelPeer = null;

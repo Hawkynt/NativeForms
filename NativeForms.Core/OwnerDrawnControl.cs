@@ -55,6 +55,22 @@ public abstract class OwnerDrawnControl : Control
         _canvas = null;
     }
 
+    /// <summary>
+    /// The single image a subclass wants animated, or <see langword="null"/>. A control that carries one
+    /// image property overrides this so the base keeps the shared <see cref="AnimationClock"/>
+    /// subscription in step with both the image and the control's realized lifetime — the wiring that
+    /// lets an <see cref="AnimatedImage"/> assigned to a plain <see cref="IImage"/> property animate.
+    /// </summary>
+    private protected virtual IImage? AnimatedImageSlot => null;
+
+    /// <summary>
+    /// (Re)subscribes <see cref="AnimatedImageSlot"/> to the shared animation clock when it is an
+    /// animated image and the control is realized, and unsubscribes otherwise. Call it from the image
+    /// property's setter; the base also calls it on realization so a subscription survives an image set
+    /// before the control had a backend.
+    /// </summary>
+    private protected void UpdateImageAnimation() => this.TrackImageAnimation(this.AnimatedImageSlot, this.Invalidate);
+
     /// <summary>The desktop theme changed: adopt the backend's fresh snapshot and repaint.</summary>
     private void OnBackendThemeChanged(object? sender, EventArgs e)
     {
@@ -192,6 +208,9 @@ public abstract class OwnerDrawnControl : Control
             if (this.Enabled)
                 this.OnKeyPress(e);
         };
+
+        // A backend now exists, so an animated image assigned before realization can finally subscribe.
+        this.UpdateImageAnimation();
     }
 
     /// <inheritdoc/>

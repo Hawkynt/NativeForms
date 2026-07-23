@@ -27,9 +27,13 @@ public class GroupBox : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.Invalidate();
         }
     }
+
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <summary>
     /// Where the <see cref="Image"/> sits relative to the caption. Defaults to
@@ -113,7 +117,7 @@ public class GroupBox : OwnerDrawnControl
             out var textRect);
 
         if (image is not null)
-            g.DrawImage(image, imageRect);
+            g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
 
         if (!string.IsNullOrEmpty(caption))
             g.DrawText(caption, font, this.Enabled ? this.ForeColor : theme.DisabledText, textRect, ContentAlignment.TopLeft);

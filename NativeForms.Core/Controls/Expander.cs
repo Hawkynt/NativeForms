@@ -63,9 +63,13 @@ public class Expander : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.Invalidate();
         }
     }
+
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <summary>Where the <see cref="Image"/> sits relative to the caption. Defaults to
     /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
@@ -153,7 +157,7 @@ public class Expander : OwnerDrawnControl
         var captionSize = string.IsNullOrEmpty(this.Text) ? Size.Empty : g.MeasureText(this.Text, theme.DefaultFont);
         var imageSize = new Size(image.Width, image.Height);
         ContentLayout.Arrange(content, imageSize, captionSize, this.TextImageRelation, ContentAlignment.MiddleLeft, out var imageRect, out var textRect);
-        g.DrawImage(image, imageRect);
+        g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
         if (!string.IsNullOrEmpty(this.Text))
             g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
     }
