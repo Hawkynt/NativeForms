@@ -52,6 +52,37 @@ public class Expander : OwnerDrawnControl
         }
     } = true;
 
+    /// <summary>An optional icon painted in the header beside the caption (after the expand glyph);
+    /// <see cref="TextImageRelation"/> places it before or after the text.</summary>
+    public IImage? Image
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>Where the <see cref="Image"/> sits relative to the caption. Defaults to
+    /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
+    /// to put the icon after the text.</summary>
+    public TextImageRelation TextImageRelation
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    } = TextImageRelation.ImageBeforeText;
+
     /// <summary>Raised after <see cref="Expanded"/> changes.</summary>
     public event EventHandler? ExpandedChanged;
 
@@ -110,8 +141,20 @@ public class Expander : OwnerDrawnControl
             new Rectangle(_GlyphInset, glyphTop, _GlyphSize, _GlyphSize),
             this.Expanded ? GlyphDirection.Down : GlyphDirection.Right);
 
-        var textLeft = _GlyphInset + _GlyphSize + _TextGap;
-        var textRect = new Rectangle(textLeft, 0, Math.Max(0, this.Width - textLeft), headerHeight);
-        g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
+        var contentLeft = _GlyphInset + _GlyphSize + _TextGap;
+        var content = new Rectangle(contentLeft, 0, Math.Max(0, this.Width - contentLeft), headerHeight);
+        var image = this.Image;
+        if (image is null)
+        {
+            g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, content, ContentAlignment.MiddleLeft);
+            return;
+        }
+
+        var captionSize = string.IsNullOrEmpty(this.Text) ? Size.Empty : g.MeasureText(this.Text, theme.DefaultFont);
+        var imageSize = new Size(image.Width, image.Height);
+        ContentLayout.Arrange(content, imageSize, captionSize, this.TextImageRelation, ContentAlignment.MiddleLeft, out var imageRect, out var textRect);
+        g.DrawImage(image, imageRect);
+        if (!string.IsNullOrEmpty(this.Text))
+            g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
     }
 }

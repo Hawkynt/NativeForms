@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms;
+using Hawkynt.NativeForms.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
@@ -132,5 +133,39 @@ internal sealed class ExpanderTests
             Assert.That(g.DrewText("Details"), Is.True);
             Assert.That(g.Operations.Exists(o => o.StartsWith("line ")), Is.True, "triangle glyph strokes");
         });
+    }
+
+    private static int AtX(RecordingGraphics g, string prefix)
+    {
+        var op = g.Operations.First(o => o.StartsWith(prefix));
+        return int.Parse(op[(op.IndexOf('@') + 1)..].Split(',')[0]);
+    }
+
+    [Test]
+    public void A_header_image_paints_before_the_caption_by_default()
+    {
+        var expander = new Expander { Text = "Mail", Bounds = new(0, 0, 200, 120), Image = new HeadlessImage(16, 16) };
+        var g = Realize(expander, out _).RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16")), Is.True, "the header icon paints");
+            Assert.That(AtX(g, "image 16x16"), Is.LessThan(AtX(g, "text \"Mail\"")), "icon before caption by default");
+        });
+    }
+
+    [Test]
+    public void TextBeforeImage_puts_the_header_icon_after_the_caption()
+    {
+        var expander = new Expander
+        {
+            Text = "Mail",
+            Bounds = new(0, 0, 200, 120),
+            Image = new HeadlessImage(16, 16),
+            TextImageRelation = TextImageRelation.TextBeforeImage,
+        };
+        var g = Realize(expander, out _).RaisePaint();
+
+        Assert.That(AtX(g, "text \"Mail\""), Is.LessThan(AtX(g, "image 16x16")), "caption first, icon after");
     }
 }

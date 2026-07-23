@@ -23,6 +23,8 @@ form.Controls.Add(expander);
 |---|---|---|---|
 | `Expanded` | `bool` | `true` | Whether the content area is shown. Collapsing remembers the current height and shrinks to `HeaderHeight`; expanding restores it. |
 | `HeaderHeight` | `int` (get) | theme row height | Pixel height of the header row — the whole control while collapsed. |
+| `Image` | `IImage?` | `null` | An optional icon painted in the header beside the caption (after the expand glyph); `TextImageRelation` places it before or after the text. |
+| `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | Where the `Image` sits relative to the caption; `TextBeforeImage` puts the icon after the text. |
 
 ### Events
 
