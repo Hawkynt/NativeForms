@@ -1254,9 +1254,19 @@ public abstract class Control
     /// base schedules a layout pass, so plain containers reflow their Anchor/Dock children.</summary>
     private protected virtual void OnBoundsChanged() => this.PerformLayout();
 
-    /// <summary>Hook for layout containers: a child joined <see cref="Controls"/>. The base
-    /// schedules a layout pass so a pre-assigned dock takes effect immediately.</summary>
-    private protected virtual void OnChildAdded(Control child) => this.PerformLayout();
+    /// <summary>
+    /// Hook for layout containers: a child joined <see cref="Controls"/>. The base lays out only when
+    /// the new child <see cref="Dock"/>s — a docked child claims edge space and shifts its siblings, so
+    /// the whole container must re-flow. An absolutely-placed or merely anchored child sits at its own
+    /// bounds and moves nobody, so no layout is due; skipping it keeps building a form of N children
+    /// linear instead of the quadratic a full pass per add would cost. Anchoring still applies on the
+    /// next resize, and a scrolling panel re-derives its content extent on the next paint.
+    /// </summary>
+    private protected virtual void OnChildAdded(Control child)
+    {
+        if (child.Dock != DockStyle.None)
+            this.PerformLayout();
+    }
 
     /// <summary>Hook for layout containers: a child left <see cref="Controls"/>. The base
     /// schedules a layout pass so the remaining docked children reclaim its edge.</summary>

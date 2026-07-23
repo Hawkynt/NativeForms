@@ -33,7 +33,10 @@ public sealed class ControlCollection : IReadOnlyList<Control>
         _owner.NotifyChildAdded(control);
     }
 
-    /// <summary>Adds several controls in order.</summary>
+    /// <summary>Adds several controls in order. For absolutely-placed or anchored children this is
+    /// linear (the base <see cref="Control.OnChildAdded"/> lays out only for a docked child); a
+    /// layout panel that positions its own children re-flows per add, so wrap a large batch into it
+    /// in <see cref="Control.SuspendLayout"/>/<see cref="Control.ResumeLayout()"/> to keep it linear.</summary>
     public void AddRange(params Control[] controls)
     {
         ArgumentNullException.ThrowIfNull(controls);

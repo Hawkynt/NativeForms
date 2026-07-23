@@ -47,6 +47,10 @@ public class FlowLayoutPanel : Panel
     /// <see cref="Control.Anchor"/>/<see cref="Control.Dock"/> are ignored — the Windows Forms
     /// flow-panel contract.
     /// </summary>
+    /// <summary>The flow positions every child itself, so a new one — anchored or not — re-flows the
+    /// panel; the base only re-flows for a docked child, which a flow child never is.</summary>
+    private protected override void OnChildAdded(Control child) => this.PerformLayout();
+
     private protected override void OnLayout()
     {
         var direction = this.FlowDirection;
