@@ -2,6 +2,8 @@
 
 > A file field: a hosted native [`TextBox`](textbox.md) holding the path plus a browse button that opens the platform's own [`OpenFileDialog` or `SaveFileDialog`](dialogs.md) and writes the choice back.
 
+![FilePicker in the NativeForms demo](../screenshots/07-pickers.png)
+
 `Hawkynt.NativeForms.FilePicker` · strategy: **owner-drawn** (frame over a hosted native `TextBox`) · peer: `ICanvasPeer` + `ITextBoxPeer`
 
 ## Usage

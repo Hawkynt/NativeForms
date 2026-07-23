@@ -1,6 +1,8 @@
 # CheckedListBox
 
 > A [`ListBox`](listbox.md) whose rows carry a themed check square in front of the text — checking is
+
+![CheckedListBox in the NativeForms demo](../screenshots/03-lists.png)
 > independent of selection, every flip is announced through the vetoable `ItemCheck` event, and the
 > check states stay index-aligned as items mutate.
 

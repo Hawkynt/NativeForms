@@ -2,6 +2,8 @@
 
 > The static entry point: register the backends the build ships, hand `Run` the main form, and it resolves a backend, realizes the control tree, and pumps the native message loop until the window closes.
 
+![Application in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.Application` · static class · selects an `IPlatformBackend` via `BackendRegistry`
 
 ## Usage

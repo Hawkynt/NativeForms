@@ -2,6 +2,8 @@
 
 > A search field: a hosted native [`TextBox`](textbox.md) framed by an owner-drawn surface that paints a magnifier glyph at the left and, while text is present, a clear (×) zone at the right — clicking it empties the box and raises `SearchCleared`.
 
+![SearchBox in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.SearchBox` · strategy: **owner-drawn** (frame over a hosted native `TextBox`) · peer: `ICanvasPeer` + `ITextBoxPeer`
 
 ## Usage

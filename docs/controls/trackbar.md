@@ -2,6 +2,8 @@
 
 > An owner-drawn slider: a themed groove with an accent-filled portion and thumb, tick marks every `TickFrequency` values, track-click paging and live thumb-drag scrubbing.
 
+![TrackBar in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.TrackBar` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

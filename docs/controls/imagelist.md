@@ -2,6 +2,8 @@
 
 > Backend-independent icon storage shared by list, tree, combo and toolbar controls: images are added as raw 32-bit ARGB pixels long before any backend exists and are materialized into native bitmaps lazily, the first time a realized control paints them.
 
+![ImageList in the NativeForms demo](../screenshots/03-lists.png)
+
 `Hawkynt.NativeForms.ImageList` · not a control — a `sealed class : IDisposable` holding pixel data
 
 ## Usage

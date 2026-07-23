@@ -1,6 +1,8 @@
 # TabControl / TabPage
 
 > An owner-drawn tab control: a themed header strip — caption and optional icon per tab, accent
+
+![TabControl / TabPage in the NativeForms demo](../screenshots/05-layout.png)
 > underline on the active tab, hover feedback, scroll arrows on overflow — over pages that are real
 > nested containers hosting native child peers. Exactly one page is visible at a time.
 

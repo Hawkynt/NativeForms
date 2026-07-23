@@ -2,6 +2,8 @@
 
 > A material-style analog time picker: a themed dial with a ring of hour numbers, a centre hub and a hand you click or drag onto a number, walking through hour → minute → seconds stages.
 
+![ClockFace in the NativeForms demo](../screenshots/21-datetime.png)
+
 `Hawkynt.NativeForms.ClockFace` · strategy: **owner-drawn** (surface-agnostic dial engine) · peer: `ICanvasPeer`
 
 `ClockFace` is the analog picker [`TimePicker`](timepicker.md) opens in a popup on a double-click, factored out as a public, reusable control. Like `CalendarCore` behind [`MonthCalendar`](monthcalendar.md)/[`DateTimePicker`](datetimepicker.md), it is deliberately dual: the familiar `OwnerDrawnControl` overrides let it stand alone in a form, while the public `Paint`/`Handle…` engine methods and the `Invalidated`/`Committed`/`Cancelled` callback slots let any host paint it into a light-dismiss popup and route input into it.

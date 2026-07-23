@@ -2,6 +2,8 @@
 
 > An Explorer-style breadcrumb bar: a row of path segments separated by chevrons, each hover-highlit and clickable, that folds its leading segments behind a "…" overflow chip when the path outgrows the control's width.
 
+![Breadcrumb in the NativeForms demo](../screenshots/07-pickers.png)
+
 `Hawkynt.NativeForms.Breadcrumb` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

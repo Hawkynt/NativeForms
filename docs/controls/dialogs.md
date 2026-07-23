@@ -2,6 +2,8 @@
 
 > The native common dialogs — `MessageBox`, `OpenFileDialog`/`SaveFileDialog`, `FolderBrowserDialog`, `ColorDialog`, `FontDialog` — plus the `DialogResult` verdict and modal `Form.ShowDialog`. Each dialog object is a thin option holder; `ShowDialog` hands the options to the running backend, which presents the platform's own dialog application-modal and blocks until it closes.
 
+![Dialogs in the NativeForms demo](../screenshots/12-messagebox.png)
+
 `Hawkynt.NativeForms.MessageBox` (static) · `CommonDialog` subclasses · strategy: **native** (`MessageBoxW`/`GetOpenFileNameW` family/`SHBrowseForFolderW`/`ChooseColorW`/`ChooseFontW` on Win32; `GtkMessageDialog`/`GtkFileChooserDialog`/GTK choosers on Linux)
 
 ## Usage

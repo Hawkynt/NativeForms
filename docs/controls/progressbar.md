@@ -2,6 +2,8 @@
 
 > An owner-drawn progress bar: a themed track filled with the accent color, either in proportion to `Value` (`Blocks`) or as an animated segment sweeping the track (`Marquee`).
 
+![ProgressBar in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.ProgressBar` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

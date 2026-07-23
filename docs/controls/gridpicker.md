@@ -1,6 +1,8 @@
 # GridPicker
 
 > The Office-style table-size chooser: a grid of cells the pointer sweeps to pick an N×M table, the
+
+![GridPicker in the NativeForms demo](../screenshots/08-ribbon.png)
 > hovered top-left block highlighted in the accent, a live "C × R Table" caption, and a click (or
 > Enter) that commits. Reusable and decoupled — drop it onto a form, host it in a drop-down, or let a
 > `RibbonGridButton` pop it up.

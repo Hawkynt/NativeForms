@@ -2,6 +2,8 @@
 
 > The abstract base of every visual element: WinForms-shaped geometry, `Text`, `Visible`/`Enabled`, ambient `Font`/colors/`Cursor`, `Anchor`/`Dock` layout, tab order and focus events, drag-and-drop, and a re-parenting `Controls` collection — all buffered until the form is shown, then live against the native peer.
 
+![Control in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.Control` · strategy: **base class** (subclasses wrap a native widget or owner-draw) · peer: `IControlPeer`
 
 ## Usage

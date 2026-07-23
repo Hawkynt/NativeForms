@@ -2,6 +2,8 @@
 
 > An owner-drawn one-month calendar page: a title row with paging arrows, a day-of-week header, and a 6×7 day grid with leading/trailing days greyed, today circled in the accent color, and single- or range-selection by mouse and keyboard. Clicking the title drills out to months, years and decades, so a distant year is three clicks away.
 
+![MonthCalendar in the NativeForms demo](../screenshots/21-datetime.png)
+
 `Hawkynt.NativeForms.MonthCalendar` · strategy: **owner-drawn** (shares the `CalendarCore` engine with `DateTimePicker`'s popup) · peer: `ICanvasPeer`
 
 ## Usage

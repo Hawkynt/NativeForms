@@ -2,6 +2,8 @@
 
 > A recurring timer whose `Tick` fires on the UI thread, driven by the platform message loop — the moral equivalent of `System.Windows.Forms.Timer`. Marquee progress, caret blink, tooltip delays and key autorepeat are all built on it.
 
+![Timer in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.Timer` · not a control — a `sealed class : IDisposable` over an `ITimerPeer` (`WM_TIMER` on Win32, `g_timeout` on GTK)
 
 ## Usage

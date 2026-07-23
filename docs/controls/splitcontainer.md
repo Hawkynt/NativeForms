@@ -1,6 +1,8 @@
 # SplitContainer
 
 > An owner-drawn container split into two panels by a draggable bar — live relayout while the mouse
+
+![SplitContainer in the NativeForms demo](../screenshots/05-layout.png)
 > button is held, a single `SplitterMoved` on release, minimum-size clamps on both sides and arrow-key
 > nudging when focused.
 

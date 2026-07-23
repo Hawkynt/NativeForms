@@ -2,6 +2,8 @@
 
 > A folder field: a hosted native [`TextBox`](textbox.md) holding the directory plus a browse button that opens the platform's own [`FolderBrowserDialog`](dialogs.md) and writes the choice back.
 
+![FolderPicker in the NativeForms demo](../screenshots/07-pickers.png)
+
 `Hawkynt.NativeForms.FolderPicker` · strategy: **owner-drawn** (frame over a hosted native `TextBox`) · peer: `ICanvasPeer` + `ITextBoxPeer`
 
 ## Usage

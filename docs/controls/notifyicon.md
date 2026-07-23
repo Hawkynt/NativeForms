@@ -1,6 +1,8 @@
 # NotifyIcon
 
 > A system-tray icon, the moral equivalent of `System.Windows.Forms.NotifyIcon`: an ARGB icon and
+
+![NotifyIcon in the NativeForms demo](../screenshots/01-basics.png)
 > hover text in the shell's notification area, with click and double-click events.
 
 `Hawkynt.NativeForms.NotifyIcon` · strategy: **native** (Win32 `Shell_NotifyIconW`) · peer:

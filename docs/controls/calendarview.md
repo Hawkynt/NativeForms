@@ -2,6 +2,8 @@
 
 > An owner-drawn, virtualized Outlook-style scheduler — the scheduling counterpart of the `MonthCalendar` date *picker*. It shows bound appointments in a Day, Work Week, Week or Month view: the first three paint a vertical time grid (hour rows, a shaded work day, a "now" line, side-by-side overlapping appointments); the month view paints a six-week day grid with a chip per appointment and a "+n more" overflow marker.
 
+![CalendarView in the NativeForms demo](../screenshots/09-calendar.png)
+
 `Hawkynt.NativeForms.CalendarView` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Why not `MonthCalendar`?

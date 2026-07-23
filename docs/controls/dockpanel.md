@@ -1,6 +1,8 @@
 # DockPanel / DockContent
 
 > A Visual-Studio-style docking manager: a container that hosts movable, dockable panes around a
+
+![DockPanel / DockContent in the NativeForms demo](../screenshots/06-docking.png)
 > central document tab well. Panes dock to an edge, tab together, split apart with draggable splitters,
 > tear off into floating windows, or collapse to auto-hide strips that fly out on hover. Dragging a
 > pane caption raises docking overlay guides with a translucent landing preview; the whole arrangement

@@ -1,6 +1,8 @@
 # StatusStrip
 
 > An owner-drawn status bar: a row of text+icon panels, embedded progress gauges and an optional
+
+![StatusStrip in the NativeForms demo](../screenshots/01-basics.png)
 > size grip — fixed panels take their measured width, `Spring` panels share whatever is left over.
 
 `Hawkynt.NativeForms.StatusStrip` · strategy: **owner-drawn** (native theme) · peer: `ICanvasPeer`

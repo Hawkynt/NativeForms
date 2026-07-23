@@ -2,6 +2,8 @@
 
 > A time-of-day editor in the classic spinner shape: an owner-drawn field paints `Value` part by part with the caret's part highlighted, and the themed spinner column at the right edge steps exactly that part.
 
+![TimePicker in the NativeForms demo](../screenshots/21-datetime.png)
+
 `Hawkynt.NativeForms.TimePicker` · strategy: **owner-drawn** (field + shared `SpinnerRenderer` button column) · peer: `ICanvasPeer`
 
 ## Usage

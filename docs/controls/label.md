@@ -2,6 +2,8 @@
 
 > A non-interactive line of static text, backed by the platform's native label widget, with WinForms-style `AutoSize`, `TextAlign`, `BorderStyle` and mnemonic rendering.
 
+![Label in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.Label` · strategy: **native** · peer: `ILabelPeer`
 
 ## Usage

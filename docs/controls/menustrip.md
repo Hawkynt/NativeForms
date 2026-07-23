@@ -1,6 +1,8 @@
 # MenuStrip
 
 > The application menu bar: an owner-drawn row of top-level items whose drop-downs — icons, check
+
+![MenuStrip in the NativeForms demo](../screenshots/08-file-menu.png)
 > and radio marks, shortcut text, cascading submenus, light dismiss — open through the shared
 > `MenuDropDown` popup engine.
 

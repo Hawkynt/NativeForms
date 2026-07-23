@@ -1,6 +1,8 @@
 # ToolStrip
 
 > An owner-drawn toolbar: icon+text buttons with hover/pressed/toggled states, separators, and
+
+![ToolStrip in the NativeForms demo](../screenshots/20-toolbars.png)
 > drop-down/split buttons whose menus open through the shared `MenuDropDown` engine — trailing items
 > that no longer fit collapse behind an overflow chevron.
 

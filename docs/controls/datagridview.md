@@ -1,6 +1,8 @@
 # DataGridView
 
 > The flagship owner-drawn control: a vertically virtualized data grid whose rows are arbitrary
+
+![DataGridView in the NativeForms demo](../screenshots/04-grid.png)
 > objects and whose cells — text, masked text, check, button, link, multi-image, progress, combo,
 > numeric, domain, date, color — are produced by reflection-free selector lambdas. Sorting and
 > column order run over index indirections that never touch the model, cells edit in place through

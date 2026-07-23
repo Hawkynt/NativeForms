@@ -2,6 +2,8 @@
 
 > An owner-drawn radio button painted in the native theme — themed ring, accent dot, themed text — with mutual exclusion among siblings in the same parent.
 
+![RadioButton in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.RadioButton` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

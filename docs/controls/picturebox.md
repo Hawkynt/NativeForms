@@ -2,6 +2,8 @@
 
 > An owner-drawn image surface: one `IImage` fitted per `SizeMode` — top-left at native size, stretched, centered, or aspect-fit zoomed — clipped to the client area, with an optional themed border.
 
+![PictureBox in the NativeForms demo](../screenshots/20-toolbars.png)
+
 `Hawkynt.NativeForms.PictureBox` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

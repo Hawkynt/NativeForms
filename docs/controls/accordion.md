@@ -1,6 +1,8 @@
 # Accordion / AccordionPane
 
 > An Outlook-style navigation pane: a vertical stack of collapsible panes, each a themed header row —
+
+![Accordion / AccordionPane in the NativeForms demo](../screenshots/16-accordion-second-pane.png)
 > toggle glyph, optional icon, caption, hover feedback — over a body of real nested child controls.
 > Headers stay put; the open panes share whatever height is left.
 

@@ -2,6 +2,8 @@
 
 > A colour swatch that drops down a palette of standard colours — the toolbar/ribbon/dialog colour chooser. The face shows the current colour and a chevron; a click opens a light-dismiss grid, and choosing a swatch sets the colour.
 
+![ColorPicker in the NativeForms demo](../screenshots/20-toolbars.png)
+
 `Hawkynt.NativeForms.ColorPicker` · strategy: **owner-drawn** · peer: `ICanvasPeer` (+ an `IPopupPeer` palette)
 
 ## Usage

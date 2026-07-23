@@ -1,6 +1,8 @@
 # Expander
 
 > A collapsible container: a themed header row — triangle glyph plus `Text` — over a content area of
+
+![Expander in the NativeForms demo](../screenshots/10-expander-expanded.png)
 > ordinary child controls. Collapsing folds the control down to the header; expanding restores
 > exactly what was there.
 

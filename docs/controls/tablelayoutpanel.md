@@ -1,6 +1,8 @@
 # TableLayoutPanel
 
 > A [`Panel`](panel.md) that slices its client area into a `ColumnCount` × `RowCount` grid and fills
+
+![TableLayoutPanel in the NativeForms demo](../screenshots/05-layout.png)
 > each child into its cell minus the child's `Margin` — tracks sized by absolute, percent or
 > auto-size styles, explicit cell positions and spans, row-major auto-placement for the rest, and an
 > optional themed cell grid.

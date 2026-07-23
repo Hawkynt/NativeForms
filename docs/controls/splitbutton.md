@@ -1,6 +1,8 @@
 # SplitButton & DropDownButton
 
 > Standalone menu buttons, the control-sized siblings of `ToolStripSplitButton` and
+
+![SplitButton & DropDownButton in the NativeForms demo](../screenshots/20-toolbars.png)
 > `ToolStripDropDownButton`: a themed button face with icon+text content, a trailing arrow zone, and
 > a drop-down of menu items opened below the control through the shared `MenuDropDown` engine.
 

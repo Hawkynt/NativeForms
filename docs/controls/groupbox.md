@@ -2,6 +2,8 @@
 
 > An owner-drawn container that frames its children with a themed border and paints its `Text` as a caption over the top-left of that frame, optionally preceded by a small icon.
 
+![GroupBox in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.GroupBox` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

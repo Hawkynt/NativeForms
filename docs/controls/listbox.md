@@ -1,6 +1,8 @@
 # ListBox
 
 > An owner-drawn list with the full set of WinForms selection modes, optional per-item icons,
+
+![ListBox in the NativeForms demo](../screenshots/03-lists.png)
 > wheel/keyboard scrolling and a one-way `DataSource` snapshot — items are arbitrary objects rendered
 > through reflection-free selector delegates.
 

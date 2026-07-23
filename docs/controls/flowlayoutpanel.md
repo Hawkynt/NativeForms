@@ -1,6 +1,8 @@
 # FlowLayoutPanel
 
 > A [`Panel`](panel.md) that positions its own children: they flow in `Controls` order along
+
+![FlowLayoutPanel in the NativeForms demo](../screenshots/05-layout.png)
 > `FlowDirection`, each keeping its own `Size` and offset by its `Margin`, wrapping into a new row or
 > column at the client edge.
 

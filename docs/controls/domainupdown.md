@@ -2,6 +2,8 @@
 
 > A spinner over a list of strings: a hosted native [`TextBox`](textbox.md) shows the selected item, the themed spinner buttons and Up/Down keys walk through `Items` — wrapping around the ends when `Wrap` is on — and typing an item's text selects it at the next commit point.
 
+![DomainUpDown in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.DomainUpDown` · strategy: **owner-drawn** (spinner shell over a hosted native `TextBox`) · peer: `ICanvasPeer` + `ITextBoxPeer`
 
 ## Usage

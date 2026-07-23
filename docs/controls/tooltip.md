@@ -1,6 +1,8 @@
 # ToolTip
 
 > Per-control hover text: rest the pointer on a registered control and a small themed popup appears
+
+![ToolTip in the NativeForms demo](../screenshots/01-basics.png)
 > near the cursor after `InitialDelay`, hiding again on leave, press or `AutoPopDelay`.
 
 `Hawkynt.NativeForms.ToolTip` · strategy: **owner-drawn** (native theme) · component, no peer of its

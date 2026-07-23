@@ -2,6 +2,8 @@
 
 > A [`TextBox`](textbox.md) whose content is forced through an input mask — phone numbers, dates, license keys. The mask engine lives entirely in the core, so it behaves identically over every backend's plain native text widget.
 
+![MaskedTextBox in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.MaskedTextBox` · strategy: **native** (core mask engine over the `TextBox` widget) · peer: `ITextBoxPeer`
 
 ## Usage

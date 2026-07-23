@@ -2,6 +2,8 @@
 
 > A spinner for a `decimal` value: a hosted native [`TextBox`](textbox.md) shows the number formatted to `DecimalPlaces`, the themed spinner buttons and Up/Down keys step by `Increment`, and assignments clamp into [`Minimum`, `Maximum`].
 
+![NumericUpDown in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.NumericUpDown` · strategy: **owner-drawn** (spinner shell over a hosted native `TextBox`) · peer: `ICanvasPeer` + `ITextBoxPeer`
 
 ## Usage

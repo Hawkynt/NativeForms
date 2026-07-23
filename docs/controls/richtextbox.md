@@ -2,6 +2,8 @@
 
 > A rich-text editor: a [`TextBox`](textbox.md) (always multiline) whose selection can carry character styles, color and size, whose paragraphs can be aligned and bulleted, and whose whole document round-trips as RTF — backed by the platform's rich editor so editing, caret and clipboard behave natively.
 
+![RichTextBox in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.RichTextBox` · strategy: **native** (Win32 `RICHEDIT50W`, GTK tagged `GtkTextView`) · peer: `IRichTextBoxPeer`
 
 ## Usage

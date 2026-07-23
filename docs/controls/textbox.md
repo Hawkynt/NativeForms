@@ -2,6 +2,8 @@
 
 > A text input box backed by the platform's native editor — a Win32 `EDIT`, a `GtkEntry`/`GtkTextView` — so caret, selection, clipboard and IME behave exactly like every other text field on the user's desktop.
 
+![TextBox in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.TextBox` · strategy: **native** · peer: `ITextBoxPeer`
 
 ## Usage

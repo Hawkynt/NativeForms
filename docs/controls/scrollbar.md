@@ -2,6 +2,8 @@
 
 > Owner-drawn standalone scrollbars: themed arrows with press-and-hold autorepeat, a thumb sized proportionally to `LargeChange` over the range, channel-click paging and thumb-drag scrubbing — with the Win32 value-range semantics.
 
+![HScrollBar / VScrollBar in the NativeForms demo](../screenshots/02-input.png)
+
 `Hawkynt.NativeForms.HScrollBar` / `VScrollBar` (base: `ScrollBar`) · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

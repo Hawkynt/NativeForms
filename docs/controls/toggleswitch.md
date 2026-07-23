@@ -2,6 +2,8 @@
 
 > An owner-drawn on/off switch — the modern [`CheckBox`](checkbox.md) alternative: a pill-shaped track (accent-filled while on, border-grey while off) with a themed thumb that sits left for off and right for on, plus an optional caption beside it.
 
+![ToggleSwitch in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.ToggleSwitch` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

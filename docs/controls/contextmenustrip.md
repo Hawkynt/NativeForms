@@ -1,6 +1,8 @@
 # ContextMenuStrip
 
 > A context menu: the same item model and owner-drawn drop-down engine as a
+
+![ContextMenuStrip in the NativeForms demo](../screenshots/19-menus.png)
 > [`MenuStrip`](menustrip.md) drop-down, opened at an arbitrary screen point instead of below a bar.
 
 `Hawkynt.NativeForms.ContextMenuStrip` · strategy: **owner-drawn** (native theme) · component, no

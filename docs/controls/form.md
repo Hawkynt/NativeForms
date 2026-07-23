@@ -2,6 +2,8 @@
 
 > A top-level window backed by a real native window: `Text` is the title bar, `Bounds` the frame, children realize into the client area — plus window management (`StartPosition`, `FormBorderStyle`, `WindowState`, size limits, icon, `TopMost`, `Opacity`), modeless `Show`, and modal display via `ShowDialog`/`DialogResult`.
 
+![Form in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.Form` · strategy: **native** · peer: `IWindowPeer`
 
 ## Usage

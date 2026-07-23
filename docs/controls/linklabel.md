@@ -2,6 +2,8 @@
 
 > An owner-drawn hyperlink label: its whole text paints in the theme's accent color with an underline, shows the hand cursor and shifts subtly while hovered, and raises `LinkClicked` on a click inside the text or on Enter/Space when focused.
 
+![LinkLabel in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.LinkLabel` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

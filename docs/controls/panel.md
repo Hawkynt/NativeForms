@@ -2,6 +2,8 @@
 
 > A simple owner-drawn container that fills itself with the theme's control background and optionally draws a border — a grouping surface for other controls, with themed scrollbars when `AutoScroll` children overflow.
 
+![Panel in the NativeForms demo](../screenshots/05-layout.png)
+
 `Hawkynt.NativeForms.Panel` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

@@ -1,6 +1,8 @@
 # TreeView
 
 > An owner-drawn tree painted in the native theme: hierarchical `TreeNode`s with expand/collapse
+
+![TreeView in the NativeForms demo](../screenshots/03-lists.png)
 > glyphs, connector lines, per-node icons from an `ImageList`, optional check boxes, single selection
 > and a cancelable Before/After event pipeline — the expanded part of the tree is flattened into a
 > row list and painting is virtualized to the visible window.

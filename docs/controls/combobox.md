@@ -2,6 +2,8 @@
 
 > A drop-down selector: an owner-drawn field in the native theme whose list opens as a light-dismiss popup below the field, with rows painted by the same renderer as [`ListBox`](listbox.md) — icons, hover highlight, theme selection colors — so the drop-down is pixel-identical to a list.
 
+![ComboBox in the NativeForms demo](../screenshots/03-lists.png)
+
 `Hawkynt.NativeForms.ComboBox` · strategy: **owner-drawn** (native theme; the editable style hosts a native [`TextBox`](textbox.md)) · peer: `ICanvasPeer` + `IPopupPeer`
 
 ## Usage

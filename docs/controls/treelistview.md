@@ -1,6 +1,8 @@
 # TreeListView
 
 > An owner-drawn TreeView × ListView hybrid: the first column renders the expandable `TreeNode`
+
+![TreeListView in the NativeForms demo](../screenshots/03-lists.png)
 > hierarchy, the remaining columns render per-node text from reflection-free selectors under a
 > ListView-style header row. Selection is full-row; expand/collapse, checking and keyboard behave
 > exactly like [`TreeView`](treeview.md) — the two controls share the engine.

@@ -2,6 +2,8 @@
 
 > A push button backed by the platform's native button widget — it looks and behaves exactly like every other button on the user's desktop.
 
+![Button in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.Button` · strategy: **native** · peer: `IButtonPeer`
 
 ## Usage

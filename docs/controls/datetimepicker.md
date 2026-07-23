@@ -2,6 +2,8 @@
 
 > A date field in the ComboBox shape: a closed, owner-drawn field showing `Value` in an invariant format with a drop arrow, opening a light-dismiss popup that hosts the same month page as `MonthCalendar`.
 
+![DateTimePicker in the NativeForms demo](../screenshots/21-datetime.png)
+
 `Hawkynt.NativeForms.DateTimePicker` · strategy: **owner-drawn** (field + popup share the `CalendarCore` engine) · peer: `ICanvasPeer` + `IPopupPeer`
 
 ## Usage

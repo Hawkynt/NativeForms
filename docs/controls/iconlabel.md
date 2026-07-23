@@ -2,6 +2,8 @@
 
 > A caption that renders an image **and** text together, owner-drawn in the platform theme — the pairing the native [`Label`](label.md) widget cannot do.
 
+![IconLabel in the NativeForms demo](../screenshots/20-toolbars.png)
+
 `Hawkynt.NativeForms.IconLabel` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

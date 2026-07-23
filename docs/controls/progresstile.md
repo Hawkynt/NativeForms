@@ -2,6 +2,8 @@
 
 > An Explorer-style tile: an icon, a primary caption, an optional secondary caption and a themed usage bar that turns a warning colour once it is nearly full — the shape a file manager uses to show how full a drive is.
 
+![ProgressTile in the NativeForms demo](../screenshots/07-pickers.png)
+
 `Hawkynt.NativeForms.ProgressTile` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

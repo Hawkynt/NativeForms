@@ -1,6 +1,8 @@
 # Ribbon
 
 > An Office-style ribbon: tabs across the top, each showing its groups side by side — every group a
+
+![Ribbon in the NativeForms demo](../screenshots/08-ribbon.png)
 > framed box with its caption along the bottom edge. Items come large (big icon over the caption,
 > full group height) or small (three stacked per column). Groups that no longer fit collapse into a
 > drop-down button; `Minimized` collapses the ribbon onto its tab strip and a tab click then floats

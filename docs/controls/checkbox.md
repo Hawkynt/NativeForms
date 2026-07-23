@@ -2,6 +2,8 @@
 
 > An owner-drawn check box painted in the native theme — themed box, accent checkmark, themed text — that toggles on click or Space.
 
+![CheckBox in the NativeForms demo](../screenshots/01-basics.png)
+
 `Hawkynt.NativeForms.CheckBox` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
 ## Usage

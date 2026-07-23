@@ -1,6 +1,8 @@
 # ListView
 
 > An owner-drawn list view painted in the native theme, covering the full view family — `Details`
+
+![ListView in the NativeForms demo](../screenshots/03-lists.png)
 > (multi-column grid with a header row), `List`, `LargeIcon`, `SmallIcon` and `Tile` — with groups
 > flattened into header rows, vetoable check boxes, extended Ctrl/Shift multi-selection, in-place
 > sorting, label editing through a hosted native text box, and painting virtualized to the visible
