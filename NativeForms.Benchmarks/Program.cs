@@ -118,6 +118,15 @@ internal static class Program
         BindLargeGrid(10_000);
         BindLargeGrid(50_000);
 
+        // Complex controls populated to thousands of items — building must stay linear.
+        BuildTree(5000);
+        ExpandBigNode(5000);
+        BuildListView(5000);
+        BuildTreeList(5000);
+        BuildCalendar(5000);
+        BuildAccordion(1000, budgetMs: 15); // ~3.6 ms linear; ~42 ms if it went quadratic
+        BuildDockPanel(1000, budgetMs: 15); // ~4 ms linear; ~26 ms if it went quadratic
+
         PrintTable();
 
         if (_failures.Count == 0)
@@ -334,6 +343,102 @@ internal static class Program
 
         var ms = watch.Elapsed.TotalMilliseconds;
         Emit($"scale.bindGrid{rows}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {rows} rows)");
+    }
+
+    private static void BuildTree(int n)
+    {
+        { var w = new TreeView(); for (var i = 0; i < 64; ++i) w.Nodes.Add("N"); } // warm-up
+
+        var watch = Stopwatch.StartNew();
+        var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
+        for (var i = 0; i < n; ++i)
+            tree.Nodes.Add("Node " + i);
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.buildTree{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} tree nodes)");
+    }
+
+    private static void ExpandBigNode(int n)
+    {
+        var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
+        var root = tree.Nodes.Add("Root");
+        for (var i = 0; i < n; ++i)
+            root.Nodes.Add("Child " + i);
+        Application.Run(new Form { Bounds = new(0, 0, 360, 480), Controls = { tree } }, new BenchBackend());
+
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < 200; ++i)
+            root.Toggle();
+        watch.Stop();
+
+        var us = watch.Elapsed.TotalMicroseconds / 200;
+        Emit($"scale.expandTree{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   (toggle a {n}-child node)");
+    }
+
+    private static void BuildListView(int n)
+    {
+        var watch = Stopwatch.StartNew();
+        var list = new ListView { Bounds = new(0, 0, 480, 440) };
+        list.Columns.Add(new ColumnHeader("Name", 240));
+        for (var i = 0; i < n; ++i)
+            list.Items.Add(new ListViewItem("Row " + i));
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.buildListView{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} list items)");
+    }
+
+    private static void BuildTreeList(int n)
+    {
+        var watch = Stopwatch.StartNew();
+        var tree = new TreeListView { Bounds = new(0, 0, 480, 440) };
+        for (var i = 0; i < n; ++i)
+            tree.Nodes.Add("Row " + i);
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.buildTreeList{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} tree-list rows)");
+    }
+
+    private static void BuildCalendar(int n)
+    {
+        MakeCalendarView(CalendarViewMode.Week, 64); // warm-up
+
+        var watch = Stopwatch.StartNew();
+        MakeCalendarView(CalendarViewMode.Week, n);
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.buildCalendar{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {n} appointments)");
+    }
+
+    private static void BuildAccordion(int n, double budgetMs = double.MaxValue)
+    {
+        var watch = Stopwatch.StartNew();
+        var accordion = new Accordion { Bounds = new(0, 0, 300, 600) };
+        for (var i = 0; i < n; ++i)
+            accordion.Panes.Add(new AccordionPane("Pane " + i));
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.buildAccordion{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} accordion panes)");
+        if (ms > budgetMs)
+            _failures.Add($"scale.buildAccordion{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
+    }
+
+    private static void BuildDockPanel(int n, double budgetMs = double.MaxValue)
+    {
+        var watch = Stopwatch.StartNew();
+        var dock = new DockPanel { Bounds = new(0, 0, 900, 600) };
+        for (var i = 0; i < n; ++i)
+            dock.AddDocument(new DockContent("Doc " + i));
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.buildDockPanel{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} dock documents)");
+        if (ms > budgetMs)
+            _failures.Add($"scale.buildDockPanel{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
     }
 
     private static Form MakeHundredControlForm()
