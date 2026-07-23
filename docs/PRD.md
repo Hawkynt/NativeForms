@@ -584,6 +584,10 @@ strategy (may differ per platform; note exceptions inline).
       `WarningThreshold`; `Clickable` gates focus/hover/`Click`, `Selected` paints the selection face.
       Named for its shape, not for drives: Core is platform-agnostic and the paint path may not touch
       the filesystem, so both captions are caller-supplied strings and nothing is `DriveInfo`-bound
+- [x] `Breadcrumb` (owner) — Explorer navigation bar: `BreadcrumbItem` segments (`Text`, `Tag`,
+      `ImageIndex`/`ImageKey`) laid left to right, chevron separators, hover-highlit and clickable.
+      `TrimOnClick` trims the path to a clicked segment (navigate-up) before `ItemClicked`; when the
+      segments outgrow the width the leading ones fold behind a "…" chip, the last segment always kept
 
 ---
 
@@ -744,6 +748,7 @@ same commit. `—` = not applicable.
 | `HScrollBar` / `VScrollBar` | ✔ | ✔ | [controls/scrollbar.md](controls/scrollbar.md) |
 | `ProgressBar` (incl. marquee) | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
 | `ProgressTile` (Explorer-style drive tile) | ✔ | ✔ | [controls/progresstile.md](controls/progresstile.md) |
+| `Breadcrumb` (Explorer navigation bar) | ✔ | ✔ | [controls/breadcrumb.md](controls/breadcrumb.md) |
 | `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
 | `MonthCalendar` (title drill-down) | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
 | `CalendarView` (Day/WorkWeek/Week/Month scheduler) | ✔ | ✔ | [controls/calendarview.md](controls/calendarview.md) |

@@ -66,6 +66,10 @@ internal sealed partial class MainForm
         folderPicker.PathChanged += (_, _) => this.SetStatus($"FolderPicker: {folderPicker.SelectedPath}");
         _toolTip.SetToolTip(folderPicker, "Type a path and press Enter, or browse with the … button.");
 
+        var breadcrumb = new Breadcrumb { Bounds = new(16, 368, 320, 26) };
+        breadcrumb.Items.AddRange("Computer", "Documents", "Projects", "NativeForms", "docs");
+        breadcrumb.ItemClicked += (_, e) => this.SetStatus($"Breadcrumb: navigated to \"{e.Item.Text}\".");
+
         page.Controls.AddRange(
             Caption("FilePicker (open, filtered)", 16, 12),
             openPicker,
@@ -76,7 +80,9 @@ internal sealed partial class MainForm
             Caption("FilePicker (a path that does not exist)", 16, 208),
             brokenPicker, brokenNote,
             Caption("FolderPicker", 16, 292),
-            folderPicker);
+            folderPicker,
+            Caption("Breadcrumb (click a segment to navigate up)", 16, 344, 320),
+            breadcrumb);
 
         // --- Column 2: icon labels ---------------------------------------------------------------
 
