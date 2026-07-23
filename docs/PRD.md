@@ -343,8 +343,8 @@ strategy (may differ per platform; note exceptions inline).
   - [~] `ITextBoxPeer.KeyDown` seam exists (Win32 EDIT subclass, GTK pre-connected
         `key-press-event`, headless fake) — wired for `SearchBox` and now for
         `NumericUpDown`/`DomainUpDown` (Enter commits the pending edit, Up/Down step from inside the
-        editor). `AcceptsReturn`/`AcceptsTab`, grid-editor Enter/Escape, word-wrap control and the
-        undo API are still pending.
+        editor). Grid-editor Enter/Escape, word-wrap control and the undo API are still pending
+        (`AcceptsReturn`/`AcceptsTab` are done — see §7.1).
 - [x] `MaskedTextBox` (core mask engine over the native TextBox: 0/9/L/?/A/a/&/C + literals +
       escapes, `PromptChar`, transactional whole-text validation with revert, `MaskCompleted`,
       `MaskedTextChanged`, raw-text extraction; whole-text transitions documented — no per-key
@@ -799,6 +799,7 @@ same commit. `—` = not applicable.
 | `CalendarView` (Day/WorkWeek/Week/Month scheduler) | ✔ | ✔ | [controls/calendarview.md](controls/calendarview.md) |
 | `TimePicker` (double-click analog clock) | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
 | `ClockFace` (analog dial, stand-alone or popup) | ✔ | ✔ | [controls/clockface.md](controls/clockface.md) |
+| `ColorPicker` (swatch + 40-colour palette drop-down) | ✔ | ✔ | [controls/colorpicker.md](controls/colorpicker.md) |
 | `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
 | `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
 | `GroupBox` (caption image, nesting) | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |

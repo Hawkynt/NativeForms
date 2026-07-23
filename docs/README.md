@@ -41,63 +41,64 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 
 | Control | Strategy | Page |
 |---|---|---|
+| `Accordion` / `AccordionPane` | owner-drawn | [accordion.md](controls/accordion.md) |
 | `Application` + `BackendRegistry` | — | [application.md](controls/application.md) |
-| `Control` (base class) | — | [control.md](controls/control.md) |
-| `Form` (incl. modal + window management) | native | [form.md](controls/form.md) |
+| `Breadcrumb` | owner-drawn | [breadcrumb.md](controls/breadcrumb.md) |
 | `Button` | native | [button.md](controls/button.md) |
+| `CalendarView` | owner-drawn | [calendarview.md](controls/calendarview.md) |
+| `CheckBox` | owner-drawn | [checkbox.md](controls/checkbox.md) |
+| `CheckedListBox` | owner-drawn | [checkedlistbox.md](controls/checkedlistbox.md) |
+| `ClockFace` | owner-drawn + popup dial | [clockface.md](controls/clockface.md) |
+| `ColorPicker` | owner-drawn | [colorpicker.md](controls/colorpicker.md) |
+| `ComboBox` | owner-drawn + popup | [combobox.md](controls/combobox.md) |
+| `ContextMenuStrip` | owner-drawn (popup engine) | [contextmenustrip.md](controls/contextmenustrip.md) |
+| `Control` (base class) | — | [control.md](controls/control.md) |
+| `DataGridView` | owner-drawn | [datagridview.md](controls/datagridview.md) |
+| `DateTimePicker` | owner-drawn + popup calendar | [datetimepicker.md](controls/datetimepicker.md) |
+| `DockPanel` / `DockContent` | owner-drawn + windows | [dockpanel.md](controls/dockpanel.md) |
+| `DomainUpDown` | owner-drawn + hosted editor | [domainupdown.md](controls/domainupdown.md) |
+| `Expander` | owner-drawn | [expander.md](controls/expander.md) |
+| `FilePicker` | owner-drawn + hosted editor | [filepicker.md](controls/filepicker.md) |
+| `FlowLayoutPanel` | owner-drawn layout | [flowlayoutpanel.md](controls/flowlayoutpanel.md) |
+| `FolderPicker` | owner-drawn + hosted editor | [folderpicker.md](controls/folderpicker.md) |
+| `Form` (incl. modal + window management) | native | [form.md](controls/form.md) |
+| `GridPicker` (Office table-size chooser) | owner-drawn | [gridpicker.md](controls/gridpicker.md) |
+| `GroupBox` | owner-drawn | [groupbox.md](controls/groupbox.md) |
+| `HScrollBar` / `VScrollBar` | owner-drawn | [scrollbar.md](controls/scrollbar.md) |
+| `IconLabel` | owner-drawn | [iconlabel.md](controls/iconlabel.md) |
+| `ImageList` | — | [imagelist.md](controls/imagelist.md) |
 | `Label` | native | [label.md](controls/label.md) |
 | `LinkLabel` | owner-drawn | [linklabel.md](controls/linklabel.md) |
-| `ColorPicker` | owner-drawn | [colorpicker.md](controls/colorpicker.md) |
-| `Breadcrumb` | owner-drawn | [breadcrumb.md](controls/breadcrumb.md) |
-| `TextBox` | native | [textbox.md](controls/textbox.md) |
+| `ListBox` | owner-drawn | [listbox.md](controls/listbox.md) |
+| `ListView` | owner-drawn | [listview.md](controls/listview.md) |
 | `MaskedTextBox` | native + core mask engine | [maskedtextbox.md](controls/maskedtextbox.md) |
-| `RichTextBox` | native | [richtextbox.md](controls/richtextbox.md) |
-| `SearchBox` | owner-drawn + hosted editor | [searchbox.md](controls/searchbox.md) |
-| `FilePicker` | owner-drawn + hosted editor | [filepicker.md](controls/filepicker.md) |
-| `FolderPicker` | owner-drawn + hosted editor | [folderpicker.md](controls/folderpicker.md) |
-| `IconLabel` | owner-drawn | [iconlabel.md](controls/iconlabel.md) |
-| `CheckBox` | owner-drawn | [checkbox.md](controls/checkbox.md) |
-| `RadioButton` | owner-drawn | [radiobutton.md](controls/radiobutton.md) |
-| `ToggleSwitch` | owner-drawn | [toggleswitch.md](controls/toggleswitch.md) |
-| `SplitButton` / `DropDownButton` | owner-drawn | [splitbutton.md](controls/splitbutton.md) |
+| `MenuStrip` + menu items | owner-drawn (popup engine) | [menustrip.md](controls/menustrip.md) |
+| `MessageBox` + common dialogs | native | [dialogs.md](controls/dialogs.md) |
+| `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
+| `NotifyIcon` | native (Windows) | [notifyicon.md](controls/notifyicon.md) |
 | `NumericUpDown` | owner-drawn + hosted editor | [numericupdown.md](controls/numericupdown.md) |
-| `DomainUpDown` | owner-drawn + hosted editor | [domainupdown.md](controls/domainupdown.md) |
-| `TrackBar` | owner-drawn | [trackbar.md](controls/trackbar.md) |
-| `HScrollBar` / `VScrollBar` | owner-drawn | [scrollbar.md](controls/scrollbar.md) |
+| `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
+| `PictureBox` | owner-drawn | [picturebox.md](controls/picturebox.md) |
 | `ProgressBar` | owner-drawn | [progressbar.md](controls/progressbar.md) |
 | `ProgressTile` | owner-drawn | [progresstile.md](controls/progresstile.md) |
-| `DateTimePicker` | owner-drawn + popup calendar | [datetimepicker.md](controls/datetimepicker.md) |
-| `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
-| `CalendarView` | owner-drawn | [calendarview.md](controls/calendarview.md) |
-| `TimePicker` | owner-drawn + popup clock | [timepicker.md](controls/timepicker.md) |
-| `ClockFace` | owner-drawn + popup dial | [clockface.md](controls/clockface.md) |
-| `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
-| `GroupBox` | owner-drawn | [groupbox.md](controls/groupbox.md) |
-| `TabControl` / `TabPage` | owner-drawn | [tabcontrol.md](controls/tabcontrol.md) |
-| `SplitContainer` | owner-drawn | [splitcontainer.md](controls/splitcontainer.md) |
-| `Expander` | owner-drawn | [expander.md](controls/expander.md) |
-| `Accordion` / `AccordionPane` | owner-drawn | [accordion.md](controls/accordion.md) |
+| `RadioButton` | owner-drawn | [radiobutton.md](controls/radiobutton.md) |
 | `Ribbon` (tabs, groups, items) | owner-drawn + popup | [ribbon.md](controls/ribbon.md) |
-| `DockPanel` / `DockContent` | owner-drawn + windows | [dockpanel.md](controls/dockpanel.md) |
-| `FlowLayoutPanel` | owner-drawn layout | [flowlayoutpanel.md](controls/flowlayoutpanel.md) |
-| `TableLayoutPanel` | owner-drawn layout | [tablelayoutpanel.md](controls/tablelayoutpanel.md) |
-| `ListBox` | owner-drawn | [listbox.md](controls/listbox.md) |
-| `CheckedListBox` | owner-drawn | [checkedlistbox.md](controls/checkedlistbox.md) |
-| `ComboBox` | owner-drawn + popup | [combobox.md](controls/combobox.md) |
-| `ListView` | owner-drawn | [listview.md](controls/listview.md) |
-| `TreeView` | owner-drawn | [treeview.md](controls/treeview.md) |
-| `TreeListView` | owner-drawn | [treelistview.md](controls/treelistview.md) |
-| `DataGridView` | owner-drawn | [datagridview.md](controls/datagridview.md) |
-| `PictureBox` | owner-drawn | [picturebox.md](controls/picturebox.md) |
-| `ImageList` | — | [imagelist.md](controls/imagelist.md) |
-| `Timer` | — | [timer.md](controls/timer.md) |
-| `MenuStrip` + menu items | owner-drawn (popup engine) | [menustrip.md](controls/menustrip.md) |
-| `ContextMenuStrip` | owner-drawn (popup engine) | [contextmenustrip.md](controls/contextmenustrip.md) |
-| `ToolStrip` | owner-drawn | [toolstrip.md](controls/toolstrip.md) |
+| `RichTextBox` | native | [richtextbox.md](controls/richtextbox.md) |
+| `SearchBox` | owner-drawn + hosted editor | [searchbox.md](controls/searchbox.md) |
+| `SplitButton` / `DropDownButton` | owner-drawn | [splitbutton.md](controls/splitbutton.md) |
+| `SplitContainer` | owner-drawn | [splitcontainer.md](controls/splitcontainer.md) |
 | `StatusStrip` | owner-drawn | [statusstrip.md](controls/statusstrip.md) |
+| `TabControl` / `TabPage` | owner-drawn | [tabcontrol.md](controls/tabcontrol.md) |
+| `TableLayoutPanel` | owner-drawn layout | [tablelayoutpanel.md](controls/tablelayoutpanel.md) |
+| `TextBox` | native | [textbox.md](controls/textbox.md) |
+| `TimePicker` | owner-drawn + popup clock | [timepicker.md](controls/timepicker.md) |
+| `Timer` | — | [timer.md](controls/timer.md) |
+| `ToggleSwitch` | owner-drawn | [toggleswitch.md](controls/toggleswitch.md) |
+| `ToolStrip` | owner-drawn | [toolstrip.md](controls/toolstrip.md) |
 | `ToolTip` | owner-drawn (popup) | [tooltip.md](controls/tooltip.md) |
-| `NotifyIcon` | native (Windows) | [notifyicon.md](controls/notifyicon.md) |
-| `MessageBox` + common dialogs | native | [dialogs.md](controls/dialogs.md) |
+| `TrackBar` | owner-drawn | [trackbar.md](controls/trackbar.md) |
+| `TreeListView` | owner-drawn | [treelistview.md](controls/treelistview.md) |
+| `TreeView` | owner-drawn | [treeview.md](controls/treeview.md) |
 
 Controls not listed here are not shipped yet — the full planned inventory, with per-control
 acceptance criteria and milestones, lives in the [PRD](PRD.md) (§7 and §10). A page is added here
