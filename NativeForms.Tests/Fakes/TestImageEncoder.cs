@@ -105,12 +105,16 @@ internal static class TestImageEncoder
     }
 
     /// <summary>Builds an ICO container around pre-encoded entries (PNG bytes or classic BMP blocks).</summary>
-    public static byte[] EncodeIco(params (int Width, int Height, byte[] Data)[] entries) => EncodeIconContainer(1, entries);
+    public static byte[] EncodeIco(params (int Width, int Height, byte[] Data)[] entries) => EncodeIconContainer(1, 1, 32, entries);
 
-    /// <summary>Builds a CUR container (directory type 2) around pre-encoded BMP entries.</summary>
-    public static byte[] EncodeCur(params (int Width, int Height, byte[] Data)[] entries) => EncodeIconContainer(2, entries);
+    /// <summary>Builds a CUR container (directory type 2), hotspot at the top-left.</summary>
+    public static byte[] EncodeCur(params (int Width, int Height, byte[] Data)[] entries) => EncodeIconContainer(2, 0, 0, entries);
 
-    private static byte[] EncodeIconContainer(ushort type, (int Width, int Height, byte[] Data)[] entries)
+    /// <summary>Builds a CUR container with an explicit hotspot (stored in the planes/bitcount fields).</summary>
+    public static byte[] EncodeCurWithHotspot(int hotspotX, int hotspotY, params (int Width, int Height, byte[] Data)[] entries)
+        => EncodeIconContainer(2, (ushort)hotspotX, (ushort)hotspotY, entries);
+
+    private static byte[] EncodeIconContainer(ushort type, ushort field1, ushort field2, (int Width, int Height, byte[] Data)[] entries)
     {
         using var output = new MemoryStream();
         Span<byte> word = stackalloc byte[4];
@@ -123,7 +127,12 @@ internal static class TestImageEncoder
         {
             output.WriteByte((byte)(width == 256 ? 0 : width));
             output.WriteByte((byte)(height == 256 ? 0 : height));
-            output.Write([0, 0, 1, 0, 32, 0]); // colors, reserved, planes 1, bpp 32 (advisory)
+            output.WriteByte(0); // colour count
+            output.WriteByte(0); // reserved
+            BinaryPrimitives.WriteUInt16LittleEndian(word, field1); // planes (ICO) or hotspot X (CUR)
+            output.Write(word[..2]);
+            BinaryPrimitives.WriteUInt16LittleEndian(word, field2); // bit count (ICO) or hotspot Y (CUR)
+            output.Write(word[..2]);
             BinaryPrimitives.WriteInt32LittleEndian(word, data.Length);
             output.Write(word);
             BinaryPrimitives.WriteInt32LittleEndian(word, offset);

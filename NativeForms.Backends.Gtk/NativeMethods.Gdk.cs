@@ -93,6 +93,11 @@ internal static partial class NativeMethods
     [LibraryImport(Gdk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint gdk_cursor_new_from_name(nint display, string name);
 
+    /// <summary>Creates a cursor from a pixbuf with the hotspot at (<paramref name="x"/>,
+    /// <paramref name="y"/>). The returned reference is owned by the caller.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_cursor_new_from_pixbuf(nint display, nint pixbuf, int x, int y);
+
     /// <summary>Sets (or, with 0, clears) the cursor shown while the pointer is over a <c>GdkWindow</c>.</summary>
     [LibraryImport(Gdk)]
     internal static partial void gdk_window_set_cursor(nint window, nint cursor);

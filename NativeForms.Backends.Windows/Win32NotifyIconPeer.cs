@@ -175,6 +175,37 @@ internal sealed unsafe class Win32NotifyIconPeer : INotifyIconPeer
         }
     }
 
+    /// <summary>Builds an <c>HCURSOR</c> from ARGB pixels and a hotspot — the same bitmaps as
+    /// <see cref="CreateIcon"/> but with <c>fIcon = 0</c> and the hotspot set.</summary>
+    internal static nint CreateCursor(int width, int height, ReadOnlySpan<int> argb, int hotspotX, int hotspotY)
+    {
+        using var color = new Win32Image(width, height, argb);
+        if (color.Handle == 0)
+            return 0;
+
+        var mask = NativeMethods.CreateBitmap(width, height, 1, 1, 0);
+        if (mask == 0)
+            return 0;
+
+        try
+        {
+            var info = new NativeMethods.ICONINFO
+            {
+                fIcon = 0, // a cursor, not an icon
+                xHotspot = (uint)hotspotX,
+                yHotspot = (uint)hotspotY,
+                hbmMask = mask,
+                hbmColor = color.Handle,
+            };
+
+            return NativeMethods.CreateIconIndirect(in info);
+        }
+        finally
+        {
+            NativeMethods.DeleteObject(mask);
+        }
+    }
+
     /// <summary>Registers the shared message-window class exactly once for the lifetime of the process.</summary>
     private static void EnsureClassRegistered()
     {

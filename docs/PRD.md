@@ -223,7 +223,9 @@ strategy (may differ per platform; note exceptions inline).
       `GTK_WINDOW_POPUP` + seat/GTK grabs; `ShowAt`/`Hide`/`Dismissed`; `Control.PointToScreen`)
       — hosts ComboBox drop-downs, menus, tooltips, calendar fly-outs
 - [x] `Component`/`IContainer` designer-free model (Timer/ToolTip/NotifyIcon/ContextMenuStrip are components; `Container` disposes in reverse order)
-- [x] `Cursor`/`Cursors` + ambient `Control.Cursor` (WM_SETCURSOR / gdk named cursors; LinkLabel hand)
+- [x] `Cursor`/`Cursors` + ambient `Control.Cursor` (WM_SETCURSOR / gdk named cursors; LinkLabel hand);
+      `Cursor.FromBytes` builds a custom bitmap pointer from a `.cur` (hotspot honoured), an `.ani`
+      (first frame) or any still image, realized natively (`gdk_cursor_new_from_pixbuf` / `CreateIconIndirect`)
 - [x] Focus model — `Focus()`/`Focused`/`CanFocus`, `TabIndex`/`TabStop` (defaults follow the
       control kind), WinForms event order (Enter→GotFocus / LostFocus→Leave with container-chain
       crossing), `Form.ActiveControl` + initial focus, Tab/Shift+Tab navigation through nested

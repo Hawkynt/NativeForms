@@ -412,8 +412,23 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
         if (cursor is null)
             return false;
 
-        NativeMethods.SetCursor(NativeMethods.LoadCursorW(0, ToCursorResource(cursor.Kind)));
+        NativeMethods.SetCursor(cursor.Kind == CursorKind.Custom
+            ? CustomCursorHandle(cursor)
+            : NativeMethods.LoadCursorW(0, ToCursorResource(cursor.Kind)));
         return true;
+    }
+
+    /// <summary>The cached <c>HCURSOR</c> for a custom bitmap cursor, built once per <see cref="Cursor"/>.</summary>
+    private static readonly Dictionary<Cursor, nint> _customCursors = [];
+
+    private static nint CustomCursorHandle(Cursor cursor)
+    {
+        if (_customCursors.TryGetValue(cursor, out var handle))
+            return handle;
+
+        handle = cursor.Pixels is { } pixels ? Win32NotifyIconPeer.CreateCursor(cursor.Width, cursor.Height, pixels, cursor.HotspotX, cursor.HotspotY) : 0;
+        _customCursors[cursor] = handle;
+        return handle;
     }
 
     /// <summary>Routes a <c>WM_NOTIFY</c> notification to the child identified by its control id.</summary>

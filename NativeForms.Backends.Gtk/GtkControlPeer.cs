@@ -373,7 +373,51 @@ internal abstract class GtkControlPeer : IControlPeer
             return;
         }
 
-        NativeMethods.gdk_window_set_cursor(window, CursorFor(NativeMethods.gtk_widget_get_display(_widget), cursor.Kind));
+        var display = NativeMethods.gtk_widget_get_display(_widget);
+        if (cursor.Kind == CursorKind.Custom && cursor.Pixels is { } pixels)
+        {
+            var custom = CreateCustomCursor(display, pixels, cursor.Width, cursor.Height, cursor.HotspotX, cursor.HotspotY);
+            NativeMethods.gdk_window_set_cursor(window, custom); // the window keeps its own reference
+            if (custom != 0)
+                NativeMethods.g_object_unref(custom);
+
+            return;
+        }
+
+        NativeMethods.gdk_window_set_cursor(window, CursorFor(display, cursor.Kind));
+    }
+
+    /// <summary>Builds a native <c>GdkCursor</c> from ARGB pixels and a hotspot, via a temporary RGBA pixbuf.</summary>
+    private static nint CreateCustomCursor(nint display, int[] argb, int width, int height, int hotspotX, int hotspotY)
+    {
+        if (width <= 0 || height <= 0 || display == 0)
+            return 0;
+
+        var pixbuf = NativeMethods.gdk_pixbuf_new(NativeMethods.GDK_COLORSPACE_RGB, 1, 8, width, height);
+        if (pixbuf == 0)
+            return 0;
+
+        unsafe
+        {
+            var stride = NativeMethods.gdk_pixbuf_get_rowstride(pixbuf);
+            var pixels = (byte*)NativeMethods.gdk_pixbuf_get_pixels(pixbuf);
+            for (var y = 0; y < height; ++y)
+            {
+                var row = pixels + (y * stride);
+                for (var x = 0; x < width; ++x)
+                {
+                    var source = unchecked((uint)argb[(y * width) + x]);
+                    row[x * 4] = (byte)((source >> 16) & 0xFF);
+                    row[(x * 4) + 1] = (byte)((source >> 8) & 0xFF);
+                    row[(x * 4) + 2] = (byte)(source & 0xFF);
+                    row[(x * 4) + 3] = (byte)(source >> 24);
+                }
+            }
+        }
+
+        var cursor = NativeMethods.gdk_cursor_new_from_pixbuf(display, pixbuf, hotspotX, hotspotY);
+        NativeMethods.g_object_unref(pixbuf);
+        return cursor;
     }
 
     /// <summary>Connects the "realize" signal once so late GDK-window state (the cursor) is applied on show.</summary>

@@ -206,7 +206,7 @@ public static class ImageDecoder
             || BinaryPrimitives.ReadUInt16LittleEndian(data[2..]) != 1)
             throw new FormatException("Not an ICO: the header is missing or not an icon container.");
 
-        return DecodeIconDirectory(data, preferredSize);
+        return DecodeIconDirectory(data, preferredSize, out _, out _);
     }
 
     /// <summary>
@@ -222,12 +222,68 @@ public static class ImageDecoder
             || BinaryPrimitives.ReadUInt16LittleEndian(data[2..]) != 2)
             throw new FormatException("Not a CUR: the header is missing or not a cursor container.");
 
-        return DecodeIconDirectory(data, preferredSize);
+        return DecodeIconDirectory(data, preferredSize, out _, out _);
     }
 
-    /// <summary>Picks the best-matching entry from an ICO/CUR directory and decodes its pixels.</summary>
-    private static (int Width, int Height, int[] Argb) DecodeIconDirectory(ReadOnlySpan<byte> data, int preferredSize)
+    /// <summary>
+    /// Decodes bytes into a pointer image: an ICO/CUR (the CUR's hotspot comes back), an ANI (its first
+    /// frame), or any still image (hotspot 0,0). The hotspot is the pixel the click aligns to.
+    /// </summary>
+    /// <exception cref="FormatException">The bytes are not a recognized image.</exception>
+    public static (int Width, int Height, int[] Argb, int HotspotX, int HotspotY) DecodeCursor(ReadOnlySpan<byte> data)
     {
+        if (data.Length >= 12 && Tag(data[..4], "RIFF") && Tag(data[8..12], "ACON"))
+            return DecodeCursor(FirstAniIcon(data));
+
+        if (data.Length >= 4 && BinaryPrimitives.ReadUInt16LittleEndian(data) == 0)
+        {
+            var kind = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+            if (kind is 1 or 2)
+            {
+                var (width, height, argb) = DecodeIconDirectory(data, 0, out var hotspotX, out var hotspotY);
+                return kind == 2 ? (width, height, argb, hotspotX, hotspotY) : (width, height, argb, 0, 0);
+            }
+        }
+
+        var image = Decode(data);
+        return (image.Width, image.Height, image.Frames[0].Argb, 0, 0);
+    }
+
+    /// <summary>The bytes of the first icon frame of an ANI, for use as a static cursor.</summary>
+    private static byte[] FirstAniIcon(ReadOnlySpan<byte> data)
+    {
+        var pos = 12;
+        while (pos + 8 <= data.Length)
+        {
+            var id = data.Slice(pos, 4);
+            var size = BinaryPrimitives.ReadInt32LittleEndian(data[(pos + 4)..]);
+            pos += 8;
+            if (size < 0 || pos + size > data.Length)
+                break;
+
+            if (Tag(id, "LIST") && size >= 4 && Tag(data.Slice(pos, 4), "fram"))
+            {
+                var inner = pos + 4;
+                if (inner + 8 <= pos + size)
+                {
+                    var innerSize = BinaryPrimitives.ReadInt32LittleEndian(data[(inner + 4)..]);
+                    if (innerSize > 0 && inner + 8 + innerSize <= data.Length)
+                        return data.Slice(inner + 8, innerSize).ToArray();
+                }
+            }
+
+            pos += size + (size & 1);
+        }
+
+        throw new FormatException("Not an ANI: no icon frame was found.");
+    }
+
+    /// <summary>Picks the best-matching entry from an ICO/CUR directory and decodes its pixels; the
+    /// entry's hotspot (meaningful only for a CUR) comes back through the out parameters.</summary>
+    private static (int Width, int Height, int[] Argb) DecodeIconDirectory(ReadOnlySpan<byte> data, int preferredSize, out int hotspotX, out int hotspotY)
+    {
+        hotspotX = 0;
+        hotspotY = 0;
         int count = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
         if (count == 0 || data.Length < 6 + (count * 16))
             throw new FormatException("Not an ICO: the entry directory is empty or truncated.");
@@ -255,6 +311,8 @@ public static class ImageDecoder
         }
 
         var record = 6 + (bestIndex * 16);
+        hotspotX = BinaryPrimitives.ReadUInt16LittleEndian(data[(record + 4)..]); // CUR: wPlanes field holds hotspot X
+        hotspotY = BinaryPrimitives.ReadUInt16LittleEndian(data[(record + 6)..]); // CUR: wBitCount field holds hotspot Y
         var byteCount = BinaryPrimitives.ReadInt32LittleEndian(data[(record + 8)..]);
         var byteOffset = BinaryPrimitives.ReadInt32LittleEndian(data[(record + 12)..]);
         if (byteCount <= 0 || byteOffset <= 0 || (long)byteOffset + byteCount > data.Length)
