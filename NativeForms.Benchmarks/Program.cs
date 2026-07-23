@@ -106,6 +106,18 @@ internal static class Program
         ScrollTraversal("TreeView", MakeTreeView(_TraversalRows), key: null);
         ScrollTraversal("CalendarView", MakeCalendarView(CalendarViewMode.Week, _TraversalRows), Keys.PageDown);
 
+        // Scale: thousands of controls / children / rows — the "does it stay linear" story. Reported
+        // in pairs so a super-linear (quadratic) cost shows as a >2x jump for a 2x input.
+        BuildForm(1000, loop: true);
+        BuildForm(2000, loop: true, budgetMs: 8);   // ~0.5 ms linear; ~46 ms if it went quadratic
+        BuildForm(2000, loop: false, budgetMs: 8);  // AddRange, same gate
+        RealizeManyControlForm(2000);
+        ResizeManyControlForm(2000);
+        ScrollManyChildPanel(1000);
+        ScrollManyChildPanel(2000, budgetUs: 4000); // ~0.3 ms linear; ~16 ms if it went quadratic
+        BindLargeGrid(10_000);
+        BindLargeGrid(50_000);
+
         PrintTable();
 
         if (_failures.Count == 0)
@@ -214,6 +226,114 @@ internal static class Program
 
         var micros = watch.Elapsed.TotalMicroseconds;
         Emit("realize.form100", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
+    }
+
+    // ---- Metric: scale (thousands of controls / children / rows) ----
+
+    /// <summary>A form of <paramref name="n"/> absolutely-positioned labels, built by a Controls.Add
+    /// loop or one AddRange — the pattern that turns quadratic if every add re-lays the whole form.</summary>
+    private static Form BuildManyControlForm(int n, bool loop)
+    {
+        var form = new Form { Bounds = new(0, 0, 900, 700) };
+        if (loop)
+        {
+            for (var i = 0; i < n; ++i)
+                form.Controls.Add(new Label { Text = "L", Bounds = new((i % 8) * 110, (i / 8) * 20, 100, 18) });
+        }
+        else
+        {
+            var many = new Control[n];
+            for (var i = 0; i < n; ++i)
+                many[i] = new Label { Text = "L", Bounds = new((i % 8) * 110, (i / 8) * 20, 100, 18) };
+            form.Controls.AddRange(many);
+        }
+
+        return form;
+    }
+
+    private static void BuildForm(int n, bool loop, double budgetMs = double.MaxValue)
+    {
+        BuildManyControlForm(64, loop); // warm-up
+
+        var watch = Stopwatch.StartNew();
+        BuildManyControlForm(n, loop);
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        var label = loop ? "loop" : "range";
+        Emit($"scale.build{label}{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   ({n} controls, {label})");
+
+        // A linear build stays far under this; a per-add full layout (quadratic) blows past it.
+        if (ms > budgetMs)
+            _failures.Add($"scale.build{label}{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
+    }
+
+    private static void RealizeManyControlForm(int n)
+    {
+        Realize(BuildManyControlForm(n, loop: false)); // warm-up
+
+        var form = BuildManyControlForm(n, loop: false);
+        var watch = Stopwatch.StartNew();
+        Realize(form);
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.realize{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (realize {n} controls)");
+    }
+
+    private static void ResizeManyControlForm(int n)
+    {
+        var form = BuildManyControlForm(n, loop: false);
+        Application.Run(form, new BenchBackend());
+
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < 100; ++i)
+            form.Bounds = new(0, 0, 900 + (i % 2), 700); // toggle width to force a relayout each time
+        watch.Stop();
+
+        var us = watch.Elapsed.TotalMicroseconds / 100;
+        Emit($"scale.resize{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   (relayout {n} controls, per resize)");
+    }
+
+    private static void ScrollManyChildPanel(int n, double budgetUs = double.MaxValue)
+    {
+        var panel = new Panel { Bounds = new(0, 0, 400, 600), AutoScroll = true };
+        for (var i = 0; i < n; ++i)
+            panel.Controls.Add(new Label { Text = "Item " + i, Bounds = new(4, i * 20, 200, 18) });
+        var form = new Form { Bounds = new(0, 0, 420, 640) };
+        form.Controls.Add(panel);
+        Application.Run(form, new BenchBackend());
+
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < 200; ++i)
+            panel.AutoScrollPosition = new(0, (i % 100) * 20); // scroll up and down repeatedly
+        watch.Stop();
+
+        var us = watch.Elapsed.TotalMicroseconds / 200;
+        Emit($"scale.scrollPanel{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   ({n} children, per scroll)");
+
+        // Re-deriving the content extent per child (quadratic) would be an order of magnitude over this.
+        if (us > budgetUs)
+            _failures.Add($"scale.scrollPanel{n}: {us:F0} µs/scroll exceeds the {budgetUs} µs linear-scale gate (quadratic regression?)");
+    }
+
+    private static void BindLargeGrid(int rows)
+    {
+        var list = new Hawkynt.NativeForms.ComponentModel.ObservableList<object?>();
+        for (var i = 0; i < rows; ++i)
+            list.Add(new Row("Row " + i, i));
+
+        var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
+        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
+        grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
+        Application.Run(new Form { Bounds = new(0, 0, 520, 480), Controls = { grid } }, new BenchBackend());
+
+        var watch = Stopwatch.StartNew();
+        grid.DataSource = list;
+        watch.Stop();
+
+        var ms = watch.Elapsed.TotalMilliseconds;
+        Emit($"scale.bindGrid{rows}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {rows} rows)");
     }
 
     private static Form MakeHundredControlForm()
