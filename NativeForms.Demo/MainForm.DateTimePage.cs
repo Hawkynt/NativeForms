@@ -41,9 +41,15 @@ internal sealed partial class MainForm
         var tHours = new TimePicker { Bounds = new(664, 148, 120, 26), Value = new(8, 0, 0), ShowMinutes = false };
         var t12 = new TimePicker { Bounds = new(664, 204, 160, 26), Value = new(14, 15, 0), Use24HourClock = false, ShowSeconds = false };
 
+        // A standalone ClockFace — the analog hands the TimePicker drop-down is built from.
+        var clock = new ClockFace { Bounds = new(16, 258, 180, 180), Value = new(10, 8, 30), ShowSeconds = true };
+        clock.ValueChanged += (_, _) => this.SetStatus($"ClockFace: {clock.Value:hh\\:mm\\:ss}.");
+
         page.Controls.AddRange(
             Caption("MonthCalendar (holidays · no weekends)", 16, 12, 300),
             calendar,
+            Caption("ClockFace (standalone analog hands)", 16, 234, 270),
+            clock,
             Caption("DateTimePicker (Short / Long / Time)", 340, 12, 300),
             dtShort, dtLong, dtTime,
             Caption("DateTimePicker (holiday-shaded)", 340, 208, 300),

@@ -66,8 +66,10 @@ internal sealed partial class MainForm
         folderPicker.PathChanged += (_, _) => this.SetStatus($"FolderPicker: {folderPicker.SelectedPath}");
         _toolTip.SetToolTip(folderPicker, "Type a path and press Enter, or browse with the … button.");
 
-        var breadcrumb = new Breadcrumb { Bounds = new(16, 368, 320, 26), Editable = true };
+        var breadcrumb = new Breadcrumb { Bounds = new(16, 368, 320, 26), Editable = true, ImageList = _icons };
         breadcrumb.Items.AddRange("Computer", "Documents", "Projects", "NativeForms", "docs");
+        for (var i = 0; i < breadcrumb.Items.Count; ++i)
+            breadcrumb.Items[i].ImageIndex = _IconFolder;
         breadcrumb.ItemClicked += (_, e) => this.SetStatus($"Breadcrumb: navigated to \"{e.Item.Text}\".");
 
         // Folder walk: each chevron drops down that segment's children — a virtual listing here, so it

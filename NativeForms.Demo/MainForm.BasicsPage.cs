@@ -22,7 +22,7 @@ internal sealed partial class MainForm
 
         var counterLabel = new Label { Bounds = new(16, 36, 300, 22), Text = _viewModel.Display };
         var counterBar = new ProgressBar { Bounds = new(16, 62, 300, 16) };
-        var clickButton = new Button { Bounds = new(16, 88, 145, 30), Text = "Click me" };
+        var clickButton = new Button { Bounds = new(16, 88, 145, 30), Text = "Click me", Image = this.SquareImage(Color.MediumSeaGreen) };
         clickButton.Click += (_, _) => _viewModel.Increment.Execute(null);
         var disabledButton = new Button { Bounds = new(171, 88, 145, 30), Text = "Disabled", Enabled = false };
         _toolTip.SetToolTip(clickButton, "Executes the view-model's RelayCommand.");
@@ -86,8 +86,8 @@ internal sealed partial class MainForm
         var iconCheck = new CheckBox
         {
             Bounds = new(340, 218, 300, 20),
-            Text = "With a generated icon",
-            Image = this.DiscImage(Color.MediumOrchid),
+            Text = "With an animated icon",
+            Image = BuildSpinner(),
         };
         var disabledCheck = new CheckBox { Bounds = new(340, 244, 300, 20), Text = "Disabled", Enabled = false };
 
@@ -114,9 +114,9 @@ internal sealed partial class MainForm
             Text = "Size",
             Image = this.DiscImage(Color.SteelBlue), // a header icon, before the caption by default
         };
-        var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small" };
-        var medium = new RadioButton { Bounds = new(16, 52, 260, 20), Text = "Medium" };
-        var large = new RadioButton { Bounds = new(16, 78, 260, 20), Text = "Large" };
+        var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small", Image = this.SquareImage(Color.MediumSeaGreen) };
+        var medium = new RadioButton { Bounds = new(16, 52, 260, 20), Text = "Medium", Image = this.SquareImage(Color.Goldenrod) };
+        var large = new RadioButton { Bounds = new(16, 78, 260, 20), Text = "Large", Image = this.SquareImage(Color.Crimson) };
         void Report(RadioButton radio) => radio.CheckedChanged += (_, _) =>
         {
             if (radio.Checked)

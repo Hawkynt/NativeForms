@@ -62,14 +62,27 @@ internal sealed partial class MainForm
         var cursorArea = new GroupBox { Bounds = new(340, 230, 234, 60), Text = "Custom cursor", Cursor = BuildTargetCursor() };
         cursorArea.Controls.Add(new Label { Bounds = new(12, 26, 210, 24), Text = "Hover here — a bitmap cursor", Cursor = BuildTargetCursor() });
 
+        // Standalone DropDownButton and SplitButton — the control-sized siblings of the strip's items.
+        var dropDown = new DropDownButton { Bounds = new(16, 310, 180, 30), Text = "Export", Image = this.SquareImage(Color.SteelBlue) };
+        dropDown.DropDownItems.Add(new ToolStripMenuItem("As PDF") { Image = this.SquareImage(Color.Crimson) });
+        dropDown.DropDownItems.Add(new ToolStripMenuItem("As PNG") { Image = this.SquareImage(Color.MediumSeaGreen) });
+        var splitBtn = new SplitButton { Bounds = new(204, 310, 180, 30), Text = "Save", Image = this.SquareImage(Color.Goldenrod) };
+        splitBtn.DropDownItems.Add(new ToolStripMenuItem("Save As…"));
+        splitBtn.DropDownItems.Add(new ToolStripMenuItem("Save a Copy"));
+        splitBtn.Click += (_, _) => this.SetStatus("SplitButton: the main Save action ran.");
+
         page.Controls.AddRange(
             Caption("ToolStrip: buttons, toggle, drop-down, split, hosted controls", 16, 12, 720),
             strip,
             Caption("IconLabel: image/text order and disabled", 16, 72, 300),
             before, after, disabledLabel,
             Caption("Animated image: running vs disabled (frozen, grey)", 340, 72, 400),
-            running, frozen, cursorArea);
+            running, frozen, cursorArea,
+            Caption("DropDownButton and SplitButton", 16, 286, 300),
+            dropDown, splitBtn);
 
+        this.Publish("toolbars.dropDown", dropDown);
+        this.Publish("toolbars.splitButton", splitBtn);
         this.Publish("toolbars.strip", strip);
         this.Publish("toolbars.running", running);
         this.Publish("toolbars.frozen", frozen);
