@@ -46,6 +46,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `Button` | native | [button.md](controls/button.md) |
 | `Label` | native | [label.md](controls/label.md) |
 | `LinkLabel` | owner-drawn | [linklabel.md](controls/linklabel.md) |
+| `ColorPicker` | owner-drawn | [colorpicker.md](controls/colorpicker.md) |
 | `Breadcrumb` | owner-drawn | [breadcrumb.md](controls/breadcrumb.md) |
 | `TextBox` | native | [textbox.md](controls/textbox.md) |
 | `MaskedTextBox` | native + core mask engine | [maskedtextbox.md](controls/maskedtextbox.md) |

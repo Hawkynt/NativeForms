@@ -468,6 +468,9 @@ strategy (may differ per platform; note exceptions inline).
       keyboard/wheel navigation; virtualized (only visible days laid out, bounded for
       100k), cached layout so populated repaints allocate zero — including a live drag preview — (empty
       ≈ 624 B, `Appointment` ≈ 48 B)
+- [x] `ColorPicker` (owner) — a colour swatch that drops down a 40-colour standard palette
+      (light-dismiss `IPopupPeer`); `SelectedColor`/`SelectedColorChanged`, keyboard-reachable, greys
+      when disabled, and embeddable in a `RibbonHostItem`/`ToolStripControlHost`
 - [x] Calendar per-day delegates on `MonthCalendar`/`DateTimePicker`/`CalendarCore`:
       `DayBackgroundProvider` (shade holidays), `DateSelectable` (predicate blocking picks), and
       `DayTooltipProvider` (per-day hover tooltip, shown by `MonthCalendar`)
