@@ -312,4 +312,29 @@ internal sealed class ProgressTileTests
         var g = Realize(Drive(), out _).RaisePaint();
         Assert.That(g.DrewText("45.2 GB free of 128 GB"), Is.True, "the non-compact tile keeps its secondary caption");
     }
+
+    // A small icon leaves the caption taller than the icon band: the bar, sitting below the caption,
+    // must lay out against the content — not the icon — so an icon-height clip never swallows it.
+    private static ProgressTile CompactSmallIcon() => new()
+    {
+        Text = "Downloads",
+        Image = new HeadlessImage(16, 16),
+        Bounds = new(0, 0, 240, 52), // content 8..44: a 16px icon shorter than caption + bar
+        Maximum = 100,
+        Value = 62,
+        Compact = true,
+    };
+
+    [Test]
+    public void Compact_draws_the_bar_below_a_caption_taller_than_a_small_icon_without_clipping_it()
+    {
+        var g = Realize(CompactSmallIcon(), out _).RaisePaint();
+        var caption = TextAt(g, "Downloads");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(AccentFillY(g), Is.GreaterThan(caption.Y), "the usage bar sits below the caption");
+            Assert.That(g.StayedInBounds, Is.True, "an icon-height clip no longer swallows the bar");
+        });
+    }
 }

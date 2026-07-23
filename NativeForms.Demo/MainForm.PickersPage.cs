@@ -225,7 +225,7 @@ internal sealed partial class MainForm
         // A compact tile: icon left, caption over the bar on its right, both matching the icon height.
         var compactTile = new ProgressTile
         {
-            Bounds = new(664, 428, 300, 40),
+            Bounds = new(664, 428, 300, 52),
             Text = "Downloads",
             SecondaryText = "ignored in compact mode",
             Image = this.SquareImage(Color.SteelBlue),

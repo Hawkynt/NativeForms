@@ -273,17 +273,14 @@ public class ProgressTile : OwnerDrawnControl
         g.PopClip();
     }
 
-    /// <summary>The compact tile: icon on the left, the caption top-aligned to it and the usage bar
-    /// bottom-aligned to it, so caption + bar together span exactly the icon's height.</summary>
+    /// <summary>The compact tile: icon on the left (centred), the caption top-aligned and the usage bar
+    /// bottom-aligned, laid out down the content height so the bar always sits below the caption.</summary>
     private void PaintCompactContent(IGraphics g, ITheme theme, Rectangle content, Color textColor, Font font, int lineHeight)
     {
-        var iconTop = content.Y;
-        var iconBottom = content.Bottom;
         var iconWidth = 0;
         if (this.Image is { } image)
         {
-            iconTop = content.Y + Math.Max(0, (content.Height - image.Height) / 2);
-            iconBottom = iconTop + image.Height;
+            var iconTop = content.Y + Math.Max(0, (content.Height - image.Height) / 2);
             g.DrawImage(image, new Rectangle(content.X, iconTop, image.Width, image.Height));
             iconWidth = image.Width + _IconGap;
         }
@@ -293,12 +290,14 @@ public class ProgressTile : OwnerDrawnControl
         if (rightW <= 0)
             return;
 
-        g.PushClip(new Rectangle(rightX, iconTop, rightW, Math.Max(0, iconBottom - iconTop)));
+        // Clip and lay out down the full content height, not the icon's: an icon shorter than the
+        // caption once clipped the bar away entirely, since the bar sits below a caption taller than it.
+        g.PushClip(new Rectangle(rightX, content.Y, rightW, content.Height));
 
-        g.DrawText(this.Text, font, textColor, new Rectangle(rightX, iconTop, rightW, lineHeight), ContentAlignment.TopLeft);
+        g.DrawText(this.Text, font, textColor, new Rectangle(rightX, content.Y, rightW, lineHeight), ContentAlignment.TopLeft);
 
-        // Bottom-align the bar to the icon; never let it climb over the caption.
-        var barTop = Math.Max(iconTop + lineHeight + _BarGap, iconBottom - _BarHeight);
+        // Bottom-align the bar to the content; never let it climb over the caption.
+        var barTop = Math.Max(content.Y + lineHeight + _BarGap, content.Bottom - _BarHeight);
         GlyphRenderer.DrawProgressBar(g, theme, new Rectangle(rightX, barTop, rightW, _BarHeight), _value, 0, _maximum, this.IsWarning ? this.WarningColor : theme.Accent);
 
         g.PopClip();

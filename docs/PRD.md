@@ -603,7 +603,7 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `ProgressTile` (owner) — Explorer-style tile: icon, caption, optional `SecondaryText` and a
       usage bar reusing `GlyphRenderer.DrawProgressBar`, switching to `WarningColor` past
       `WarningThreshold`; `Clickable` gates focus/hover/`Click`, `Selected` paints the selection face;
-      `Compact` gives a short one-row layout (icon left, caption over the bar, sized to the icon height).
+      `Compact` gives a short one-row layout (icon left, caption over the bar down the content height).
       Named for its shape, not for drives: Core is platform-agnostic and the paint path may not touch
       the filesystem, so both captions are caller-supplied strings and nothing is `DriveInfo`-bound
 - [x] `Breadcrumb` (owner) — Explorer navigation bar: `BreadcrumbItem` segments (`Text`, `Tag`,
