@@ -49,6 +49,7 @@ public partial class DockPanel : OwnerDrawnControl
             if (ReferenceEquals(field, value))
                 return;
 
+            this.BindImageListAnimation(field, value);
             field = value;
             this.Invalidate();
         }

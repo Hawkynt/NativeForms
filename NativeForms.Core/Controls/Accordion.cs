@@ -45,6 +45,7 @@ public class Accordion : OwnerDrawnControl
             if (ReferenceEquals(field, value))
                 return;
 
+            this.BindImageListAnimation(field, value);
             field = value;
             this.Invalidate();
         }

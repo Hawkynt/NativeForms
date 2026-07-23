@@ -205,6 +205,7 @@ public class ListView : OwnerDrawnControl
             if (ReferenceEquals(field, value))
                 return;
 
+            this.BindImageListAnimation(field, value);
             field = value;
             _flatDirty = true;
             this.Invalidate();
@@ -221,6 +222,7 @@ public class ListView : OwnerDrawnControl
             if (ReferenceEquals(field, value))
                 return;
 
+            this.BindImageListAnimation(field, value);
             field = value;
             _flatDirty = true;
             this.Invalidate();

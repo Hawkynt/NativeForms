@@ -54,7 +54,19 @@ public class ComboBox : OwnerDrawnControl
     public Func<object?, IImage?>? ImageSelector { get; set; }
 
     /// <summary>The icon store <see cref="ImageIndexSelector"/> indexes into, or <see langword="null"/> for none.</summary>
-    public ImageList? ImageList { get; set; }
+    public ImageList? ImageList
+    {
+        get => field;
+        set
+        {
+            if (ReferenceEquals(field, value))
+                return;
+
+            this.BindImageListAnimation(field, value);
+            field = value;
+            this.Invalidate();
+        }
+    }
 
     /// <summary>Optional selector mapping an item to its <see cref="ImageList"/> index; a negative
     /// index means no icon. <see cref="ImageSelector"/> wins when both are set.</summary>

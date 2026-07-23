@@ -71,6 +71,26 @@ public abstract class OwnerDrawnControl : Control
     /// </summary>
     private protected void UpdateImageAnimation() => this.TrackImageAnimation(this.AnimatedImageSlot, this.Invalidate);
 
+    /// <summary>
+    /// Repaints the control as any animated entry in an image list advances a frame. Call from an
+    /// <see cref="ImageList"/> property's setter with the previous and next lists so the
+    /// <see cref="ImageList.FrameChanged"/> subscription follows reassignment; a still-only list never
+    /// raises the event, so this costs an idle control nothing.
+    /// </summary>
+    private protected void BindImageListAnimation(ImageList? previous, ImageList? current)
+    {
+        if (ReferenceEquals(previous, current))
+            return;
+
+        if (previous is not null)
+            previous.FrameChanged -= this.OnImageListFrameChanged;
+
+        if (current is not null)
+            current.FrameChanged += this.OnImageListFrameChanged;
+    }
+
+    private void OnImageListFrameChanged(object? sender, EventArgs e) => this.Invalidate();
+
     /// <summary>The desktop theme changed: adopt the backend's fresh snapshot and repaint.</summary>
     private void OnBackendThemeChanged(object? sender, EventArgs e)
     {

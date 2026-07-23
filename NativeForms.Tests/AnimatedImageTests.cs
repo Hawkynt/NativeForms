@@ -238,4 +238,47 @@ internal sealed class AnimatedImageTests
             Assert.That(peer.Image!.Width, Is.EqualTo(2), "the pushed frame is the 2×2 image");
         });
     }
+
+    // --- Animated entries in an ImageList (tree / list / tab / … icons) ----------------------------
+
+    [Test]
+    public void An_image_list_resolves_an_animated_entry_to_a_frame_and_raises_FrameChanged()
+    {
+        var image = ThreeFrames(0);
+        var list = new ImageList(2);
+        var index = list.Add(image);
+        var backend = new HeadlessBackend();
+        var frameChanges = 0;
+        list.FrameChanged += (_, _) => ++frameChanges;
+
+        var resolved = list.GetImage(index, backend);
+        AnimationClock.Instance.Advance(image.StartTick + 150); // frame 0 → 1
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolved, Is.Not.InstanceOf<AnimatedImage>(), "GetImage resolves an animated entry to a concrete frame");
+            Assert.That(resolved.Width, Is.EqualTo(2), "the frame is the 2×2 image");
+            Assert.That(frameChanges, Is.GreaterThan(0), "advancing the shared clock raises FrameChanged so consumers repaint");
+        });
+    }
+
+    [Test]
+    public void A_control_repaints_as_its_image_lists_animated_icon_advances()
+    {
+        var image = ThreeFrames(0);
+        var list = new ImageList(2);
+        list.Add(image);
+        var tree = new TreeView { Bounds = new(0, 0, 120, 80), ImageList = list };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(tree);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        var before = canvas.InvalidateCount;
+
+        AnimationClock.Instance.Advance(image.StartTick + 150); // frame 0 → 1
+
+        Assert.That(canvas.InvalidateCount, Is.GreaterThan(before),
+            "the control repaints as its image list's animated icon advances a frame");
+    }
 }

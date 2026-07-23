@@ -104,6 +104,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
             if (ReferenceEquals(field, value))
                 return;
 
+            this.BindImageListAnimation(field, value);
             field = value;
             this.Invalidate();
         }

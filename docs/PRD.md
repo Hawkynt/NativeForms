@@ -654,7 +654,10 @@ strategy (may differ per platform; note exceptions inline).
       AccordionPane, DockContent), resolved through the shared `ImageList.ResolveIndex`/`IndexOfKey`
       (index wins, key falls back, case-insensitive). Arbitrary-object lists (ComboBox, ListBox) reach
       the same `ImageList` through their `ImageIndexSelector`/`ImageSelector` lambdas. Same rendering
-      path everywhere
+      path everywhere. An `ImageList` entry may itself be an `AnimatedImage` (`ImageList.Add(AnimatedImage)`):
+      `GetImage` resolves it to the current frame and the list raises `FrameChanged` as it advances, so
+      every icon-based control (TreeView, TreeListView, ListView, TabControl, Accordion, Breadcrumb,
+      DockPanel, Ribbon, ComboBox) animates the icon by repainting on that event
 - [x] Threading: loop-thread affinity, `Control.Invoke`/`BeginInvoke` (PostMessage dispatcher /
       `g_idle_add`), `NativeFormsSynchronizationContext` installed by `Run`
 

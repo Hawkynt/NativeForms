@@ -16,7 +16,17 @@ public sealed class ImageList : IDisposable
     private readonly List<int[]> _pixels = [];
     private readonly List<IImage?> _realized = [];
     private readonly List<string?> _keys = [];
+    private readonly List<AnimatedImage?> _animated = [];
     private IPlatformBackend? _backend;
+
+    /// <summary>
+    /// Raised as any animated entry's frame advances, so every control drawing from this list can
+    /// repaint. A control subscribes when the list is assigned and unsubscribes when it is replaced;
+    /// the list keeps the shared <see cref="AnimationClock"/> ticking while it holds an animated entry.
+    /// </summary>
+    public event EventHandler? FrameChanged;
+
+    private void RaiseFrameChanged() => this.FrameChanged?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Creates a list whose images are all <paramref name="imageSize"/> pixels.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A dimension is zero or negative.</exception>
@@ -51,8 +61,32 @@ public sealed class ImageList : IDisposable
         _pixels.Add(argb.ToArray());
         _realized.Add(null);
         _keys.Add(null);
+        _animated.Add(null);
         return _pixels.Count - 1;
     }
+
+    /// <summary>
+    /// Adds a still or animated <see cref="AnimatedImage"/> as an entry and returns its index — the
+    /// same collection interface, so any control that draws from an image list (tree, list, tab, tool
+    /// strip …) can carry an animated icon. The list registers an animated entry with the shared
+    /// <see cref="AnimationClock"/> and raises <see cref="FrameChanged"/> as it advances; each frame is
+    /// realized against the drawing backend and scaled into the icon slot exactly like a still entry.
+    /// </summary>
+    public int Add(AnimatedImage image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        _pixels.Add([]);
+        _realized.Add(null);
+        _keys.Add(null);
+        _animated.Add(image);
+        if (image.IsAnimated)
+            AnimationClock.Instance.Register(image, image, static () => true, this.RaiseFrameChanged);
+
+        return _pixels.Count - 1;
+    }
+
+    /// <summary>Adds an <see cref="AnimatedImage"/> under a lookup <paramref name="key"/>.</summary>
+    public int Add(string key, AnimatedImage image) => this.SetKey(this.Add(image), key);
 
     /// <summary>Adds an image under a lookup <paramref name="key"/> and returns its index — the keyed
     /// counterpart of <see cref="Add(ReadOnlySpan{int})"/>, so controls can reference it by
@@ -196,6 +230,7 @@ public sealed class ImageList : IDisposable
         _pixels.Add(pixels);
         _realized.Add(null);
         _keys.Add(null);
+        _animated.Add(null);
         return _pixels.Count - 1;
     }
 
@@ -250,12 +285,21 @@ public sealed class ImageList : IDisposable
             _backend = backend;
         }
 
+        // An animated entry realizes its current frame against the backend (the frame caches inside the
+        // AnimatedImage); a still entry realizes and caches its single bitmap here.
+        if (_animated[index] is { } animated)
+            return animated.FrameImage(backend, animated.CurrentFrameIndex(Environment.TickCount64));
+
         return _realized[index] ??= backend.CreateImage(this.ImageSize.Width, this.ImageSize.Height, _pixels[index]);
     }
 
     /// <summary>Disposes all realized native bitmaps; the pixel data stays usable.</summary>
     public void Dispose()
     {
+        foreach (var animated in _animated)
+            if (animated is not null)
+                AnimationClock.Instance.Unregister(animated);
+
         this.DisposeRealized();
         _backend = null;
     }
