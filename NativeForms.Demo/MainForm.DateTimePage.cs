@@ -11,7 +11,7 @@ internal sealed partial class MainForm
     /// </summary>
     private TabPage BuildDateTimePage()
     {
-        var page = new TabPage("Date & Time") { ImageIndex = _IconPurple };
+        var page = new TabPage("Date/Time") { ImageIndex = _IconPurple };
 
         // A shared holiday set and a weekend blackout, reused by the calendar and a picker.
         var holidays = new HashSet<(int Month, int Day)> { (7, 4), (7, 25), (12, 25) };
@@ -42,13 +42,13 @@ internal sealed partial class MainForm
         var t12 = new TimePicker { Bounds = new(664, 204, 160, 26), Value = new(14, 15, 0), Use24HourClock = false, ShowSeconds = false };
 
         page.Controls.AddRange(
-            Caption("MonthCalendar (holidays · no weekends · tips)", 16, 12, 300),
+            Caption("MonthCalendar (holidays · no weekends)", 16, 12, 300),
             calendar,
             Caption("DateTimePicker (Short / Long / Time)", 340, 12, 300),
             dtShort, dtLong, dtTime,
-            Caption("DateTimePicker (holiday-shaded drop-down)", 340, 208, 300),
+            Caption("DateTimePicker (holiday-shaded)", 340, 208, 300),
             dtHoliday,
-            Caption("TimePicker (full / no seconds / hours / 12h)", 664, 12, 300),
+            Caption("TimePicker (full / no-sec / hours / 12h)", 664, 12, 300),
             tFull, tNoSec, tHours, t12);
 
         this.Publish("datetime.calendar", calendar);

@@ -13,7 +13,7 @@ internal sealed partial class MainForm
     /// </summary>
     private TabPage BuildToolbarsPage()
     {
-        var page = new TabPage("Toolbars") { ImageIndex = _IconGear };
+        var page = new TabPage("Tools") { ImageIndex = _IconGear };
 
         var strip = new ToolStrip { Bounds = new(16, 36, 948, 30) };
         var newButton = new ToolStripButton { ImageList = _icons, ImageIndex = _IconNew };

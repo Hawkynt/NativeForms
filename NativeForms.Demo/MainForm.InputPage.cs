@@ -166,7 +166,7 @@ internal sealed partial class MainForm
             shortPicker, customPicker,
             Caption("MonthCalendar (title drills to years)", 664, 100),
             calendar,
-            Caption("TimePicker (full · 12h no-seconds · hours-only)", 664, 332),
+            Caption("TimePicker (full · 12h no-seconds)", 664, 332),
             time, time12,
             Caption("TimePicker (hours only)", 664, 420),
             timeHours);

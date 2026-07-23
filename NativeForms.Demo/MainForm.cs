@@ -59,7 +59,7 @@ internal sealed partial class MainForm : Form
     public MainForm()
     {
         this.Text = "NativeForms Gallery";
-        this.Bounds = new(Point.Empty, new Size(1000, 720));
+        this.Bounds = new(Point.Empty, new Size(1060, 720));
         this.MinimumSize = new(820, 560);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.SetIcon(_IconSize, _IconSize, DiscPixels(_IconSize, Color.RoyalBlue));
