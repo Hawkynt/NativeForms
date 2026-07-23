@@ -114,13 +114,17 @@ public class Panel : OwnerDrawnControl
     /// never passed through <see cref="DisplayRectangle"/> — would otherwise overhang, swallowing
     /// every press aimed at the thumb.
     /// </summary>
+    /// <summary>The viewport held for the duration of a scroll pass, so re-placing every child does not
+    /// re-derive the content extent (an O(n) walk) once per child — which made scrolling quadratic.</summary>
+    private Size? _scrollPassViewport;
+
     private protected override Rectangle GetChildPeerBounds(Control child)
     {
         var bounds = child.Bounds;
         if (!this.AutoScroll)
             return bounds;
 
-        this.GetScrollState(out _, out _, out _, out var viewport);
+        var viewport = _scrollPassViewport ?? this.ScrollViewport();
         var x = bounds.X - _scroll.X;
         var y = bounds.Y - _scroll.Y;
         return new(
@@ -156,6 +160,13 @@ public class Panel : OwnerDrawnControl
 
         var padding = this.Padding;
         return new(width + padding.Right, height + padding.Bottom);
+    }
+
+    /// <summary>The scroll viewport once — the shared helper behind <see cref="GetChildPeerBounds"/>.</summary>
+    private Size ScrollViewport()
+    {
+        this.GetScrollState(out _, out _, out _, out var viewport);
+        return viewport;
     }
 
     /// <summary>Determines which scrollbars are needed; each bar steals room from the other's axis.</summary>
@@ -202,8 +213,19 @@ public class Panel : OwnerDrawnControl
             return;
 
         _scroll = clamped;
-        for (var i = 0; i < this.Controls.Count; ++i)
-            this.Controls[i].PushPeerBounds();
+
+        // One viewport for the whole re-push: each child's GetChildPeerBounds reads it from the cache
+        // instead of walking every child to re-derive the extent, keeping the scroll linear in children.
+        _scrollPassViewport = viewport;
+        try
+        {
+            for (var i = 0; i < this.Controls.Count; ++i)
+                this.Controls[i].PushPeerBounds();
+        }
+        finally
+        {
+            _scrollPassViewport = null;
+        }
 
         this.Invalidate();
     }
