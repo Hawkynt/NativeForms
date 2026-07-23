@@ -73,6 +73,13 @@ public sealed class BreadcrumbItemEventArgs(BreadcrumbItem item, int index) : Ev
     public int Index { get; } = index;
 }
 
+/// <summary>Carries the text a <see cref="Breadcrumb"/> edit field committed.</summary>
+public sealed class BreadcrumbPathEventArgs(string path) : EventArgs
+{
+    /// <summary>The full path the user entered, before parsing into segments.</summary>
+    public string Path { get; } = path;
+}
+
 /// <summary>The ordered set of segments of a <see cref="Breadcrumb"/>, left to right.</summary>
 public sealed class BreadcrumbItemCollection : IReadOnlyList<BreadcrumbItem>
 {

@@ -29,6 +29,14 @@ Clicking a segment trims the path to it (the navigate-up gesture) and raises `It
 | `SubItemsProvider` | `Func<BreadcrumbItem?, IReadOnlyList<BreadcrumbItem>>?` — the folder-walk hook: given a segment (or `null` for the level before the first), returns its children. A click on the following chevron lists them; choosing one navigates in. Nothing touches the filesystem, so it serves a real directory, an archive or any virtual tree. |
 | `ItemClicked` | Raised when a segment is clicked (after any trim), carrying the `BreadcrumbItem` and its `Index`. |
 | `SubItemSelected` | Raised when a child chosen from a chevron drop-down is navigated into. |
+| `Editable` | `bool` (default `false`) — whether clicking the bar's empty space turns it into an editable path field. |
+| `FullPath` | `string` (get) — the segment captions joined by `PathSeparator`; the text the edit field starts from. |
+| `IsEditing` | `bool` (get) — whether the edit field is currently shown. |
+| `PathParser` | `Func<string, IReadOnlyList<BreadcrumbItem>>?` — turns committed edit text into segments (default splits on `PathSeparator`); a caller resolving a real or virtual path supplies its own, labelling and tagging each node. |
+| `AutoCompleteSource` | `Func<string, IReadOnlyList<string>>?` — path completions for the field: the first candidate that extends the typed text is appended and selected (type on to replace, Enter to accept). |
+| `PathEntered` | Raised when the field commits a path (Enter), carrying the entered text. |
+
+Methods: `BeginEdit()`, `EndEdit(bool commit)`.
 
 ### BreadcrumbItem
 

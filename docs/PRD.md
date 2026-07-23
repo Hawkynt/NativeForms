@@ -602,7 +602,10 @@ strategy (may differ per platform; note exceptions inline).
       `TrimOnClick` trims the path to a clicked segment (navigate-up) before `ItemClicked`; when the
       segments outgrow the width the leading ones fold behind a "…" chip, the last segment always kept.
       A `SubItemsProvider` delegate (folder walk) drops down a segment's children on its chevron —
-      virtual namespaces (archives, remote trees) supported — with a configurable `PathSeparator`
+      virtual namespaces (archives, remote trees) supported — with a configurable `PathSeparator`.
+      `Editable` turns an empty-space click into a hosted `TextBox` path field: Enter reparses through a
+      `PathParser` delegate and raises `PathEntered`, Escape reverts, and an `AutoCompleteSource`
+      delegate appends the first matching completion for acceptance
 
 ---
 

@@ -25,6 +25,10 @@ public class Breadcrumb : OwnerDrawnControl
     /// (whose children a click drops down); -1 when it trails the overflow chip.</summary>
     private readonly List<(int Left, int Right, int Segment)> _chevronZones = [];
     private MenuDropDown? _menu;
+    private TextBox? _editor;
+    private bool _editing;
+    private bool _autoCompleting;
+    private string _editorPrevText = string.Empty;
     private int _hot = -1;
 
     /// <summary>Creates an empty breadcrumb.</summary>
@@ -82,6 +86,60 @@ public class Breadcrumb : OwnerDrawnControl
 
     /// <summary>Raises <see cref="SubItemSelected"/>.</summary>
     protected virtual void OnSubItemSelected(BreadcrumbItemEventArgs e) => this.SubItemSelected?.Invoke(this, e);
+
+    /// <summary>
+    /// Whether clicking the bar's empty space turns it into an editable path field. Off by default; a
+    /// caller can also drive it explicitly with <see cref="BeginEdit"/>.
+    /// </summary>
+    public bool Editable { get; set; }
+
+    /// <summary>The whole path — the segment captions joined by <see cref="PathSeparator"/> — the text
+    /// the edit field starts from.</summary>
+    public string FullPath
+    {
+        get
+        {
+            var parts = new string[this.Items.Count];
+            for (var i = 0; i < this.Items.Count; ++i)
+                parts[i] = this.Items[i].Text;
+
+            return string.Join(this.PathSeparator, parts);
+        }
+    }
+
+    /// <summary>Whether the bar is currently showing its edit field rather than the crumbs.</summary>
+    public bool IsEditing => _editing;
+
+    /// <summary>The current edit-field text, for headless tests.</summary>
+    internal string EditorText => _editor?.Text ?? string.Empty;
+
+    /// <summary>Drives a user edit into the field, running the real change pipeline, for headless tests.</summary>
+    internal void TypeIntoEditorForTest(string text)
+    {
+        if (_editor is not null)
+            _editor.Text = text;
+    }
+
+    /// <summary>
+    /// Turns committed edit text into the new set of segments. Left <see langword="null"/>, the text is
+    /// split on <see cref="PathSeparator"/> (empty parts dropped). A caller resolving a real or virtual
+    /// path supplies its own — labelling segments, attaching a <see cref="BreadcrumbItem.Tag"/> per node.
+    /// </summary>
+    public Func<string, IReadOnlyList<BreadcrumbItem>>? PathParser { get; set; }
+
+    /// <summary>
+    /// Supplies path completions for the edit field: given the text typed so far, returns candidate
+    /// full paths. The first candidate that extends the typed text is appended and selected, so typing
+    /// on replaces it and Enter accepts it. Delegate-driven, so it completes against a real directory,
+    /// an archive listing or any virtual namespace.
+    /// </summary>
+    public Func<string, IReadOnlyList<string>>? AutoCompleteSource { get; set; }
+
+    /// <summary>Raised when the edit field commits a path (Enter), carrying the entered text.</summary>
+    public event EventHandler<BreadcrumbPathEventArgs>? PathEntered;
+
+    /// <summary>Raises <see cref="PathEntered"/>.</summary>
+    protected virtual void OnPathEntered(BreadcrumbPathEventArgs e) => this.PathEntered?.Invoke(this, e);
 
     /// <summary>Raises <see cref="ItemClicked"/>.</summary>
     protected virtual void OnItemClicked(BreadcrumbItemEventArgs e) => this.ItemClicked?.Invoke(this, e);
@@ -251,7 +309,13 @@ public class Breadcrumb : OwnerDrawnControl
 
         var hit = this.HitTest(e.X);
         if (hit < 0)
-            return; // the overflow chip and empty space are not navigable
+        {
+            // The overflow chip and empty space are not navigable — but empty space starts an edit.
+            if (this.Editable)
+                this.BeginEdit();
+
+            return;
+        }
 
         var item = this.Items[hit];
         if (this.TrimOnClick)
@@ -322,5 +386,119 @@ public class Breadcrumb : OwnerDrawnControl
         base.OnUnrealized();
         _menu?.CloseAll();
         _menu = null;
+    }
+
+    /// <summary>Switches the bar to its edit field, prefilled with <see cref="FullPath"/> and focused.</summary>
+    public void BeginEdit()
+    {
+        if (_editing)
+            return;
+
+        var editor = this.EnsureEditor();
+        _autoCompleting = true; // the prefill must not trigger a completion
+        editor.Text = this.FullPath;
+        _autoCompleting = false;
+        _editorPrevText = editor.Text;
+        editor.Bounds = new Rectangle(0, 0, this.Width, this.Height);
+        editor.Visible = true;
+        _editing = true;
+        this.Invalidate();
+        editor.Focus();
+    }
+
+    /// <summary>Leaves the edit field. When <paramref name="commit"/>, the typed path replaces the
+    /// segments (through <see cref="PathParser"/>) and <see cref="PathEntered"/> fires; otherwise the
+    /// crumbs are restored unchanged.</summary>
+    public void EndEdit(bool commit)
+    {
+        if (!_editing)
+            return;
+
+        _editing = false;
+        var text = _editor!.Text;
+        _editor.Visible = false;
+        if (commit)
+            this.CommitPath(text);
+
+        this.Focus();
+        this.Invalidate();
+    }
+
+    private TextBox EnsureEditor()
+    {
+        if (_editor is not null)
+            return _editor;
+
+        _editor = new TextBox { TabStop = false, Visible = false };
+        _editor.KeyDown += this.OnEditorKeyDown;
+        _editor.TextChanged += this.OnEditorTextChanged;
+        this.Controls.Add(_editor);
+        return _editor;
+    }
+
+    private void OnEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.KeyCode)
+        {
+            case Keys.Enter:
+                this.EndEdit(commit: true);
+                e.Handled = true;
+                break;
+
+            case Keys.Escape:
+                this.EndEdit(commit: false);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    /// <summary>Appends the first matching completion (selected) as the user extends the typed text.</summary>
+    private void OnEditorTextChanged(object? sender, EventArgs e)
+    {
+        if (_autoCompleting || _editor is null)
+            return;
+
+        var text = _editor.Text;
+        var grew = text.Length > _editorPrevText.Length;
+        _editorPrevText = text;
+        if (!grew || this.AutoCompleteSource is not { } source || text.Length == 0)
+            return;
+
+        string? match = null;
+        foreach (var candidate in source(text))
+            if (candidate.Length > text.Length && candidate.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+            {
+                match = candidate;
+                break;
+            }
+
+        if (match is null)
+            return;
+
+        _autoCompleting = true;
+        _editor.Text = match;
+        _editor.SelectionStart = text.Length;         // select the appended tail, so typing replaces it
+        _editor.SelectionLength = match.Length - text.Length;
+        _autoCompleting = false;
+    }
+
+    private void CommitPath(string text)
+    {
+        var segments = this.PathParser is { } parser ? parser(text) : this.DefaultParse(text);
+        this.Items.Clear();
+        for (var i = 0; i < segments.Count; ++i)
+            this.Items.Add(segments[i]);
+
+        this.OnPathEntered(new BreadcrumbPathEventArgs(text));
+    }
+
+    /// <summary>Splits a path on <see cref="PathSeparator"/>, dropping empty parts.</summary>
+    private IReadOnlyList<BreadcrumbItem> DefaultParse(string text)
+    {
+        var result = new List<BreadcrumbItem>();
+        foreach (var part in text.Split(this.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            result.Add(new BreadcrumbItem(part));
+
+        return result;
     }
 }

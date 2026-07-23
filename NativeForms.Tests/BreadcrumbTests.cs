@@ -180,6 +180,88 @@ internal sealed class BreadcrumbTests
         });
     }
 
+    // --- Edit mode + autocompletion -----------------------------------------------------------
+
+    [Test]
+    public void Clicking_empty_space_enters_edit_mode_when_editable()
+    {
+        var crumb = ThreeSegments();
+        crumb.Editable = true;
+        var canvas = Realize(crumb, out _);
+        canvas.RaisePaint();
+
+        canvas.RaiseMouseDown(380, 12); // past the last segment — empty space
+
+        Assert.That(crumb.IsEditing, Is.True, "the empty area opens the path field");
+    }
+
+    [Test]
+    public void Committing_the_edit_field_reparses_the_path_into_segments()
+    {
+        var crumb = ThreeSegments(); // Home / Docs / Sub
+        Realize(crumb, out _);
+        string? entered = null;
+        crumb.PathEntered += (_, e) => entered = e.Path;
+
+        crumb.BeginEdit();
+        Assert.That(crumb.EditorText, Is.EqualTo("Home/Docs/Sub"), "the field starts from the full path");
+
+        crumb.TypeIntoEditorForTest("Users/Alex/Pictures");
+        crumb.EndEdit(commit: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(crumb.IsEditing, Is.False);
+            Assert.That(entered, Is.EqualTo("Users/Alex/Pictures"));
+            Assert.That(crumb.Items.Select(i => i.Text), Is.EqualTo(new[] { "Users", "Alex", "Pictures" }), "split on the separator");
+        });
+    }
+
+    [Test]
+    public void Escaping_the_edit_field_restores_the_crumbs_unchanged()
+    {
+        var crumb = ThreeSegments();
+        Realize(crumb, out _);
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("Something/Else");
+        crumb.EndEdit(commit: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(crumb.IsEditing, Is.False);
+            Assert.That(crumb.Items.Select(i => i.Text), Is.EqualTo(new[] { "Home", "Docs", "Sub" }), "cancel keeps the path");
+        });
+    }
+
+    [Test]
+    public void The_edit_field_appends_the_first_matching_completion()
+    {
+        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) }; // empty, so the field starts blank
+        crumb.AutoCompleteSource = _ => ["Documents", "Downloads", "Music"];
+        Realize(crumb, out _);
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("Do"); // matches Documents and Downloads → first wins
+
+        Assert.That(crumb.EditorText, Is.EqualTo("Documents"), "the completion is appended for acceptance");
+    }
+
+    [Test]
+    public void A_custom_parser_labels_the_committed_segments()
+    {
+        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };
+        crumb.PathParser = text => text.Split(':', System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => new BreadcrumbItem(p.ToUpperInvariant())).ToArray();
+        Realize(crumb, out _);
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("archive:folder:file");
+        crumb.EndEdit(commit: true);
+
+        Assert.That(crumb.Items.Select(i => i.Text), Is.EqualTo(new[] { "ARCHIVE", "FOLDER", "FILE" }), "the custom parser drives virtual paths");
+    }
+
     [Test]
     public void Navigating_into_a_child_trims_to_the_parent_and_appends_it()
     {
