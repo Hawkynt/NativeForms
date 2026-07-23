@@ -685,6 +685,34 @@ internal sealed class CalendarViewTests
     }
 
     [Test]
+    public void Dragging_the_end_edge_into_the_next_day_column_moves_the_end_to_that_day()
+    {
+        var calendar = CreateCalendar(out var canvas); // Week view, Mon 2026-07-13 .. Sun 2026-07-19
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+
+        var index = IndexOf(calendar, "Lunch"); // 2026-07-16 12:00–13:00
+        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+        var bottom = bounds.Bottom - 3; // the real end edge
+
+        var nextDayX = calendar.DayColumnCenterX(new DateTime(2026, 7, 17));
+        Assert.That(nextDayX, Is.GreaterThan(0), "the next day is on screen");
+
+        canvas.RaiseMouseDown(cx, bottom);
+        canvas.RaiseMouseMove(nextDayX, bottom); // drag the end horizontally into the next day's column
+        canvas.RaiseMouseUp(nextDayX, bottom);
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 16, 12, 0, 0)), "the start held");
+            Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 17)), "the end crossed into the next day");
+            Assert.That(moved.End, Is.GreaterThan(moved.Start), "still a valid span");
+        });
+    }
+
+    [Test]
     public void Hovering_a_real_edge_shows_the_resize_cursor()
     {
         var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());

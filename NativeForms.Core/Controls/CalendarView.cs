@@ -139,7 +139,6 @@ public class CalendarView : OwnerDrawnControl
     private int _moveGrabPixels;
     private int _moveGrabDays;
     private int _moveDurationMinutes;
-    private DateTime _moveDay;   // the box's day column, the base date a resize anchors to
     private string? _moveSubject;
     private Color _moveAccent;
     private DateTime _previewStart;
@@ -389,6 +388,18 @@ public class CalendarView : OwnerDrawnControl
                 return (_layout[i].ClipStart, _layout[i].ClipEnd);
 
         return (false, false);
+    }
+
+    /// <summary>The client x at the horizontal centre of a visible day's column, or -1 when that day
+    /// is off view. For tests of cross-day edge dragging.</summary>
+    internal int DayColumnCenterX(DateTime day)
+    {
+        var col = (int)(day.Date - this.FirstVisibleDate.Date).TotalDays;
+        if (col < 0 || col >= this.VisibleDayCount)
+            return -1;
+
+        var w = this.DayColumnWidth;
+        return _GutterWidth + (col * w) + (w / 2);
     }
 
     // --- Geometry ----------------------------------------------------------------------------------
@@ -1304,7 +1315,6 @@ public class CalendarView : OwnerDrawnControl
         {
             var body = this.BodyBounds;
             var screenTop = box.Rect.Y + body.Y - _scrollY;
-            _moveDay = box.Day;
             _dragKind = EdgeKindOf(box, screenTop, e.Y);
             _moveGrabPixels = e.Y - screenTop;
         }
@@ -1340,25 +1350,27 @@ public class CalendarView : OwnerDrawnControl
         {
             case DragKind.ResizeStart:
             {
-                // Anchor to the box's own day: the moved start stays on that day, capped below by the
-                // end (relative to the day, but never past midnight since the start cannot leave the day).
-                var endRel = (int)(appt.End - _moveDay).TotalMinutes;
-                var upper = Math.Min(1440, endRel) - _timeScale;
-                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), 0, Math.Max(0, upper));
-                _previewStart = _moveDay.AddMinutes(min);
+                // The start follows the pointer's day column and minute, so a drag can carry it onto
+                // another day; it never reaches the end (a one-slot minimum span is kept).
+                var day = this.DayColumnDate(e.X);
+                var min = this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY));
+                var start = day.AddMinutes(min);
+                var latest = appt.End.AddMinutes(-_timeScale);
+                _previewStart = start > latest ? latest : start;
                 _previewEnd = appt.End;
                 break;
             }
 
             case DragKind.ResizeEnd:
             {
-                // Anchor to the box's own day: the moved end stays on that day, floored above by the
-                // start (relative to the day; a start on an earlier day floors at the first slot).
-                var startRel = (int)(appt.Start - _moveDay).TotalMinutes;
-                var lower = Math.Max(0, startRel) + _timeScale;
-                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), lower, 1440);
+                // The end follows the pointer's day column and minute, so a drag can carry it onto a
+                // later (or earlier) day; it never crosses back before the start.
+                var day = this.DayColumnDate(e.X);
+                var min = this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY));
+                var end = day.AddMinutes(min);
+                var earliest = appt.Start.AddMinutes(_timeScale);
+                _previewEnd = end < earliest ? earliest : end;
                 _previewStart = appt.Start;
-                _previewEnd = _moveDay.AddMinutes(min);
                 break;
             }
 

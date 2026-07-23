@@ -459,7 +459,8 @@ strategy (may differ per platform; note exceptions inline).
       drag-to-move/edge-resize of a movable appointment with a live snapped ghost and a north-south
       resize cursor — cancelable `AppointmentMoving` then `AppointmentMoved` (`AppointmentMoveEventArgs`),
       the app applies + re-binds, per-entry lockable via `Appointment.Movable` (locked entries show a
-      padlock and refuse to drag), Escape cancels; multi-day timed spans clamped per overlapping day
+      padlock and refuse to drag), Escape cancels; an edge drag follows the pointer's day column so a
+      start/end can be dragged onto another day; multi-day timed spans clamped per overlapping day
       with continuation chevrons — only a real (non-clamped) edge resizes, an off-view edge stays put;
       keyboard/wheel navigation; virtualized (only visible days laid out, bounded for
       100k), cached layout so populated repaints allocate zero — including a live drag preview — (empty
