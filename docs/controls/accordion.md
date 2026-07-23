@@ -46,7 +46,7 @@ accordion.ExpandMode = AccordionExpandMode.Multiple;
 |---|---|---|---|
 | `Panes` | `AccordionPaneCollection` | empty | The panes, top to bottom. Adding parents the pane into `Controls`; the first pane added opens by itself. |
 | `ExpandMode` | `AccordionExpandMode` | `Single` | Whether opening a pane closes the others. Switching back to `Single` folds down to the selected pane. |
-| `ImageList` | `ImageList?` | `null` | The icons referenced by each pane's `ImageIndex`. |
+| `ImageList` | `ImageList?` | `null` | The icons referenced by each pane's `ImageIndex` (or its `ImageKey` string; index wins). |
 | `SelectedIndex` | `int` | `-1` | The open pane under `Single`, the most recently opened one otherwise; `-1` while none is open. Assigning expands that pane through the ordinary path, so `PaneExpanding` can still veto it. |
 | `SelectedPane` | `AccordionPane?` | `null` | The current pane; setting expands it. |
 | `HeaderHeight` | `int` (get) | theme row height | Pixel height of one header row. |

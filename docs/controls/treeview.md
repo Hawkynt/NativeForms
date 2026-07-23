@@ -88,7 +88,9 @@ Constructors: `TreeNode()`, `TreeNode(string text)`.
 | `Text` | `string` | `""` | The node's label. |
 | `Tag` | `object?` | `null` | Arbitrary caller data. |
 | `ImageIndex` | `int` | `-1` | The image-list index of the node's icon, or `-1` for none. |
+| `ImageKey` | `string?` | `null` | The image-list key of the node's icon — the string alternative to `ImageIndex` (index wins when both are set). |
 | `SelectedImageIndex` | `int` | `-1` | The icon used while the node is selected, or `-1` to reuse `ImageIndex`. |
+| `SelectedImageKey` | `string?` | `null` | The keyed alternative to `SelectedImageIndex`. |
 | `Checked` | `bool` | `false` | The check state. Changing it raises `AfterCheck` on an attached control. |
 | `IsExpanded` | `bool` (get) | `false` | Whether the node's children are currently shown. |
 | `Nodes` | `TreeNodeCollection` (get) | empty | The child nodes, created on first access. |

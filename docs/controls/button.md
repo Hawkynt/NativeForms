@@ -27,6 +27,8 @@ var ok = new Button { Text = "OK", DialogResult = DialogResult.OK };
 | `ImageAlign` | `ContentAlignment` | `MiddleCenter` | Where the image anchors within the face. Advisory for now: neither the Win32 nor the GTK button offers free image placement, so no backend renders it; the value is forwarded so a capable backend can honor it. |
 | `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | How image and text share the face. GTK honors the four directional values through the button's image position (`Overlay` renders as `ImageBeforeText`); Win32 push buttons offer no placement control. |
 | `DialogResult` | `DialogResult` | `None` | The verdict a click reports to the owning [`Form`](form.md). Anything other than `None` makes a click set `Form.DialogResult`, which closes the form when it is shown modally — the WinForms dialog contract. |
+| `Command` | `ICommand?` | `null` | The MVVM command a click executes, passing `CommandParameter`. Attaching one tracks `CanExecute` to drive the button's `Enabled` (and follows the command's `CanExecuteChanged`), delegate-based and reflection-free. |
+| `CommandParameter` | `object?` | `null` | The argument passed to `Command.Execute`/`CanExecute`. |
 
 Inherits the common members of [`Control`](control.md). Native activation — mouse click, Space,
 Enter — raises the inherited `Click` event; `PerformClick()` raises it programmatically.

@@ -36,7 +36,7 @@ tabs.ImageList = icons;
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `TabPages` | `TabPageCollection` | empty | The pages, in tab order. Adding parents the page into `Controls`; the first page added becomes the selected one. |
-| `ImageList` | `ImageList?` | `null` | The icons referenced by each page's `ImageIndex`. |
+| `ImageList` | `ImageList?` | `null` | The icons referenced by each page's `ImageIndex` (or its `ImageKey` string; index wins). |
 | `SelectedIndex` | `int` | `-1` | Index of the visible page, `-1` while there are no pages. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `TabPage?` | `null` | The visible page; setting selects by `IndexOf`. |
 | `Alignment` | `TabAlignment` | `Top` | Which edge the header strip runs along — `Top`, `Bottom`, `Left` or `Right`. |

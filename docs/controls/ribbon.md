@@ -98,6 +98,7 @@ Constructors: `RibbonTab()` and `RibbonTab(string text)`.
 | `Text` | `string` | `""` | The caption painted along the group's bottom edge. |
 | `Items` | `ToolStripItemCollection` | empty | The items, laid out left to right in columns. |
 | `ImageIndex` | `int` | `-1` | Index of the icon the collapsed drop-down button shows. |
+| `ImageKey` | `string?` | `null` | The keyed alternative to `ImageIndex` (index wins when both are set). |
 | `IsCollapsed` | `bool` (get) | `false` | Whether the group is currently folded into its drop-down button. Recomputed on every layout pass. |
 | `Bounds` | `Rectangle` (get) | empty | The group's laid-out rectangle, as of the last layout pass — empty while minimized or on an unselected tab. |
 | `Tag` | `object?` | `null` | Caller-owned data. |

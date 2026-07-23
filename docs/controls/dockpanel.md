@@ -108,7 +108,7 @@ may hold any character.
 | `DockToEdge(content, edge)` | Docks a pane to an edge, joining any existing group there. |
 | `Contents` | `IReadOnlyList<DockContent>` — every owned pane. |
 | `ActiveContent` / `ActiveContentChanged` | The pane with the active caption. |
-| `ImageList` | The icons `DockContent.ImageIndex` indexes into. |
+| `ImageList` | The icons `DockContent.ImageIndex` (or `ImageKey`) index into. |
 | `DocumentTabStripEdge` | `TabAlignment` (default `Bottom`) — which edge each tab group's tab strip sits on. `Top`/`Bottom` lay the tabs in a horizontal row; `Left`/`Right` stack them in a vertical strip sized to the widest caption. |
 | `SaveLayout()` / `LoadLayout(string, Func<string,DockContent?>)` | Reflection-free layout round-trip. |
 

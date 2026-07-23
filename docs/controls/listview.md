@@ -56,6 +56,8 @@ Inherits the common members of [`Control`](control.md).
 | `FullRowSelect` | `bool` | `true` | Whether the selection highlight spans the full Details row; when `false` it covers only the first column. |
 | `MultiSelect` | `bool` | `true` | Whether Ctrl/Shift gestures can select more than one item. Turning it off collapses the selection to its first index. |
 | `CheckBoxes` | `bool` | `false` | Whether every item shows a themed check box; see `ListViewItem.Checked`. |
+| `CheckedIndices` | `IReadOnlyList<int>` | (live) | The indices of the currently checked items — a live view backed by the item states. |
+| `CheckedItems` | `IReadOnlyList<ListViewItem>` | (live) | The currently checked items — a live view over [`CheckedIndices`](listview.md). |
 | `LabelEdit` | `bool` | `false` | Whether the user can edit item labels; see `BeginEdit`. |
 | `LargeImageList` | `ImageList?` | `null` | The icon store for `LargeIcon` and `Tile` (via `ListViewItem.ImageIndex`); its image size drives those views' cell size. |
 | `SmallImageList` | `ImageList?` | `null` | The icon store for the remaining views; its image size drives the `SmallIcon` cell size. |
