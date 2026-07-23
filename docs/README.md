@@ -34,6 +34,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | [Architecture](architecture.md) | Core/peer split, backends, realization lifecycle, containers, popups, timers, modal loops, AOT rules |
 | [MVVM & data binding](mvvm.md) | `ObservableObject`, `RelayCommand`, `PropertyBinding<T>`, `ObservableList<T>`, command wiring |
 | [Custom controls](custom-controls.md) | Authoring owner-drawn controls: `OwnerDrawnControl`, `IGraphics`, `ITheme`, shared paint primitives |
+| [Images, animation & cursors](imaging.md) | Supported formats (PNG/BMP/PCX/GIF/ICO/CUR/ANI), `AnimatedImage` + the shared clock, custom cursors from a `.cur`/`.ani` |
 | [PRD](PRD.md) | The authoritative feature checklist and roadmap |
 
 ## Control reference

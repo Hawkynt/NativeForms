@@ -58,13 +58,17 @@ internal sealed partial class MainForm
         var running = new PictureBox { Bounds = new(340, 96, 110, 110), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, AnimatedImage = BuildSpinner() };
         var frozen = new PictureBox { Bounds = new(464, 96, 110, 110), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, AnimatedImage = BuildSpinner(), Enabled = false };
 
+        // A custom bitmap cursor (Cursor.FromImage) — the same route a decoded .cur/.ani takes.
+        var cursorArea = new GroupBox { Bounds = new(340, 230, 234, 60), Text = "Custom cursor", Cursor = BuildTargetCursor() };
+        cursorArea.Controls.Add(new Label { Bounds = new(12, 26, 210, 24), Text = "Hover here — a bitmap cursor", Cursor = BuildTargetCursor() });
+
         page.Controls.AddRange(
             Caption("ToolStrip: buttons, toggle, drop-down, split, hosted controls", 16, 12, 720),
             strip,
             Caption("IconLabel: image/text order and disabled", 16, 72, 300),
             before, after, disabledLabel,
             Caption("Animated image: running vs disabled (frozen, grey)", 340, 72, 400),
-            running, frozen);
+            running, frozen, cursorArea);
 
         this.Publish("toolbars.strip", strip);
         this.Publish("toolbars.running", running);

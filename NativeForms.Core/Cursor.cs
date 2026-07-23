@@ -108,6 +108,17 @@ public sealed class Cursor
         var (width, height, argb, hotspotX, hotspotY) = ImageDecoder.DecodeCursor(data);
         return new Cursor(argb, width, height, hotspotX, hotspotY);
     }
+
+    /// <summary>Builds a custom cursor directly from row-major ARGB pixels and a hotspot.</summary>
+    /// <exception cref="System.ArgumentException">The pixels are too few for the size.</exception>
+    public static Cursor FromImage(int[] pixels, int width, int height, int hotspotX = 0, int hotspotY = 0)
+    {
+        System.ArgumentNullException.ThrowIfNull(pixels);
+        if (width <= 0 || height <= 0 || pixels.Length < width * height)
+            throw new System.ArgumentException("The pixel buffer is smaller than the given size.", nameof(pixels));
+
+        return new Cursor(pixels, width, height, hotspotX, hotspotY);
+    }
 }
 
 /// <summary>The shared instances of the stock cursors, mirroring <c>System.Windows.Forms.Cursors</c>.</summary>

@@ -416,6 +416,33 @@ internal sealed partial class MainForm : Form
         return new AnimatedImage(new DecodedImage(size, size, frames, loopCount: 0));
     }
 
+    /// <summary>A procedural custom cursor — a red target ring with a centred hotspot — to show
+    /// <see cref="Cursor.FromImage"/> without shipping a <c>.cur</c> file.</summary>
+    private static Cursor BuildTargetCursor()
+    {
+        const int size = 24;
+        const int center = size / 2;
+        var pixels = new int[size * size];
+        var ring = unchecked((int)0xFFE03030);
+        for (var y = 0; y < size; ++y)
+            for (var x = 0; x < size; ++x)
+            {
+                var dx = x - center;
+                var dy = y - center;
+                var distance = (dx * dx) + (dy * dy);
+                if (distance is >= 64 and <= 100) // a ring between radius 8 and 10
+                    pixels[(y * size) + x] = ring;
+            }
+
+        for (var i = 0; i < size; ++i)
+        {
+            pixels[(center * size) + i] = ring; // horizontal cross-hair
+            pixels[(i * size) + center] = ring; // vertical cross-hair
+        }
+
+        return Cursor.FromImage(pixels, size, size, center, center);
+    }
+
     private static void FillDisc(int[] pixels, int size, int cx, int cy, int radius, int argb)
     {
         for (var y = -radius; y <= radius; ++y)

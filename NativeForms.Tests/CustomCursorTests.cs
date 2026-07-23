@@ -60,6 +60,22 @@ internal sealed class CustomCursorTests
     }
 
     [Test]
+    public void FromImage_builds_a_custom_cursor_from_raw_pixels()
+    {
+        int[] pixels = [Red, Blue, Blue, Red];
+        var cursor = Cursor.FromImage(pixels, 2, 2, 1, 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cursor.Kind, Is.EqualTo(CursorKind.Custom));
+            Assert.That((cursor.HotspotX, cursor.HotspotY), Is.EqualTo((1, 1)));
+            Assert.That(cursor.Pixels, Is.EqualTo(pixels));
+        });
+
+        Assert.Throws<System.ArgumentException>(() => Cursor.FromImage(pixels, 4, 4), "too few pixels for the size");
+    }
+
+    [Test]
     public void Assigning_a_custom_cursor_reaches_the_peer()
     {
         int[] pixels = [Red, Blue, Blue, Red];

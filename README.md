@@ -46,6 +46,7 @@ input and photographs it in-process:
 | ![Basics](docs/screenshots/01-basics.png)<br>**Buttons, MVVM, toggles** | ![Input](docs/screenshots/02-input.png)<br>**Text, spinners, dates** | ![Lists & trees](docs/screenshots/03-lists.png)<br>**Lists, trees, combos** |
 | ![DataGridView](docs/screenshots/04-grid.png)<br>**DataGridView (12 column kinds)** | ![Layout](docs/screenshots/05-layout.png)<br>**Layout containers** | ![Docking](docs/screenshots/06-docking.png)<br>**Dock / float / auto-hide** |
 | ![Pickers](docs/screenshots/07-pickers.png)<br>**File/folder/drive pickers** | ![Ribbon](docs/screenshots/08-ribbon.png)<br>**Office-style ribbon** | ![Calendar](docs/screenshots/09-calendar.png)<br>**Outlook-style scheduler** |
+| ![Menus](docs/screenshots/19-menus.png)<br>**Context menus & attach points** | ![Toolbars](docs/screenshots/20-toolbars.png)<br>**Hosted controls, animation states** | ![Date & Time](docs/screenshots/21-datetime.png)<br>**Day shading, blocked days, pickers** |
 
 More: [docking drag overlays](docs/screenshots/docking-drag.png) · [the month scheduler](docs/screenshots/calendar-month.png) · [a modal MessageBox](docs/screenshots/messagebox.png) · [a context menu](docs/screenshots/context-menu.png). The full set lives in [`docs/screenshots/`](docs/screenshots/).
 
@@ -89,8 +90,9 @@ reflection-free two-way `PropertyBinding<T>` live in `Hawkynt.NativeForms.Compon
 
 The full reference lives under **[`docs/`](docs/README.md)** — an [architecture
 overview](docs/architecture.md), an [MVVM & data-binding guide](docs/mvvm.md), a [custom-control
-authoring guide](docs/custom-controls.md), and one reference page per control (usage example, API
-tables, behavior notes). What ships today:
+authoring guide](docs/custom-controls.md), an [images, animation & custom cursors
+guide](docs/imaging.md), and one reference page per control (usage example, API tables, behavior
+notes). What ships today:
 
 | Family | Controls (each links to its reference page) |
 |---|---|
