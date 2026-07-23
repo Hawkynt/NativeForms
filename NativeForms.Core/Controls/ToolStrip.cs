@@ -47,6 +47,7 @@ public class ToolStrip : OwnerDrawnControl
         this.Items.Changed += (_, _) =>
         {
             _itemWidths = null;
+            this.SyncHostedControls();
             this.Invalidate();
         };
     }
@@ -61,6 +62,63 @@ public class ToolStrip : OwnerDrawnControl
     {
         base.OnRealized(peer);
         _itemWidths = null; // measurements now come from the live backend
+        this.SyncHostedControls();
+    }
+
+    /// <summary>Parents any hosted control that is not yet a child of this bar into it.</summary>
+    private void SyncHostedControls()
+    {
+        for (var i = 0; i < this.Items.Count; ++i)
+            if (this.Items[i] is ToolStripControlHost host && !ReferenceEquals(host.Control.Parent, this))
+                this.Controls.Add(host.Control);
+    }
+
+    /// <summary>The host item a child control belongs to, or <see langword="null"/> when the control
+    /// was parented some other way.</summary>
+    private ToolStripControlHost? FindHost(Control child)
+    {
+        for (var i = 0; i < this.Items.Count; ++i)
+            if (this.Items[i] is ToolStripControlHost host && ReferenceEquals(host.Control, child))
+                return host;
+
+        return null;
+    }
+
+    /// <summary>A hosted control is on screen only where the layout placed it — not while its item is
+    /// in the overflow — combined with its own visibility flag.</summary>
+    private protected override bool GetChildPeerVisible(Control child)
+        => this.FindHost(child) is { } host ? host.Placed && child.IsVisibleLocal : child.IsVisibleLocal;
+
+    /// <summary>Positions each hosted control in its item slot and vetoes the peer of any host pushed
+    /// into the overflow, pushing the veto only when a host's placement actually flips.</summary>
+    private void PlaceHostedControls()
+    {
+        var firstOverflow = this.FirstOverflowIndex();
+        var x = 0;
+        for (var i = 0; i < this.Items.Count; ++i)
+        {
+            var item = this.Items[i];
+            var visible = item.Visible;
+            if (item is ToolStripControlHost host)
+            {
+                var placed = visible && i < firstOverflow;
+                if (placed)
+                    host.Control.Bounds = new Rectangle(
+                        x + ButtonPadding,
+                        2,
+                        Math.Max(0, this.ItemWidth(i, item) - (2 * ButtonPadding)),
+                        Math.Max(0, this.Height - 4));
+
+                if (host.Placed != placed)
+                {
+                    host.Placed = placed;
+                    host.Control.PushPeerVisibleTree();
+                }
+            }
+
+            if (visible && i < firstOverflow)
+                x += this.ItemWidth(i, item);
+        }
     }
 
     private protected override void OnUnrealized()
@@ -90,6 +148,7 @@ public class ToolStrip : OwnerDrawnControl
         var theme = this.Theme;
         var height = this.Height;
         g.FillRectangle(theme.ControlBackground, new(0, 0, this.Width, height));
+        this.PlaceHostedControls();
 
         var firstOverflow = this.FirstOverflowIndex();
         var x = 0;
@@ -190,6 +249,9 @@ public class ToolStrip : OwnerDrawnControl
     private void PaintItem(IGraphics g, ToolStripItem item, int index, Rectangle bounds)
     {
         var theme = this.Theme;
+        if (item is ToolStripControlHost)
+            return; // the hosted control paints itself through its own peer
+
         if (item is ToolStripSeparator)
         {
             var mid = bounds.X + (bounds.Width / 2);
@@ -342,6 +404,9 @@ public class ToolStrip : OwnerDrawnControl
     /// <summary>Measures one item: padding, icon, caption and arrow zone as applicable.</summary>
     private int MeasureItemWidth(ToolStripItem item)
     {
+        if (item is ToolStripControlHost host)
+            return host.HostWidth;
+
         if (item is ToolStripSeparator)
             return SeparatorWidth;
 

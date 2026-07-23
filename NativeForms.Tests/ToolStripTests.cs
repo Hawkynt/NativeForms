@@ -253,4 +253,35 @@ internal sealed class ToolStripTests
         canvas.RaiseMouseUp(35, 10);
         Assert.That(clicks, Is.EqualTo(new[] { "second", "first" }), "the refreshed width routes x=35 to the first button");
     }
+
+    [Test]
+    public void A_hosted_control_is_parented_and_positioned_in_its_slot()
+    {
+        var combo = new ComboBox();
+        var strip = CreateStrip(out var canvas, out _, width: 300);
+        strip.Items.Add(new ToolStripControlHost(combo) { HostWidth = 120 });
+
+        canvas.RaisePaint(); // placement runs in the paint pass
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(combo.Parent, Is.SameAs(strip), "the bar adopts the hosted control");
+            Assert.That(combo.Bounds.X, Is.EqualTo(4), "inset by the button padding");
+            Assert.That(combo.Bounds.Width, Is.EqualTo(112), "HostWidth minus the padding on both sides");
+            Assert.That(combo.Visible, Is.True);
+        });
+    }
+
+    [Test]
+    public void An_overflowed_hosted_control_is_hidden()
+    {
+        var combo = new ComboBox();
+        var strip = CreateStrip(out var canvas, out _, width: 60);
+        strip.Items.Add(new ToolStripButton("A"));
+        strip.Items.Add(new ToolStripControlHost(combo) { HostWidth = 120 }); // cannot fit → overflow
+
+        canvas.RaisePaint();
+
+        Assert.That(combo.Visible, Is.False, "a host pushed into the overflow hides its control");
+    }
 }

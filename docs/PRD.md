@@ -499,8 +499,10 @@ strategy (may differ per platform; note exceptions inline).
   - [x] `ICommand` wiring (auto enable/disable via `CanExecute`)
 - [~] `ContextMenuStrip` — `Control.ContextMenuStrip` + right-click at the cursor on
       owner-drawn controls; native-widget controls pending (peer right-click events)
-- [x] `ToolStrip` (owner) — icon+text buttons, toggles, separators,
-      `ToolStripDropDownButton`/`ToolStripSplitButton`, overflow chevron popup, `ImageList`
+- [x] `ToolStrip` (owner) — icon+text buttons, toggles (`CheckOnClick`), separators,
+      `ToolStripDropDownButton`/`ToolStripSplitButton` (checkboxes + icons in their drop-downs via
+      `ToolStripMenuItem`), `ToolStripControlHost` hosting a real `Control` (combo/date/time/colour
+      pickers), overflow chevron popup, `ImageList`
 - [x] `StatusStrip` — `ToolStripStatusLabel` (incl. `Spring`), embedded progress item (shared
       renderer), size grip
 - [~] `ToolTip` — owner-drawn controls with Initial/AutoPop delays via `Timer` + popup done;

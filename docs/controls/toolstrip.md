@@ -64,6 +64,20 @@ the `DropDownItems` drop-down. Constructors: `ToolStripSplitButton()`,
 
 A vertical dividing line, 7 px wide. Takes no clicks and no hover.
 
+### ToolStripControlHost
+
+Hosts a real `Control` — a `ComboBox`, `DateTimePicker`, `TimePicker`, `CheckBox`, a colour button —
+among the buttons, the toolbar counterpart of WinForms `ToolStripControlHost` (and of the ribbon's
+`RibbonHostItem`). The bar parents the control into its own `Controls`, positions it in the item's
+slot (inset by the button padding, filling the bar height) and hides its peer while the item is pushed
+into the overflow. `HostWidth` (default 120) reserves the slot; constructor
+`ToolStripControlHost(Control)`.
+
+```csharp
+var zoom = new ComboBox { /* … */ };
+strip.Items.Add(new ToolStripControlHost(zoom) { HostWidth = 90 });
+```
+
 ## Notes
 
 - **Click contract.** A press arms the item and paints the pressed fill; the click commits on mouse
