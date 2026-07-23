@@ -100,6 +100,62 @@ internal sealed class AnimatedImageTests
     }
 
     [Test]
+    public void Pausing_freezes_the_frame_and_resuming_continues_from_it()
+    {
+        var image = ThreeFrames(0);
+        var start = image.StartTick;
+
+        image.Pause(start + 150); // freeze on frame 1
+        Assert.Multiple(() =>
+        {
+            Assert.That(image.IsPaused, Is.True);
+            Assert.That(image.CurrentFrameIndex(start + 1000), Is.EqualTo(1), "time passing does not advance a paused image");
+        });
+
+        image.Resume(start + 1000); // 850 ms were spent paused
+        Assert.Multiple(() =>
+        {
+            Assert.That(image.IsPaused, Is.False);
+            Assert.That(image.CurrentFrameIndex(start + 1000), Is.EqualTo(1), "resumes exactly where it froze");
+            Assert.That(image.CurrentFrameIndex(start + 1100), Is.EqualTo(2), "then keeps advancing (paused time excluded)");
+        });
+    }
+
+    [Test]
+    public void Grayscale_luminance_weights_the_channels_and_keeps_alpha()
+    {
+        int[] source = [unchecked((int)0xFFFF0000), unchecked((int)0x8000FF00), unchecked((int)0xFF0000FF)];
+        var gray = AnimatedImage.GrayscaleForTest(source);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(gray[0], Is.EqualTo(unchecked((int)0xFF4C4C4C)), "red → 0x4C, alpha kept");
+            Assert.That(gray[1], Is.EqualTo(unchecked((int)0x80959595)), "green → 0x95, alpha 0x80 kept");
+            Assert.That(gray[2], Is.EqualTo(unchecked((int)0xFF1C1C1C)), "blue → 0x1C");
+        });
+    }
+
+    [Test]
+    public void A_disabled_picture_box_freezes_the_animation_and_re_enabling_resumes_it()
+    {
+        var image = ThreeFrames(0);
+        var box = new PictureBox { Bounds = new(0, 0, 40, 40), AnimatedImage = image };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(box);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        box.Enabled = false;
+        canvas.RaisePaint();
+        Assert.That(image.IsPaused, Is.True, "a disabled box freezes its animation");
+
+        box.Enabled = true;
+        canvas.RaisePaint();
+        Assert.That(image.IsPaused, Is.False, "re-enabling resumes it");
+    }
+
+    [Test]
     public void A_picture_box_draws_the_current_animation_frame()
     {
         var box = new PictureBox { Bounds = new(0, 0, 40, 40), AnimatedImage = ThreeFrames(0) };

@@ -14,6 +14,9 @@ public sealed class AnimatedImage : IDisposable
     private readonly DecodedImage _decoded;
     private IPlatformBackend? _backend;
     private IImage?[] _images;
+    private IImage?[] _grayImages;
+    private long _pausedAtTick;   // 0 = running; otherwise the tick the animation was frozen at
+    private long _pausedTotalMs;  // total time spent paused, subtracted from the elapsed clock
 
     /// <summary>Wraps a decoded image.</summary>
     public AnimatedImage(DecodedImage decoded)
@@ -21,6 +24,7 @@ public sealed class AnimatedImage : IDisposable
         ArgumentNullException.ThrowIfNull(decoded);
         _decoded = decoded;
         _images = new IImage?[decoded.Frames.Count];
+        _grayImages = new IImage?[decoded.Frames.Count];
         this.LoopCount = decoded.LoopCount;
         this.StartTick = Environment.TickCount64;
     }
@@ -80,24 +84,79 @@ public sealed class AnimatedImage : IDisposable
         return count - 1;
     }
 
-    /// <summary>The current frame's index for a monotonic <paramref name="nowTick"/>.</summary>
-    internal int CurrentFrameIndex(long nowTick) => this.FrameIndexAt(nowTick - this.StartTick);
+    /// <summary>Whether the animation is currently frozen (the hosting control is disabled).</summary>
+    internal bool IsPaused => _pausedAtTick != 0;
+
+    /// <summary>Freezes the animation at its current frame — the elapsed clock stops advancing.</summary>
+    internal void Pause(long nowTick)
+    {
+        if (_pausedAtTick == 0)
+            _pausedAtTick = nowTick == 0 ? 1 : nowTick;
+    }
+
+    /// <summary>Resumes a frozen animation, continuing from the frame it stopped on (the paused span is
+    /// excluded from the elapsed clock).</summary>
+    internal void Resume(long nowTick)
+    {
+        if (_pausedAtTick == 0)
+            return;
+
+        _pausedTotalMs += nowTick - _pausedAtTick;
+        _pausedAtTick = 0;
+    }
+
+    /// <summary>The current frame's index for a monotonic <paramref name="nowTick"/>, holding still
+    /// while paused and excluding paused time so a resume continues where it froze.</summary>
+    internal int CurrentFrameIndex(long nowTick)
+    {
+        var reference = _pausedAtTick != 0 ? _pausedAtTick : nowTick;
+        return this.FrameIndexAt(reference - this.StartTick - _pausedTotalMs);
+    }
 
     /// <summary>Realizes (and caches) the given frame's <see cref="IImage"/> for a backend.</summary>
     internal IImage FrameImage(IPlatformBackend backend, int index)
     {
-        if (!ReferenceEquals(_backend, backend))
-        {
-            this.DisposeImages();
-            _backend = backend;
-            _images = new IImage?[_decoded.Frames.Count];
-        }
-
+        this.EnsureBackend(backend);
         return _images[index] ??= backend.CreateImage(_decoded.Width, _decoded.Height, _decoded.Frames[index].Argb);
+    }
+
+    /// <summary>Realizes (and caches) a grayscale version of the given frame — the disabled look.</summary>
+    internal IImage FrameImageGray(IPlatformBackend backend, int index)
+    {
+        this.EnsureBackend(backend);
+        return _grayImages[index] ??= backend.CreateImage(_decoded.Width, _decoded.Height, Grayscale(_decoded.Frames[index].Argb));
     }
 
     /// <inheritdoc/>
     public void Dispose() => this.DisposeImages();
+
+    private void EnsureBackend(IPlatformBackend backend)
+    {
+        if (ReferenceEquals(_backend, backend))
+            return;
+
+        this.DisposeImages();
+        _backend = backend;
+        _images = new IImage?[_decoded.Frames.Count];
+        _grayImages = new IImage?[_decoded.Frames.Count];
+    }
+
+    /// <summary>The grayscale transform, exposed for tests (the backend image discards pixels).</summary>
+    internal static int[] GrayscaleForTest(int[] argb) => Grayscale(argb);
+
+    /// <summary>Converts ARGB pixels to grayscale (luminance-weighted), keeping the alpha.</summary>
+    private static int[] Grayscale(int[] argb)
+    {
+        var gray = new int[argb.Length];
+        for (var i = 0; i < argb.Length; ++i)
+        {
+            var pixel = argb[i];
+            var luminance = (((pixel >> 16) & 0xFF) * 77 + ((pixel >> 8) & 0xFF) * 150 + (pixel & 0xFF) * 29) >> 8;
+            gray[i] = (int)((uint)pixel & 0xFF000000) | (luminance << 16) | (luminance << 8) | luminance;
+        }
+
+        return gray;
+    }
 
     private void DisposeImages()
     {
@@ -105,6 +164,12 @@ public sealed class AnimatedImage : IDisposable
         {
             _images[i]?.Dispose();
             _images[i] = null;
+        }
+
+        for (var i = 0; i < _grayImages.Length; ++i)
+        {
+            _grayImages[i]?.Dispose();
+            _grayImages[i] = null;
         }
     }
 }

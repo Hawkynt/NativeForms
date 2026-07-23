@@ -24,7 +24,7 @@ form.Controls.Add(box);
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `Image` | `IImage?` | `null` | The static image to display, or `null` for background (and border) only. |
-| `AnimatedImage` | `AnimatedImage?` | `null` | A decoded still or animated image; when animated, the shared animation clock repaints the box as the frame advances. Takes precedence over `Image`. A hidden box is not repainted but shows the correct frame when shown again (the frame is a function of elapsed time). |
+| `AnimatedImage` | `AnimatedImage?` | `null` | A decoded still or animated image; when animated, the shared animation clock repaints the box as the frame advances. Takes precedence over `Image`. A hidden box is not repainted but shows the correct frame when shown again (the frame is a function of elapsed time). **Disabling** the box freezes the animation on its current frame and renders it **grayscale**; re-enabling resumes exactly where it stopped (the paused span is excluded from the clock). |
 | `SizeMode` | `PictureBoxSizeMode` | `Normal` | How the image is fitted into the client area (see the geometries below). |
 | `BorderStyle` | `BorderStyle` | `None` | `None` or `FixedSingle` — a single line in the theme's border color. |
 

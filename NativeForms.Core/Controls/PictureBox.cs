@@ -110,7 +110,15 @@ public class PictureBox : OwnerDrawnControl
 
         if (this.AnimatedImage is { Width: > 0, Height: > 0 } animated && this.Backend is { } backend)
         {
-            var frame = animated.FrameImage(backend, animated.CurrentFrameIndex(Environment.TickCount64));
+            // Disabled freezes the animation and greys the frame; enabling resumes where it stopped.
+            var now = Environment.TickCount64;
+            if (this.Enabled && animated.IsPaused)
+                animated.Resume(now);
+            else if (!this.Enabled && !animated.IsPaused)
+                animated.Pause(now);
+
+            var index = animated.CurrentFrameIndex(now);
+            var frame = this.Enabled ? animated.FrameImage(backend, index) : animated.FrameImageGray(backend, index);
             g.PushClip(client);
             g.DrawImage(frame, GetImageRectangle(client.Size, new Size(animated.Width, animated.Height), this.SizeMode));
             g.PopClip();
