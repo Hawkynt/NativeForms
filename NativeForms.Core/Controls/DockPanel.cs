@@ -54,6 +54,26 @@ public partial class DockPanel : OwnerDrawnControl
         }
     }
 
+    /// <summary>
+    /// Which edge each tab group's document-tab strip sits on. <see cref="TabAlignment.Top"/> and
+    /// <see cref="TabAlignment.Bottom"/> lay the tabs out in a horizontal row (bottom by default, the
+    /// classic document well); <see cref="TabAlignment.Left"/>/<see cref="TabAlignment.Right"/> stack
+    /// them in a vertical strip whose width fits the widest caption.
+    /// </summary>
+    public TabAlignment DocumentTabStripEdge
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.PerformLayout();
+            this.Invalidate();
+        }
+    } = TabAlignment.Bottom;
+
     /// <summary>Every pane the manager owns, in the order they were added.</summary>
     public IReadOnlyList<DockContent> Contents => (IReadOnlyList<DockContent>?)_contents ?? [];
 
@@ -619,18 +639,57 @@ public partial class DockPanel : OwnerDrawnControl
     {
         var caption = this.CaptionHeight;
         group.CaptionBounds = new Rectangle(bounds.X, bounds.Y, bounds.Width, Math.Min(caption, bounds.Height));
-        var tabStrip = group.Contents.Count > 1 ? Math.Min(this.TabStripHeight, Math.Max(0, bounds.Height - caption)) : 0;
-        group.TabStripBounds = tabStrip > 0
-            ? new Rectangle(bounds.X, bounds.Bottom - tabStrip, bounds.Width, tabStrip)
-            : Rectangle.Empty;
-        group.ContentBounds = new Rectangle(
-            bounds.X,
-            bounds.Y + group.CaptionBounds.Height,
-            bounds.Width,
-            Math.Max(0, bounds.Height - group.CaptionBounds.Height - tabStrip));
+
+        // The region under the caption is split between the tab strip — on the chosen edge — and content.
+        var below = new Rectangle(bounds.X, bounds.Y + group.CaptionBounds.Height, bounds.Width, Math.Max(0, bounds.Height - group.CaptionBounds.Height));
+        var edge = this.DocumentTabStripEdge;
+        var vertical = edge is TabAlignment.Left or TabAlignment.Right;
+
+        var thickness = 0;
+        if (group.Contents.Count > 1)
+            thickness = vertical
+                ? Math.Min(this.VerticalTabStripWidth(group), below.Width)
+                : Math.Min(this.TabStripHeight, below.Height);
+
+        var strip = Rectangle.Empty;
+        var content = below;
+        if (thickness > 0)
+            switch (edge)
+            {
+                case TabAlignment.Top:
+                    strip = new(below.X, below.Y, below.Width, thickness);
+                    content = new(below.X, below.Y + thickness, below.Width, below.Height - thickness);
+                    break;
+                case TabAlignment.Left:
+                    strip = new(below.X, below.Y, thickness, below.Height);
+                    content = new(below.X + thickness, below.Y, below.Width - thickness, below.Height);
+                    break;
+                case TabAlignment.Right:
+                    strip = new(below.Right - thickness, below.Y, thickness, below.Height);
+                    content = new(below.X, below.Y, below.Width - thickness, below.Height);
+                    break;
+                default:
+                    strip = new(below.X, below.Bottom - thickness, below.Width, thickness);
+                    content = new(below.X, below.Y, below.Width, below.Height - thickness);
+                    break;
+            }
+
+        group.TabStripBounds = strip;
+        group.ContentBounds = content;
 
         if (group.Active is { } active)
             active.Bounds = group.ContentBounds;
+    }
+
+    /// <summary>The width a vertical (left/right) tab strip needs to fit its widest caption.</summary>
+    private int VerticalTabStripWidth(DockTabGroupNode group)
+    {
+        var widest = _MinVerticalTabWidth;
+        if (this.Backend is { } backend)
+            for (var i = 0; i < group.Contents.Count; ++i)
+                widest = Math.Max(widest, backend.MeasureText(group.Contents[i].Title, this.Font).Width + 12);
+
+        return Math.Min(_TabMaxWidth, widest);
     }
 
     /// <inheritdoc/>

@@ -291,7 +291,9 @@ strategy (may differ per platform; note exceptions inline).
       quit the loop — `IWindowPeer.SetQuitsOnClose`), `AutoHide` edge strips that fly out on hover,
       drag-to-redock with the diamond overlay guides + translucent landing preview (transient overlay
       surface, allocation-free at rest), `Ctrl+Tab` document switching, caption close/float/pin
-      buttons, and reflection-free `SaveLayout`/`LoadLayout` round-trip. Empty manager ≈544 B, empty
+      buttons, a `DocumentTabStripEdge` (`TabAlignment`) placing the tab strip on any edge — horizontal
+      rows on top/bottom, vertical strips on left/right — and reflection-free `SaveLayout`/`LoadLayout`
+      round-trip. Empty manager ≈544 B, empty
       pane ≈368 B, populated repaint 0 B/frame
 - [~] `FlowLayoutPanel` (all four `FlowDirection`s, `WrapContents`, `Control.Margin`,
       AutoScroll interplay) and `TableLayoutPanel` (absolute/percent/auto-size styles, spans,

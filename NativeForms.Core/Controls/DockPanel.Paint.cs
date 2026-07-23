@@ -6,6 +6,7 @@ namespace Hawkynt.NativeForms;
 public partial class DockPanel
 {
     private const int _TabMaxWidth = 160;
+    private const int _MinVerticalTabWidth = 40;
     private const int _IconGap = 4;
     private const int _CaptionInset = 6;
 
@@ -161,17 +162,31 @@ public partial class DockPanel
     {
         var strip = group.TabStripBounds;
         g.FillRectangle(theme.HeaderBackground, strip);
-        g.DrawLine(theme.Border, strip.X, strip.Y, strip.Right - 1, strip.Y);
+
+        var edge = this.DocumentTabStripEdge;
+        var vertical = edge is TabAlignment.Left or TabAlignment.Right;
+
+        // A separating line along the edge the strip shares with the content it labels.
+        switch (edge)
+        {
+            case TabAlignment.Top: g.DrawLine(theme.Border, strip.X, strip.Bottom - 1, strip.Right - 1, strip.Bottom - 1); break;
+            case TabAlignment.Left: g.DrawLine(theme.Border, strip.Right - 1, strip.Y, strip.Right - 1, strip.Bottom - 1); break;
+            case TabAlignment.Right: g.DrawLine(theme.Border, strip.X, strip.Y, strip.X, strip.Bottom - 1); break;
+            default: g.DrawLine(theme.Border, strip.X, strip.Y, strip.Right - 1, strip.Y); break; // Bottom
+        }
 
         var count = group.Contents.Count;
-        var tabW = this.TabWidth(strip.Width, count);
+        var extent = vertical ? strip.Height : strip.Width;
+        var cellSize = this.TabCellSize(extent, count, vertical);
+        if (cellSize <= 0)
+            return;
+
         for (var i = 0; i < count; ++i)
         {
-            var cell = new Rectangle(strip.X + (i * tabW), strip.Y, tabW, strip.Height);
-            if (cell.Right > strip.Right)
+            var cell = TabCellRect(strip, i, cellSize, vertical);
+            if (vertical ? cell.Bottom > strip.Bottom : cell.Right > strip.Right)
                 break;
 
-            var pane = group.Contents[i];
             var selected = i == group.ActiveIndex;
             if (selected)
                 g.FillRectangle(theme.ControlBackground, cell);
@@ -179,14 +194,34 @@ public partial class DockPanel
                 g.FillRectangle(theme.SelectionBackground, cell);
 
             if (selected)
-                g.FillRectangle(theme.Accent, new Rectangle(cell.X, cell.Y, cell.Width, 2));
+                g.FillRectangle(theme.Accent, TabAccentRect(cell, edge));
 
             var text = new Rectangle(cell.X + 6, cell.Y, cell.Width - 12, cell.Height);
             g.PushClip(text);
-            g.DrawText(pane.Title, theme.DefaultFont, theme.ControlText, text, ContentAlignment.MiddleLeft);
+            g.DrawText(group.Contents[i].Title, theme.DefaultFont, theme.ControlText, text, ContentAlignment.MiddleLeft);
             g.PopClip();
         }
     }
+
+    /// <summary>The per-tab extent along the strip's axis: capped to the max tab width when horizontal
+    /// and to a row height when vertical, shrinking to share the strip when the tabs are many.</summary>
+    private int TabCellSize(int stripExtent, int count, bool vertical)
+        => count <= 0 ? 0 : Math.Min(vertical ? this.TabStripHeight : _TabMaxWidth, stripExtent / count);
+
+    /// <summary>The i-th tab cell laid out along the strip's axis.</summary>
+    private static Rectangle TabCellRect(Rectangle strip, int i, int cellSize, bool vertical)
+        => vertical
+            ? new Rectangle(strip.X, strip.Y + (i * cellSize), strip.Width, cellSize)
+            : new Rectangle(strip.X + (i * cellSize), strip.Y, cellSize, strip.Height);
+
+    /// <summary>The 2-px selected-tab accent, on the cell edge that faces the content.</summary>
+    private static Rectangle TabAccentRect(Rectangle cell, TabAlignment edge) => edge switch
+    {
+        TabAlignment.Top => new(cell.X, cell.Bottom - 2, cell.Width, 2),
+        TabAlignment.Left => new(cell.Right - 2, cell.Y, 2, cell.Height),
+        TabAlignment.Right => new(cell.X, cell.Y, 2, cell.Height),
+        _ => new(cell.X, cell.Y, cell.Width, 2), // Bottom: content is above
+    };
 
     private void PaintAutoHideStrips(IGraphics g, ITheme theme)
     {
@@ -251,7 +286,6 @@ public partial class DockPanel
 
     // --- Geometry (deterministic; no per-frame measuring) -----------------------------------------
 
-    private int TabWidth(int stripWidth, int count) => count <= 0 ? 0 : Math.Min(_TabMaxWidth, stripWidth / count);
 
     private int CaptionButtonsWidth(DockContent active) => this.CaptionButtonCount(active) * this.CaptionHeight;
 
@@ -379,10 +413,12 @@ public partial class DockPanel
             return -1;
 
         var count = group.Contents.Count;
-        var tabW = this.TabWidth(strip.Width, count);
-        if (tabW <= 0)
+        var vertical = this.DocumentTabStripEdge is TabAlignment.Left or TabAlignment.Right;
+        var cellSize = this.TabCellSize(vertical ? strip.Height : strip.Width, count, vertical);
+        if (cellSize <= 0)
             return -1;
-        var i = (pt.X - strip.X) / tabW;
+
+        var i = (vertical ? pt.Y - strip.Y : pt.X - strip.X) / cellSize;
         return i >= 0 && i < count ? i : -1;
     }
 }

@@ -279,6 +279,61 @@ internal sealed class DockPanelTests
     }
 
     [Test]
+    public void Top_aligned_tabs_sit_under_the_caption_above_the_content()
+    {
+        var dock = new DockPanel { DocumentTabStripEdge = TabAlignment.Top };
+        var a = Pane("a");
+        var b = Pane("b");
+        dock.AddDocument(a);
+        dock.AddDocument(b);
+        Realize(dock);
+        var group = dock.GroupOf(a)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(group.TabStripBounds.Y, Is.EqualTo(group.CaptionBounds.Bottom), "the strip is right under the caption");
+            Assert.That(group.ContentBounds.Y, Is.EqualTo(group.TabStripBounds.Bottom), "content is below the strip");
+            Assert.That(group.TabStripBounds.Width, Is.EqualTo(group.ContentBounds.Width), "a horizontal strip spans the width");
+        });
+    }
+
+    [Test]
+    public void Left_aligned_tabs_form_a_vertical_strip_beside_the_content()
+    {
+        var dock = new DockPanel { DocumentTabStripEdge = TabAlignment.Left };
+        var a = Pane("a");
+        var b = Pane("b");
+        dock.AddDocument(a);
+        dock.AddDocument(b);
+        Realize(dock);
+        var group = dock.GroupOf(a)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(group.TabStripBounds.X, Is.EqualTo(group.ContentBounds.X - group.TabStripBounds.Width), "the strip is left of the content");
+            Assert.That(group.ContentBounds.X, Is.EqualTo(group.TabStripBounds.Right), "content starts at the strip's right edge");
+            Assert.That(group.TabStripBounds.Height, Is.EqualTo(group.ContentBounds.Height), "the vertical strip spans the content height");
+            Assert.That(group.TabStripBounds.Width, Is.LessThan(group.ContentBounds.Width), "a slim vertical strip");
+        });
+    }
+
+    [Test]
+    public void A_click_on_a_vertically_stacked_tab_activates_its_pane()
+    {
+        var dock = new DockPanel { DocumentTabStripEdge = TabAlignment.Left };
+        var a = Pane("a");
+        var b = Pane("b");
+        dock.AddDocument(a);
+        dock.AddDocument(b); // b is active on add
+        var (_, _, canvas) = Realize(dock);
+        var strip = dock.GroupOf(a)!.TabStripBounds;
+
+        canvas.RaiseMouseDown(strip.X + 4, strip.Y + 4); // the first (top) tab in the vertical strip
+
+        Assert.That(dock.ActiveContent, Is.SameAs(a), "clicking the top tab activates the first pane");
+    }
+
+    [Test]
     public void A_long_caption_title_is_clipped_so_it_cannot_overpaint_the_buttons()
     {
         var dock = new DockPanel();

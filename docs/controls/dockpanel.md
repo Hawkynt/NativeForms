@@ -107,6 +107,7 @@ may hold any character.
 | `Contents` | `IReadOnlyList<DockContent>` — every owned pane. |
 | `ActiveContent` / `ActiveContentChanged` | The pane with the active caption. |
 | `ImageList` | The icons `DockContent.ImageIndex` indexes into. |
+| `DocumentTabStripEdge` | `TabAlignment` (default `Bottom`) — which edge each tab group's tab strip sits on. `Top`/`Bottom` lay the tabs in a horizontal row; `Left`/`Right` stack them in a vertical strip sized to the widest caption. |
 | `SaveLayout()` / `LoadLayout(string, Func<string,DockContent?>)` | Reflection-free layout round-trip. |
 
 ### `DockContent`
