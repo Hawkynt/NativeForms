@@ -155,6 +155,28 @@ internal sealed class CalendarCore
     /// <summary>The latest selectable day; later cells paint disabled and reject clicks.</summary>
     public DateTime MaxDate { get; set; } = MaximumDate;
 
+    /// <summary>An optional per-day background colour — the hook for shading holidays, deadlines and the
+    /// like. Returns a <see cref="Color"/> to fill that day's cell (in-month days only), or
+    /// <see langword="null"/> to leave it plain. The current selection still paints over it.</summary>
+    public Func<DateTime, Color?>? DayBackgroundProvider { get; set; }
+
+    /// <summary>An optional predicate that blocks individual days from being picked — a blackout of
+    /// weekends, booked slots or any custom rule on top of <see cref="MinDate"/>/<see cref="MaxDate"/>.
+    /// A day it rejects paints disabled and refuses clicks.</summary>
+    public Func<DateTime, bool>? DateSelectable { get; set; }
+
+    /// <summary>An optional per-day tooltip text, shown by the hosting control on hover.</summary>
+    public Func<DateTime, string?>? DayTooltipProvider { get; set; }
+
+    /// <summary>Whether a day may be selected: inside the window and not vetoed by <see cref="DateSelectable"/>.</summary>
+    private bool IsDaySelectable(DateTime date)
+        => date >= this.MinDate.Date && date <= this.MaxDate.Date && (this.DateSelectable is null || this.DateSelectable(date));
+
+    /// <summary>The day under a point on the month page, or <see langword="null"/> elsewhere — the hook
+    /// a host uses to drive per-day tooltips.</summary>
+    public DateTime? DayAt(ITheme theme, Size size, int x, int y)
+        => this.HitTest(theme, size, x, y, out var day, out _) == CalendarHit.Day ? day : null;
+
     /// <summary>The day of week in the leftmost grid column.</summary>
     public DayOfWeek FirstDayOfWeek { get; set; } = DayOfWeek.Monday;
 
@@ -453,23 +475,24 @@ internal sealed class CalendarCore
         var date = FirstGridDate(_displayMonth, this.FirstDayOfWeek);
         var selectionStart = this.SelectionStart.Date;
         var selectionEnd = this.SelectionEnd.Date;
-        var minDay = this.MinDate.Date;
-        var maxDay = this.MaxDate.Date;
         var today = this.TodayDate.Date;
         var focus = this.FocusDate.Date;
         for (var row = 0; row < 6; ++row)
             for (var col = 0; col < 7; ++col, date = date.AddDays(1))
             {
                 var cell = new Rectangle(col * cellWidth, top + row * cellHeight, cellWidth, cellHeight);
+                var inMonth = date.Month == _displayMonth.Month && date.Year == _displayMonth.Year;
                 var selected = date >= selectionStart && date <= selectionEnd;
                 if (selected)
                     GlyphRenderer.FillSelection(g, theme, cell);
+                else if (inMonth && this.DayBackgroundProvider is { } background && background(date) is { } fill)
+                    g.FillRectangle(fill, cell);
 
                 if (date == today)
                     g.DrawEllipse(theme.Accent, new(cell.X + 1, cell.Y + 1, cell.Width - 2, cell.Height - 2));
 
                 var color = selected ? theme.SelectionText
-                    : date < minDay || date > maxDay || date.Month != _displayMonth.Month || date.Year != _displayMonth.Year ? theme.DisabledText
+                    : !inMonth || !this.IsDaySelectable(date) ? theme.DisabledText
                     : theme.ControlText;
                 g.DrawText(numbers[date.Day - 1], theme.DefaultFont, color, cell, ContentAlignment.MiddleCenter);
 
@@ -615,7 +638,7 @@ internal sealed class CalendarCore
                 this.ZoomInto(periodIndex);
                 break;
 
-            case CalendarHit.Day when day >= this.MinDate.Date && day <= this.MaxDate.Date:
+            case CalendarHit.Day when this.IsDaySelectable(day):
                 this.FocusDate = day;
                 _dragging = true;
                 if (e.Shift)
@@ -640,7 +663,7 @@ internal sealed class CalendarCore
         if (this.HitTest(theme, size, e.X, e.Y, out var day, out _) != CalendarHit.Day)
             return;
 
-        if (day < this.MinDate.Date || day > this.MaxDate.Date)
+        if (!this.IsDaySelectable(day))
             return;
 
         this.FocusDate = day;

@@ -1,3 +1,5 @@
+using System.Drawing;
+
 namespace Hawkynt.NativeForms;
 
 /// <summary>
@@ -14,6 +16,8 @@ public class MonthCalendar : OwnerDrawnControl
 {
     private readonly CalendarCore _core;
     private bool _focused;
+    private DateTime? _hoverDay;
+    private ToolTip? _dayTip;
 
     /// <summary>Creates a calendar showing the current month with today selected.</summary>
     public MonthCalendar()
@@ -165,6 +169,41 @@ public class MonthCalendar : OwnerDrawnControl
     protected virtual void OnDateSelected(DateRangeEventArgs e) => this.DateSelected?.Invoke(this, e);
 
     /// <inheritdoc/>
+    /// <summary>An optional per-day background colour — shade holidays, deadlines and the like.
+    /// In-month days only; the selection still paints over it.</summary>
+    public Func<DateTime, Color?>? DayBackgroundProvider
+    {
+        get => _core.DayBackgroundProvider;
+        set
+        {
+            _core.DayBackgroundProvider = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>An optional predicate that blocks individual days from being picked (weekends, booked
+    /// days, …) on top of <see cref="MinDate"/>/<see cref="MaxDate"/>; a rejected day paints disabled.</summary>
+    public Func<DateTime, bool>? DateSelectable
+    {
+        get => _core.DateSelectable;
+        set
+        {
+            _core.DateSelectable = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>An optional per-day tooltip text, shown on hover.</summary>
+    public Func<DateTime, string?>? DayTooltipProvider
+    {
+        get => _core.DayTooltipProvider;
+        set => _core.DayTooltipProvider = value;
+    }
+
+    /// <summary>The tooltip text for the day currently under the pointer, for tests.</summary>
+    internal string? HoveredDayTooltipText { get; private set; }
+
+    /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e) => _core.Paint(e.Graphics, this.Theme, this.Size, _focused);
 
     /// <inheritdoc/>
@@ -175,7 +214,38 @@ public class MonthCalendar : OwnerDrawnControl
     }
 
     /// <inheritdoc/>
-    protected override void OnMouseMove(MouseEventArgs e) => _core.HandleMouseMove(this.Theme, this.Size, e);
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        _core.HandleMouseMove(this.Theme, this.Size, e);
+        this.UpdateDayTooltip(e.X, e.Y);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        _hoverDay = null;
+        this.HoveredDayTooltipText = null;
+        _dayTip?.Hide();
+    }
+
+    /// <summary>Refreshes the per-day tooltip as the pointer moves onto a new day.</summary>
+    private void UpdateDayTooltip(int x, int y)
+    {
+        if (_core.DayTooltipProvider is not { } provider)
+            return;
+
+        var day = _core.DayAt(this.Theme, this.Size, x, y);
+        if (day == _hoverDay)
+            return;
+
+        _hoverDay = day;
+        this.HoveredDayTooltipText = day is { } d ? provider(d) : null;
+
+        var tip = _dayTip ??= new ToolTip();
+        tip.Hide(); // re-arm so the new day's text shows after the delay
+        tip.SetToolTip(this, this.HoveredDayTooltipText ?? string.Empty);
+    }
 
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e) => _core.HandleMouseUp(e);

@@ -468,6 +468,9 @@ strategy (may differ per platform; note exceptions inline).
       keyboard/wheel navigation; virtualized (only visible days laid out, bounded for
       100k), cached layout so populated repaints allocate zero — including a live drag preview — (empty
       ≈ 624 B, `Appointment` ≈ 48 B)
+- [x] Calendar per-day delegates on `MonthCalendar`/`DateTimePicker`/`CalendarCore`:
+      `DayBackgroundProvider` (shade holidays), `DateSelectable` (predicate blocking picks), and
+      `DayTooltipProvider` (per-day hover tooltip, shown by `MonthCalendar`)
 - [~] `DateTimePicker` (owner field + popup calendar sharing `CalendarCore`) — Long/Short/Time/
       Custom invariant formats, `ShowCheckBox`/`Checked` greying, closed Up/Down day stepping,
       Alt+Down/F4, commit/cancel semantics, drop-down title drill-down done; `BoldedDates` and

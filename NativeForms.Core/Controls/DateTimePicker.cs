@@ -83,6 +83,17 @@ public class DateTimePicker : OwnerDrawnControl
         }
     }
 
+    /// <summary>An optional per-day background colour for the drop-down calendar — shade holidays and
+    /// the like. Applied the next time the calendar opens.</summary>
+    public Func<DateTime, System.Drawing.Color?>? DayBackgroundProvider { get; set; }
+
+    /// <summary>An optional predicate that blocks individual days in the drop-down from being picked,
+    /// on top of <see cref="MinDate"/>/<see cref="MaxDate"/>.</summary>
+    public Func<DateTime, bool>? DateSelectable { get; set; }
+
+    /// <summary>An optional per-day tooltip for the drop-down calendar, shown on hover.</summary>
+    public Func<DateTime, string?>? DayTooltipProvider { get; set; }
+
     /// <summary>How the closed field renders <see cref="Value"/>; always the invariant culture.</summary>
     public DateTimePickerFormat Format
     {
@@ -342,6 +353,9 @@ public class DateTimePicker : OwnerDrawnControl
         var day = _value.Date;
         calendar.MinDate = _minDate;
         calendar.MaxDate = _maxDate;
+        calendar.DayBackgroundProvider = this.DayBackgroundProvider;
+        calendar.DateSelectable = this.DateSelectable;
+        calendar.DayTooltipProvider = this.DayTooltipProvider;
         calendar.TodayDate = DateTime.Today;
         calendar.SelectionStart = day;
         calendar.SelectionEnd = day;

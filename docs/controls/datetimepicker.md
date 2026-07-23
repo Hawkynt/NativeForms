@@ -21,6 +21,9 @@ form.Controls.Add(picker);
 | `Value` | `DateTime` | `DateTime.Now` | The picked date and time, clamped into [`MinDate`, `MaxDate`] on assignment. |
 | `MinDate` | `DateTime` | `1753-01-01` | The earliest pickable date; assignments and steps clamp to it. Throws `ArgumentOutOfRangeException` when set later than `MaxDate`. |
 | `MaxDate` | `DateTime` | `9998-12-31` | The latest pickable date; assignments and steps clamp to it. Throws `ArgumentOutOfRangeException` when set earlier than `MinDate`. |
+| `DayBackgroundProvider` | `Func<DateTime, Color?>?` | `null` | Per-day background shading (holidays) for the drop-down calendar. |
+| `DateSelectable` | `Func<DateTime, bool>?` | `null` | A predicate blocking individual days in the drop-down from being picked, on top of `MinDate`/`MaxDate`. |
+| `DayTooltipProvider` | `Func<DateTime, string?>?` | `null` | Per-day tooltip text passed to the drop-down calendar. |
 | `Format` | `DateTimePickerFormat` | `Long` | How the closed field renders `Value` — always in the invariant culture: `Long` = `dddd, dd MMMM yyyy`, `Short` = `MM/dd/yyyy`, `Time` = `HH:mm:ss`, `Custom` = `CustomFormat`. |
 | `CustomFormat` | `string` | `""` | The invariant pattern used while `Format` is `Custom`; empty renders an empty field. |
 | `ShowCheckBox` | `bool` | `false` | Whether the field carries a check box in front of the text. |

@@ -26,6 +26,9 @@ calendar.SetSelectionRange(new(2026, 7, 10), new(2026, 7, 12));
 | `FirstDayOfWeek` | `DayOfWeek` | `Monday` | The day of week shown in the leftmost column. |
 | `MinDate` | `DateTime` | `1753-01-01` | The earliest selectable day; earlier cells paint disabled and reject clicks. Throws `ArgumentOutOfRangeException` when set later than `MaxDate`. |
 | `MaxDate` | `DateTime` | `9998-12-31` | The latest selectable day; later cells paint disabled and reject clicks. Throws `ArgumentOutOfRangeException` when set earlier than `MinDate`. |
+| `DayBackgroundProvider` | `Func<DateTime, Color?>?` | `null` | Per-day background shading (holidays, deadlines) for in-month days; the selection still paints over it. |
+| `DateSelectable` | `Func<DateTime, bool>?` | `null` | A predicate that blocks individual days from being picked (weekends, booked days) on top of `MinDate`/`MaxDate`; a rejected day paints disabled. |
+| `DayTooltipProvider` | `Func<DateTime, string?>?` | `null` | Per-day tooltip text, shown on hover. |
 | `TodayDate` | `DateTime` | today | The day wearing the accent circle. Settable, like its WinForms namesake, so long-running views and tests stay deterministic. |
 
 ### Methods

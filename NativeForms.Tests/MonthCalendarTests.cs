@@ -549,4 +549,44 @@ internal sealed class MonthCalendarTests
             Assert.That(offPage.Operations.Any(o => o.StartsWith("fill #FF0078D4", StringComparison.Ordinal)), Is.False, "a selection below the page must highlight no cell at all");
         });
     }
+
+    // --- Per-day delegates (background, selectable, tooltip) ------------------------------------
+
+    [Test]
+    public void DateSelectable_blocks_a_vetoed_day_from_being_picked()
+    {
+        var calendar = CreateCalendar(out var canvas); // selection starts on 2026-07-15
+        calendar.DateSelectable = d => d != new DateTime(2026, 7, 16);
+
+        Click(canvas, 70, 99); // 2026-07-16 (row 2, col 3) — vetoed
+        Assert.That(calendar.SelectionStart, Is.EqualTo(new DateTime(2026, 7, 15)), "a vetoed day cannot be selected");
+
+        Click(canvas, 90, 99); // 2026-07-17 (row 2, col 4) — allowed
+        Assert.That(calendar.SelectionStart, Is.EqualTo(new DateTime(2026, 7, 17)), "an allowed day still selects");
+    }
+
+    [Test]
+    public void DayBackgroundProvider_fills_a_days_cell()
+    {
+        var calendar = CreateCalendar(out var canvas);
+        calendar.DayBackgroundProvider = d => d == new DateTime(2026, 7, 4) ? System.Drawing.Color.FromArgb(0xFF, 0xFF, 0, 0) : null;
+
+        var g = canvas.RaisePaint();
+
+        // 2026-07-04 is row 0, col 5 → cell 100,44,20,22.
+        Assert.That(g.Operations.Any(o => o.StartsWith("fill #FFFF0000 100,44,20,22", StringComparison.Ordinal)), Is.True, "the holiday cell is shaded");
+    }
+
+    [Test]
+    public void DayTooltipProvider_reports_the_hovered_days_text()
+    {
+        var calendar = CreateCalendar(out var canvas);
+        calendar.DayTooltipProvider = d => d == new DateTime(2026, 7, 4) ? "Independence Day" : null;
+
+        canvas.RaiseMouseMove(110, 55); // over 2026-07-04 (row 0, col 5)
+        Assert.That(calendar.HoveredDayTooltipText, Is.EqualTo("Independence Day"));
+
+        canvas.RaiseMouseMove(50, 55); // over 2026-07-01 — no tooltip
+        Assert.That(calendar.HoveredDayTooltipText, Is.Null);
+    }
 }
