@@ -456,10 +456,12 @@ strategy (may differ per platform; note exceptions inline).
       "+n more" overflow; reflection-free `SetAppointments<T>(…, Func<T,Appointment>)` binding into a
       start-sorted snapshot; side-by-side overlap column packing; click select (`SelectionChanged`),
       double-click/Enter `AppointmentActivate`, empty-time drag `TimeRangeSelected` (`DateRangeEventArgs`),
-      drag-to-move/edge-resize of a movable appointment with a live snapped ghost — cancelable
-      `AppointmentMoving` then `AppointmentMoved` (`AppointmentMoveEventArgs`), the app applies + re-binds,
-      per-entry lockable via `Appointment.Movable` (locked entries show a padlock and refuse to drag),
-      Escape cancels; keyboard/wheel navigation; virtualized (only visible days laid out, bounded for
+      drag-to-move/edge-resize of a movable appointment with a live snapped ghost and a north-south
+      resize cursor — cancelable `AppointmentMoving` then `AppointmentMoved` (`AppointmentMoveEventArgs`),
+      the app applies + re-binds, per-entry lockable via `Appointment.Movable` (locked entries show a
+      padlock and refuse to drag), Escape cancels; multi-day timed spans clamped per overlapping day
+      with continuation chevrons — only a real (non-clamped) edge resizes, an off-view edge stays put;
+      keyboard/wheel navigation; virtualized (only visible days laid out, bounded for
       100k), cached layout so populated repaints allocate zero — including a live drag preview — (empty
       ≈ 624 B, `Appointment` ≈ 48 B)
 - [~] `DateTimePicker` (owner field + popup calendar sharing `CalendarCore`) — Long/Short/Time/

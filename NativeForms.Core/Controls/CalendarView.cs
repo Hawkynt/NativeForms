@@ -48,6 +48,18 @@ public class CalendarView : OwnerDrawnControl
         public Rectangle Rect;
         public bool Timed;
         public string Text;
+
+        /// <summary>The day column this box belongs to — the base date its clamped top/bottom edges
+        /// are measured from, so a resize on a multi-day box anchors to the right day.</summary>
+        public DateTime Day;
+
+        /// <summary>Whether the top edge is a clamped continuation from an earlier day (the real start
+        /// is out of view), not the appointment's actual start — so it offers no start-resize.</summary>
+        public bool ClipStart;
+
+        /// <summary>Whether the bottom edge is a clamped continuation into a later day (the real end is
+        /// out of view), not the appointment's actual end — so it offers no end-resize.</summary>
+        public bool ClipEnd;
     }
 
     /// <summary>What an armed appointment drag is doing: sliding the whole body to a new time, or
@@ -127,6 +139,7 @@ public class CalendarView : OwnerDrawnControl
     private int _moveGrabPixels;
     private int _moveGrabDays;
     private int _moveDurationMinutes;
+    private DateTime _moveDay;   // the box's day column, the base date a resize anchors to
     private string? _moveSubject;
     private Color _moveAccent;
     private DateTime _previewStart;
@@ -365,6 +378,19 @@ public class CalendarView : OwnerDrawnControl
         return false;
     }
 
+    /// <summary>The continuation-clamp flags of the first laid-out timed box for an appointment index —
+    /// <c>ClipStart</c>/<c>ClipEnd</c> mark a box whose top/bottom edge is a multi-day continuation
+    /// rather than the real start/end. For tests of the out-of-view multi-day handling.</summary>
+    internal (bool ClipStart, bool ClipEnd) BoxClipFlags(int index)
+    {
+        this.EnsureLayout();
+        for (var i = 0; i < _layout.Count; ++i)
+            if (_layout[i].Index == index && _layout[i].Timed)
+                return (_layout[i].ClipStart, _layout[i].ClipEnd);
+
+        return (false, false);
+    }
+
     // --- Geometry ----------------------------------------------------------------------------------
 
     private bool IsMonth => _viewMode == CalendarViewMode.Month;
@@ -599,8 +625,10 @@ public class CalendarView : OwnerDrawnControl
         for (var k = 0; k < n; ++k)
         {
             var appt = _appointments[_dayScratch[k]];
-            var startMinutes = appt.Start < dayStart ? 0 : (int)(appt.Start - dayStart).TotalMinutes;
-            var endMinutes = appt.End > dayEnd ? 1440 : (int)(appt.End - dayStart).TotalMinutes;
+            var clipStart = appt.Start < dayStart;
+            var clipEnd = appt.End > dayEnd;
+            var startMinutes = clipStart ? 0 : (int)(appt.Start - dayStart).TotalMinutes;
+            var endMinutes = clipEnd ? 1440 : (int)(appt.End - dayStart).TotalMinutes;
             if (endMinutes <= startMinutes)
                 endMinutes = startMinutes + _timeScale;
 
@@ -615,6 +643,9 @@ public class CalendarView : OwnerDrawnControl
                 Timed = true,
                 Text = ChipText(appt),
                 Rect = new(x, top + 1, Math.Max(1, slotWidth - 2), Math.Max(this.ChipHeight, bottom - top - 2)),
+                Day = dayStart,
+                ClipStart = clipStart,
+                ClipEnd = clipEnd,
             });
         }
     }
@@ -1038,6 +1069,14 @@ public class CalendarView : OwnerDrawnControl
         if (!appt.Movable)
             PaintLock(g, new(rect.Right - 12, rect.Y + 2, 8, 8), theme.DisabledText);
 
+        // A multi-day box continues off this day: a small chevron at the clamped edge says so, and
+        // marks the edge that carries no resize grab.
+        if (box.ClipStart && rect.Width > 12)
+            Glyphs.PaintTriangle(g, accent, new(rect.X + (rect.Width / 2) - 4, rect.Y + 1, 8, 4), GlyphDirection.Up);
+
+        if (box.ClipEnd && rect.Width > 12)
+            Glyphs.PaintTriangle(g, accent, new(rect.X + (rect.Width / 2) - 4, rect.Bottom - 5, 8, 4), GlyphDirection.Down);
+
         g.PopClip();
 
         if (selected)
@@ -1212,6 +1251,40 @@ public class CalendarView : OwnerDrawnControl
 
     /// <summary>Arms a reschedule on a movable appointment: records the grab and seeds the preview. A
     /// non-movable appointment is refused here, so it never drags and shows no move affordance.</summary>
+    /// <summary>Which edge (if any) a y falls on for a timed box, honoring the resizable-height floor
+    /// and the continuation clamps: a clamped edge is a continuation, not a real start/end, so it never
+    /// resizes — a multi-day box's off-view edge stays put.</summary>
+    private static DragKind EdgeKindOf(ApptBox box, int screenTop, int y)
+    {
+        if (box.Rect.Height < _EdgeGrab * 3)
+            return DragKind.Move;
+
+        var screenBottom = screenTop + box.Rect.Height;
+        if (!box.ClipStart && y - screenTop <= _EdgeGrab)
+            return DragKind.ResizeStart;
+
+        if (!box.ClipEnd && screenBottom - y <= _EdgeGrab)
+            return DragKind.ResizeEnd;
+
+        return DragKind.Move;
+    }
+
+    /// <summary>The resize edge under a client point, or <see cref="DragKind.Move"/> when the point is
+    /// not on a movable timed box's real edge — the basis for the resize cursor.</summary>
+    private DragKind EdgeKindAt(int x, int y)
+    {
+        var hit = this.HitTestBox(x, y);
+        if (hit < 0)
+            return DragKind.Move;
+
+        var box = _layout[hit];
+        if (!box.Timed || !_appointments[box.Index].Movable)
+            return DragKind.Move;
+
+        var screenTop = box.Rect.Y + this.BodyBounds.Y - _scrollY;
+        return EdgeKindOf(box, screenTop, y);
+    }
+
     private void PrimeMove(ApptBox box, int index, MouseEventArgs e)
     {
         var appt = _appointments[index];
@@ -1231,14 +1304,8 @@ public class CalendarView : OwnerDrawnControl
         {
             var body = this.BodyBounds;
             var screenTop = box.Rect.Y + body.Y - _scrollY;
-            var screenBottom = screenTop + box.Rect.Height;
-
-            // Only a tall enough box offers edge-resize; a short one is all move so it never becomes
-            // impossible to slide.
-            var resizable = box.Rect.Height >= _EdgeGrab * 3;
-            _dragKind = resizable && e.Y - screenTop <= _EdgeGrab ? DragKind.ResizeStart
-                : resizable && screenBottom - e.Y <= _EdgeGrab ? DragKind.ResizeEnd
-                : DragKind.Move;
+            _moveDay = box.Day;
+            _dragKind = EdgeKindOf(box, screenTop, e.Y);
             _moveGrabPixels = e.Y - screenTop;
         }
         else
@@ -1273,19 +1340,25 @@ public class CalendarView : OwnerDrawnControl
         {
             case DragKind.ResizeStart:
             {
-                var endMin = (int)(appt.End - appt.Start.Date).TotalMinutes;
-                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), 0, endMin - _timeScale);
-                _previewStart = appt.Start.Date.AddMinutes(min);
+                // Anchor to the box's own day: the moved start stays on that day, capped below by the
+                // end (relative to the day, but never past midnight since the start cannot leave the day).
+                var endRel = (int)(appt.End - _moveDay).TotalMinutes;
+                var upper = Math.Min(1440, endRel) - _timeScale;
+                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), 0, Math.Max(0, upper));
+                _previewStart = _moveDay.AddMinutes(min);
                 _previewEnd = appt.End;
                 break;
             }
 
             case DragKind.ResizeEnd:
             {
-                var startMin = (int)(appt.Start - appt.Start.Date).TotalMinutes;
-                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), startMin + _timeScale, 1440);
+                // Anchor to the box's own day: the moved end stays on that day, floored above by the
+                // start (relative to the day; a start on an earlier day floors at the first slot).
+                var startRel = (int)(appt.Start - _moveDay).TotalMinutes;
+                var lower = Math.Max(0, startRel) + _timeScale;
+                var min = Math.Clamp(this.SnapMinutes(this.MinutesForY(e.Y - grid.Y + _scrollY)), lower, 1440);
                 _previewStart = appt.Start;
-                _previewEnd = appt.Start.Date.AddMinutes(min);
+                _previewEnd = _moveDay.AddMinutes(min);
                 break;
             }
 
@@ -1448,7 +1521,11 @@ public class CalendarView : OwnerDrawnControl
         }
 
         if (!_rangeDragging)
+        {
+            // Idle: show the north-south resize cursor over a real (non-continuation) timed edge.
+            this.SetRegionCursor(this.EdgeKindAt(e.X, e.Y) != DragKind.Move ? Cursors.SizeNS : null);
             return;
+        }
 
         if (this.IsMonth)
         {

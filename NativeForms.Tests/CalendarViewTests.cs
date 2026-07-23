@@ -536,4 +536,171 @@ internal sealed class CalendarViewTests
         // the bound set is — the virtualization guarantee.
         Assert.That(calendar.LaidOutBoxCount, Is.LessThan(200), $"{calendar.LaidOutBoxCount} boxes for a week out of 100k appointments");
     }
+
+    // --- Multi-day / out-of-view resize -------------------------------------------------------------
+
+    // A 2026-07-15 10:00 → 2026-07-17 14:00 appointment: three days, its start and end on different days.
+    private static Appointment Trip() => new("Trip", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 17, 14, 0, 0));
+
+    private static CalendarView CreateDay(DateTime day, out HeadlessCanvasPeer canvas, params Appointment[] appts)
+    {
+        var calendar = new CalendarView
+        {
+            Bounds = new(0, 0, 700, 1100),
+            ViewMode = CalendarViewMode.Day,
+            SelectedDate = day,
+            Now = _NowInstant,
+        };
+        calendar.SetAppointments(appts);
+
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(calendar);
+        Application.Run(form, backend);
+        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        return calendar;
+    }
+
+    [Test]
+    public void A_multi_day_box_is_clamped_and_flags_its_off_view_edges()
+    {
+        var start = CreateDay(new DateTime(2026, 7, 15), out _, Trip());
+        var middle = CreateDay(new DateTime(2026, 7, 16), out _, Trip());
+        var end = CreateDay(new DateTime(2026, 7, 17), out _, Trip());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(start.BoxClipFlags(0), Is.EqualTo((false, true)), "the start day owns the real start, continues below");
+            Assert.That(middle.BoxClipFlags(0), Is.EqualTo((true, true)), "a spanned middle day is a continuation both ways");
+            Assert.That(end.BoxClipFlags(0), Is.EqualTo((true, false)), "the end day owns the real end, continues above");
+        });
+    }
+
+    [Test]
+    public void Resizing_the_start_on_the_first_day_leaves_the_off_view_end_untouched()
+    {
+        var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+
+        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+        var top = bounds.Y + 2; // the real start edge at 10:00
+
+        canvas.RaiseMouseDown(cx, top);
+        canvas.RaiseMouseMove(cx, top - (2 * _SlotPx)); // pull the start up one hour → 09:00
+        canvas.RaiseMouseUp(cx, top - (2 * _SlotPx));
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 9, 0, 0)), "the start moved earlier");
+            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 17, 14, 0, 0)), "the out-of-view end held");
+        });
+    }
+
+    [Test]
+    public void Resizing_the_end_on_the_last_day_leaves_the_off_view_start_untouched()
+    {
+        var calendar = CreateDay(new DateTime(2026, 7, 17), out var canvas, Trip());
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+
+        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+        var bottom = bounds.Bottom - 3; // the real end edge at 14:00
+
+        canvas.RaiseMouseDown(cx, bottom);
+        canvas.RaiseMouseMove(cx, bottom - (2 * _SlotPx)); // pull the end up one hour → 13:00
+        canvas.RaiseMouseUp(cx, bottom - (2 * _SlotPx));
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 0, 0)), "the out-of-view start held");
+            Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 17)), "the end stayed on the last day");
+            Assert.That(moved.End, Is.LessThan(new DateTime(2026, 7, 17, 14, 0, 0)), "and moved earlier");
+            Assert.That(moved.End, Is.GreaterThan(moved.Start), "still a valid span");
+            Assert.That((moved.End - moved.End.Date).TotalMinutes % calendar.TimeScale, Is.Zero, "snapped to a slot");
+        });
+    }
+
+    [Test]
+    public void A_continuation_edge_moves_the_appointment_rather_than_resizing_it()
+    {
+        // On the end day the top edge is a continuation from the previous day: grabbing it must not be
+        // read as a start-resize (which would keep the end and shrink the span), but as a whole move.
+        var calendar = CreateDay(new DateTime(2026, 7, 17), out var canvas, Trip());
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+        var originalSpan = Trip().End - Trip().Start;
+
+        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+        var top = bounds.Y + 2; // the clamped continuation edge
+
+        canvas.RaiseMouseDown(cx, top);
+        canvas.RaiseMouseMove(cx, top + (4 * _SlotPx));
+        canvas.RaiseMouseUp(cx, top + (4 * _SlotPx));
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.That(moved!.End - moved.Start, Is.EqualTo(originalSpan), "the span is preserved — a move, not an edge resize");
+    }
+
+    [Test]
+    public void A_spanned_middle_day_paints_without_error_and_moves_from_either_edge()
+    {
+        var calendar = CreateDay(new DateTime(2026, 7, 16), out var canvas, Trip());
+        Assert.DoesNotThrow(() => canvas.RaisePaint(), "the both-way continuation chevrons paint");
+
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+        var span = Trip().End - Trip().Start;
+
+        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+
+        canvas.RaiseMouseDown(cx, bounds.Y + 2);
+        canvas.RaiseMouseMove(cx, bounds.Y + 2 + (3 * _SlotPx));
+        canvas.RaiseMouseUp(cx, bounds.Y + 2 + (3 * _SlotPx));
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.That(moved!.End - moved.Start, Is.EqualTo(span), "neither continuation edge resizes; it moves");
+    }
+
+    [Test]
+    public void An_appointment_starting_before_the_visible_range_is_clamped_on_the_first_day()
+    {
+        // Starts five days before the shown week and ends inside it — the classic "starts out of view".
+        var early = new Appointment("Away", new(2026, 7, 10, 8, 0, 0), new(2026, 7, 14, 12, 0, 0));
+        var calendar = new CalendarView { Bounds = new(0, 0, 900, 1100), SelectedDate = _Week, Now = _NowInstant };
+        calendar.SetAppointments(new[] { early });
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(calendar);
+        Application.Run(form, backend);
+
+        var flags = calendar.BoxClipFlags(0); // first visible day is Monday 2026-07-13
+        Assert.That(flags.ClipStart, Is.True, "the real start is before the week, so the first day's box is a continuation");
+    }
+
+    [Test]
+    public void Hovering_a_real_edge_shows_the_resize_cursor()
+    {
+        var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());
+        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+        var cx = bounds.X + (bounds.Width / 2);
+
+        canvas.RaiseMouseMove(cx, bounds.Y + 2); // over the real start edge
+        var onEdge = ((HeadlessCanvasPeer)calendar.Peer!).Cursor;
+
+        canvas.RaiseMouseMove(cx, bounds.Y + (bounds.Height / 2)); // over the body
+        var onBody = ((HeadlessCanvasPeer)calendar.Peer!).Cursor;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(onEdge, Is.SameAs(Cursors.SizeNS), "the real edge offers a north-south resize cursor");
+            Assert.That(onBody, Is.Not.SameAs(Cursors.SizeNS), "the body does not");
+        });
+    }
 }

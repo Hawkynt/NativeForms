@@ -40,6 +40,9 @@ internal sealed partial class MainForm
             new("Talk prep", mon.AddDays(3).AddHours(16), mon.AddDays(3).AddHours(17), _CatFocus),
             new("Retro", mon.AddDays(4).AddHours(15), mon.AddDays(4).AddHours(16), _CatPersonal),
             new("Gym", mon.AddDays(5).AddHours(8), mon.AddDays(5).AddHours(9), _CatPersonal),
+            // A multi-day timed span: it clamps to each day it crosses and shows continuation
+            // chevrons, and only its real start/end edges (not the clamped ones) offer a resize.
+            new("On-call", mon.AddDays(2).AddHours(20), mon.AddDays(4).AddHours(6), _CatUrgent, Location: "Ops"),
             // A locked entry: the whole day is off, and it must not be dragged onto another slot.
             new("Company holiday", mon.AddDays(4), mon.AddDays(5), _CatUrgent, AllDay: true, Movable: false),
         ];
