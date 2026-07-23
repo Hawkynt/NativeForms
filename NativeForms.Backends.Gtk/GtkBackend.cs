@@ -43,6 +43,19 @@ public sealed partial class GtkBackend : IPlatformBackend
         }
     }
 
+    private static nint _measureContext;
+
+    /// <summary>
+    /// The reused Pango context for text measurement, built once from the default Cairo font map.
+    /// Kept for the process lifetime (the default font map is stable across theme changes, which alter
+    /// resolved colours and fonts, not the map itself), so measurement never rebuilds a font-map
+    /// context. Created lazily on the UI thread the first time text is measured.
+    /// </summary>
+    private static nint MeasureContext()
+        => _measureContext != 0
+            ? _measureContext
+            : _measureContext = NativeMethods.pango_font_map_create_context(NativeMethods.pango_cairo_font_map_get_default());
+
     /// <summary>
     /// Subscribes to <c>notify::gtk-theme-name</c> and <c>notify::gtk-application-prefer-dark-theme</c>
     /// on the default <c>GtkSettings</c>, so a theme or dark-mode switch invalidates the cached theme
@@ -184,24 +197,19 @@ public sealed partial class GtkBackend : IPlatformBackend
 
         // A layout on a context from the default font map measures identically to the per-paint
         // PangoCairo layout, but needs no Cairo surface — so it works before anything is realized.
-        var context = NativeMethods.pango_font_map_create_context(NativeMethods.pango_cairo_font_map_get_default());
+        // The context is created once and reused: it is stateless for measuring (text and font live on
+        // the layout), and building a fresh font-map context per call dominated cold-start text
+        // measurement (autosize labels, tab widths) — all on the single UI thread, so no lock is due.
+        var layout = NativeMethods.pango_layout_new(MeasureContext());
         try
         {
-            var layout = NativeMethods.pango_layout_new(context);
-            try
-            {
-                GtkGraphics.ConfigureLayout(layout, text, font);
-                NativeMethods.pango_layout_get_pixel_size(layout, out var width, out var height);
-                return new Size(width, height);
-            }
-            finally
-            {
-                NativeMethods.g_object_unref(layout);
-            }
+            GtkGraphics.ConfigureLayout(layout, text, font);
+            NativeMethods.pango_layout_get_pixel_size(layout, out var width, out var height);
+            return new Size(width, height);
         }
         finally
         {
-            NativeMethods.g_object_unref(context);
+            NativeMethods.g_object_unref(layout);
         }
     }
 
