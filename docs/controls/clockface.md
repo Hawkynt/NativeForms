@@ -33,9 +33,10 @@ Hosting the same engine in a popup is exactly what `TimePicker` does — wire `P
 | `Value` | `TimeSpan` | the current time of day | The selected time — whole seconds, kept inside a single day. Setting it repaints and raises `ValueChanged` on a real change. |
 | `OriginalValue` | `TimeSpan` | `00:00:00` | The value the dial opened on; a host reverts to it on cancel. Assigning it does not raise `ValueChanged`. |
 | `Use24HourClock` | `bool` | `true` | Whether the hour ring is the two-ring 00–23 dial rather than a single 01–12 ring with an AM/PM toggle. |
-| `ShowSeconds` | `bool` | `false` | Whether a seconds stage follows the minute. Turning it off while the seconds stage is active falls back to the minute. |
-| `Stage` | `ClockFaceStage` | `Hour` | The hand the dial is editing — `Hour`, `Minute` or `Second`. Assigning `Second` while `ShowSeconds` is off falls back to `Minute`. |
-| `FinalStage` | `ClockFaceStage` | — | The last stage of the current layout: `Second` when shown, else `Minute`. |
+| `Precision` | `ClockFacePrecision` | `Minutes` | How far the dial drills: `Hours` (the hour is the only step), `Minutes`, or `Seconds`. Lowering it falls a deeper active stage back to the deepest one still shown. |
+| `ShowSeconds` | `bool` | `false` | `Precision == Seconds` in boolean form; setting it toggles between `Seconds` and `Minutes`. |
+| `Stage` | `ClockFaceStage` | `Hour` | The hand the dial is editing — `Hour`, `Minute` or `Second`. Assigning a stage past `Precision` falls back to the deepest hand shown. |
+| `FinalStage` | `ClockFaceStage` | — | The last stage of the current layout — the deepest hand `Precision` offers. |
 
 ### Methods
 
@@ -59,7 +60,7 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 ## Notes
 
-- **Stages, like the material picker.** A dial gesture on the hour ring sets the hour and, on release, advances to the minute; the minute advances to the seconds when `ShowSeconds` is on; the seconds stage is the last. A header segment (the `hh`/`mm`/`ss` readout, the active one accented) is clickable to jump straight to that stage, and the OK affordance in the footer — or Enter on the final stage — commits.
+- **Stages, like the material picker.** A dial gesture on the hour ring sets the hour and, on release, advances to the minute; the minute advances to the seconds when `Precision` reaches them. **Setting the final part commits**: releasing a dial gesture on the deepest stage `Precision` offers closes the dial (so an `Hours` dial commits on the first pick), as does the OK affordance in the footer or Enter on the final stage. A header segment (the `hh`/`mm`/`ss` readout, the active one accented) is clickable to jump straight to that stage.
 - **The 24-hour dial has two rings.** They share the twelve clock positions: the **inner** ring holds `00`–`11`, the **outer** ring `12`–`23`, so `00`/`12` sit at the top and `03`/`15` at three o'clock. A click picks the ring by how far from the centre it lands. This is the cleaner of the two obvious 24-hour layouts (the alternative — a single ring that the AM/PM state reinterprets — hides half the hours), and it matches the field's own `Use24HourClock` shape without an AM/PM toggle.
 - **Minutes and seconds snap to a single unit.** The rings are labelled at the twelve five-unit marks (`00`, `05`, … `55`) but a click or drag rounds to the nearest single minute/second, so every value is reachable with a fine drag.
 - **12-hour dials carry an AM/PM toggle** at the header's right edge; tapping it flips the half day, keeping the shown hour digits.

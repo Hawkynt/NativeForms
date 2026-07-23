@@ -169,6 +169,55 @@ internal sealed class ClockFaceTests
     }
 
     [Test]
+    public void Picking_the_final_part_on_the_dial_commits()
+    {
+        var clock = CreatePicker(out var canvas); // Minutes precision → the minute is final
+        var committed = 0;
+        clock.Committed = () => ++committed;
+
+        canvas.RaiseMouseDown(_ThreeOClockX, 118); // set the hour
+        canvas.RaiseMouseUp(_ThreeOClockX, 118);   // hour is not final → advance, no commit
+        Assert.That(committed, Is.Zero, "setting a non-final part only advances");
+        Assert.That(clock.Stage, Is.EqualTo(ClockFaceStage.Minute));
+
+        canvas.RaiseMouseDown(_CenterX, _BottomY); // set the minute
+        canvas.RaiseMouseUp(_CenterX, _BottomY);   // the minute is final → commit
+
+        Assert.That(committed, Is.EqualTo(1), "picking the last part closes the dial");
+    }
+
+    [Test]
+    public void Hours_precision_makes_the_hour_the_final_part_and_commits_on_the_first_pick()
+    {
+        var clock = CreatePicker(out var canvas);
+        clock.Precision = ClockFacePrecision.Hours;
+        var committed = 0;
+        clock.Committed = () => ++committed;
+
+        Assert.That(clock.FinalStage, Is.EqualTo(ClockFaceStage.Hour));
+
+        canvas.RaiseMouseDown(_ThreeOClockX, 118); // pick the hour — the only part
+        canvas.RaiseMouseUp(_ThreeOClockX, 118);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(clock.Value.Hours, Is.EqualTo(15));
+            Assert.That(committed, Is.EqualTo(1), "picking the hour commits when it is the final part");
+        });
+    }
+
+    [Test]
+    public void Lowering_the_precision_pulls_the_active_stage_back()
+    {
+        var clock = CreatePicker(out _, showSeconds: true);
+        clock.Stage = ClockFaceStage.Second;
+
+        clock.Precision = ClockFacePrecision.Hours;
+
+        Assert.That(clock.Stage, Is.EqualTo(ClockFaceStage.Hour), "a stage past the new precision falls back");
+    }
+
+    [Test]
     public void Arrows_nudge_the_active_hand_wrapping_within_the_part()
     {
         var clock = CreatePicker(out var canvas);

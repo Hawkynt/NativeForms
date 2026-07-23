@@ -493,4 +493,44 @@ internal sealed class TimePickerTests
             Assert.That(picker.SelectedField, Is.EqualTo(TimePickerField.Hour));
         });
     }
+
+    [Test]
+    public void ShowMinutes_off_makes_it_an_hours_only_field()
+    {
+        var picker = CreatePicker(out var canvas, new TimeSpan(9, 30, 15));
+        picker.ShowMinutes = false;
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.Value, Is.EqualTo(new TimeSpan(9, 0, 0)), "minutes and seconds are dropped");
+            Assert.That(g.DrewText("09"), Is.True, "the hour still shows");
+            Assert.That(g.DrewText("30"), Is.False, "the minute part is gone");
+            Assert.That(g.Operations.Any(o => o.StartsWith("text \":\"", StringComparison.Ordinal)), Is.False, "no separator is painted");
+        });
+    }
+
+    [Test]
+    public void The_caret_stays_on_the_hour_when_minutes_are_hidden()
+    {
+        var picker = CreatePicker(out _, new TimeSpan(9, 30, 15));
+        picker.ShowMinutes = false;
+        picker.SelectedField = TimePickerField.Hour;
+
+        picker.SelectNextField();
+
+        Assert.That(picker.SelectedField, Is.EqualTo(TimePickerField.Hour), "the minute is not a stop on an hours-only field");
+    }
+
+    [Test]
+    public void Turning_minutes_off_also_forces_seconds_off_in_the_value()
+    {
+        var picker = CreatePicker(out _, new TimeSpan(9, 30, 45));
+        picker.ShowSeconds = true;
+
+        picker.ShowMinutes = false;
+
+        Assert.That(picker.Value, Is.EqualTo(new TimeSpan(9, 0, 0)), "only the hour survives");
+    }
 }

@@ -30,6 +30,7 @@ time.UpButton();   // 09:30:00 -> 09:31:00
 | `Value` | `TimeSpan` | the current time of day | The picked time — whole seconds, clamped into [`MinTime`, `MaxTime`] and into a single day. |
 | `MinTime` | `TimeSpan` | `00:00:00` | The earliest pickable time; assignments clamp to it and steps below it are refused. Throws `ArgumentOutOfRangeException` when negative, longer than a day, or later than `MaxTime`. |
 | `MaxTime` | `TimeSpan` | `23:59:59` | The latest pickable time. Throws `ArgumentOutOfRangeException` when negative, longer than a day, or earlier than `MinTime`. |
+| `ShowMinutes` | `bool` | `true` | Whether the field carries a minutes part (and, under it, seconds). Turning it off makes an hours-only picker: it drops minutes and seconds from `Value` and moves a caret off them back to the hour. |
 | `ShowSeconds` | `bool` | `true` | Whether the field carries a seconds part. Turning it off drops the seconds from `Value` and moves a caret parked on them back to the minutes. |
 | `Use24HourClock` | `bool` | `true` | Whether the hour part runs `00`–`23` rather than `01`–`12` with an AM/PM part. |
 | `SelectedField` | `TimePickerField` | `Hour` | The part the caret sits on — what the spinner buttons, the Up/Down keys and the wheel step. Assigning a part the current layout hides falls back to `Hour`. |

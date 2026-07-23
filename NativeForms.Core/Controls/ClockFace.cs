@@ -17,6 +17,19 @@ public enum ClockFaceStage
     Second,
 }
 
+/// <summary>How far a <see cref="ClockFace"/> lets the user drill in — the last hand it offers.</summary>
+public enum ClockFacePrecision
+{
+    /// <summary>The hour only; picking an hour is the final step.</summary>
+    Hours,
+
+    /// <summary>Hours then minutes (the default).</summary>
+    Minutes,
+
+    /// <summary>Hours, minutes then seconds.</summary>
+    Seconds,
+}
+
 /// <summary>
 /// A material-style analog time picker: a themed dial with a ring of hour numbers, a centre hub and a
 /// hand pointing at the selected value. Clicking or dragging the hand onto a number sets that part;
@@ -113,9 +126,10 @@ public class ClockFace : OwnerDrawnControl
         }
     } = true;
 
-    /// <summary>Whether the dial offers a seconds stage after the minute. Turning it off while the
-    /// seconds stage is active falls back to the minute.</summary>
-    public bool ShowSeconds
+    /// <summary>How far the dial lets the user drill: hours only, hours+minutes, or hours+minutes+seconds.
+    /// Lowering it while a now-hidden hand is active falls the stage back to the deepest one still shown.
+    /// Defaults to <see cref="ClockFacePrecision.Minutes"/>.</summary>
+    public ClockFacePrecision Precision
     {
         get => field;
         set
@@ -124,22 +138,31 @@ public class ClockFace : OwnerDrawnControl
                 return;
 
             field = value;
-            if (!value && _stage == ClockFaceStage.Second)
-                this.Stage = ClockFaceStage.Minute;
+            if ((int)_stage > (int)this.FinalStage)
+                this.Stage = this.FinalStage;
 
             this.Repaint();
         }
+    } = ClockFacePrecision.Minutes;
+
+    /// <summary>Whether the dial offers a seconds stage after the minute — the <see cref="Precision"/>
+    /// value <see cref="ClockFacePrecision.Seconds"/> in boolean form. Setting it toggles between
+    /// <see cref="ClockFacePrecision.Seconds"/> and <see cref="ClockFacePrecision.Minutes"/>.</summary>
+    public bool ShowSeconds
+    {
+        get => this.Precision == ClockFacePrecision.Seconds;
+        set => this.Precision = value ? ClockFacePrecision.Seconds : ClockFacePrecision.Minutes;
     }
 
-    /// <summary>The hand the dial is currently editing. Assigning a seconds stage while
-    /// <see cref="ShowSeconds"/> is off falls back to the minute.</summary>
+    /// <summary>The hand the dial is currently editing. Assigning a stage past the current
+    /// <see cref="Precision"/> falls back to the deepest hand it offers.</summary>
     public ClockFaceStage Stage
     {
         get => _stage;
         set
         {
-            if (value == ClockFaceStage.Second && !this.ShowSeconds)
-                value = ClockFaceStage.Minute;
+            if ((int)value > (int)this.FinalStage)
+                value = this.FinalStage;
 
             if (_stage == value)
                 return;
@@ -174,8 +197,13 @@ public class ClockFace : OwnerDrawnControl
     protected override bool IsInputKey(Keys keyData)
         => keyData is Keys.Enter or Keys.Escape or Keys.Left or Keys.Right or Keys.Up or Keys.Down or Keys.Tab;
 
-    /// <summary>The final stage of the current layout — the seconds ring when shown, else the minute.</summary>
-    public ClockFaceStage FinalStage => this.ShowSeconds ? ClockFaceStage.Second : ClockFaceStage.Minute;
+    /// <summary>The final stage of the current layout — the deepest hand <see cref="Precision"/> offers.</summary>
+    public ClockFaceStage FinalStage => this.Precision switch
+    {
+        ClockFacePrecision.Hours => ClockFaceStage.Hour,
+        ClockFacePrecision.Seconds => ClockFaceStage.Second,
+        _ => ClockFaceStage.Minute,
+    };
 
     /// <summary>The natural popup size for a dial painted with the given theme: a square dial framed by
     /// a header (the readout and AM/PM toggle) and a footer (the OK affordance).</summary>
@@ -505,8 +533,9 @@ public class ClockFace : OwnerDrawnControl
         this.SetFromPoint(layout, e.X, e.Y);
     }
 
-    /// <summary>Ends a dial gesture, advancing the hour stage to the minute (and the minute to the
-    /// seconds when shown), the way the material picker walks the user forward.</summary>
+    /// <summary>Ends a dial gesture: walks the user forward to the next hand, and — once the final
+    /// hand the <see cref="Precision"/> offers has been set — commits, so picking the last part closes
+    /// the dial without a separate OK.</summary>
     public void HandleMouseUp(MouseEventArgs e)
     {
         if (!_dragging)
@@ -517,16 +546,10 @@ public class ClockFace : OwnerDrawnControl
             return;
 
         _pressedOnDial = false;
-        switch (_stage)
-        {
-            case ClockFaceStage.Hour:
-                this.Stage = ClockFaceStage.Minute;
-                break;
-
-            case ClockFaceStage.Minute when this.ShowSeconds:
-                this.Stage = ClockFaceStage.Second;
-                break;
-        }
+        if (_stage == this.FinalStage)
+            this.Committed?.Invoke();
+        else
+            this.Stage = this.NextStage();
     }
 
     /// <summary>Nudges the active part one unit per wheel notch — up steps forward, down back.</summary>
@@ -573,13 +596,10 @@ public class ClockFace : OwnerDrawnControl
         }
     }
 
-    /// <summary>The stage after the current one, skipping the hidden seconds and wrapping to the hour.</summary>
-    private ClockFaceStage NextStage() => _stage switch
-    {
-        ClockFaceStage.Hour => ClockFaceStage.Minute,
-        ClockFaceStage.Minute when this.ShowSeconds => ClockFaceStage.Second,
-        _ => ClockFaceStage.Hour,
-    };
+    /// <summary>The stage after the current one, stopping at the <see cref="Precision"/> depth and
+    /// wrapping back to the hour from the final stage.</summary>
+    private ClockFaceStage NextStage()
+        => _stage == this.FinalStage ? ClockFaceStage.Hour : (ClockFaceStage)((int)_stage + 1);
 
     /// <summary>Steps the active part by <paramref name="direction"/> units, wrapping within the part.</summary>
     private void Nudge(int direction)

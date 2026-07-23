@@ -470,15 +470,17 @@ strategy (may differ per platform; note exceptions inline).
       Alt+Down/F4, commit/cancel semantics, drop-down title drill-down done; `BoldedDates` and
       per-part focus on the closed field pending
 - [x] `TimePicker` (owner field + shared `Drawing.SpinnerRenderer` column) — `TimeSpan` `Value`,
-      `Min`/`MaxTime` window, `ShowSeconds`/`Use24HourClock` layouts, per-part caret (click,
-      Left/Right) with the spinner buttons, Up/Down and the wheel stepping the part under it,
-      wrap-without-carry, timer-driven autorepeat via the shared `AutoRepeat` engine
+      `Min`/`MaxTime` window, `ShowMinutes` (hours-only)/`ShowSeconds`/`Use24HourClock` layouts,
+      per-part caret (click, Left/Right) with the spinner buttons, Up/Down and the wheel stepping the
+      part under it, wrap-without-carry, timer-driven autorepeat via the shared `AutoRepeat` engine
   - [x] Double-click opens the analog `ClockFace` in a light-dismiss popup (the `IPopupPeer`
-        mechanism `DateTimePicker` uses): staged hour → minute → seconds dial, live preview into
-        the field clamped to `Min`/`MaxTime`, OK/Enter commit, Escape/outside-click cancel-and-revert
+        mechanism `DateTimePicker` uses): staged hour → minute → seconds dial matching the field's
+        precision, live preview into the field clamped to `Min`/`MaxTime`, picking the final part
+        commits (OK/Enter too), Escape/outside-click cancel-and-revert
 - [x] `ClockFace` (owner dial, reusable stand-alone or popup-hosted like `CalendarCore`) — themed
       analog picker: 12-hour ring + AM/PM toggle or two-ring 00–23 dial, minute/seconds rings snapping
-      to a single unit, click/drag/keyboard, stage machine with `Committed`/`Cancelled` callbacks,
+      to a single unit, `Precision` (Hours/Minutes/Seconds) with picking the final part committing,
+      click/drag/keyboard, stage machine with `Committed`/`Cancelled` callbacks,
       allocation-free repaint at every stage (cached strings, shared trig table, cached hand endpoint)
 - [x] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill), `Style.Marquee`
       (timer-driven sweep, allocation-free per tick), `Step`/`PerformStep`, vertical orientation

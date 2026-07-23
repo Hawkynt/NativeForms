@@ -129,6 +129,32 @@ public class TimePicker : OwnerDrawnControl
     } = true;
 
     /// <summary>
+    /// Whether the field carries a minutes part (and, under it, seconds). Turning it off makes the
+    /// field an hours-only picker: it moves a caret parked on the minutes or seconds back to the hour
+    /// and drops both from <see cref="Value"/>. Defaults to <see langword="true"/>.
+    /// </summary>
+    public bool ShowMinutes
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            if (!value)
+            {
+                if (_selectedField is TimePickerField.Minute or TimePickerField.Second)
+                    _selectedField = TimePickerField.Hour;
+
+                this.Value = new(_value.Hours, 0, 0);
+            }
+
+            this.Invalidate();
+        }
+    } = true;
+
+    /// <summary>
     /// Whether the hour part runs 00–23 rather than 01–12 with an AM/PM part. Defaults to
     /// <see langword="true"/>: the repository builds with <c>InvariantGlobalization</c>, and the
     /// invariant culture's short-time pattern is the 24-hour <c>HH:mm</c> — the default is spelled
@@ -233,7 +259,9 @@ public class TimePicker : OwnerDrawnControl
         var popup = _popup ??= this.CreateClockPopup(backend);
         var clock = _clock!;
         clock.Use24HourClock = this.Use24HourClock;
-        clock.ShowSeconds = this.ShowSeconds;
+        clock.Precision = !this.ShowMinutes ? ClockFacePrecision.Hours
+            : this.ShowSeconds ? ClockFacePrecision.Seconds
+            : ClockFacePrecision.Minutes;
         clock.Stage = ClockFaceStage.Hour;
         clock.OriginalValue = _value;
         clock.Value = _value;
@@ -313,14 +341,17 @@ public class TimePicker : OwnerDrawnControl
 
         var x = _Padding;
         this.PaintPart(g, theme, font, digits[this.DisplayHour()], TimePickerField.Hour, ref x, digitWidth, textColor);
-        g.DrawText(":", font, textColor, new(x, 0, separatorWidth, height), ContentAlignment.MiddleCenter);
-        x += separatorWidth;
-        this.PaintPart(g, theme, font, digits[_value.Minutes], TimePickerField.Minute, ref x, digitWidth, textColor);
-        if (this.ShowSeconds)
+        if (this.ShowMinutes)
         {
             g.DrawText(":", font, textColor, new(x, 0, separatorWidth, height), ContentAlignment.MiddleCenter);
             x += separatorWidth;
-            this.PaintPart(g, theme, font, digits[_value.Seconds], TimePickerField.Second, ref x, digitWidth, textColor);
+            this.PaintPart(g, theme, font, digits[_value.Minutes], TimePickerField.Minute, ref x, digitWidth, textColor);
+            if (this.ShowSeconds)
+            {
+                g.DrawText(":", font, textColor, new(x, 0, separatorWidth, height), ContentAlignment.MiddleCenter);
+                x += separatorWidth;
+                this.PaintPart(g, theme, font, digits[_value.Seconds], TimePickerField.Second, ref x, digitWidth, textColor);
+            }
         }
 
         if (!this.Use24HourClock)
@@ -522,7 +553,8 @@ public class TimePicker : OwnerDrawnControl
     /// <summary>Whether the current layout shows the given part at all.</summary>
     private bool IsFieldVisible(TimePickerField part) => part switch
     {
-        TimePickerField.Second => this.ShowSeconds,
+        TimePickerField.Minute => this.ShowMinutes,
+        TimePickerField.Second => this.ShowMinutes && this.ShowSeconds,
         TimePickerField.Meridiem => !this.Use24HourClock,
         _ => true,
     };
@@ -597,7 +629,9 @@ public class TimePicker : OwnerDrawnControl
         else if (value > _DayEnd)
             value = _DayEnd;
 
-        value = this.ShowSeconds ? TruncateToSecond(value) : new(value.Hours, value.Minutes, 0);
+        value = !this.ShowMinutes ? new(value.Hours, 0, 0)
+            : this.ShowSeconds ? TruncateToSecond(value)
+            : new(value.Hours, value.Minutes, 0);
         return value < _minTime ? _minTime : value > _maxTime ? _maxTime : value;
     }
 
