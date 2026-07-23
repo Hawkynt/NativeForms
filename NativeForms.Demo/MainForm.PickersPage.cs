@@ -200,11 +200,25 @@ internal sealed partial class MainForm
         fullDrive.Click += (_, _) => Select(fullDrive);
         mediaDrive.Click += (_, _) => Select(mediaDrive);
 
+        // A compact tile: icon left, caption over the bar on its right, both matching the icon height.
+        var compactTile = new ProgressTile
+        {
+            Bounds = new(664, 428, 300, 40),
+            Text = "Downloads",
+            SecondaryText = "ignored in compact mode",
+            Image = this.SquareImage(Color.SteelBlue),
+            Maximum = 100,
+            Value = 62,
+            Compact = true,
+        };
+
         page.Controls.AddRange(
             Caption("ProgressTile (Explorer-style drives)", 664, 12),
             systemDrive, fullDrive, mediaDrive,
             Caption("ProgressTile (inert read-out)", 664, 304),
-            quotaTile);
+            quotaTile,
+            Caption("ProgressTile (compact)", 664, 408, 300),
+            compactTile);
 
         // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
         var openPath = openPicker.SelectedPath;

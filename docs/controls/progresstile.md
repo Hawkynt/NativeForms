@@ -37,6 +37,7 @@ form.Controls.Add(drive);
 | `IsWarning` | `bool` | `false` | Whether the bar is currently past the threshold. |
 | `Clickable` | `bool` | `false` | Whether the tile behaves as a button: focusable, hover-highlighted, raising `Click`. |
 | `Selected` | `bool` | `false` | Whether the tile paints as the selected one of a set. |
+| `Compact` | `bool` | `false` | Short one-row layout: the icon on the left with the caption stacked directly over the usage bar to its right, the two sized to the icon's height. The `SecondaryText` line is not shown in this mode. |
 
 The inherited `Text` is the primary caption. Also honours the ambient `Font` and `ForeColor`.
 

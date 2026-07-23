@@ -170,6 +170,25 @@ public class ProgressTile : OwnerDrawnControl
         }
     }
 
+    /// <summary>
+    /// Whether to use the short, one-row layout: the icon on the left with the caption stacked directly
+    /// over the usage bar on its right, the two together sized to the icon's height for a tight visual
+    /// fit. The <see cref="SecondaryText"/> line is not shown in this mode. Defaults to
+    /// <see langword="false"/> (the full three-line tile).
+    /// </summary>
+    public bool Compact
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    }
+
     /// <summary>Whether the bar is currently past <see cref="WarningThreshold"/>.</summary>
     public bool IsWarning => this.WarningThreshold > 0 && _value >= this.WarningThreshold;
 
@@ -200,8 +219,22 @@ public class ProgressTile : OwnerDrawnControl
             : this.Selected ? theme.SelectionText
             : this.ForeColor;
 
-        // Icon column at the leading edge, vertically centred.
         var content = new Rectangle(_Padding, _Padding, Math.Max(0, width - (2 * _Padding)), Math.Max(0, height - (2 * _Padding)));
+        var font = this.Font;
+        var lineHeight = g.MeasureText(this.Text, font).Height;
+        if (this.Compact)
+            this.PaintCompactContent(g, theme, content, textColor, font, lineHeight);
+        else
+            this.PaintStackContent(g, theme, content, textColor, font, lineHeight);
+
+        if (this.Clickable && this.Focused)
+            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(2, 2, width - 5, height - 5));
+    }
+
+    /// <summary>The full tile: icon on the left, then caption, usage bar and secondary caption stacked
+    /// from the top, dropping bottom-up whatever no longer fits.</summary>
+    private void PaintStackContent(IGraphics g, ITheme theme, Rectangle content, Color textColor, Font font, int lineHeight)
+    {
         if (this.Image is { } image)
         {
             var iconTop = content.Y + Math.Max(0, (content.Height - image.Height) / 2);
@@ -210,11 +243,6 @@ public class ProgressTile : OwnerDrawnControl
             content = new(content.X + shift, content.Y, Math.Max(0, content.Width - shift), content.Height);
         }
 
-        // Text column: caption, bar, secondary caption — stacked from the top. A tile too short for
-        // the whole stack drops the parts that no longer fit, bottom-up, rather than overdrawing
-        // them: the caption is what identifies the tile, so it is the last thing to go.
-        var font = this.Font;
-        var lineHeight = g.MeasureText(this.Text, font).Height;
         g.PushClip(content);
 
         var y = content.Y;
@@ -243,10 +271,37 @@ public class ProgressTile : OwnerDrawnControl
         }
 
         g.PopClip();
+    }
 
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
-        if (this.Clickable && this.Focused)
-            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(2, 2, width - 5, height - 5));
+    /// <summary>The compact tile: icon on the left, the caption top-aligned to it and the usage bar
+    /// bottom-aligned to it, so caption + bar together span exactly the icon's height.</summary>
+    private void PaintCompactContent(IGraphics g, ITheme theme, Rectangle content, Color textColor, Font font, int lineHeight)
+    {
+        var iconTop = content.Y;
+        var iconBottom = content.Bottom;
+        var iconWidth = 0;
+        if (this.Image is { } image)
+        {
+            iconTop = content.Y + Math.Max(0, (content.Height - image.Height) / 2);
+            iconBottom = iconTop + image.Height;
+            g.DrawImage(image, new Rectangle(content.X, iconTop, image.Width, image.Height));
+            iconWidth = image.Width + _IconGap;
+        }
+
+        var rightX = content.X + iconWidth;
+        var rightW = Math.Max(0, content.Right - rightX);
+        if (rightW <= 0)
+            return;
+
+        g.PushClip(new Rectangle(rightX, iconTop, rightW, Math.Max(0, iconBottom - iconTop)));
+
+        g.DrawText(this.Text, font, textColor, new Rectangle(rightX, iconTop, rightW, lineHeight), ContentAlignment.TopLeft);
+
+        // Bottom-align the bar to the icon; never let it climb over the caption.
+        var barTop = Math.Max(iconTop + lineHeight + _BarGap, iconBottom - _BarHeight);
+        GlyphRenderer.DrawProgressBar(g, theme, new Rectangle(rightX, barTop, rightW, _BarHeight), _value, 0, _maximum, this.IsWarning ? this.WarningColor : theme.Accent);
+
+        g.PopClip();
     }
 
     /// <inheritdoc/>

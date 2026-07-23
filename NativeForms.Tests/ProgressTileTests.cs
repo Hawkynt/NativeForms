@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
@@ -263,5 +264,52 @@ internal sealed class ProgressTileTests
         var canvas = Realize(tile, out _);
 
         Assert.That(canvas.RaisePaint().OutOfBoundsOperations, Is.Empty);
+    }
+
+    // --- Compact layout ----------------------------------------------------------------------------
+
+    private static ProgressTile CompactDrive() => new()
+    {
+        Text = "Windows (C:)",
+        SecondaryText = "45.2 GB free of 128 GB",
+        Image = new HeadlessImage(32, 32),
+        Bounds = new(0, 0, 240, 48), // content 8..40 tall → the 32px icon fills it
+        Maximum = 128,
+        Value = 83,
+        Compact = true,
+    };
+
+    private static Point TextAt(RecordingGraphics g, string text)
+    {
+        var op = g.Operations.First(o => o.StartsWith("text") && o.Contains($"\"{text}\""));
+        var at = op[(op.LastIndexOf('@') + 1)..].Split(',');
+        return new(int.Parse(at[0]), int.Parse(at[1]));
+    }
+
+    private static int AccentFillY(RecordingGraphics g)
+        => int.Parse(g.Operations.First(o => o.StartsWith("fill #FF0078D4")).Split(' ')[2].Split(',')[1]);
+
+    [Test]
+    public void Compact_puts_the_caption_over_the_bar_beside_the_icon_and_drops_the_secondary_line()
+    {
+        var g = Realize(CompactDrive(), out _).RaisePaint();
+        var caption = TextAt(g, "Windows (C:)");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 32x32")), Is.True, "the icon still paints");
+            Assert.That(g.DrewText("45.2 GB free of 128 GB"), Is.False, "the secondary line is dropped in compact mode");
+            Assert.That(caption.X, Is.GreaterThan(32), "the caption sits to the right of the icon");
+            Assert.That(caption.Y, Is.EqualTo(8), "the caption is top-aligned to the icon top");
+            Assert.That(AccentFillY(g), Is.GreaterThan(caption.Y), "the usage bar sits below the caption");
+            Assert.That(AccentFillY(g), Is.LessThan(40), "and within the icon's vertical band");
+        });
+    }
+
+    [Test]
+    public void The_full_tile_still_shows_the_secondary_line()
+    {
+        var g = Realize(Drive(), out _).RaisePaint();
+        Assert.That(g.DrewText("45.2 GB free of 128 GB"), Is.True, "the non-compact tile keeps its secondary caption");
     }
 }
