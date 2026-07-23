@@ -14,7 +14,7 @@ internal sealed partial class Autopilot
     private void DriveDocking()
     {
         Section("Docking");
-        this.SelectTab("Docking");
+        this.SelectTab("Dock");
 
         var dock = _form.Part<DockPanel>("docking.dock");
         var solution = _form.Part<DockContent>("docking.solution");

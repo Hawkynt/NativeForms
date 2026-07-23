@@ -38,7 +38,27 @@ internal sealed partial class Autopilot
         this.CaptureScrolledPanel();
         this.CaptureRibbonStates();
         this.CaptureAccordionPanes();
+        this.CaptureDockTabEdges();
         this.CaptureMessageBox();
+    }
+
+    /// <summary>The docking page with its document tabs moved to a side (vertical) strip.</summary>
+    private void CaptureDockTabEdges()
+    {
+        this.SelectTab("Dock");
+        this.Pristine();
+        var dock = _form.Part<DockPanel>("docking.dock");
+
+        this.Do(() => dock.DocumentTabStripEdge = TabAlignment.Left);
+        this.Settle(150);
+        this.Screenshot("22-dock-tabs-left");
+
+        this.Do(() => dock.DocumentTabStripEdge = TabAlignment.Top);
+        this.Settle(150);
+        this.Screenshot("23-dock-tabs-top");
+
+        this.Do(() => dock.DocumentTabStripEdge = TabAlignment.Bottom);
+        this.Settle(80);
     }
 
     /// <summary>The ribbon on a second tab, squeezed until a group collapses, and minimized.</summary>

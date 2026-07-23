@@ -19,7 +19,7 @@ internal sealed partial class MainForm
     /// </summary>
     private TabPage BuildDockingPage()
     {
-        var page = new TabPage("Docking") { ImageIndex = _IconGear };
+        var page = new TabPage("Dock") { ImageIndex = _IconGear };
 
         var caption = Caption(
             "DockPanel — drag a pane caption onto a guide to re-dock; splitters resize; pin auto-hides.",
@@ -29,6 +29,7 @@ internal sealed partial class MainForm
         var load = new Button { Bounds = new(144, 34, 120, 26), Text = "Load layout" };
         var reset = new Button { Bounds = new(272, 34, 130, 26), Text = "Reset layout" };
         var floatBtn = new Button { Bounds = new(410, 34, 150, 26), Text = "Float Output" };
+        var tabsBtn = new Button { Bounds = new(568, 34, 170, 26), Text = "Doc tabs: Bottom" };
 
         var dock = new DockPanel
         {
@@ -107,7 +108,22 @@ internal sealed partial class MainForm
             this.SetStatus($"Docking: Output is {output.DockState}.");
         };
 
-        page.Controls.AddRange(caption, save, load, reset, floatBtn, dock);
+        // Cycle the document tab strip through every edge — top and bottom rows, left and right columns.
+        tabsBtn.Click += (_, _) =>
+        {
+            dock.DocumentTabStripEdge = dock.DocumentTabStripEdge switch
+            {
+                TabAlignment.Bottom => TabAlignment.Top,
+                TabAlignment.Top => TabAlignment.Left,
+                TabAlignment.Left => TabAlignment.Right,
+                _ => TabAlignment.Bottom,
+            };
+            tabsBtn.Text = $"Doc tabs: {dock.DocumentTabStripEdge}";
+            this.SetStatus($"DockPanel: document tabs on the {dock.DocumentTabStripEdge}.");
+        };
+
+        page.Controls.AddRange(caption, save, load, reset, floatBtn, tabsBtn, dock);
+        this.Publish("docking.tabsButton", tabsBtn);
 
         this.Publish("docking.page", page);
         this.Publish("docking.dock", dock);
