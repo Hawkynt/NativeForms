@@ -382,7 +382,11 @@ public class Accordion : OwnerDrawnControl
         else if (pane.IsExpanded && _selectedIndex < 0)
             _selectedIndex = this.Panes.Count - 1;
 
-        this.PerformLayout();
+        // While unrealized, skip the per-pane layout: OnRealized lays every pane out once, so a bulk
+        // build stays linear instead of re-flowing all panes on each add.
+        if (this.IsRealized)
+            this.PerformLayout();
+
         this.Invalidate();
     }
 

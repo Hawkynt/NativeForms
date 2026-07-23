@@ -133,9 +133,11 @@ public partial class DockPanel : OwnerDrawnControl
     /// <summary>Moves a pane into a new <see cref="DockState"/>, the single writer of pane placement.</summary>
     internal void SetContentState(DockContent content, DockState state)
     {
-        if (_contents is null || !_contents.Contains(content))
+        if (!ReferenceEquals(content.DockPanel, this))
         {
-            // Unowned pane: adopt it, which routes back here once parented.
+            // Unowned pane: adopt it, which routes back here once parented. The ownership check reads
+            // the content's own back-reference — an O(1) test instead of scanning every content, so a
+            // bulk build does not walk the growing list on every add.
             this.Add(content, state, content.DockEdge);
             return;
         }
@@ -312,9 +314,12 @@ public partial class DockPanel : OwnerDrawnControl
 
     private void AddToGroup(DockTabGroupNode group, DockContent content)
     {
-        if (!group.Contents.Contains(content))
-            group.Contents.Add(content);
-        group.ActiveIndex = group.Contents.IndexOf(content);
+        // SetContentState detaches the content from its current group before landing it here, and a
+        // no-op state change returns earlier — so the content is always new to this group. Appending
+        // and taking the last index avoids the two O(n) list scans (Contains + IndexOf) that made
+        // building a dock of N documents quadratic.
+        group.Contents.Add(content);
+        group.ActiveIndex = group.Contents.Count - 1;
     }
 
     private void RemoveFromTree(DockContent content)
@@ -522,6 +527,11 @@ public partial class DockPanel : OwnerDrawnControl
 
     private void CommitLayout()
     {
+        // While unrealized, defer: OnRealized commits one layout, so a bulk build (adding many
+        // documents up front) stays linear instead of re-laying the whole dock tree on each add.
+        if (!this.IsRealized)
+            return;
+
         this.PerformLayout();
         this.PushPeerVisibleTree();
         this.Invalidate();

@@ -912,6 +912,11 @@ public abstract class Control
     /// <summary>The realized native peer, or <see langword="null"/> before realization.</summary>
     internal IControlPeer? Peer => _peer;
 
+    /// <summary>Whether the control has a live peer. Containers that lay their children out on add can
+    /// skip that pass while unrealized — construction ends with one layout on <c>OnRealized</c>, so a
+    /// per-add pass during a bulk build would only be thrown-away quadratic work.</summary>
+    private protected bool IsRealized => _peer is not null;
+
     /// <summary>The backend this control is realized on, or <see langword="null"/> before realization.</summary>
     internal IPlatformBackend? Backend => _backend;
 
