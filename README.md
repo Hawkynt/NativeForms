@@ -35,6 +35,20 @@ deviations are documented per control — start with the base-class list in
 [docs/controls/control.md](docs/controls/control.md#differences-from-systemwindowsformscontrol);
 every page whose control diverges carries its own "Differences from WinForms" section.
 
+## 📸 Screenshots
+
+The bundled `NativeForms.Demo` is a tabbed gallery of every control. These are captured on Linux/GTK
+by the demo's headless autopilot (`--autopilot`), which drives the whole gallery with synthesized
+input and photographs it in-process:
+
+| | | |
+|:---:|:---:|:---:|
+| ![Basics](docs/screenshots/01-basics.png)<br>**Buttons, MVVM, toggles** | ![Input](docs/screenshots/02-input.png)<br>**Text, spinners, dates** | ![Lists & trees](docs/screenshots/03-lists.png)<br>**Lists, trees, combos** |
+| ![DataGridView](docs/screenshots/04-grid.png)<br>**DataGridView (12 column kinds)** | ![Layout](docs/screenshots/05-layout.png)<br>**Layout containers** | ![Docking](docs/screenshots/06-docking.png)<br>**Dock / float / auto-hide** |
+| ![Pickers](docs/screenshots/07-pickers.png)<br>**File/folder/drive pickers** | ![Ribbon](docs/screenshots/08-ribbon.png)<br>**Office-style ribbon** | ![Calendar](docs/screenshots/09-calendar.png)<br>**Outlook-style scheduler** |
+
+More: [docking drag overlays](docs/screenshots/docking-drag.png) · [the month scheduler](docs/screenshots/calendar-month.png) · [a modal MessageBox](docs/screenshots/messagebox.png) · [a context menu](docs/screenshots/context-menu.png). The full set lives in [`docs/screenshots/`](docs/screenshots/).
+
 ## 🧩 Architecture
 
 ```

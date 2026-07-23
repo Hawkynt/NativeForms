@@ -12,6 +12,21 @@ collected in
 [Control — Differences from System.Windows.Forms.Control](controls/control.md#differences-from-systemwindowsformscontrol);
 each control page carries its own "Differences from WinForms" section where behavior diverges.
 
+## Gallery
+
+The `NativeForms.Demo` app is a tabbed showcase of every control, captured on Linux/GTK by its
+headless autopilot. Each page below is one tab of the demo:
+
+| | | |
+|:---:|:---:|:---:|
+| [![Basics](screenshots/01-basics.png)](screenshots/01-basics.png)<br>Basics | [![Input](screenshots/02-input.png)](screenshots/02-input.png)<br>Input | [![Lists](screenshots/03-lists.png)](screenshots/03-lists.png)<br>Lists & trees |
+| [![Grid](screenshots/04-grid.png)](screenshots/04-grid.png)<br>DataGridView | [![Layout](screenshots/05-layout.png)](screenshots/05-layout.png)<br>Layout | [![Docking](screenshots/06-docking.png)](screenshots/06-docking.png)<br>Docking |
+| [![Pickers](screenshots/07-pickers.png)](screenshots/07-pickers.png)<br>Pickers | [![Ribbon](screenshots/08-ribbon.png)](screenshots/08-ribbon.png)<br>Ribbon | [![Calendar](screenshots/09-calendar.png)](screenshots/09-calendar.png)<br>Calendar |
+
+Interaction states: [docking drag overlays](screenshots/docking-drag.png),
+[the month scheduler](screenshots/calendar-month.png), [a modal MessageBox](screenshots/messagebox.png),
+[a context menu](screenshots/context-menu.png).
+
 ## Guides
 
 | Page | Covers |
