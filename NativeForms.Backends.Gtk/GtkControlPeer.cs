@@ -555,6 +555,7 @@ internal abstract class GtkControlPeer : IControlPeer
             ConnectAllocationClamp();
             SelectScrollEvents();
             ConnectPointerSignals();
+            ConnectContextMenuSignals();
         }
 
         _parentFixed = parentFixed;
@@ -636,6 +637,75 @@ internal abstract class GtkControlPeer : IControlPeer
 
     /// <inheritdoc/>
     public event EventHandler? PointerLeave;
+
+    /// <inheritdoc/>
+    public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
+
+    /// <summary>
+    /// Wires the right-click and Menu-key context-menu requests. Gated by the same
+    /// <see cref="NeedsPointerSignals"/> flag as hover, so the canvas — which raises the request from
+    /// its own mouse pipeline — opts out rather than double-delivering. The handlers return whether the
+    /// core opened a menu, so a button-3 press falls through to GTK's own default menu only when the
+    /// control carries none of its own.
+    /// </summary>
+    private void ConnectContextMenuSignals()
+    {
+        if (_widget == 0 || !this.NeedsPointerSignals)
+            return;
+
+        NativeMethods.gtk_widget_add_events(_widget, NativeMethods.GDK_BUTTON_PRESS_MASK);
+
+        var data = this.PinSelf();
+        unsafe
+        {
+            NativeMethods.g_signal_connect_data(
+                _widget, "button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnContextButtonPress, data, 0, 0);
+            NativeMethods.g_signal_connect_data(
+                _widget, "popup-menu", (nint)(delegate* unmanaged[Cdecl]<nint, nint, int>)&OnPopupMenuSignal, data, 0, 0);
+        }
+    }
+
+    /// <summary>Raises <see cref="ContextMenuRequested"/> at a client-space point; returns whether the
+    /// core opened a menu, so the caller suppresses the widget's own default one.</summary>
+    private bool RaiseContextMenu(int x, int y)
+    {
+        if (this.ContextMenuRequested is not { } handler)
+            return false;
+
+        var args = new ContextMenuRequestedEventArgs(new Point(x, y));
+        handler(this, args);
+        return args.Handled;
+    }
+
+    /// <summary>Native "button-press-event" handler that turns a single right-click into a context-menu
+    /// request; every other press falls through untouched.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnContextButtonPress(nint widget, nint eventPtr, nint userData)
+    {
+        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkControlPeer peer)
+            return 0;
+
+        unsafe
+        {
+            ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
+            if (e.Type != NativeMethods.GDK_BUTTON_PRESS || e.Button != 3)
+                return 0;
+
+            return peer.RaiseContextMenu((int)e.X, (int)e.Y) ? 1 : 0;
+        }
+    }
+
+    /// <summary>Native "popup-menu" handler (Shift+F10 / Menu key): <c>gboolean (GtkWidget*, gpointer)</c>;
+    /// opens the menu at the widget's centre.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnPopupMenuSignal(nint widget, nint userData)
+    {
+        if (userData == 0 || GCHandle.FromIntPtr(userData).Target is not GtkControlPeer peer)
+            return 0;
+
+        NativeMethods.gtk_widget_get_allocation(peer._widget, out var allocation);
+        return peer.RaiseContextMenu(allocation.Width / 2, allocation.Height / 2) ? 1 : 0;
+    }
 
     /// <summary>Raises <see cref="PointerMove"/>; used by peers that feed the channel from a mouse
     /// pipeline they already own rather than from a connection of their own.</summary>

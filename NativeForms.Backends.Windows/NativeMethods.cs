@@ -465,6 +465,12 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool ClientToScreen(nint hWnd, ref POINT lpPoint);
 
+    /// <summary>Converts a point from screen coordinates to a window's client space, in place — the
+    /// inverse of <see cref="ClientToScreen"/>, used to place a right-click's context menu.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ScreenToClient(nint hWnd, ref POINT lpPoint);
+
     /// <summary>Retrieves a window's bounding rectangle in screen coordinates.</summary>
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

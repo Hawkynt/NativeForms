@@ -13,8 +13,10 @@ namespace Hawkynt.NativeForms;
 /// a control — it owns no peer until it opens and can serve any number of controls at once.
 /// </summary>
 /// <remarks>
-/// Right-click opening is wired through the owner-drawn mouse pipeline; native-widget controls
-/// (Button, TextBox …) need right-click events on their peers first, tracked in <c>docs/PRD.md</c>.
+/// Right-click opening reaches every control: owner-drawn ones open it from their canvas mouse
+/// pipeline, and native-widget controls (Button, TextBox …) open it from
+/// <see cref="Backends.IControlPeer.ContextMenuRequested"/>, which each backend raises from a
+/// right-click or the Menu / Shift+F10 keyboard request.
 /// </remarks>
 public class ContextMenuStrip : Component
 {

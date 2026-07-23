@@ -97,6 +97,25 @@ internal abstract class Win32ControlPeer : IControlPeer
     /// <summary>Raises <see cref="PointerLeave"/>.</summary>
     private protected void RaisePointerLeave() => PointerLeave?.Invoke(this, EventArgs.Empty);
 
+    /// <inheritdoc/>
+    public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
+
+    /// <summary>Whether anything is listening for the context-menu request — the subclass proc checks
+    /// this before decoding a <c>WM_CONTEXTMENU</c>.</summary>
+    private protected bool HasContextMenuListener => ContextMenuRequested is not null;
+
+    /// <summary>Raises <see cref="ContextMenuRequested"/> at a client-space point; returns whether the
+    /// core opened a menu, so the caller suppresses the widget's own default menu.</summary>
+    private protected bool RaiseContextMenu(Point clientLocation)
+    {
+        if (ContextMenuRequested is not { } handler)
+            return false;
+
+        var args = new ContextMenuRequestedEventArgs(clientLocation);
+        handler(this, args);
+        return args.Handled;
+    }
+
     /// <summary>The standard tooltip control owning this widget's tip, created on first use.</summary>
     private nint _toolTipWindow;
 

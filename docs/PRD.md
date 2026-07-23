@@ -507,8 +507,9 @@ strategy (may differ per platform; note exceptions inline).
         (`Keys` chords) displayed and dispatched via `ProcessShortcut`; form-wide routing and
         Alt bar activation blocked on the §7.1 focus model
   - [x] `ICommand` wiring (auto enable/disable via `CanExecute`)
-- [~] `ContextMenuStrip` — `Control.ContextMenuStrip` + right-click at the cursor on
-      owner-drawn controls; native-widget controls pending (peer right-click events)
+- [x] `ContextMenuStrip` — `Control.ContextMenuStrip` + right-click at the cursor on both
+      owner-drawn and native-widget controls (peer `ContextMenuRequested` from WM_CONTEXTMENU /
+      a GTK button-3 press, plus the Menu / Shift+F10 keyboard request)
 - [x] `ToolStrip` (owner) — icon+text buttons, toggles (`CheckOnClick`), separators,
       `ToolStripDropDownButton`/`ToolStripSplitButton` (checkboxes + icons in their drop-downs via
       `ToolStripMenuItem`), `ToolStripControlHost` hosting a real `Control` (combo/date/time/colour

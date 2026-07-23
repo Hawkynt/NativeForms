@@ -232,6 +232,22 @@ internal abstract class HeadlessPeer : IControlPeer
     /// <summary>Simulates the pointer leaving this peer.</summary>
     public void RaisePointerLeave() => this.PointerLeave?.Invoke(this, EventArgs.Empty);
 
+    /// <inheritdoc/>
+    public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
+
+    /// <summary>Simulates a right-click / Menu-key context-menu request at a client-space point — the
+    /// fake's stand-in for the native <c>WM_CONTEXTMENU</c> / button-3 press. Returns whether the core
+    /// opened a menu, exactly as a real peer reads back to suppress the widget's own default menu.</summary>
+    public bool RaiseContextMenu(int x, int y)
+    {
+        if (this.ContextMenuRequested is not { } handler)
+            return false;
+
+        var args = new ContextMenuRequestedEventArgs(new Point(x, y));
+        handler(this, args);
+        return args.Handled;
+    }
+
     /// <summary>The platform tip text last asked for, or null while no tip is up — the fake's record
     /// of <see cref="IControlPeer.ShowToolTip"/>.</summary>
     public string? ToolTipText { get; private set; }

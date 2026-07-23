@@ -126,6 +126,57 @@ internal sealed class ContextMenuTests
         Assert.That(menu.IsOpen, Is.False);
     }
 
+    /// <summary>Realizes a native button carrying a context menu and returns all the actors.</summary>
+    private static Button CreateButton(out ContextMenuStrip menu, out HeadlessButtonPeer peer, out HeadlessBackend backend)
+    {
+        menu = new();
+        menu.Items.Add(new ToolStripMenuItem("Copy"));
+        menu.Items.Add(new ToolStripMenuItem("Paste"));
+
+        var button = new Button { Bounds = new(10, 10, 80, 26), Text = "Go", ContextMenuStrip = menu };
+        backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(button);
+        Application.Run(form, backend);
+        peer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+        peer.ScreenOrigin = new(400, 300);
+        return button;
+    }
+
+    [Test]
+    public void Right_click_on_a_native_control_opens_its_menu_and_marks_the_request_handled()
+    {
+        CreateButton(out var menu, out var peer, out var backend);
+
+        var handled = peer.RaiseContextMenu(5, 6);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handled, Is.True, "the core opened a menu, so the widget suppresses its own default one");
+            Assert.That(menu.IsOpen, Is.True);
+            Assert.That(PopupOf(backend).ShowCalls.Single().Location, Is.EqualTo(new Point(405, 306)));
+        });
+    }
+
+    [Test]
+    public void A_native_context_menu_request_without_a_menu_is_left_for_the_widgets_own()
+    {
+        var button = new Button { Bounds = new(10, 10, 80, 26), Text = "Go" };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(button);
+        Application.Run(form, backend);
+        var peer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+
+        var handled = peer.RaiseContextMenu(5, 6);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handled, Is.False, "with no ContextMenuStrip the request is left unhandled for the widget's own menu");
+            Assert.That(backend.Created.OfType<HeadlessPopupPeer>(), Is.Empty);
+        });
+    }
+
     [Test]
     public void Opening_cancel_keeps_the_menu_closed_on_both_paths()
     {

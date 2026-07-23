@@ -9,6 +9,21 @@ namespace Hawkynt.NativeForms.Backends;
 /// sync with the managed control. All coordinates are in the parent's client space, top-left origin,
 /// pixels — exactly like Windows Forms.
 /// </summary>
+/// <summary>
+/// Carries a context-menu request from a peer to its <see cref="Control"/>: where the menu should
+/// open, in the requesting widget's client space, and a <see cref="Handled"/> flag the core sets once
+/// it has shown the control's <see cref="Control.ContextMenuStrip"/> — which the peer reads to
+/// suppress the widget's own default menu.
+/// </summary>
+public sealed class ContextMenuRequestedEventArgs(Point location) : EventArgs
+{
+    /// <summary>Where the menu should open, in the requesting widget's client space.</summary>
+    public Point Location { get; } = location;
+
+    /// <summary>Set by the core when it opened a menu, so the peer suppresses the native default one.</summary>
+    public bool Handled { get; set; }
+}
+
 public interface IControlPeer : IDisposable
 {
     /// <summary>Positions and sizes the widget within its parent.</summary>
@@ -74,6 +89,17 @@ public interface IControlPeer : IDisposable
 
     /// <summary>Raised when the pointer leaves the widget — the counterpart of <see cref="PointerMove"/>.</summary>
     event EventHandler? PointerLeave;
+
+    /// <summary>
+    /// Raised when the user asks for a context menu on the widget — a right mouse click
+    /// (<c>WM_CONTEXTMENU</c> on Win32, a button-3 press on GTK) or the Menu / Shift+F10 keyboard
+    /// request. The core opens the control's <see cref="Control.ContextMenuStrip"/> at
+    /// <see cref="ContextMenuRequestedEventArgs.Location"/> and sets
+    /// <see cref="ContextMenuRequestedEventArgs.Handled"/>, which the peer reads to suppress the
+    /// widget's own default menu (an edit control's cut/copy/paste, say). Owner-drawn controls open
+    /// their menu from the canvas mouse pipeline instead, so their peer never raises this.
+    /// </summary>
+    event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
 
     /// <summary>
     /// Shows the platform's own tooltip on the widget, or hides it when <paramref name="text"/> is

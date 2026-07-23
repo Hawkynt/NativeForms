@@ -31,6 +31,10 @@ internal static unsafe partial class NativeMethods
     /// <summary>Right mouse button released.</summary>
     internal const uint WM_RBUTTONUP = 0x0205;
 
+    /// <summary>A context menu was requested (right-click release or the Menu/Shift+F10 keyboard
+    /// gesture); <c>lParam</c> carries the screen position, or -1 when keyboard-invoked.</summary>
+    internal const uint WM_CONTEXTMENU = 0x007B;
+
     /// <summary>Middle mouse button pressed.</summary>
     internal const uint WM_MBUTTONDOWN = 0x0207;
 

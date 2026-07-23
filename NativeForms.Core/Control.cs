@@ -653,8 +653,8 @@ public abstract class Control
 
     /// <summary>
     /// The context menu a right-click on this control opens at the cursor, or <see langword="null"/>
-    /// for none. Owner-drawn controls open it from their mouse pipeline; native-widget controls need
-    /// right-click peer events first (tracked in <c>docs/PRD.md</c>).
+    /// for none. Owner-drawn controls open it from their mouse pipeline; native-widget controls open
+    /// it from their peer's <see cref="Backends.IControlPeer.ContextMenuRequested"/>.
     /// </summary>
     public ContextMenuStrip? ContextMenuStrip { get; set; }
 
@@ -764,6 +764,21 @@ public abstract class Control
         _state &= ~State.Focused;
         this.OnLostFocus(EventArgs.Empty);
         this.OnLeave(EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Opens this control's <see cref="ContextMenuStrip"/> where a native peer reports a right-click
+    /// or Menu-key request, and marks the request handled so the peer suppresses the widget's own
+    /// default menu. Owner-drawn controls open the same menu from their canvas mouse pipeline, so this
+    /// path serves only the native-widget controls whose peers raise the request.
+    /// </summary>
+    private void OnPeerContextMenuRequested(object? sender, ContextMenuRequestedEventArgs e)
+    {
+        if (this.ContextMenuStrip is not { } menu)
+            return;
+
+        menu.Show(this, e.Location);
+        e.Handled = true;
     }
 
     /// <summary>
@@ -1574,6 +1589,7 @@ public abstract class Control
         _backend = backend;
         peer.GotFocus += this.OnPeerGotFocus;
         peer.LostFocus += this.OnPeerLostFocus;
+        peer.ContextMenuRequested += this.OnPeerContextMenuRequested;
         this.PushPeerBounds();
         peer.SetText(this.Text);
         peer.SetEnabled(_enabled);
@@ -1640,6 +1656,7 @@ public abstract class Control
 
         _peer.GotFocus -= this.OnPeerGotFocus;
         _peer.LostFocus -= this.OnPeerLostFocus;
+        _peer.ContextMenuRequested -= this.OnPeerContextMenuRequested;
 
         // The popup bit goes with the peer: unrealizing tears every owned surface down, and leaving it
         // set would have the control swallow every focus loss it is ever told about again.

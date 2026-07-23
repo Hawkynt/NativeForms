@@ -22,6 +22,10 @@ internal static partial class NativeMethods
     internal const int GDK_FOCUS_CHANGE_MASK = 1 << 14;
     internal const int GDK_SCROLL_MASK = 1 << 21;
 
+    /// <summary>The <c>GdkEventType</c> value for a single button press (double/triple presses differ),
+    /// so a context-menu handler fires once per right-click rather than again on the compound event.</summary>
+    internal const int GDK_BUTTON_PRESS = 4;
+
     /// <summary>Selects the axis-valuator ("smooth") form of the wheel, which is what XI2 and
     /// Wayland deliver for a real mouse; without it GDK only offers the legacy discrete events.</summary>
     internal const int GDK_SMOOTH_SCROLL_MASK = 1 << 23;

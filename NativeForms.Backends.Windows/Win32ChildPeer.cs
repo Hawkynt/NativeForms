@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -97,11 +98,43 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
                     peer._leaveTracked = false;
                     peer.RaisePointerLeave();
                     break;
+                case NativeMethods.WM_CONTEXTMENU:
+                    // A control that opened its own menu suppresses the default one (an edit's
+                    // cut/copy/paste) by not deferring to DefSubclassProc.
+                    if (peer.OnContextMenu(lParam))
+                        return 0;
+                    break;
                 default:
                     break;
             }
 
         return NativeMethods.DefSubclassProc(hwnd, msg, wParam, lParam);
+    }
+
+    /// <summary>
+    /// Turns a <c>WM_CONTEXTMENU</c> into a client-space context-menu request: the cursor position for a
+    /// right-click, or the control's centre when the Menu/Shift+F10 key raised it (<paramref name="lParam"/>
+    /// is -1). Returns whether the core opened a menu, so the caller can suppress the default one.
+    /// </summary>
+    private bool OnContextMenu(nint lParam)
+    {
+        if (!this.HasContextMenuListener)
+            return false;
+
+        Point client;
+        if (lParam == -1)
+        {
+            NativeMethods.GetClientRect(Handle, out var rect);
+            client = new((rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2);
+        }
+        else
+        {
+            var point = new NativeMethods.POINT { x = (short)(lParam & 0xFFFF), y = (short)((lParam >> 16) & 0xFFFF) };
+            NativeMethods.ScreenToClient(Handle, ref point);
+            client = new(point.x, point.y);
+        }
+
+        return this.RaiseContextMenu(client);
     }
 
     /// <summary>Arms leave tracking once per crossing and raises the move with client-space coordinates.</summary>
