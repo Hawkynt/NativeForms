@@ -248,9 +248,9 @@ internal sealed partial class Autopilot
             var bounds = this.Read(() => Injection.WindowBounds(popups[0]));
             var rowHeight = this.Read(() => Theme.RowHeight);
 
-            // Row 1 of cool / warm / separator / clear: the second gradient.
-            this.ClickAt(new(bounds.X + 40, bounds.Y + 1 + rowHeight + (rowHeight / 2)));
-            this.Expect("the status line", this.Read(() => status.Text), "PictureBox: green → purple gradient regenerated.");
+            // Row 2 of spinner / cool / warm / separator / clear: the green → purple gradient.
+            this.ClickAt(new(bounds.X + 40, bounds.Y + 1 + (2 * rowHeight) + (rowHeight / 2)));
+            this.Expect("the status line", this.Read(() => status.Text), "PictureBox: green → purple gradient.");
             this.ExpectTrue("the menu stayed open after committing an item", !this.Read(() => menu.IsOpen));
         });
     }

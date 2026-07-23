@@ -58,4 +58,17 @@ public sealed class DecodedImage
             return total;
         }
     }
+
+    /// <summary>The shortest per-frame delay (floored at 1 ms) — the finest cadence an animation needs.</summary>
+    public int ShortestFrameDelayMilliseconds
+    {
+        get
+        {
+            var shortest = int.MaxValue;
+            for (var i = 0; i < this.Frames.Count; ++i)
+                shortest = Math.Min(shortest, Math.Max(1, this.Frames[i].DelayMilliseconds));
+
+            return shortest == int.MaxValue ? 1 : shortest;
+        }
+    }
 }

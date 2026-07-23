@@ -379,6 +379,47 @@ internal sealed partial class MainForm : Form
     }
 
     /// <summary>A horizontal blend between two colors, shaded darker toward the bottom.</summary>
+    /// <summary>Builds a procedural spinner animation — a ring of dots with the bright one rotating —
+    /// so the demo shows the animation clock without shipping an image file.</summary>
+    private static AnimatedImage BuildSpinner()
+    {
+        const int size = 48;
+        const int dots = 8;
+        var frames = new ImageFrame[dots];
+        for (var f = 0; f < dots; ++f)
+        {
+            var pixels = new int[size * size]; // transparent
+            for (var d = 0; d < dots; ++d)
+            {
+                var angle = d * 2 * Math.PI / dots;
+                var cx = (int)((size / 2) + (Math.Cos(angle) * ((size / 2) - 6)));
+                var cy = (int)((size / 2) + (Math.Sin(angle) * ((size / 2) - 6)));
+                var trailing = (((f - d) % dots) + dots) % dots; // 0 = the lead dot
+                var alpha = Math.Max(40, 255 - (trailing * 28));
+                FillDisc(pixels, size, cx, cy, 4, (alpha << 24) | (0x30 << 16) | (0x60 << 8) | 0xD0);
+            }
+
+            frames[f] = new ImageFrame(pixels, 90);
+        }
+
+        return new AnimatedImage(new DecodedImage(size, size, frames, loopCount: 0));
+    }
+
+    private static void FillDisc(int[] pixels, int size, int cx, int cy, int radius, int argb)
+    {
+        for (var y = -radius; y <= radius; ++y)
+            for (var x = -radius; x <= radius; ++x)
+            {
+                if ((x * x) + (y * y) > radius * radius)
+                    continue;
+
+                var px = cx + x;
+                var py = cy + y;
+                if (px >= 0 && px < size && py >= 0 && py < size)
+                    pixels[(py * size) + px] = argb;
+            }
+    }
+
     private static int[] GradientPixels(int width, int height, Color from, Color to)
     {
         var pixels = new int[width * height];

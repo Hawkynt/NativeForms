@@ -1,16 +1,19 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// An owner-drawn image surface. Shows one <see cref="IImage"/> under a <see cref="SizeMode"/>
-/// policy — top-left at native size, stretched, centered, or aspect-fit zoomed — clipped to the
-/// client area, with an optional themed single-line border.
+/// An owner-drawn image surface. Shows one <see cref="IImage"/> — or an <see cref="AnimatedImage"/>,
+/// whose current frame is picked from elapsed time and repainted by the shared animation clock — under
+/// a <see cref="SizeMode"/> policy (top-left at native size, stretched, centered, or aspect-fit
+/// zoomed), clipped to the client area, with an optional themed single-line border.
 /// </summary>
 public class PictureBox : OwnerDrawnControl
 {
-    /// <summary>The image to display, or <see langword="null"/> for background (and border) only.</summary>
+    /// <summary>The static image to display, or <see langword="null"/>. An <see cref="AnimatedImage"/>,
+    /// when set, takes precedence.</summary>
     public IImage? Image
     {
         get => field;
@@ -20,6 +23,27 @@ public class PictureBox : OwnerDrawnControl
                 return;
 
             field = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// A decoded still or animated image to display. When animated it registers with the shared
+    /// <c>AnimationClock</c>, which repaints the box as the frame advances; a hidden box is not
+    /// repainted but shows the correct frame the moment it returns (the frame is a function of elapsed
+    /// time). Takes precedence over <see cref="Image"/>.
+    /// </summary>
+    public AnimatedImage? AnimatedImage
+    {
+        get => field;
+        set
+        {
+            if (ReferenceEquals(field, value))
+                return;
+
+            AnimationClock.Instance.Unregister(this);
+            field = value;
+            this.RegisterAnimation();
             this.Invalidate();
         }
     }
@@ -56,6 +80,27 @@ public class PictureBox : OwnerDrawnControl
     } = BorderStyle.None;
 
     /// <inheritdoc/>
+    private protected override void OnRealized(IControlPeer peer)
+    {
+        base.OnRealized(peer);
+        this.RegisterAnimation();
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        base.OnUnrealized();
+        AnimationClock.Instance.Unregister(this);
+    }
+
+    /// <summary>Subscribes an animated image to the shared clock once the box is realized.</summary>
+    private void RegisterAnimation()
+    {
+        if (this.AnimatedImage is { IsAnimated: true } animated && this.IsRealized)
+            AnimationClock.Instance.Register(this, animated, () => this.Visible, this.Invalidate);
+    }
+
+    /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -63,7 +108,14 @@ public class PictureBox : OwnerDrawnControl
         var client = new Rectangle(0, 0, this.Width, this.Height);
         g.FillRectangle(theme.ControlBackground, client);
 
-        if (this.Image is { Width: > 0, Height: > 0 } image)
+        if (this.AnimatedImage is { Width: > 0, Height: > 0 } animated && this.Backend is { } backend)
+        {
+            var frame = animated.FrameImage(backend, animated.CurrentFrameIndex(Environment.TickCount64));
+            g.PushClip(client);
+            g.DrawImage(frame, GetImageRectangle(client.Size, new Size(animated.Width, animated.Height), this.SizeMode));
+            g.PopClip();
+        }
+        else if (this.Image is { Width: > 0, Height: > 0 } image)
         {
             g.PushClip(client);
             g.DrawImage(image, GetImageRectangle(client.Size, new Size(image.Width, image.Height), this.SizeMode));

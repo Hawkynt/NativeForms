@@ -137,42 +137,53 @@ internal sealed partial class MainForm
         var fullLabel = new Label { Bounds = new(914, 224, 50, 18), Text = "100 %" };
         _toolTip.SetToolTip(marquee, "Style = Marquee sweeps forever.");
 
+        // A procedurally-built animation driven by the shared animation clock (no image file needed).
         var picture = new PictureBox
         {
             Bounds = new(664, 296, 300, 140),
-            SizeMode = PictureBoxSizeMode.StretchImage,
+            SizeMode = PictureBoxSizeMode.Zoom,
             BorderStyle = BorderStyle.FixedSingle,
-            Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.RoyalBlue, Color.Orange)),
+            AnimatedImage = BuildSpinner(),
         };
         var pictureMenu = new ContextMenuStrip();
+        var spin = new ToolStripMenuItem("Animated spinner");
+        spin.Click += (_, _) =>
+        {
+            picture.Image = null;
+            picture.AnimatedImage = BuildSpinner();
+            this.SetStatus("PictureBox: animated spinner (shared clock).");
+        };
         var cool = new ToolStripMenuItem("Blue → orange gradient");
         cool.Click += (_, _) =>
         {
+            picture.AnimatedImage = null;
             picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.RoyalBlue, Color.Orange));
-            this.SetStatus("PictureBox: blue → orange gradient regenerated.");
+            this.SetStatus("PictureBox: blue → orange gradient.");
         };
         var warm = new ToolStripMenuItem("Green → purple gradient");
         warm.Click += (_, _) =>
         {
+            picture.AnimatedImage = null;
             picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid));
-            this.SetStatus("PictureBox: green → purple gradient regenerated.");
+            this.SetStatus("PictureBox: green → purple gradient.");
         };
         var clear = new ToolStripMenuItem("Clear image");
         clear.Click += (_, _) =>
         {
+            picture.AnimatedImage = null;
             picture.Image = null;
             this.SetStatus("PictureBox: image cleared.");
         };
-        pictureMenu.Items.AddRange(cool, warm, new ToolStripSeparator(), clear);
+        pictureMenu.Items.AddRange(spin, cool, warm, new ToolStripSeparator(), clear);
         picture.ContextMenuStrip = pictureMenu;
-        _toolTip.SetToolTip(picture, "Right-click for gradient options.");
+        _toolTip.SetToolTip(picture, "Right-click to switch between the animation and gradients.");
 
         page.Controls.AddRange(
             Caption("RadioButton (nested in a GroupBox)", 664, 12),
             group,
             Caption("ProgressBar", 664, 158),
             empty, half, full, marquee, emptyLabel, halfLabel, fullLabel,
-            Caption("PictureBox (generated gradient)", 664, 272),
+            Caption("PictureBox (animated + gradients)", 664, 272),
             picture);
 
         // Everything the walkthrough moves on this page, snapshotted the instant it was authored so
