@@ -25,7 +25,10 @@ Clicking a segment trims the path to it (the navigate-up gesture) and raises `It
 | `Items` | `BreadcrumbItemCollection` — the path segments, left to right (`Add`, `Add(string)`, `AddRange(params string[])`, `Remove`, `TrimAfter(index)`, `Clear`). |
 | `ImageList` | `ImageList?` — the icons segments' `ImageIndex`/`ImageKey` point into. |
 | `TrimOnClick` | `bool` (default `true`) — whether clicking a segment trims the path to it before `ItemClicked` fires. |
+| `PathSeparator` | `string` (default `"/"`) — the delimiter that joins/splits a path; a plain text convention, so any virtual namespace picks its own. |
+| `SubItemsProvider` | `Func<BreadcrumbItem?, IReadOnlyList<BreadcrumbItem>>?` — the folder-walk hook: given a segment (or `null` for the level before the first), returns its children. A click on the following chevron lists them; choosing one navigates in. Nothing touches the filesystem, so it serves a real directory, an archive or any virtual tree. |
 | `ItemClicked` | Raised when a segment is clicked (after any trim), carrying the `BreadcrumbItem` and its `Index`. |
+| `SubItemSelected` | Raised when a child chosen from a chevron drop-down is navigated into. |
 
 ### BreadcrumbItem
 

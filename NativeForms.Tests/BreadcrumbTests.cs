@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using Hawkynt.NativeForms;
 using Hawkynt.NativeForms.Tests.Fakes;
 
@@ -134,5 +135,67 @@ internal sealed class BreadcrumbTests
         crumb.Items.TrimAfter(0);
 
         Assert.That(crumb.Items, Has.Count.EqualTo(1));
+    }
+
+    // --- Folder walk (SubItemsProvider) --------------------------------------------------------
+
+    [Test]
+    public void PathSeparator_defaults_to_slash_and_is_settable()
+    {
+        var crumb = new Breadcrumb();
+        Assert.That(crumb.PathSeparator, Is.EqualTo("/"));
+
+        crumb.PathSeparator = "\\";
+        Assert.That(crumb.PathSeparator, Is.EqualTo("\\"));
+    }
+
+    [Test]
+    public void Clicking_a_chevron_with_a_provider_drops_down_the_child_menu()
+    {
+        var crumb = ThreeSegments();
+        crumb.SubItemsProvider = _ => [new BreadcrumbItem("Pictures"), new BreadcrumbItem("Music")];
+        var canvas = Realize(crumb, out var backend);
+        canvas.RaisePaint();
+
+        canvas.RaiseMouseDown(50, 12); // the chevron just after "Home" (spans 44..60)
+
+        Assert.That(backend.Created.OfType<HeadlessPopupPeer>().Any(), Is.True, "the folder-walk drop-down opened");
+    }
+
+    [Test]
+    public void Without_a_provider_a_chevron_click_is_inert()
+    {
+        var crumb = ThreeSegments();
+        var canvas = Realize(crumb, out var backend);
+        canvas.RaisePaint();
+        BreadcrumbItemEventArgs? clicked = null;
+        crumb.ItemClicked += (_, e) => clicked = e;
+
+        canvas.RaiseMouseDown(50, 12); // the chevron gap
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(backend.Created.OfType<HeadlessPopupPeer>().Any(), Is.False, "no drop-down without a provider");
+            Assert.That(clicked, Is.Null, "the chevron is not a navigable segment");
+        });
+    }
+
+    [Test]
+    public void Navigating_into_a_child_trims_to_the_parent_and_appends_it()
+    {
+        var crumb = ThreeSegments(); // Home / Docs / Sub
+        Realize(crumb, out _);
+        BreadcrumbItemEventArgs? sub = null;
+        crumb.SubItemSelected += (_, e) => sub = e;
+
+        crumb.NavigateInto(0, new BreadcrumbItem("Pictures")); // a child of segment 0 ("Home")
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(crumb.Items, Has.Count.EqualTo(2), "the path is trimmed to Home, then the child appended");
+            Assert.That(crumb.Items[0].Text, Is.EqualTo("Home"));
+            Assert.That(crumb.Items[1].Text, Is.EqualTo("Pictures"));
+            Assert.That(sub?.Item.Text, Is.EqualTo("Pictures"), "SubItemSelected reports the chosen child");
+        });
     }
 }

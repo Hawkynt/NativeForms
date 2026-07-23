@@ -600,7 +600,9 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `Breadcrumb` (owner) — Explorer navigation bar: `BreadcrumbItem` segments (`Text`, `Tag`,
       `ImageIndex`/`ImageKey`) laid left to right, chevron separators, hover-highlit and clickable.
       `TrimOnClick` trims the path to a clicked segment (navigate-up) before `ItemClicked`; when the
-      segments outgrow the width the leading ones fold behind a "…" chip, the last segment always kept
+      segments outgrow the width the leading ones fold behind a "…" chip, the last segment always kept.
+      A `SubItemsProvider` delegate (folder walk) drops down a segment's children on its chevron —
+      virtual namespaces (archives, remote trees) supported — with a configurable `PathSeparator`
 
 ---
 

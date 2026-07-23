@@ -20,6 +20,11 @@ public class Breadcrumb : OwnerDrawnControl
 
     /// <summary>One hit zone painted this frame: the x-range and the item it maps to (-1 = overflow chip).</summary>
     private readonly List<(int Left, int Right, int Index)> _zones = [];
+
+    /// <summary>One chevron hit zone painted this frame: the x-range and the segment index it follows
+    /// (whose children a click drops down); -1 when it trails the overflow chip.</summary>
+    private readonly List<(int Left, int Right, int Segment)> _chevronZones = [];
+    private MenuDropDown? _menu;
     private int _hot = -1;
 
     /// <summary>Creates an empty breadcrumb.</summary>
@@ -51,6 +56,32 @@ public class Breadcrumb : OwnerDrawnControl
 
     /// <summary>Raised when a segment is clicked (after any <see cref="TrimOnClick"/> trim).</summary>
     public event EventHandler<BreadcrumbItemEventArgs>? ItemClicked;
+
+    /// <summary>
+    /// The string that joins segments into a path and splits a typed path back into segments — "/" by
+    /// default. Purely a text convention, so a caller walking an archive or any other virtual namespace
+    /// picks whatever delimiter that namespace uses.
+    /// </summary>
+    public string PathSeparator
+    {
+        get => field;
+        set => field = value ?? "/";
+    } = "/";
+
+    /// <summary>
+    /// Supplies the children of a segment for its chevron drop-down — the "folder walk" hook. Given a
+    /// segment (or <see langword="null"/> for the level before the first one), it returns that node's
+    /// child entries; a click on the following chevron lists them, and choosing one navigates into it.
+    /// Nothing here touches the filesystem, so it serves a real directory, an archive or any virtual
+    /// tree equally. Left <see langword="null"/>, chevrons stay inert separators.
+    /// </summary>
+    public Func<BreadcrumbItem?, IReadOnlyList<BreadcrumbItem>>? SubItemsProvider { get; set; }
+
+    /// <summary>Raised when a child chosen from a chevron drop-down is navigated into.</summary>
+    public event EventHandler<BreadcrumbItemEventArgs>? SubItemSelected;
+
+    /// <summary>Raises <see cref="SubItemSelected"/>.</summary>
+    protected virtual void OnSubItemSelected(BreadcrumbItemEventArgs e) => this.SubItemSelected?.Invoke(this, e);
 
     /// <summary>Raises <see cref="ItemClicked"/>.</summary>
     protected virtual void OnItemClicked(BreadcrumbItemEventArgs e) => this.ItemClicked?.Invoke(this, e);
@@ -116,6 +147,7 @@ public class Breadcrumb : OwnerDrawnControl
         var theme = this.Theme;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
         _zones.Clear();
+        _chevronZones.Clear();
         if (this.Items.Count == 0)
             return;
 
@@ -129,6 +161,7 @@ public class Breadcrumb : OwnerDrawnControl
             this.PaintSegment(g, theme, EllipsisItem, new Rectangle(x, 0, width, this.Height), hot: _hot == -1, index: -1);
             x += width;
             this.PaintChevron(g, theme, x);
+            _chevronZones.Add((x, x + ChevronAdvance, first - 1)); // drops down the deepest hidden segment
             x += ChevronAdvance;
         }
 
@@ -141,6 +174,7 @@ public class Breadcrumb : OwnerDrawnControl
             if (i < this.Items.Count - 1)
             {
                 this.PaintChevron(g, theme, x);
+                _chevronZones.Add((x, x + ChevronAdvance, i));
                 x += ChevronAdvance;
             }
         }
@@ -209,6 +243,12 @@ public class Breadcrumb : OwnerDrawnControl
         if (e.Button != MouseButtons.Left)
             return;
 
+        if (this.SubItemsProvider is not null && this.ChevronAt(e.X) is { } segment)
+        {
+            this.OpenSubItems(segment, e.X);
+            return;
+        }
+
         var hit = this.HitTest(e.X);
         if (hit < 0)
             return; // the overflow chip and empty space are not navigable
@@ -218,5 +258,69 @@ public class Breadcrumb : OwnerDrawnControl
             this.Items.TrimAfter(hit);
 
         this.OnItemClicked(new BreadcrumbItemEventArgs(item, hit));
+    }
+
+    /// <summary>The segment index a chevron under a client x follows, or <see langword="null"/> for none.</summary>
+    private int? ChevronAt(int x)
+    {
+        for (var i = 0; i < _chevronZones.Count; ++i)
+            if (x >= _chevronZones[i].Left && x < _chevronZones[i].Right)
+                return _chevronZones[i].Segment;
+
+        return null;
+    }
+
+    /// <summary>Drops down the children of a segment (from <see cref="SubItemsProvider"/>) as a menu;
+    /// choosing one navigates into it.</summary>
+    private void OpenSubItems(int segmentIndex, int x)
+    {
+        if (this.SubItemsProvider is not { } provider || this.Backend is not { } backend)
+            return;
+
+        var parent = segmentIndex >= 0 && segmentIndex < this.Items.Count ? this.Items[segmentIndex] : null;
+        var children = provider(parent);
+        if (children is null || children.Count == 0)
+            return;
+
+        var menuItems = new List<ToolStripItem>(children.Count);
+        foreach (var child in children)
+        {
+            var captured = child;
+            var menuItem = new ToolStripMenuItem(child.Text);
+            if (this.ImageList is { } images)
+            {
+                menuItem.ImageList = images;
+                menuItem.ImageIndex = child.ResolveImageIndex(images);
+            }
+
+            menuItem.Click += (_, _) => this.NavigateInto(segmentIndex, captured);
+            menuItems.Add(menuItem);
+        }
+
+        var menu = _menu ??= new MenuDropDown(backend, this.Theme);
+        menu.Owner = this.OwnerWindowPeer;
+        menu.Open(menuItems, this.PointToScreen(new Point(Math.Max(0, x - 8), this.Height)));
+    }
+
+    /// <summary>Navigates into a child chosen from a chevron drop-down: trims the path to the segment
+    /// whose children were listed, appends the chosen child, and reports it. Internal so a headless
+    /// test can drive the navigation without the popup.</summary>
+    internal void NavigateInto(int segmentIndex, BreadcrumbItem child)
+    {
+        _menu?.CloseAll();
+        this.Items.TrimAfter(segmentIndex);
+        this.Items.Add(child);
+
+        var e = new BreadcrumbItemEventArgs(child, this.Items.Count - 1);
+        this.OnSubItemSelected(e);
+        this.OnItemClicked(e);
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        base.OnUnrealized();
+        _menu?.CloseAll();
+        _menu = null;
     }
 }
