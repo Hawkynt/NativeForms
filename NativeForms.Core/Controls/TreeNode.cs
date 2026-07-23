@@ -10,6 +10,8 @@ public sealed class TreeNode
 {
     private TreeNodeCollection? _nodes;
     private ITreeNodeHost? _host;
+    private Func<TreeNode, IEnumerable<TreeNode>>? _childLoader;
+    private bool _childrenLoaded;
 
     /// <summary>Creates a node with an empty label.</summary>
     public TreeNode() { }
@@ -168,8 +170,35 @@ public sealed class TreeNode
     /// <summary>The node's index among its siblings, maintained by the owning collection.</summary>
     internal int SiblingIndex { get; set; } = -1;
 
-    /// <summary>Whether the node has at least one child (without forcing <see cref="Nodes"/> into existence).</summary>
-    internal bool HasChildren => _nodes is { Count: > 0 };
+    /// <summary>Whether the node has at least one child (without forcing <see cref="Nodes"/> into
+    /// existence) — or an unrun lazy loader, so a not-yet-populated node still paints as expandable.</summary>
+    internal bool HasChildren => _nodes is { Count: > 0 } || (_childLoader is not null && !_childrenLoaded);
+
+    /// <summary>
+    /// Registers a delegate that supplies this node's children the first time it is expanded — the lazy
+    /// "populate on demand" idiom for large or <em>virtual</em> trees (a filesystem folder, an archive
+    /// entry, a remote listing). The node paints as expandable straight away; on its first expansion the
+    /// loader runs, the nodes it yields are appended, and it is never called again. Passing
+    /// <see langword="null"/> clears it, and clearing re-arms a fresh loader set afterwards.
+    /// </summary>
+    public void SetChildLoader(Func<TreeNode, IEnumerable<TreeNode>>? loader)
+    {
+        _childLoader = loader;
+        _childrenLoaded = false;
+        _host?.OnStructureChanged(); // the expand glyph may appear or disappear
+    }
+
+    /// <summary>Runs the lazy child loader once, appending whatever it yields.</summary>
+    private void EnsureChildrenLoaded()
+    {
+        if (_childLoader is null || _childrenLoaded)
+            return;
+
+        _childrenLoaded = true; // set first, so a re-entrant expand from within the loader does not recurse
+        var loader = _childLoader;
+        foreach (var child in loader(this))
+            this.Nodes.Add(child);
+    }
 
     /// <summary>Whether a sibling precedes this node.</summary>
     internal bool HasPreviousSibling => this.SiblingIndex > 0;
@@ -189,6 +218,7 @@ public sealed class TreeNode
         var host = _host;
         if (host is null)
         {
+            this.EnsureChildrenLoaded();
             this.IsExpanded = true;
             return;
         }
@@ -198,6 +228,7 @@ public sealed class TreeNode
         if (e.Cancel)
             return;
 
+        this.EnsureChildrenLoaded();
         this.IsExpanded = true;
         host.OnStructureChanged();
         host.OnAfterExpand(new TreeViewEventArgs(this));

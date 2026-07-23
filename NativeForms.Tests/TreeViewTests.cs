@@ -533,6 +533,59 @@ internal sealed class TreeViewTests
         });
     }
 
+    // --- Lazy child population (SetChildLoader) ------------------------------------------------
+
+    [Test]
+    public void A_node_with_a_loader_paints_as_expandable_before_it_is_populated()
+    {
+        var tree = new TreeView { Bounds = new(0, 0, 200, 200) };
+        var root = tree.Nodes.Add("root");
+        root.SetChildLoader(_ => [new TreeNode("child")]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(root.Nodes.Count, Is.Zero, "nothing is loaded yet");
+            Assert.That(root.HasChildren, Is.True, "but the node reads as expandable");
+        });
+    }
+
+    [Test]
+    public void Expanding_a_node_runs_its_loader_exactly_once()
+    {
+        var tree = new TreeView { Bounds = new(0, 0, 200, 200) };
+        var root = tree.Nodes.Add("root");
+        var calls = 0;
+        root.SetChildLoader(n =>
+        {
+            ++calls;
+            return [new TreeNode($"{n.Text}.a"), new TreeNode($"{n.Text}.b")];
+        });
+
+        root.Expand();
+        Assert.Multiple(() =>
+        {
+            Assert.That(calls, Is.EqualTo(1), "the loader runs on the first expand");
+            Assert.That(root.Nodes.Count, Is.EqualTo(2), "its children were appended");
+            Assert.That(root.Nodes[0].Text, Is.EqualTo("root.a"));
+        });
+
+        root.Collapse();
+        root.Expand();
+        Assert.That(calls, Is.EqualTo(1), "the loader is not run again");
+    }
+
+    [Test]
+    public void A_loader_that_yields_nothing_leaves_a_no_longer_expandable_node()
+    {
+        var tree = new TreeView { Bounds = new(0, 0, 200, 200) };
+        var root = tree.Nodes.Add("root");
+        root.SetChildLoader(_ => []);
+
+        root.Expand();
+
+        Assert.That(root.HasChildren, Is.False, "an empty load makes the node a leaf");
+    }
+
     // --- Drag-and-drop reorder (AllowReorder) --------------------------------------------------
 
     private const int _DragX = 100; // well right of the glyph/check cells, so a press lands on the label

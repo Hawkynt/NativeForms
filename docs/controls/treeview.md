@@ -101,6 +101,7 @@ Constructors: `TreeNode()`, `TreeNode(string text)`.
 | `Collapse()` | Hides the children (same pipeline). When the selected node vanishes under the collapsing one, the selection moves up to this node. |
 | `Toggle()` | Expands a collapsed node, collapses an expanded one. |
 | `EnsureVisible()` | Expands every ancestor and scrolls the attached control until this node is on screen. |
+| `SetChildLoader(Func<TreeNode, IEnumerable<TreeNode>>?)` | Registers a delegate that supplies the node's children the first time it is expanded — lazy population for large or **virtual** trees (folders, archive entries, remote listings). The node paints as expandable immediately; the loader runs once. `null` clears it. |
 
 ### TreeNodeCollection
 

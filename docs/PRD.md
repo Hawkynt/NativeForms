@@ -380,7 +380,8 @@ strategy (may differ per platform; note exceptions inline).
       (arrows walk rows, Right into child, Left to parent, +/−/*/Space), `EnsureVisible`,
       virtualized paint over the lazily re-flattened visible-node list (100k nodes bounded), drag
       reorder/reparent (`AllowReorder`, `ItemDrag`/`NodeDragOver`/`NodeDrop`, above/onto/below
-      insertion marker, translucent drag image `ShowDragImage`, own-subtree guard, hover auto-expand) done;
+      insertion marker, translucent drag image `ShowDragImage`, own-subtree guard, hover auto-expand),
+      lazy child population on first expand via a per-node delegate (`SetChildLoader`, virtual trees) done;
       label editing (TextBox overlay) and state images pending
 - [~] `TreeListView` (owner) — TreeView × ListView-Details hybrid done: hierarchy in the first
       column + selector-driven sub-item columns (`TreeListViewColumn`), shared engine pieces
