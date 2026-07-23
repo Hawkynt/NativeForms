@@ -139,6 +139,12 @@ Targets (measured by the `NativeForms.Benchmarks` project; treat as CI-guarded g
 - [x] `NativeForms.Benchmarks` (dependency-free Stopwatch harness: construction ns+bytes,
       realize, paints/s, 100k-row scroll) + nightly job with 2× regression thresholds and JSON
       artifact; trim job alongside.
+- [x] **Scale is linear**, benchmarked and gated: building a form of 2000 controls ~0.5 ms (was
+      quadratic — every add re-laid the whole form; now the base lays out only for a docked child),
+      scrolling an AutoScroll panel of 2000 children ~0.3 ms/notch (was quadratic — each child
+      re-derived the content extent; now one viewport per pass), binding a 50k-row `DataGridView`
+      ~6 ms (virtualized), realizing 2000 controls ~1 ms. Linear-scale gates fail the nightly job if
+      the build or scroll paths regress to quadratic.
 
 Design rules that serve the budget: buffered-then-flushed peer state (no shadow trees), lazy child
 realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflection metadata cache.
