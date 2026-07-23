@@ -56,6 +56,9 @@ internal sealed partial class MainForm : Form
     private PropertyBinding<string>? _labelBinding;
     private PropertyBinding<int>? _progressBinding;
 
+    // The tray icon, held for the window's lifetime; null on backends without tray support.
+    private NotifyIcon? _notifyIcon;
+
     public MainForm()
     {
         this.Text = "NativeForms Gallery";
@@ -97,6 +100,27 @@ internal sealed partial class MainForm : Form
         this.Publish("chrome.toolTip", _toolTip);
         this.LayoutChrome();
         this.Resize += (_, _) => this.LayoutChrome();
+        this.TryShowTrayIcon();
+    }
+
+    /// <summary>
+    /// Shows a <see cref="NotifyIcon"/> in the system tray on backends that support one (Windows). The
+    /// GTK backend has no tray integration yet (docs/PRD.md §7.7), so the attempt is swallowed there —
+    /// the component is still exercised, it simply has nowhere to appear.
+    /// </summary>
+    private void TryShowTrayIcon()
+    {
+        try
+        {
+            _notifyIcon = new NotifyIcon { Text = "NativeForms Gallery" };
+            _notifyIcon.SetIcon(_IconSize, _IconSize, DiscPixels(_IconSize, Color.RoyalBlue));
+            _notifyIcon.DoubleClick += (_, _) => this.SetStatus("NotifyIcon: the tray icon was double-clicked.");
+            _notifyIcon.Visible = true;
+        }
+        catch (NotSupportedException)
+        {
+            _notifyIcon = null; // no tray on this backend
+        }
     }
 
     /// <summary>
