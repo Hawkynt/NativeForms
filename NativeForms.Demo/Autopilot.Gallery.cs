@@ -40,6 +40,7 @@ internal sealed partial class Autopilot
         this.CaptureAccordionPanes();
         this.CaptureDockTabEdges();
         this.CaptureMessageBox();
+        this.CaptureCustomMessageBox();
     }
 
     /// <summary>The docking page with its document tabs moved to a side (vertical) strip.</summary>
@@ -270,6 +271,35 @@ internal sealed partial class Autopilot
         this.Settle(120);
         this.Screenshot("12-messagebox");
         this.KeyInto(dialog, KeySym.Escape);
+        this.Settle(150);
+    }
+
+    /// <summary>The owner-drawn message box: a custom animated icon and arbitrary button labels.</summary>
+    private void CaptureCustomMessageBox()
+    {
+        this.SelectTab(0);
+        this.Pristine();
+        var button = _form.Part<Button>("basics.customDialog");
+        var screen = this.ScreenOf(button, 150, 15);
+
+        this.Post(() =>
+        {
+            Injection.Move(_root, screen);
+            Injection.Press(_root, screen, 1, 0);
+            Injection.Release(_root, screen, 1, 0);
+        });
+
+        var dialog = this.WaitForPopup(4000);
+        if (dialog == 0)
+        {
+            Console.WriteLine("      capture skipped: 24-custom-messagebox — the dialog never appeared");
+            _captureFailures.Add("24-custom-messagebox");
+            return;
+        }
+
+        this.Settle(150);
+        this.Screenshot("24-custom-messagebox");
+        this.KeyInto(dialog, KeySym.Return); // AcceptButton is the first custom button
         this.Settle(150);
     }
 }

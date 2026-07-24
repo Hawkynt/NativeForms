@@ -50,11 +50,26 @@ internal sealed partial class MainForm
             dialogResultLabel.Text = $"Result: {result}";
         };
 
+        // The owner-drawn message box: a custom animated icon and arbitrary button labels — neither of
+        // which the native dialog can show. Returns the index of the button pressed.
+        var customDialogButton = new Button { Bounds = new(16, 224, 300, 30), Text = "Custom MessageBox…" };
+        customDialogButton.Click += (_, _) =>
+        {
+            var choice = MessageBox.Show(
+                "The gallery is rebuilding its thumbnails.",
+                "Please wait",
+                ["Run in background", "Pause", "Cancel"],
+                BuildSpinner());
+            dialogResultLabel.Text = choice >= 0 ? $"Result: button {choice}" : "Result: dismissed";
+        };
+
         page.Controls.AddRange(
             Caption("Button + MVVM counter", 16, 12),
             counterLabel, counterBar, clickButton, disabledButton,
             Caption("Button → modal dialog", 16, 134),
-            dialogButton, dialogResultLabel);
+            dialogButton, dialogResultLabel, customDialogButton);
+
+        this.Publish("basics.customDialog", customDialogButton);
 
         // --- Column 2: labels, link, check boxes, toggle switch ---------------------------------
 

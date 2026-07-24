@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
@@ -92,9 +93,84 @@ public static class MessageBox
     internal static DialogResult Show(IPlatformBackend backend, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
         => Show(backend, null, text, caption, buttons, icon);
 
-    /// <summary>The single funnel every overload ends in: resolve the owner's window peer and forward.</summary>
+    /// <summary>The single funnel every native overload ends in: resolve the owner's window peer and forward.</summary>
     internal static DialogResult Show(IPlatformBackend backend, Form? owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
         => backend.ShowMessageBox(text ?? string.Empty, caption ?? string.Empty, buttons, icon, owner?.WindowPeer);
+
+    // --- Custom icon and custom buttons (owner-drawn) ---------------------------------------------
+    // The native dialog cannot show an arbitrary image (let alone an animated one) or arbitrary button
+    // labels, so these overloads render an owner-drawn dialog instead. A custom icon may be any
+    // IImage, including an AnimatedImage, which animates in the box.
+
+    /// <summary>Shows a message box with a custom <paramref name="icon"/> image (still or an
+    /// <see cref="AnimatedImage"/>) and the given standard button set.</summary>
+    public static DialogResult Show(string text, string caption, MessageBoxButtons buttons, IImage icon)
+        => ShowOwnerDrawn(RequireBackend(), null, text, caption, buttons, MessageBoxIcon.None, icon);
+
+    /// <summary>Shows a message box owned by <paramref name="owner"/> with a custom <paramref name="icon"/>
+    /// image and the given standard button set.</summary>
+    public static DialogResult Show(Form owner, string text, string caption, MessageBoxButtons buttons, IImage icon)
+        => ShowOwnerDrawn(owner?.Backend ?? RequireBackend(), owner, text, caption, buttons, MessageBoxIcon.None, icon);
+
+    /// <summary>
+    /// Shows a message box with arbitrary <paramref name="buttonLabels"/> (left to right) and an
+    /// optional custom <paramref name="icon"/> or standard <paramref name="standardIcon"/> glyph, and
+    /// returns the zero-based index of the button pressed, or -1 if the dialog was closed another way.
+    /// </summary>
+    public static int Show(string text, string caption, IReadOnlyList<string> buttonLabels, IImage? icon = null, MessageBoxIcon standardIcon = MessageBoxIcon.None)
+        => ShowCustomButtons(RequireBackend(), null, text, caption, buttonLabels, icon, standardIcon);
+
+    /// <summary>The owner-taking counterpart of <see cref="Show(string, string, IReadOnlyList{string}, IImage, MessageBoxIcon)"/>.</summary>
+    public static int Show(Form owner, string text, string caption, IReadOnlyList<string> buttonLabels, IImage? icon = null, MessageBoxIcon standardIcon = MessageBoxIcon.None)
+        => ShowCustomButtons(owner?.Backend ?? RequireBackend(), owner, text, caption, buttonLabels, icon, standardIcon);
+
+    /// <summary>Custom-button overload on an explicit backend. Intended for tests.</summary>
+    internal static int Show(IPlatformBackend backend, string text, string caption, IReadOnlyList<string> buttonLabels, IImage? icon, MessageBoxIcon standardIcon)
+        => ShowCustomButtons(backend, null, text, caption, buttonLabels, icon, standardIcon);
+
+    /// <summary>Standard-buttons + custom-icon overload on an explicit backend. Intended for tests.</summary>
+    internal static DialogResult Show(IPlatformBackend backend, string text, string caption, MessageBoxButtons buttons, IImage icon)
+        => ShowOwnerDrawn(backend, null, text, caption, buttons, MessageBoxIcon.None, icon);
+
+    /// <summary>Runs the owner-drawn dialog for a standard button set with a custom icon and maps the
+    /// clicked index back to a <see cref="DialogResult"/>.</summary>
+    private static DialogResult ShowOwnerDrawn(IPlatformBackend backend, Form? owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon standardIcon, IImage? icon)
+    {
+        var set = StandardButtons(buttons);
+        var form = new MessageBoxForm(backend, text ?? string.Empty, caption ?? string.Empty, icon, standardIcon, set.Labels, set.Default, set.Cancel);
+        ConfiguredForTest?.Invoke(form);
+        form.ShowDialog(owner, backend);
+        return form.ClickedIndex >= 0 ? set.Results[form.ClickedIndex] : DialogResult.Cancel;
+    }
+
+    /// <summary>Runs the owner-drawn dialog for arbitrary button labels and returns the clicked index.</summary>
+    private static int ShowCustomButtons(IPlatformBackend backend, Form? owner, string text, string caption, IReadOnlyList<string> labels, IImage? icon, MessageBoxIcon standardIcon)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        if (labels.Count == 0)
+            throw new ArgumentException("At least one button label is required.", nameof(labels));
+
+        var form = new MessageBoxForm(backend, text ?? string.Empty, caption ?? string.Empty, icon, standardIcon, labels, 0, -1);
+        ConfiguredForTest?.Invoke(form);
+        form.ShowDialog(owner, backend);
+        return form.ClickedIndex;
+    }
+
+    /// <summary>The labels, results and default/cancel indices for a standard button set.</summary>
+    private static (string[] Labels, DialogResult[] Results, int Default, int Cancel) StandardButtons(MessageBoxButtons buttons)
+        => buttons switch
+        {
+            MessageBoxButtons.OKCancel => (["OK", "Cancel"], [DialogResult.OK, DialogResult.Cancel], 0, 1),
+            MessageBoxButtons.AbortRetryIgnore => (["Abort", "Retry", "Ignore"], [DialogResult.Abort, DialogResult.Retry, DialogResult.Ignore], 1, -1),
+            MessageBoxButtons.YesNoCancel => (["Yes", "No", "Cancel"], [DialogResult.Yes, DialogResult.No, DialogResult.Cancel], 0, 2),
+            MessageBoxButtons.YesNo => (["Yes", "No"], [DialogResult.Yes, DialogResult.No], 0, -1),
+            MessageBoxButtons.RetryCancel => (["Retry", "Cancel"], [DialogResult.Retry, DialogResult.Cancel], 0, 1),
+            _ => (["OK"], [DialogResult.OK], 0, 0),
+        };
+
+    /// <summary>Test seam: configure the freshly-built owner-drawn dialog (for example to script a
+    /// button click through the backend's modal action) before it runs modally.</summary>
+    internal static Action<MessageBoxForm>? ConfiguredForTest;
 
     /// <summary>The running application backend, or the classic "no message loop" complaint.</summary>
     private static IPlatformBackend RequireBackend()
