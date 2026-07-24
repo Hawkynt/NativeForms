@@ -805,7 +805,7 @@ public abstract class Control
     private protected IImage? CurrentFrameOf(IImage? image)
     {
         if (image is not AnimatedImage animated || this.Backend is not { } backend)
-            return image;
+            return this.Enabled || image is null ? image : image.DisabledImage ?? image;
 
         var now = Environment.TickCount64;
         if (this.Enabled && animated.IsPaused)

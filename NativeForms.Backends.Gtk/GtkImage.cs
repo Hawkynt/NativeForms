@@ -62,9 +62,50 @@ internal sealed class GtkImage : IImage
     /// <summary>The underlying Cairo surface handle, drawn by <see cref="GtkGraphics.DrawImage"/>.</summary>
     internal nint Surface => _surface;
 
+    private GtkImage? _disabled;
+
+    /// <inheritdoc />
+    public IImage? DisabledImage => _disabled ??= this.CreateGrayscale();
+
+    /// <summary>Realises a greyscale sibling for the disabled look, un-premultiplying this surface's own
+    /// pixels so no separate source copy has to be kept alive.</summary>
+    private GtkImage CreateGrayscale()
+    {
+        var argb = new int[this.Width * this.Height];
+        var stride = NativeMethods.cairo_format_stride_for_width(NativeMethods.CAIRO_FORMAT_ARGB32, this.Width);
+        unsafe
+        {
+            var rows = (byte*)_buffer;
+            for (var y = 0; y < this.Height; ++y)
+            {
+                var pixel = (uint*)(rows + (y * stride));
+                for (var x = 0; x < this.Width; ++x)
+                {
+                    var p = pixel[x];
+                    var a = (p >> 24) & 0xFF;
+                    uint r = (p >> 16) & 0xFF, g = (p >> 8) & 0xFF, b = p & 0xFF;
+                    if (a > 0) // undo Cairo's premultiplication before weighting the channels
+                    {
+                        r = r * 255 / a;
+                        g = g * 255 / a;
+                        b = b * 255 / a;
+                    }
+
+                    var lum = ((r * 77) + (g * 150) + (b * 29)) >> 8;
+                    argb[(y * this.Width) + x] = unchecked((int)((a << 24) | (lum << 16) | (lum << 8) | lum));
+                }
+            }
+        }
+
+        return new GtkImage(this.Width, this.Height, argb);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
+        _disabled?.Dispose();
+        _disabled = null;
+
         if (_surface != 0)
         {
             NativeMethods.cairo_surface_destroy(_surface);

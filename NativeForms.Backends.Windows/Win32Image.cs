@@ -40,11 +40,43 @@ internal sealed unsafe class Win32Image : IImage
         if (this._bitmap == 0 || bits == 0)
             return;
 
+        this._bits = bits;
         var pixelCount = width * height;
         var destination = new Span<uint>((void*)bits, pixelCount);
         var count = Math.Min(pixelCount, argb.Length);
         for (var i = 0; i < count; ++i)
             destination[i] = Premultiply(unchecked((uint)argb[i]));
+    }
+
+    private nint _bits;
+    private Win32Image? _disabled;
+
+    /// <inheritdoc/>
+    public IImage? DisabledImage => this._bitmap == 0 || this._bits == 0 ? null : (this._disabled ??= this.CreateGrayscale());
+
+    /// <summary>Realises a greyscale sibling for the disabled look, un-premultiplying the DIB's own
+    /// pixels so no separate source copy is retained.</summary>
+    private Win32Image CreateGrayscale()
+    {
+        var argb = new int[this.Width * this.Height];
+        var source = new Span<uint>((void*)this._bits, argb.Length);
+        for (var i = 0; i < argb.Length; ++i)
+        {
+            var p = source[i];
+            var a = (p >> 24) & 0xFF;
+            uint r = (p >> 16) & 0xFF, g = (p >> 8) & 0xFF, b = p & 0xFF;
+            if (a > 0) // undo the premultiplication before weighting the channels
+            {
+                r = r * 255 / a;
+                g = g * 255 / a;
+                b = b * 255 / a;
+            }
+
+            var lum = ((r * 77) + (g * 150) + (b * 29)) >> 8;
+            argb[i] = unchecked((int)((a << 24) | (lum << 16) | (lum << 8) | lum));
+        }
+
+        return new Win32Image(this.Width, this.Height, argb);
     }
 
     /// <inheritdoc/>
@@ -78,6 +110,10 @@ internal sealed unsafe class Win32Image : IImage
     /// <inheritdoc/>
     public void Dispose()
     {
+        this._disabled?.Dispose();
+        this._disabled = null;
+        this._bits = 0; // the bits belong to the DIB section freed below
+
         if (this._bitmap == 0)
             return;
 
