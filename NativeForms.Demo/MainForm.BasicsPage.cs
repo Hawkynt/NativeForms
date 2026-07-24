@@ -158,34 +158,30 @@ internal sealed partial class MainForm
             Bounds = new(664, 296, 300, 140),
             SizeMode = PictureBoxSizeMode.Zoom,
             BorderStyle = BorderStyle.FixedSingle,
-            AnimatedImage = BuildSpinner(),
+            Image = BuildSpinner(),
         };
         var pictureMenu = new ContextMenuStrip();
         var spin = new ToolStripMenuItem("Animated spinner");
         spin.Click += (_, _) =>
         {
-            picture.Image = null;
-            picture.AnimatedImage = BuildSpinner();
+            picture.Image = BuildSpinner();
             this.SetStatus("PictureBox: animated spinner (shared clock).");
         };
         var cool = new ToolStripMenuItem("Blue → orange gradient");
         cool.Click += (_, _) =>
         {
-            picture.AnimatedImage = null;
             picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.RoyalBlue, Color.Orange));
             this.SetStatus("PictureBox: blue → orange gradient.");
         };
         var warm = new ToolStripMenuItem("Green → purple gradient");
         warm.Click += (_, _) =>
         {
-            picture.AnimatedImage = null;
             picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid));
             this.SetStatus("PictureBox: green → purple gradient.");
         };
         var clear = new ToolStripMenuItem("Clear image");
         clear.Click += (_, _) =>
         {
-            picture.AnimatedImage = null;
             picture.Image = null;
             this.SetStatus("PictureBox: image cleared.");
         };

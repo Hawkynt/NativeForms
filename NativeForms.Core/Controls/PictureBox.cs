@@ -12,8 +12,11 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class PictureBox : OwnerDrawnControl
 {
-    /// <summary>The static image to display, or <see langword="null"/>. An <see cref="AnimatedImage"/>,
-    /// when set, takes precedence.</summary>
+    /// <summary>
+    /// The image to display, or <see langword="null"/>. It may be an <see cref="AnimatedImage"/> (which
+    /// is an <see cref="IImage"/>): when animated the box subscribes to the shared animation clock and
+    /// repaints as the frame advances, and a disabled box freezes on and greys the current frame.
+    /// </summary>
     public IImage? Image
     {
         get => field;
@@ -23,30 +26,13 @@ public class PictureBox : OwnerDrawnControl
                 return;
 
             field = value;
+            this.UpdateImageAnimation();
             this.Invalidate();
         }
     }
 
-    /// <summary>
-    /// A decoded still or animated image to display. When animated it registers with the shared
-    /// <c>AnimationClock</c>, which repaints the box as the frame advances; a hidden box is not
-    /// repainted but shows the correct frame the moment it returns (the frame is a function of elapsed
-    /// time). Takes precedence over <see cref="Image"/>.
-    /// </summary>
-    public AnimatedImage? AnimatedImage
-    {
-        get => field;
-        set
-        {
-            if (ReferenceEquals(field, value))
-                return;
-
-            AnimationClock.Instance.Unregister(this);
-            field = value;
-            this.RegisterAnimation();
-            this.Invalidate();
-        }
-    }
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
 
     /// <summary>How the image is fitted into the client area.</summary>
     public PictureBoxSizeMode SizeMode
@@ -80,27 +66,6 @@ public class PictureBox : OwnerDrawnControl
     } = BorderStyle.None;
 
     /// <inheritdoc/>
-    private protected override void OnRealized(IControlPeer peer)
-    {
-        base.OnRealized(peer);
-        this.RegisterAnimation();
-    }
-
-    /// <inheritdoc/>
-    private protected override void OnUnrealized()
-    {
-        base.OnUnrealized();
-        AnimationClock.Instance.Unregister(this);
-    }
-
-    /// <summary>Subscribes an animated image to the shared clock once the box is realized.</summary>
-    private void RegisterAnimation()
-    {
-        if (this.AnimatedImage is { IsAnimated: true } animated && this.IsRealized)
-            AnimationClock.Instance.Register(this, animated, () => this.Visible, this.Invalidate);
-    }
-
-    /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -108,25 +73,12 @@ public class PictureBox : OwnerDrawnControl
         var client = new Rectangle(0, 0, this.Width, this.Height);
         g.FillRectangle(theme.ControlBackground, client);
 
-        if (this.AnimatedImage is { Width: > 0, Height: > 0 } animated && this.Backend is { } backend)
-        {
-            // Disabled freezes the animation and greys the frame; enabling resumes where it stopped.
-            var now = Environment.TickCount64;
-            if (this.Enabled && animated.IsPaused)
-                animated.Resume(now);
-            else if (!this.Enabled && !animated.IsPaused)
-                animated.Pause(now);
-
-            var index = animated.CurrentFrameIndex(now);
-            var frame = this.Enabled ? animated.FrameImage(backend, index) : animated.FrameImageGray(backend, index);
-            g.PushClip(client);
-            g.DrawImage(frame, GetImageRectangle(client.Size, new Size(animated.Width, animated.Height), this.SizeMode));
-            g.PopClip();
-        }
-        else if (this.Image is { Width: > 0, Height: > 0 } image)
+        // CurrentFrameOf resolves an animated image to its current frame (frozen and greyed while
+        // disabled) and returns a still image unchanged, so one path serves both.
+        if (this.Image is { Width: > 0, Height: > 0 } image && this.CurrentFrameOf(image) is { } frame)
         {
             g.PushClip(client);
-            g.DrawImage(image, GetImageRectangle(client.Size, new Size(image.Width, image.Height), this.SizeMode));
+            g.DrawImage(frame, GetImageRectangle(client.Size, new Size(image.Width, image.Height), this.SizeMode));
             g.PopClip();
         }
 

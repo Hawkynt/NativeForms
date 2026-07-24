@@ -139,7 +139,7 @@ internal sealed class AnimatedImageTests
     public void A_disabled_picture_box_freezes_the_animation_and_re_enabling_resumes_it()
     {
         var image = ThreeFrames(0);
-        var box = new PictureBox { Bounds = new(0, 0, 40, 40), AnimatedImage = image };
+        var box = new PictureBox { Bounds = new(0, 0, 40, 40), Image = image };
         var backend = new HeadlessBackend();
         var form = new Form();
         form.Controls.Add(box);
@@ -158,7 +158,7 @@ internal sealed class AnimatedImageTests
     [Test]
     public void A_picture_box_draws_the_current_animation_frame()
     {
-        var box = new PictureBox { Bounds = new(0, 0, 40, 40), AnimatedImage = ThreeFrames(0) };
+        var box = new PictureBox { Bounds = new(0, 0, 40, 40), Image = ThreeFrames(0) };
         var backend = new HeadlessBackend();
         var form = new Form();
         form.Controls.Add(box);

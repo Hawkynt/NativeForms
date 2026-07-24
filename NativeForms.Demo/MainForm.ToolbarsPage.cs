@@ -55,8 +55,8 @@ internal sealed partial class MainForm
         var disabledLabel = new IconLabel { Bounds = new(16, 156, 240, 24), Text = "Disabled — greyed caption", Image = this.DiscImage(Color.Crimson), Enabled = false };
 
         // The same animation running and disabled (frozen on its current frame, painted grayscale).
-        var running = new PictureBox { Bounds = new(340, 96, 110, 110), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, AnimatedImage = BuildSpinner() };
-        var frozen = new PictureBox { Bounds = new(464, 96, 110, 110), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, AnimatedImage = BuildSpinner(), Enabled = false };
+        var running = new PictureBox { Bounds = new(340, 96, 110, 110), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, Image = BuildSpinner() };
+        var frozen = new PictureBox { Bounds = new(464, 96, 110, 110), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, Image = BuildSpinner(), Enabled = false };
 
         // A custom bitmap cursor (Cursor.FromImage) — the same route a decoded .cur/.ani takes.
         var cursorArea = new GroupBox { Bounds = new(340, 230, 234, 60), Text = "Custom cursor", Cursor = BuildTargetCursor() };
