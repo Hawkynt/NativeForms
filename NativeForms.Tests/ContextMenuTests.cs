@@ -116,6 +116,38 @@ internal sealed class ContextMenuTests
     }
 
     [Test]
+    public void A_parent_grab_break_under_an_open_submenu_keeps_the_cascade_open()
+    {
+        var menu = new ContextMenuStrip();
+        var more = new ToolStripMenuItem("More");
+        more.DropDownItems.Add(new ToolStripMenuItem("Child"));
+        menu.Items.Add(more);
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right); // open the menu
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        parent.RaiseMouseMove(20, (backend.Theme.RowHeight / 2) + 1); // hover "More" → opens the submenu
+        Assert.That(backend.Created.OfType<HeadlessPopupPeer>().Count(p => p.IsShown), Is.EqualTo(2), "the submenu opened as a second popup");
+
+        // The parent loses its grab to the submenu it just opened — a grab-broken some backends report
+        // asynchronously, after the engine's synchronous suppression window has closed.
+        parent.RaiseGrabBroken();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(menu.IsOpen, Is.True, "the cascade stays open when the parent reports a grab-break under an open submenu");
+            Assert.That(backend.Created.OfType<HeadlessPopupPeer>().Count(p => p.IsShown), Is.EqualTo(2), "both levels remain shown");
+        });
+    }
+
+    [Test]
     public void Light_dismissal_closes_the_menu()
     {
         CreatePanel(out var menu, out _, out var canvas, out var backend);

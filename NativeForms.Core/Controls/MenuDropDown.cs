@@ -236,8 +236,17 @@ internal sealed class MenuDropDown
         popup.KeyPress += (_, e) => e.Handled = this.HandleKeyPress(e.KeyChar);
         popup.Dismissed += (_, _) =>
         {
-            if (!_suppressDismiss)
-                this.CloseAll();
+            if (_suppressDismiss)
+                return;
+
+            // A level that is no longer the deepest one lost its grab to a child it just opened — the
+            // grab handoff, which some backends report asynchronously, after the synchronous
+            // _suppressDismiss window has closed. Only the current (deepest) level's dismissal is a real
+            // light-dismiss, so a parent's grab-broken never tears the open submenu cascade down.
+            if (_levels.Count == 0 || !ReferenceEquals(_levels[^1], level))
+                return;
+
+            this.CloseAll();
         };
 
         _levels.Add(level);

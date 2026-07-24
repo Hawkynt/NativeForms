@@ -999,6 +999,11 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
         this.Hide();
         this.Dismissed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Raises <see cref="Dismissed"/> without hiding — the grab-broken a real backend reports
+    /// when a child popup takes the grab from this one. The surface stays shown (the child owns the
+    /// grab), so this reproduces the async parent-dismissal that must not tear the cascade down.</summary>
+    public void RaiseGrabBroken() => this.Dismissed?.Invoke(this, EventArgs.Empty);
 }
 
 /// <summary>
