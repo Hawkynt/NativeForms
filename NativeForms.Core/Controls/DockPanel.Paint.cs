@@ -74,14 +74,18 @@ public partial class DockPanel
         if (group.Active is not { } active)
             return;
 
-        // Content frame.
-        if (group.ContentBounds is { Width: > 1, Height: > 1 } content)
-            g.DrawRectangle(theme.Border, new Rectangle(content.X, content.Y, content.Width - 1, content.Height - 1));
-
         this.PaintCaption(g, theme, group, active);
 
         if (!group.TabStripBounds.IsEmpty)
             this.PaintTabStrip(g, theme, group);
+
+        // One frame around the whole well (tab strip + body), drawn after the fills so nothing erases
+        // it; the strip's own separating line and the caption line read as the dividers within it.
+        var well = group.TabStripBounds.IsEmpty
+            ? group.ContentBounds
+            : Rectangle.Union(group.TabStripBounds, group.ContentBounds);
+        if (well is { Width: > 1, Height: > 1 })
+            g.DrawRectangle(theme.Border, new Rectangle(well.X, well.Y, well.Width - 1, well.Height - 1));
     }
 
     private void PaintCaption(IGraphics g, ITheme theme, DockTabGroupNode group, DockContent active)

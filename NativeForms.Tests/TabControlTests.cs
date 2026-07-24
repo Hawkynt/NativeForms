@@ -52,7 +52,7 @@ internal sealed class TabControlTests
             Assert.That(canvas.Children, Has.Count.EqualTo(2), "both pages are real nested children");
             Assert.That(pageCanvases[0].Visible, Is.True);
             Assert.That(pageCanvases[1].Visible, Is.False, "only the selected page shows");
-            Assert.That(pageCanvases[0].Bounds, Is.EqualTo(new Rectangle(0, _HeaderHeight, 300, 200 - _HeaderHeight)));
+            Assert.That(pageCanvases[0].Bounds, Is.EqualTo(new Rectangle(1, _HeaderHeight, 298, 200 - _HeaderHeight - 1)));
         });
     }
 
@@ -73,7 +73,7 @@ internal sealed class TabControlTests
             Assert.That(tabs.SelectedTab, Is.SameAs(two));
             Assert.That(pageCanvases[0].Visible, Is.False);
             Assert.That(pageCanvases[1].Visible, Is.True);
-            Assert.That(two.Bounds, Is.EqualTo(new Rectangle(0, _HeaderHeight, 300, 200 - _HeaderHeight)));
+            Assert.That(two.Bounds, Is.EqualTo(new Rectangle(1, _HeaderHeight, 298, 200 - _HeaderHeight - 1)));
         });
     }
 
@@ -202,7 +202,7 @@ internal sealed class TabControlTests
         tabs.Alignment = TabAlignment.Bottom;
         Realize(tabs, out _);
 
-        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(0, 0, 300, 200 - _HeaderHeight)));
+        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(1, 1, 298, 200 - _HeaderHeight - 1)));
     }
 
     [Test]
@@ -226,7 +226,7 @@ internal sealed class TabControlTests
         Realize(tabs, out _);
 
         var stripWidth = (2 * _TabPadding) + (3 * _CharWidth); // widest caption "One"/"Two"
-        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(stripWidth, 0, 300 - stripWidth, 200)));
+        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(stripWidth, 1, 300 - stripWidth - 1, 198)));
     }
 
     [Test]
@@ -251,7 +251,7 @@ internal sealed class TabControlTests
         var canvas = Realize(tabs, out _);
 
         var stripWidth = (2 * _TabPadding) + (3 * _CharWidth);
-        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(0, 0, 300 - stripWidth, 200)));
+        Assert.That(one.Bounds, Is.EqualTo(new Rectangle(1, 1, 300 - stripWidth - 1, 198)));
 
         canvas.RaisePaint();
         canvas.RaiseMouseDown(300 - 10, _HeaderHeight + (_HeaderHeight / 2));
@@ -360,8 +360,8 @@ internal sealed class TabControlTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(one.Bounds, Is.EqualTo(new Rectangle(0, _HeaderHeight, 400, 300 - _HeaderHeight)));
-            Assert.That(two.Bounds, Is.EqualTo(new Rectangle(0, _HeaderHeight, 400, 300 - _HeaderHeight)));
+            Assert.That(one.Bounds, Is.EqualTo(new Rectangle(1, _HeaderHeight, 398, 300 - _HeaderHeight - 1)));
+            Assert.That(two.Bounds, Is.EqualTo(new Rectangle(1, _HeaderHeight, 398, 300 - _HeaderHeight - 1)));
         });
     }
 

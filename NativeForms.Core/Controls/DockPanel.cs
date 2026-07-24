@@ -678,8 +678,12 @@ public partial class DockPanel : OwnerDrawnControl
         group.TabStripBounds = strip;
         group.ContentBounds = content;
 
+        // Inset the pane one pixel inside its content so the well's border ring survives the opaque
+        // pane surface drawn over it.
         if (group.Active is { } active)
-            active.Bounds = group.ContentBounds;
+            active.Bounds = group.ContentBounds is { Width: > 2, Height: > 2 } cb
+                ? new Rectangle(cb.X + 1, cb.Y + 1, cb.Width - 2, cb.Height - 2)
+                : group.ContentBounds;
     }
 
     /// <summary>The width a vertical (left/right) tab strip needs to fit its widest caption.</summary>

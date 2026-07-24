@@ -201,12 +201,15 @@ public class TabControl : OwnerDrawnControl
     private Rectangle GetContentArea()
     {
         var t = this.StripThickness;
+
+        // Inset the page one pixel on the three control-edge sides, so the outer border ring stays on
+        // the TabControl's own canvas instead of being hidden under the opaque page surface.
         return _alignment switch
         {
-            TabAlignment.Top => new(0, t, this.Width, Math.Max(0, this.Height - t)),
-            TabAlignment.Bottom => new(0, 0, this.Width, Math.Max(0, this.Height - t)),
-            TabAlignment.Left => new(t, 0, Math.Max(0, this.Width - t), this.Height),
-            _ => new(0, 0, Math.Max(0, this.Width - t), this.Height),
+            TabAlignment.Top => new(1, t, Math.Max(0, this.Width - 2), Math.Max(0, this.Height - t - 1)),
+            TabAlignment.Bottom => new(1, 1, Math.Max(0, this.Width - 2), Math.Max(0, this.Height - t - 1)),
+            TabAlignment.Left => new(t, 1, Math.Max(0, this.Width - t - 1), Math.Max(0, this.Height - 2)),
+            _ => new(1, 1, Math.Max(0, this.Width - t - 1), Math.Max(0, this.Height - 2)),
         };
     }
 
@@ -513,6 +516,10 @@ public class TabControl : OwnerDrawnControl
 
         if (_overflow)
             this.PaintOverflowArrows(g, theme, header, stripEnd);
+
+        // The outer frame last, so a selected tab's top-edge fill cannot erase it — together with the
+        // strip/page divider this gives the WinForms look of a bordered page well.
+        g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
     }
 
     /// <summary>The rectangle a tab of the given flow size occupies at the given flow offset in the strip.</summary>
