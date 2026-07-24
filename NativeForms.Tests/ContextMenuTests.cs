@@ -178,6 +178,31 @@ internal sealed class ContextMenuTests
     }
 
     [Test]
+    public void A_submenu_is_anchored_to_the_level_that_opened_it_not_the_owning_window()
+    {
+        var menu = new ContextMenuStrip();
+        var more = new ToolStripMenuItem("More");
+        more.DropDownItems.Add(new ToolStripMenuItem("Child"));
+        menu.Items.Add(more);
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right);
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        parent.RaiseMouseMove(20, (backend.Theme.RowHeight / 2) + 1); // hover "More" → opens the submenu
+
+        var child = backend.Created.OfType<HeadlessPopupPeer>().Single(p => !ReferenceEquals(p, parent));
+        Assert.That(child.ParentPopup, Is.SameAs(parent),
+            "the nested popup chains to the level that opened it, so a stacked-popup server maps it as that popup's child rather than the root window's");
+    }
+
+    [Test]
     public void Light_dismissal_closes_the_menu()
     {
         CreatePanel(out var menu, out _, out var canvas, out var backend);

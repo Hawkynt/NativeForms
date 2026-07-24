@@ -46,12 +46,12 @@ internal sealed partial class Autopilot
                 return;
             }
 
-            // Scan the menu column top to bottom: hovering a submenu-parent row opens a second popup.
+            // Scan the menu column top to bottom: hovering the submenu-parent row opens a second popup.
             // A pure hover (no press) must leave both levels standing — the grab handoff from parent to
             // child is expected, not a dismissal, so the cascade may not collapse under it.
             var bounds = this.Read(() => Injection.WindowBounds(popups[0]));
             var opened = false;
-            for (var y = 8; y < bounds.Height - 4 && !opened; y += 6)
+            for (var y = 8; y <= bounds.Height - 4 && !opened; y += 6)
             {
                 var point = new Point(bounds.X + (bounds.Width / 2), bounds.Y + y);
                 this.Pump("a submenu hover", () => Injection.Move(this.RootAt(point), point));

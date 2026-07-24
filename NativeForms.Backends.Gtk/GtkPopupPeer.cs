@@ -81,6 +81,19 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     }
 
     /// <inheritdoc />
+    public void SetParentPopup(IPopupPeer parent)
+    {
+        // Wayland maps a menu as an xdg_popup, and a nested xdg_popup must chain to the top-most mapped
+        // popup — the level that opened this one — not the root window the whole cascade descends from.
+        // Left pointing at the owner window, GDK refuses the map ("Tried to map a popup with a non-top
+        // most parent") and the submenu silently never appears. Re-anchoring the transient parent to the
+        // opening level's top-level before the map builds the popup chain the server requires. X11 is
+        // indifferent to this, so the same call is simply harmless there.
+        if (parent is GtkPopupPeer level)
+            NativeMethods.gtk_window_set_transient_for(_window, level._window);
+    }
+
+    /// <inheritdoc />
     public void ShowAt(Point screenLocation, Size size)
     {
         // Say what kind of surface this is before it is mapped. A window manager reads the hint to

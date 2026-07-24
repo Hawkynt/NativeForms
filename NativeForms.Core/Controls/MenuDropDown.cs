@@ -251,9 +251,13 @@ internal sealed class MenuDropDown
 
         // Showing this level takes the light-dismiss grab from the current deepest one, which fires a
         // grab-broken on it asynchronously; tell it that break is an expected handoff so it stays open
-        // instead of tearing the cascade down.
+        // instead of tearing the cascade down. A nested level also anchors to the one that opened it, so
+        // a stacked-popup server maps it as a child of the top-most popup rather than of the root window.
         if (_levels.Count > 0)
+        {
             _levels[^1].Popup.ExpectGrabHandoff();
+            popup.SetParentPopup(_levels[^1].Popup);
+        }
 
         _levels.Add(level);
 

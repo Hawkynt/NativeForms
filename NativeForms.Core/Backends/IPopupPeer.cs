@@ -48,6 +48,15 @@ public interface IPopupPeer : ICanvasPeer
     void Regrab() { }
 
     /// <summary>
+    /// Anchors this surface to another popup as its parent instead of the owning window — the relationship
+    /// a submenu has to the menu level that opened it. On a stacked-popup display server (Wayland) a nested
+    /// popup must chain to the top-most mapped popup, not the root window, or the server refuses to map it
+    /// and the submenu never appears. Must be set before <see cref="ShowAt"/>. A backend whose popups are
+    /// free-floating top-levels (Win32) needs nothing here, hence the no-op default.
+    /// </summary>
+    void SetParentPopup(IPopupPeer parent) { }
+
+    /// <summary>
     /// Raised when the user dismisses the surface: a click outside it, loss of the activation/grab
     /// that keeps it up, or Escape. The surface is hidden first, then the event is raised.
     /// </summary>

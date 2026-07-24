@@ -981,8 +981,13 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
     /// <summary>How many times the menu engine had this popup re-take the grab a closed child held.</summary>
     public int RegrabCount { get; private set; }
 
+    /// <summary>The popup this one was anchored to as a nested level, so tests can assert a submenu
+    /// chains to the level that opened it rather than to the owning window.</summary>
+    public IPopupPeer? ParentPopup { get; private set; }
+
     public void ExpectGrabHandoff() => ++this.ExpectGrabHandoffCount;
     public void Regrab() => ++this.RegrabCount;
+    public void SetParentPopup(IPopupPeer parent) => this.ParentPopup = parent;
 
     public event EventHandler? Dismissed;
 
