@@ -90,6 +90,10 @@ public class ListView : OwnerDrawnControl
         this.Groups.ListChanged += this.OnGroupsChanged;
     }
 
+    /// <summary>An unset <see cref="Control.BackColor"/> resolves to the theme's field background, so the
+    /// list looks like a native list box until an app recolours it.</summary>
+    private protected override Color FallbackBackColor => this.Theme.FieldBackground;
+
     /// <summary>The columns shown in Details view. Mutating this collection repaints the control.</summary>
     public ObservableList<ColumnHeader> Columns { get; }
 
@@ -1365,7 +1369,7 @@ public class ListView : OwnerDrawnControl
         var theme = this.Theme;
         var width = this.Width;
         var height = this.Height;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, height));
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, width, height));
 
         var headerHeight = this.HeaderHeight;
         if (headerHeight > 0)
@@ -1414,7 +1418,7 @@ public class ListView : OwnerDrawnControl
     private void PaintGroupHeader(IGraphics g, ITheme theme, int groupIndex, int y, int rowHeight)
     {
         var text = groupIndex >= 0 ? this.Groups[groupIndex].Header : Strings.DefaultListViewGroupHeader;
-        g.DrawText(text, theme.DefaultFont, theme.Accent, new Rectangle(_CellPad + 2, y, this.Width - 8, rowHeight), ContentAlignment.MiddleLeft);
+        g.DrawText(text, this.Font, theme.Accent, new Rectangle(_CellPad + 2, y, this.Width - 8, rowHeight), ContentAlignment.MiddleLeft);
         g.DrawLine(theme.Accent, _CellPad, y + rowHeight - 2, this.Width - _CellPad, y + rowHeight - 2);
     }
 
@@ -1451,7 +1455,7 @@ public class ListView : OwnerDrawnControl
             GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, selWidth, rowHeight));
         }
 
-        var textColor = selected ? theme.SelectionText : theme.ControlText;
+        var textColor = selected ? theme.SelectionText : this.ForeColor;
         if (this.Columns.Count == 0)
         {
             this.PaintPrimaryCell(g, theme, item, textColor, 0, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
@@ -1470,7 +1474,7 @@ public class ListView : OwnerDrawnControl
                 var subIndex = c - 1;
                 var text = subIndex < item.SubItems.Count ? item.SubItems[subIndex] : string.Empty;
                 var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
-                g.DrawText(text, theme.DefaultFont, textColor, textRect, col.TextAlign);
+                g.DrawText(text, this.Font, textColor, textRect, col.TextAlign);
             }
 
             g.PopClip();
@@ -1506,7 +1510,7 @@ public class ListView : OwnerDrawnControl
         }
 
         var textRect = new Rectangle(left, y, x + width - left - _CellPad, rowHeight);
-        g.DrawText(item.Text, theme.DefaultFont, textColor, textRect, alignment);
+        g.DrawText(item.Text, this.Font, textColor, textRect, alignment);
     }
 
     /// <summary>Paints a List or SmallIcon cell: selection fill, check glyph, icon and label.</summary>
@@ -1534,13 +1538,13 @@ public class ListView : OwnerDrawnControl
                 left += iconSize.Width + _IconGap;
             }
 
-            var textColor = selected ? theme.SelectionText : theme.ControlText;
-            g.DrawText(item.Text, theme.DefaultFont, textColor, new Rectangle(left, y, cellX + cellWidth - left - _CellPad, rowHeight), ContentAlignment.MiddleLeft);
+            var textColor = selected ? theme.SelectionText : this.ForeColor;
+            g.DrawText(item.Text, this.Font, textColor, new Rectangle(left, y, cellX + cellWidth - left - _CellPad, rowHeight), ContentAlignment.MiddleLeft);
             g.PopClip();
             return;
         }
 
-        this.PaintPrimaryCell(g, theme, item, selected ? theme.SelectionText : theme.ControlText, cellX, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
+        this.PaintPrimaryCell(g, theme, item, selected ? theme.SelectionText : this.ForeColor, cellX, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
     }
 
     /// <summary>Paints a LargeIcon cell: icon centered above the (clipped) centered label, check overlay top-left.</summary>
@@ -1555,7 +1559,7 @@ public class ListView : OwnerDrawnControl
 
         var labelRect = new Rectangle(cellX + _CellPad, y + iconSize.Height + _LargeIconLabelGap, cellWidth - (2 * _CellPad), this.ItemHeight);
         g.PushClip(labelRect);
-        g.DrawText(item.Text, theme.DefaultFont, selected ? theme.SelectionText : theme.ControlText, labelRect, ContentAlignment.MiddleCenter);
+        g.DrawText(item.Text, this.Font, selected ? theme.SelectionText : this.ForeColor, labelRect, ContentAlignment.MiddleCenter);
         g.PopClip();
 
         if (this.CheckBoxes)
@@ -1576,9 +1580,9 @@ public class ListView : OwnerDrawnControl
         var labelWidth = Math.Max(0, cellX + cellWidth - left - _CellPad);
         var lineHeight = rowHeight / 2;
         g.PushClip(new Rectangle(left, y, labelWidth, rowHeight));
-        g.DrawText(item.Text, theme.DefaultFont, selected ? theme.SelectionText : theme.ControlText, new Rectangle(left, y, labelWidth, lineHeight), ContentAlignment.MiddleLeft);
+        g.DrawText(item.Text, this.Font, selected ? theme.SelectionText : this.ForeColor, new Rectangle(left, y, labelWidth, lineHeight), ContentAlignment.MiddleLeft);
         if (item.SubItems.Count > 0)
-            g.DrawText(item.SubItems[0], theme.DefaultFont, selected ? theme.SelectionText : theme.DisabledText, new Rectangle(left, y + lineHeight, labelWidth, rowHeight - lineHeight), ContentAlignment.MiddleLeft);
+            g.DrawText(item.SubItems[0], this.Font, selected ? theme.SelectionText : theme.DisabledText, new Rectangle(left, y + lineHeight, labelWidth, rowHeight - lineHeight), ContentAlignment.MiddleLeft);
 
         g.PopClip();
 

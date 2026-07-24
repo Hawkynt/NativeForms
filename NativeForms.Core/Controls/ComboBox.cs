@@ -36,6 +36,9 @@ public class ComboBox : OwnerDrawnControl
         this.Items.ListChanged += this.OnItemsListChanged;
     }
 
+    /// <summary>An unset <see cref="Control.BackColor"/> resolves to the theme's field background.</summary>
+    private protected override Color FallbackBackColor => this.Theme.FieldBackground;
+
     /// <summary>The items offered by the drop-down. Mutating this collection repaints the control.</summary>
     public ObservableList<object?> Items { get; }
 
@@ -288,7 +291,7 @@ public class ComboBox : OwnerDrawnControl
         var theme = this.Theme;
         var width = this.Width;
         var height = this.Height;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, height));
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, width, height));
 
         var buttonWidth = this.ButtonWidth;
         if (_editor is null) // the editable style shows its content through the hosted editor instead
@@ -300,11 +303,11 @@ public class ComboBox : OwnerDrawnControl
                 ListBox.DrawRowContent(g, theme, fieldRect, this.DisplaySelector(item), this.IconOf(item), false);
             }
             else if (this.PlaceholderText.Length > 0)
-                g.DrawText(this.PlaceholderText, theme.DefaultFont, theme.DisabledText, new Rectangle(fieldRect.X + 2, fieldRect.Y, fieldRect.Width - 2, fieldRect.Height), ContentAlignment.MiddleLeft);
+                g.DrawText(this.PlaceholderText, this.Font, theme.DisabledText, new Rectangle(fieldRect.X + 2, fieldRect.Y, fieldRect.Width - 2, fieldRect.Height), ContentAlignment.MiddleLeft);
         }
 
         // The drop-down arrow, centered in the button zone.
-        var arrowColor = this.Enabled ? theme.ControlText : theme.DisabledText;
+        var arrowColor = this.Enabled ? this.ForeColor : theme.DisabledText;
         GlyphRenderer.DrawComboArrow(g, arrowColor, new Rectangle(width - buttonWidth, 0, buttonWidth, height));
 
         g.DrawRectangle(_focused ? theme.Accent : theme.Border, new Rectangle(0, 0, width - 1, height - 1));
@@ -488,7 +491,7 @@ public class ComboBox : OwnerDrawnControl
         var g = e.Graphics;
         var theme = this.Theme;
         var size = _popupSize;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, size.Width, size.Height));
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, size.Width, size.Height));
 
         var rowHeight = theme.RowHeight;
         var last = Math.Min(this.Items.Count, _popupTopIndex + _popupVisibleRows);

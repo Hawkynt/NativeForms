@@ -47,6 +47,9 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         _rows = new(this.Nodes, () => this.VisibleRowCount);
     }
 
+    /// <summary>An unset <see cref="Control.BackColor"/> resolves to the theme's field background.</summary>
+    private protected override Color FallbackBackColor => this.Theme.FieldBackground;
+
     /// <summary>The root nodes. Mutating any level of the hierarchy re-flattens and repaints.</summary>
     public TreeNodeCollection Nodes { get; }
 
@@ -626,7 +629,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     {
         var g = e.Graphics;
         var theme = this.Theme;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, this.Width, this.Height));
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
         var rowHeight = this.ItemHeight;
         var top = _rows.TopIndex;
@@ -648,7 +651,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     private void PaintDragImage(IGraphics g, ITheme theme, int rowHeight)
     {
         var node = _dragNode!;
-        var font = theme.DefaultFont;
+        var font = this.Font;
         var iconSize = rowHeight - 4;
 
         var images = this.ImageList;
@@ -672,7 +675,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
             contentX += iconSize + _IconGap;
         }
 
-        g.DrawText(node.Text, font, Color.FromArgb(200, theme.ControlText), new Rectangle(contentX, y, Math.Max(0, rect.Right - _TextPad - contentX), rowHeight), ContentAlignment.MiddleLeft);
+        g.DrawText(node.Text, font, Color.FromArgb(200, this.ForeColor), new Rectangle(contentX, y, Math.Max(0, rect.Right - _TextPad - contentX), rowHeight), ContentAlignment.MiddleLeft);
     }
 
     /// <summary>Paints the drag preview: an outline around an "onto" target, or an indented insertion
@@ -723,9 +726,9 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
 
         x = this.PaintImage(g, node, selected, x, y, rowHeight);
 
-        var textColor = selected ? theme.SelectionText : theme.ControlText;
+        var textColor = selected ? theme.SelectionText : this.ForeColor;
         var textRect = new Rectangle(x + _TextPad, y, this.Width - x - (2 * _TextPad), rowHeight);
-        g.DrawText(node.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleLeft);
+        g.DrawText(node.Text, this.Font, textColor, textRect, ContentAlignment.MiddleLeft);
     }
 
     private void PaintLines(IGraphics g, ITheme theme, TreeNode node, int y, int rowHeight, int glyphCellLeft, int contentLeft)

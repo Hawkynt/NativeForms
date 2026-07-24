@@ -326,4 +326,37 @@ internal sealed class AppearanceTests
 
         Assert.That(canvas.InvalidateCount, Is.EqualTo(before + 3), "own color, own padding and the inherited font each repaint");
     }
+
+    // Owner-drawn field controls honour an explicitly-set BackColor instead of always painting the
+    // theme field background — the WinForms contract for recolouring a control.
+
+    private static RecordingGraphics PaintField(Control control)
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(control);
+        Application.Run(form, backend);
+        return backend.Created.OfType<HeadlessCanvasPeer>().Last().RaisePaint();
+    }
+
+    [Test]
+    public void A_list_view_fills_with_an_explicit_BackColor()
+    {
+        var g = PaintField(new ListView { Bounds = new(0, 0, 100, 100), BackColor = Color.FromArgb(0xFF, 0x20, 0x30, 0x40) });
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF203040")), Is.True, "the list fills with the set BackColor");
+    }
+
+    [Test]
+    public void A_tree_view_fills_with_an_explicit_BackColor()
+    {
+        var g = PaintField(new TreeView { Bounds = new(0, 0, 100, 100), BackColor = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) });
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF112233")), Is.True, "the tree fills with the set BackColor");
+    }
+
+    [Test]
+    public void A_combo_box_fills_with_an_explicit_BackColor()
+    {
+        var g = PaintField(new ComboBox { Bounds = new(0, 0, 100, 26), BackColor = Color.FromArgb(0xFF, 0x44, 0x55, 0x66) });
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF445566")), Is.True, "the combo field fills with the set BackColor");
+    }
 }
