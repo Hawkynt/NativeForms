@@ -155,6 +155,10 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 
 - [x] `IGraphics` surface: lines, rects, text (native font, aligned), images/icons, clip stack.
       Backed by **GDI** (Win32) and **Cairo/Pango** (GTK); CoreGraphics (Cocoa) pending.
+- [~] Colour emoji in any control's `Text`: GTK renders it on both native widgets and the owner-drawn
+      path (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font); the
+      Win32 owner-drawn path is monochrome-only (GDI `DrawTextW` can't emit COLR/CBDT layers — colour
+      there needs a DirectWrite/Direct2D text path, tracked).
 - [x] `ITheme`: accent, window/control/field background, text/disabled/selection colors, default font,
       row height, scrollbar size — queried from the OS (`GetSysColor`/`SPI_GETNONCLIENTMETRICS` on
       Win32; `GtkStyleContext`/`gtk-font-name` on GTK); `DefaultTheme` fallback for headless/tests.

@@ -22,7 +22,7 @@ internal sealed partial class MainForm
 
         var counterLabel = new Label { Bounds = new(16, 36, 300, 22), Text = _viewModel.Display };
         var counterBar = new ProgressBar { Bounds = new(16, 62, 300, 16) };
-        var clickButton = new Button { Bounds = new(16, 88, 145, 30), Text = "Click me", Image = this.SquareImage(Color.MediumSeaGreen) };
+        var clickButton = new Button { Bounds = new(16, 88, 145, 30), Text = "Click me 🎨", Image = this.SquareImage(Color.MediumSeaGreen) };
         clickButton.Click += (_, _) => _viewModel.Increment.Execute(null);
         var disabledButton = new Button { Bounds = new(171, 88, 145, 30), Text = "Disabled", Enabled = false };
         _toolTip.SetToolTip(clickButton, "Executes the view-model's RelayCommand.");
@@ -106,7 +106,7 @@ internal sealed partial class MainForm
         };
         var disabledCheck = new CheckBox { Bounds = new(340, 244, 300, 20), Text = "Disabled", Enabled = false };
 
-        var toggle = new ToggleSwitch { Bounds = new(340, 296, 300, 24), Text = "Notifications", Checked = true };
+        var toggle = new ToggleSwitch { Bounds = new(340, 296, 300, 24), Text = "Notifications 🔔 (colour emoji)", Checked = true };
         toggle.CheckedChanged += (_, _)
             => this.SetStatus($"Notifications are {(toggle.Checked ? "on" : "off")}.");
         _toolTip.SetToolTip(toggle, "An owner-drawn on/off switch.");
