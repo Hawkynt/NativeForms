@@ -430,11 +430,15 @@ public class ClockFace : OwnerDrawnControl
     private void PaintRing(IGraphics g, ITheme theme, in Layout layout, Font font)
     {
         var active = this.ActiveIndex();
+        var numberWidth = g.MeasureText("00", font).Width;
+
         if (_stage != ClockFaceStage.Hour)
         {
             var labels = _fives ??= BuildFives();
+            var step = RingStep(layout.OuterRadius, numberWidth);
             for (var i = 0; i < 12; ++i)
-                this.PaintNumber(g, theme, layout, font, labels[i], i * 5, layout.OuterRadius, active);
+                if (i % step == 0 || (i * 5 == active && layout.OuterRadius == _handRadius))
+                    this.PaintNumber(g, theme, layout, font, labels[i], i * 5, layout.OuterRadius, active);
 
             return;
         }
@@ -443,18 +447,40 @@ public class ClockFace : OwnerDrawnControl
         {
             var outer = _hoursOuter ??= BuildHoursOuter();
             var inner = _twoDigits ??= BuildTwoDigits();
+            var outerStep = RingStep(layout.OuterRadius, numberWidth);
+            var innerStep = RingStep(layout.InnerRadius, numberWidth);
             for (var i = 0; i < 12; ++i)
             {
-                this.PaintNumber(g, theme, layout, font, outer[i], i * 5, layout.OuterRadius, active);
-                this.PaintNumber(g, theme, layout, font, inner[i], i * 5, layout.InnerRadius, active);
+                if (i % outerStep == 0 || (i * 5 == active && layout.OuterRadius == _handRadius))
+                    this.PaintNumber(g, theme, layout, font, outer[i], i * 5, layout.OuterRadius, active);
+                if (i % innerStep == 0 || (i * 5 == active && layout.InnerRadius == _handRadius))
+                    this.PaintNumber(g, theme, layout, font, inner[i], i * 5, layout.InnerRadius, active);
             }
 
             return;
         }
 
         var hours = _hours12 ??= BuildHours12();
+        var hourStep = RingStep(layout.OuterRadius, numberWidth);
         for (var i = 0; i < 12; ++i)
-            this.PaintNumber(g, theme, layout, font, hours[i], i * 5, layout.OuterRadius, active);
+            if (i % hourStep == 0 || (i * 5 == active && layout.OuterRadius == _handRadius))
+                this.PaintNumber(g, theme, layout, font, hours[i], i * 5, layout.OuterRadius, active);
+    }
+
+    /// <summary>The smallest step through the twelve ring slots — a divisor of twelve, so the top slot
+    /// always survives and the survivors stay evenly spaced — whose neighbouring labels clear one
+    /// another on a ring of <paramref name="radius"/>. A cramped dial thins the ring (e.g. 12/3/6/9)
+    /// rather than smearing overlapping numbers together.</summary>
+    private static int RingStep(int radius, int numberWidth)
+    {
+        // Two slots k apart sit a chord 2·radius·sin(k·15°) apart; keep that wider than a label + gap.
+        var needed = numberWidth + 4;
+        ReadOnlySpan<int> steps = [1, 2, 3, 4, 6];
+        foreach (var step in steps)
+            if (2.0 * radius * Math.Sin(step * Math.PI / 12.0) >= needed)
+                return step;
+
+        return 6;
     }
 
     /// <summary>Paints one ring number centred at its position, in the selection colour when it is the
