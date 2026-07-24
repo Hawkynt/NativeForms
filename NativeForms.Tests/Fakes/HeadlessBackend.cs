@@ -975,6 +975,15 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
 
     public bool LightDismiss { get; set; } = true;
 
+    /// <summary>How many times the menu engine told this popup a grab handoff to a child is expected.</summary>
+    public int ExpectGrabHandoffCount { get; private set; }
+
+    /// <summary>How many times the menu engine had this popup re-take the grab a closed child held.</summary>
+    public int RegrabCount { get; private set; }
+
+    public void ExpectGrabHandoff() => ++this.ExpectGrabHandoffCount;
+    public void Regrab() => ++this.RegrabCount;
+
     public event EventHandler? Dismissed;
 
     public void ShowAt(Point screenLocation, Size size)

@@ -249,6 +249,12 @@ internal sealed class MenuDropDown
             this.CloseAll();
         };
 
+        // Showing this level takes the light-dismiss grab from the current deepest one, which fires a
+        // grab-broken on it asynchronously; tell it that break is an expected handoff so it stays open
+        // instead of tearing the cascade down.
+        if (_levels.Count > 0)
+            _levels[^1].Popup.ExpectGrabHandoff();
+
         _levels.Add(level);
 
         // The grab moving to the new popup must not read as the previous level being dismissed.
@@ -275,11 +281,18 @@ internal sealed class MenuDropDown
     private void CloseBelow(Level level)
     {
         var index = _levels.IndexOf(level);
+        var closedAny = false;
         for (var i = _levels.Count - 1; i > index; --i)
         {
             this.TearDownLevel(_levels[i]);
             _levels.RemoveAt(i);
+            closedAny = true;
         }
+
+        // A child that held the grab is gone, so the level that is deepest again re-takes it to keep
+        // catching outside clicks and Escape.
+        if (closedAny && _levels.Count > 0)
+            _levels[^1].Popup.Regrab();
     }
 
     /// <summary>Enter/mnemonic on the hovered row: descend into a submenu or commit the item.</summary>

@@ -148,6 +148,36 @@ internal sealed class ContextMenuTests
     }
 
     [Test]
+    public void Opening_a_submenu_tells_the_parent_the_grab_handoff_is_expected_and_closing_it_regrabs()
+    {
+        var menu = new ContextMenuStrip();
+        var more = new ToolStripMenuItem("More");
+        more.DropDownItems.Add(new ToolStripMenuItem("Child"));
+        menu.Items.Add(more);
+        menu.Items.Add(new ToolStripMenuItem("Plain"));
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right);
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        var rowHeight = backend.Theme.RowHeight;
+        parent.RaiseMouseMove(20, (rowHeight / 2) + 1); // hover "More" → opens the submenu
+
+        Assert.That(parent.ExpectGrabHandoffCount, Is.EqualTo(1),
+            "the parent is told the grab handoff to the submenu it opened is expected, so its grab-broken must not dismiss it");
+
+        parent.RaiseMouseMove(20, rowHeight + (rowHeight / 2) + 1); // hover "Plain" → closes the submenu
+
+        Assert.That(parent.RegrabCount, Is.GreaterThan(0), "closing the child has the parent re-take the light-dismiss grab");
+    }
+
+    [Test]
     public void Light_dismissal_closes_the_menu()
     {
         CreatePanel(out var menu, out _, out var canvas, out var backend);

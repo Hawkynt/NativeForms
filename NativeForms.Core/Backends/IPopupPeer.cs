@@ -36,6 +36,18 @@ public interface IPopupPeer : ICanvasPeer
     void Hide();
 
     /// <summary>
+    /// Tells the surface that its light-dismiss grab is about to be handed off to a child popup it is
+    /// opening, so the resulting grab loss is expected and must not dismiss it — consumed by the next
+    /// grab loss. This is what lets a menu cascade open a submenu without the parent level closing.
+    /// A surface that takes no grab (a tooltip) needs nothing here, hence the no-op default.
+    /// </summary>
+    void ExpectGrabHandoff() { }
+
+    /// <summary>Re-takes the light-dismiss grab a now-closed child popup held, so this surface again
+    /// catches outside clicks and Escape. A no-op if it already holds the grab, is hidden, or never grabs.</summary>
+    void Regrab() { }
+
+    /// <summary>
     /// Raised when the user dismisses the surface: a click outside it, loss of the activation/grab
     /// that keeps it up, or Escape. The surface is hidden first, then the event is raised.
     /// </summary>

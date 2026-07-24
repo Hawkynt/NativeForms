@@ -105,9 +105,17 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         if (!this.LightDismiss)
             return;
 
-        // The seat grab routes pointer events outside the application to the popup (owner events keep
-        // in-app delivery normal); the GTK grab redirects the application's own events to it. Together
-        // they make every outside click land in OnWindowButtonPress.
+        this.TakeGrab();
+    }
+
+    /// <summary>
+    /// Takes the pointer grab that makes this the light-dismiss surface. The seat grab routes pointer
+    /// events outside the application to the popup (owner events keep in-app delivery normal); the GTK
+    /// grab redirects the application's own events to it. Together they make every outside click land in
+    /// <see cref="OnWindowButtonPress"/>.
+    /// </summary>
+    private void TakeGrab()
+    {
         var seat = NativeMethods.gdk_display_get_default_seat(NativeMethods.gdk_display_get_default());
         NativeMethods.gdk_seat_grab(
             seat,
@@ -120,6 +128,24 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
             0);
         NativeMethods.gtk_grab_add(_window);
         _grabbed = true;
+    }
+
+    /// <summary>Whether the next grab-broken is the expected handoff to a child popup this level opened,
+    /// rather than a real focus change that should dismiss it.</summary>
+    private bool _expectGrabBroken;
+
+    /// <inheritdoc/>
+    public void ExpectGrabHandoff() => _expectGrabBroken = true;
+
+    /// <inheritdoc/>
+    public void Regrab()
+    {
+        // Re-take the grab a now-closed child popup held, so this level again catches outside clicks and
+        // Escape. A no-op if it still holds the grab, is hidden, or never grabs.
+        if (_grabbed || !_shown || !this.LightDismiss || _window == 0)
+            return;
+
+        this.TakeGrab();
     }
 
     /// <inheritdoc />
@@ -214,7 +240,21 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int OnWindowGrabBroken(nint widget, nint eventPtr, nint userData)
     {
-        PopupFromData(userData)?.Dismiss();
+        var peer = PopupFromData(userData);
+        if (peer is null)
+            return 0;
+
+        // A submenu this popup just opened takes the grab, breaking this one's — an expected handoff,
+        // not a dismissal. The break arrives asynchronously, after the open call returned, so a
+        // persistent flag (not a synchronous guard) is what catches it; the grab is now the child's.
+        if (peer._expectGrabBroken)
+        {
+            peer._expectGrabBroken = false;
+            peer._grabbed = false;
+            return 0;
+        }
+
+        peer.Dismiss();
         return 0; // let the event propagate; dismissal is a side effect, not a consumption
     }
 
