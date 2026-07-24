@@ -489,7 +489,7 @@ internal sealed class CalendarCore
                     g.FillRectangle(fill, cell);
 
                 if (date == today)
-                    g.DrawEllipse(theme.Accent, new(cell.X + 1, cell.Y + 1, cell.Width - 2, cell.Height - 2));
+                    DrawTodayMarker(g, theme, cell);
 
                 var color = selected ? theme.SelectionText
                     : !inMonth || !this.IsDaySelectable(date) ? theme.DisabledText
@@ -528,7 +528,7 @@ internal sealed class CalendarCore
                 GlyphRenderer.FillSelection(g, theme, cell);
 
             if (index == today)
-                g.DrawEllipse(theme.Accent, new(cell.X + 1, cell.Y + 1, cell.Width - 2, cell.Height - 2));
+                DrawTodayMarker(g, theme, cell);
 
             var outside = insidePage == 10 && (index == 0 || index == _PeriodCells - 1);
             var color = isSelected ? theme.SelectionText
@@ -549,6 +549,22 @@ internal sealed class CalendarCore
         var dx = pointsLeft ? 3 : -3;
         g.DrawLine(theme.ControlText, centerX + dx, centerY - 4, centerX - dx, centerY);
         g.DrawLine(theme.ControlText, centerX - dx, centerY, centerX + dx, centerY + 4);
+    }
+
+    /// <summary>Rings today's cell with a centred accent circle sized to the cell's shorter side, so it
+    /// stays circular on both the square day cells and the wide period/drop-down cells and sits inside
+    /// the focus outline instead of degenerating into a full-cell oval on top of it.</summary>
+    private static void DrawTodayMarker(IGraphics g, ITheme theme, Rectangle cell)
+    {
+        var diameter = Math.Min(cell.Width, cell.Height) - 4;
+        if (diameter < 1)
+            return;
+
+        g.DrawEllipse(theme.Accent, new(
+            cell.X + ((cell.Width - diameter) / 2),
+            cell.Y + ((cell.Height - diameter) / 2),
+            diameter,
+            diameter));
     }
 
     private static string[] CreateDayNumbers()

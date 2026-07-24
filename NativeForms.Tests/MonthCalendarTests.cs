@@ -108,7 +108,7 @@ internal sealed class MonthCalendarTests
 
         var g = canvas.RaisePaint();
 
-        Assert.That(g.Operations, Does.Contain("ellipse #FF0078D4 121,89,18,20"), "July 19 wears the accent circle");
+        Assert.That(g.Operations, Does.Contain("ellipse #FF0078D4 122,91,16,16"), "July 19 wears the accent circle");
     }
 
     [Test]
@@ -522,7 +522,7 @@ internal sealed class MonthCalendarTests
         Assert.Multiple(() =>
         {
             Assert.That(g.Operations.Any(o => o.StartsWith("fill #FF0078D4 70,22,35,51", StringComparison.Ordinal)), Is.True, "March, the selected month, carries the selection fill");
-            Assert.That(g.Operations.Any(o => o.StartsWith("ellipse #FF0078D4 71,74", StringComparison.Ordinal)), Is.True, "July, today's month, wears the accent circle");
+            Assert.That(g.Operations.Any(o => o.StartsWith("ellipse #FF0078D4 72,83", StringComparison.Ordinal)), Is.True, "July, today's month, wears the accent circle");
         });
     }
 
