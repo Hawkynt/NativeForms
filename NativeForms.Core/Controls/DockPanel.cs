@@ -260,7 +260,10 @@ public partial class DockPanel : OwnerDrawnControl
             case DockState.AutoHide:
                 _autoHide?.Remove(content);
                 if (ReferenceEquals(_flyout, content))
+                {
+                    content.BorderStyle = BorderStyle.None;
                     _flyout = null;
+                }
                 break;
             case DockState.Floating:
                 this.MoveFromFloat(content);

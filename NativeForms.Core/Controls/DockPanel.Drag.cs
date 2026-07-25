@@ -454,6 +454,10 @@ public partial class DockPanel
     private void ShowFlyout(DockContent pane)
     {
         _flyout = pane;
+        // The fly-out floats over the document area, so the manager's own well frame — painted under the
+        // panes — cannot outline it. The pane draws its own single border instead, the way a real
+        // auto-hide fly-out is boxed away from the content it covers.
+        pane.BorderStyle = BorderStyle.FixedSingle;
         this.RaiseToTop(pane);
         this.SetActive(pane);
         this.CommitLayout();
@@ -467,6 +471,7 @@ public partial class DockPanel
         // Collapsing hands the active caption back to the docked tree, so nothing keeps reporting the
         // now-hidden fly-out pane as active.
         var wasActive = ReferenceEquals(_active, _flyout);
+        _flyout.BorderStyle = BorderStyle.None; // re-docked panes take the manager's frame again
         _flyout = null;
         if (wasActive)
             this.SetActive(this.FirstTreeContent());

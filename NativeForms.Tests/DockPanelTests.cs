@@ -127,6 +127,11 @@ internal sealed class DockPanelTests
         pane.Activate(); // fly out
         Assert.That(dock.FlyoutContent, Is.SameAs(pane));
         Assert.That(dock.IsContentShown(pane), Is.True);
+        Assert.That(pane.BorderStyle, Is.EqualTo(BorderStyle.FixedSingle),
+            "a fly-out draws its own border, since it floats over content the manager's frame cannot outline");
+
+        pane.ToggleAutoHide(); // re-dock
+        Assert.That(pane.BorderStyle, Is.EqualTo(BorderStyle.None), "a re-docked pane takes the manager's frame again");
     }
 
     [Test]
