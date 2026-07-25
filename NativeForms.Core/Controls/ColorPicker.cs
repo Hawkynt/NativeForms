@@ -162,8 +162,27 @@ public class ColorPicker : OwnerDrawnControl
     private int HexY => _Pad + _SvH + 8;
     private int BasicY => this.HexY + this.Theme.RowHeight + 6;
     private int CustomY => this.BasicY + (_BasicRows * _Cell) + this.Theme.RowHeight + 4;
+    private int TabsY => this.CustomY + (_CustomRows * _Cell) + 8;
+    private int ChannelsY => this.TabsY + this.Theme.RowHeight + 4;
+    private int NumericWidth => this.PopupInnerWidth;
+    private int PopupInnerWidth => this.RightColumnX + _PreviewW - _Pad;
 
-    private Size PopupSize => new(this.RightColumnX + _PreviewW + _Pad, this.CustomY + (_CustomRows * _Cell) + _Pad);
+    private Size PopupSize => new(this.RightColumnX + _PreviewW + _Pad, this.ChannelsY + (4 * this.Theme.RowHeight) + _Pad);
+
+    private static readonly string[] _Spaces = ["RGB", "HSL", "HSV", "CMYK"];
+
+    private Rectangle TabRect(int i)
+    {
+        var w = this.NumericWidth / 4;
+        return new Rectangle(_Pad + (i * w), this.TabsY, w, this.Theme.RowHeight);
+    }
+
+    private Rectangle ChannelTrack(int i)
+    {
+        const int labelW = 26, valueW = 40;
+        var y = this.ChannelsY + (i * this.Theme.RowHeight);
+        return new Rectangle(_Pad + labelW, y + 4, this.NumericWidth - labelW - valueW, this.Theme.RowHeight - 8);
+    }
 
     // --- Popup wiring ------------------------------------------------------------------------------
 
@@ -173,7 +192,7 @@ public class ColorPicker : OwnerDrawnControl
         popup.Paint += (_, e) => this.PaintMixer(e.Graphics);
         popup.MouseDown += (_, e) => this.OnMixerDown(e);
         popup.MouseMove += (_, e) => this.OnMixerMove(e);
-        popup.MouseUp += (_, _) => { if (_mixer is { } m) m.Drag = DragTarget.None; };
+        popup.MouseUp += (_, _) => { if (_mixer is { } m) { m.Drag = DragTarget.None; m.Channel = -1; } };
         popup.Dismissed += (_, _) => this.CloseDropDown();
         return popup;
     }
@@ -220,6 +239,7 @@ public class ColorPicker : OwnerDrawnControl
 
         this.PaintSwatches(g, _Basic, _BasicCols, _BasicRows, this.BasicY);
         this.PaintSwatches(g, _custom, _CustomCols, _CustomRows, this.CustomY);
+        this.PaintNumeric(g, mixer);
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, size.Width - 1, size.Height - 1));
     }
@@ -293,7 +313,12 @@ public class ColorPicker : OwnerDrawnControl
         }
 
         if (this.SwatchAt(_custom, _CustomCols, _CustomRows, this.CustomY, e, out var custom))
+        {
             this.Commit(mixer, custom);
+            return;
+        }
+
+        this.OnNumericDown(mixer, e);
     }
 
     private void OnMixerMove(MouseEventArgs e)
@@ -306,6 +331,7 @@ public class ColorPicker : OwnerDrawnControl
             case DragTarget.Sv: this.UpdateSv(mixer, e); break;
             case DragTarget.Hue: this.UpdateHue(mixer, e); break;
             case DragTarget.Alpha: this.UpdateAlpha(mixer, e); break;
+            case DragTarget.Channel: this.UpdateChannel(mixer, e); break;
         }
     }
 
@@ -362,6 +388,137 @@ public class ColorPicker : OwnerDrawnControl
         return false;
     }
 
+    // --- Numeric tabs ------------------------------------------------------------------------------
+
+    private static int ChannelCount(ColorSpace space) => space == ColorSpace.Cmyk ? 4 : 3;
+
+    private static (string Label, double Max) ChannelSpec(ColorSpace space, int i) => space switch
+    {
+        ColorSpace.Rgb => (("RGB"[i]).ToString(), 255),
+        ColorSpace.Hsl => (i == 0 ? "H" : i == 1 ? "S" : "L", i == 0 ? 360 : 100),
+        ColorSpace.Hsv => (i == 0 ? "H" : i == 1 ? "S" : "V", i == 0 ? 360 : 100),
+        _ => (("CMYK"[i]).ToString(), 100),
+    };
+
+    private static double ChannelValue(Mixer mixer, int i)
+    {
+        var c = mixer.Color;
+        switch (mixer.Space)
+        {
+            case ColorSpace.Rgb: return i == 0 ? c.R : i == 1 ? c.G : c.B;
+            case ColorSpace.Hsv: return i == 0 ? mixer.H : i == 1 ? mixer.S * 100 : mixer.V * 100;
+            case ColorSpace.Hsl:
+                ColorMath.ColorToHsl(c, out var h, out var s, out var l);
+                return i == 0 ? h : i == 1 ? s * 100 : l * 100;
+            default:
+                ColorMath.ColorToCmyk(c, out var cc, out var mm, out var yy, out var kk);
+                return (i == 0 ? cc : i == 1 ? mm : i == 2 ? yy : kk) * 100;
+        }
+    }
+
+    private static void SetChannel(Mixer mixer, int i, double value)
+    {
+        var c = mixer.Color;
+        switch (mixer.Space)
+        {
+            case ColorSpace.Rgb:
+                var r = i == 0 ? (int)Math.Round(value) : c.R;
+                var g = i == 1 ? (int)Math.Round(value) : c.G;
+                var b = i == 2 ? (int)Math.Round(value) : c.B;
+                mixer.Set(Color.FromArgb(mixer.A, Clamp8(r), Clamp8(g), Clamp8(b)));
+                break;
+            case ColorSpace.Hsv:
+                if (i == 0) mixer.H = value;
+                else if (i == 1) mixer.S = value / 100;
+                else mixer.V = value / 100;
+                mixer.InvalidateSv();
+                break;
+            case ColorSpace.Hsl:
+                ColorMath.ColorToHsl(c, out var h, out var s, out var l);
+                if (i == 0) h = value; else if (i == 1) s = value / 100; else l = value / 100;
+                mixer.Set(ColorMath.HslToColor(h, s, l, mixer.A));
+                break;
+            default:
+                ColorMath.ColorToCmyk(c, out var cc, out var mm, out var yy, out var kk);
+                var v = value / 100;
+                if (i == 0) cc = v; else if (i == 1) mm = v; else if (i == 2) yy = v; else kk = v;
+                mixer.Set(ColorMath.CmykToColor(cc, mm, yy, kk, mixer.A));
+                break;
+        }
+    }
+
+    private static int Clamp8(int x) => x < 0 ? 0 : x > 255 ? 255 : x;
+
+    private void PaintNumeric(IGraphics g, Mixer mixer)
+    {
+        var theme = this.Theme;
+        for (var i = 0; i < _Spaces.Length; ++i)
+        {
+            var tab = this.TabRect(i);
+            var active = (int)mixer.Space == i;
+            g.FillRectangle(active ? theme.ControlBackground : theme.HeaderBackground, tab);
+            if (active)
+                g.FillRectangle(theme.Accent, new Rectangle(tab.X, tab.Bottom - 2, tab.Width, 2));
+            g.DrawRectangle(theme.Border, Border(tab));
+            g.DrawText(_Spaces[i], theme.DefaultFont, active ? theme.ControlText : theme.HeaderText, tab, ContentAlignment.MiddleCenter);
+        }
+
+        var count = ChannelCount(mixer.Space);
+        for (var i = 0; i < count; ++i)
+        {
+            var (label, max) = ChannelSpec(mixer.Space, i);
+            var value = ChannelValue(mixer, i);
+            var track = this.ChannelTrack(i);
+            var labelRect = new Rectangle(_Pad, track.Y - 4, 24, this.Theme.RowHeight);
+            g.DrawText(label, theme.DefaultFont, theme.ControlText, labelRect, ContentAlignment.MiddleLeft);
+
+            g.FillRectangle(theme.FieldBackground, track);
+            var t = max <= 0 ? 0 : Math.Clamp(value / max, 0, 1);
+            g.FillRectangle(theme.Accent, new Rectangle(track.X, track.Y, (int)(t * track.Width), track.Height));
+            g.DrawRectangle(theme.Border, Border(track));
+
+            var valueRect = new Rectangle(track.Right + 4, track.Y - 4, 36, this.Theme.RowHeight);
+            g.DrawText(((int)Math.Round(value)).ToString(), theme.DefaultFont, theme.ControlText, valueRect, ContentAlignment.MiddleRight);
+        }
+    }
+
+    private bool OnNumericDown(Mixer mixer, MouseEventArgs e)
+    {
+        for (var i = 0; i < _Spaces.Length; ++i)
+            if (this.TabRect(i).Contains(e.X, e.Y))
+            {
+                mixer.Space = (ColorSpace)i;
+                _popup?.InvalidateAll();
+                return true;
+            }
+
+        for (var i = 0; i < ChannelCount(mixer.Space); ++i)
+        {
+            var track = this.ChannelTrack(i);
+            if (track.Contains(e.X, e.Y) || (e.Y >= track.Y - 4 && e.Y < track.Bottom + 4 && e.X >= track.X && e.X < track.Right + 40))
+            {
+                mixer.Drag = DragTarget.Channel;
+                mixer.Channel = i;
+                this.UpdateChannel(mixer, e);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void UpdateChannel(Mixer mixer, MouseEventArgs e)
+    {
+        if (mixer.Channel < 0)
+            return;
+
+        var (_, max) = ChannelSpec(mixer.Space, mixer.Channel);
+        var track = this.ChannelTrack(mixer.Channel);
+        var t = Math.Clamp((e.X - track.X) / (double)Math.Max(1, track.Width - 1), 0, 1);
+        SetChannel(mixer, mixer.Channel, t * max);
+        this.Apply(mixer);
+    }
+
     // --- Shared painting helpers -------------------------------------------------------------------
 
     private static Rectangle Border(Rectangle r) => new(r.X, r.Y, r.Width - 1, r.Height - 1);
@@ -388,7 +545,10 @@ public class ColorPicker : OwnerDrawnControl
     ];
 
     /// <summary>Which slider a mixer drag is tracking.</summary>
-    private enum DragTarget { None, Sv, Hue, Alpha }
+    private enum DragTarget { None, Sv, Hue, Alpha, Channel }
+
+    /// <summary>The numeric-tab colour space.</summary>
+    private enum ColorSpace { Rgb, Hsl, Hsv, Cmyk }
 
     /// <summary>The mixer's transient state, alive only while the drop-down is open — the HSV(+A) working
     /// value, the colour the field held when opened, the active drag and the cached gradient bitmaps.</summary>
@@ -398,6 +558,8 @@ public class ColorPicker : OwnerDrawnControl
         internal byte A;
         internal readonly Color Old;
         internal DragTarget Drag;
+        internal ColorSpace Space;
+        internal int Channel = -1; // the numeric row being dragged, or -1
 
         private IImage? _sv;
         private int _svHue = -1;

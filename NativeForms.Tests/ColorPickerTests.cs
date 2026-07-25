@@ -93,6 +93,43 @@ internal sealed class ColorPickerTests
         Assert.That(picker.SelectedColor.G, Is.GreaterThan(picker.SelectedColor.R), "the hue swept toward green");
     }
 
+    // Numeric layout mirrored from the control (RowHeight = 22): the popup inner width is 280, tabs sit
+    // at y=350 and the first channel track at y≈380 spanning x 34..248.
+    private const int _TabsTop = 350;
+    private const int _Channel0Y = 384;
+
+    [Test]
+    public void Clicking_a_numeric_tab_switches_the_channel_readout()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        picker.SelectedColor = Color.RoyalBlue;
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.RaiseMouseDown(148 + 35, _TabsTop + 11); // the HSV tab (index 2 of 4, each 70 wide from x=8)
+        var g = popup.RaisePaint();
+
+        Assert.That(g.DrewText("V"), Is.True, "the HSV tab shows a value channel the RGB tab does not");
+    }
+
+    [Test]
+    public void Dragging_a_numeric_channel_sets_that_component()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        picker.SelectedColor = Color.RoyalBlue; // R = 65
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.RaiseMouseDown(247, _Channel0Y); // far right of the R channel track → R = 255
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.SelectedColor.R, Is.EqualTo(255));
+            Assert.That(picker.SelectedColor.G, Is.EqualTo(105), "green is untouched");
+            Assert.That(picker.SelectedColor.B, Is.EqualTo(225), "blue is untouched");
+        });
+    }
+
     [Test]
     public void The_mixer_blits_the_saturation_value_gradient()
     {
