@@ -410,6 +410,58 @@ internal sealed class CalendarViewTests
     }
 
     [Test]
+    public void Dragging_a_month_chips_right_edge_resizes_the_end_day()
+    {
+        var calendar = CreateCalendar(out var canvas);
+        calendar.ViewMode = CalendarViewMode.Month;
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+
+        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
+        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+        var edge = bounds.Right - 3; // grab the right edge
+        var cy = bounds.Y + (bounds.Height / 2);
+
+        canvas.RaiseMouseDown(edge, cy);
+        canvas.RaiseMouseMove(edge + 100, cy); // one day cell to the right
+        canvas.RaiseMouseUp(edge + 100, cy);
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 9, 0, 0)), "the start day stays put");
+            Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 16)), "the end day extends by one day");
+            Assert.That(moved.End.TimeOfDay, Is.EqualTo(new TimeSpan(9, 30, 0)), "the end time of day is preserved");
+        });
+    }
+
+    [Test]
+    public void Dragging_a_month_chips_left_edge_resizes_the_start_day()
+    {
+        var calendar = CreateCalendar(out var canvas);
+        calendar.ViewMode = CalendarViewMode.Month;
+        AppointmentMoveEventArgs? moved = null;
+        calendar.AppointmentMoved += (_, e) => moved = e;
+
+        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
+        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+        var edge = bounds.X + 3; // grab the left edge
+        var cy = bounds.Y + (bounds.Height / 2);
+
+        canvas.RaiseMouseDown(edge, cy);
+        canvas.RaiseMouseMove(edge - 100, cy); // one day cell to the left
+        canvas.RaiseMouseUp(edge - 100, cy);
+
+        Assert.That(moved, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved!.Start.Date, Is.EqualTo(new DateTime(2026, 7, 14)), "the start day moves one day earlier");
+            Assert.That(moved.Start.TimeOfDay, Is.EqualTo(new TimeSpan(9, 0, 0)), "the start time of day is preserved");
+            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 9, 30, 0)), "the end stays put");
+        });
+    }
+
+    [Test]
     public void Dragging_an_appointments_bottom_edge_resizes_its_end()
     {
         var appt = new Appointment("Review", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 15, 11, 0, 0));

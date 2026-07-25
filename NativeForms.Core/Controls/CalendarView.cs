@@ -1280,6 +1280,23 @@ public class CalendarView : OwnerDrawnControl
         return DragKind.Move;
     }
 
+    /// <summary>Which horizontal edge (if any) a month chip's <paramref name="x"/> falls on: the left edge
+    /// resizes the appointment's start day, the right edge its end day. Away from both edges it moves the
+    /// whole appointment by whole days. Too narrow a chip to carry two grab zones only ever moves.</summary>
+    private static DragKind MonthEdgeKind(ApptBox box, int x)
+    {
+        if (box.Rect.Width < _EdgeGrab * 3)
+            return DragKind.Move;
+
+        if (x - box.Rect.X <= _EdgeGrab)
+            return DragKind.ResizeStart;
+
+        if (box.Rect.Right - x <= _EdgeGrab)
+            return DragKind.ResizeEnd;
+
+        return DragKind.Move;
+    }
+
     /// <summary>The resize edge under a client point, or <see cref="DragKind.Move"/> when the point is
     /// not on a movable timed box's real edge — the basis for the resize cursor.</summary>
     private DragKind EdgeKindAt(int x, int y)
@@ -1289,8 +1306,11 @@ public class CalendarView : OwnerDrawnControl
             return DragKind.Move;
 
         var box = _layout[hit];
-        if (!box.Timed || !_appointments[box.Index].Movable)
+        if (!_appointments[box.Index].Movable)
             return DragKind.Move;
+
+        if (!box.Timed)
+            return this.IsMonth ? MonthEdgeKind(box, x) : DragKind.Move;
 
         var screenTop = box.Rect.Y + this.BodyBounds.Y - _scrollY;
         return EdgeKindOf(box, screenTop, y);
@@ -1320,7 +1340,7 @@ public class CalendarView : OwnerDrawnControl
         }
         else
         {
-            _dragKind = DragKind.Move;
+            _dragKind = this.IsMonth ? MonthEdgeKind(box, e.X) : DragKind.Move;
             var pressDay = this.IsMonth ? this.MonthDayAt(e.X, e.Y) : this.DayColumnDate(e.X);
             _moveGrabDays = pressDay is { } day ? (int)(day.Date - appt.Start.Date).TotalDays : 0;
         }
@@ -1335,6 +1355,28 @@ public class CalendarView : OwnerDrawnControl
         var appt = _appointments[_moveIndex];
         if (_moveFixed)
         {
+            // Month resize: the grabbed edge follows the pointer's day cell, changing the appointment's
+            // start or end day (keeping its time of day) while the opposite edge stays put; a one-day
+            // minimum span is kept so the edges never cross.
+            if (this.IsMonth && _dragKind is DragKind.ResizeStart or DragKind.ResizeEnd)
+            {
+                var edgeDay = (this.MonthDayAt(e.X, e.Y) ?? (_dragKind == DragKind.ResizeStart ? appt.Start : appt.End)).Date;
+                if (_dragKind == DragKind.ResizeStart)
+                {
+                    var startDate = edgeDay > appt.End.Date ? appt.End.Date : edgeDay;
+                    _previewStart = startDate + appt.Start.TimeOfDay;
+                    _previewEnd = appt.End;
+                }
+                else
+                {
+                    var endDate = edgeDay < appt.Start.Date ? appt.Start.Date : edgeDay;
+                    _previewStart = appt.Start;
+                    _previewEnd = endDate + appt.End.TimeOfDay;
+                }
+
+                return;
+            }
+
             // Day granularity: the whole appointment shifts by whole days, preserving its time-of-day
             // and duration — the same for the all-day band and for month chips.
             var target = this.IsMonth ? this.MonthDayAt(e.X, e.Y) : this.DayColumnDate(e.X);
@@ -1534,8 +1576,14 @@ public class CalendarView : OwnerDrawnControl
 
         if (!_rangeDragging)
         {
-            // Idle: show the north-south resize cursor over a real (non-continuation) timed edge.
-            this.SetRegionCursor(this.EdgeKindAt(e.X, e.Y) != DragKind.Move ? Cursors.SizeNS : null);
+            // Idle: show a resize cursor over a real (non-continuation) edge — north-south over a timed
+            // box's top/bottom, east-west over a month chip's start/end day edge.
+            this.SetRegionCursor(this.EdgeKindAt(e.X, e.Y) switch
+            {
+                DragKind.Move => null,
+                _ when this.IsMonth => Cursors.SizeWE,
+                _ => Cursors.SizeNS,
+            });
             return;
         }
 
