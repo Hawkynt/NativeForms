@@ -135,6 +135,45 @@ internal sealed class ExpanderTests
         });
     }
 
+    [Test]
+    public void Checkable_Checked_mirrors_Expanded_and_raises_CheckedChanged()
+    {
+        var expander = new Expander { Text = "Options", Bounds = new(0, 0, 200, 150), ShowCheckBox = true };
+        Realize(expander, out _);
+        var checkedChanges = 0;
+        expander.CheckedChanged += (_, _) => ++checkedChanges;
+
+        Assert.That(expander.Checked, Is.True, "checked tracks the default-expanded state");
+
+        expander.Checked = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(expander.Expanded, Is.False, "clearing the check collapses the content");
+            Assert.That(expander.Height, Is.EqualTo(_HeaderHeight));
+            Assert.That(checkedChanges, Is.EqualTo(1), "CheckedChanged fired for the binding hook");
+        });
+
+        expander.Checked = true;
+        Assert.That(expander.Expanded, Is.True, "ticking the check re-opens the content");
+    }
+
+    [Test]
+    public void Checkable_header_paints_a_check_box_that_reflects_the_state()
+    {
+        var expander = new Expander { Text = "Options", Bounds = new(0, 0, 200, 150), ShowCheckBox = true };
+        var canvas = Realize(expander, out _);
+
+        var checkedPaint = canvas.RaisePaint();
+        Assert.That(checkedPaint.Operations.Exists(o => o.StartsWith("line #FF0078D4")), Is.True,
+            "a ticked check box draws the accent check mark");
+
+        expander.Checked = false;
+        var clearedPaint = canvas.RaisePaint();
+        Assert.That(clearedPaint.Operations.Exists(o => o.StartsWith("line #FF0078D4")), Is.False,
+            "a cleared check box draws no accent check mark");
+    }
+
     private static int AtX(RecordingGraphics g, string prefix)
     {
         var op = g.Operations.First(o => o.StartsWith(prefix));

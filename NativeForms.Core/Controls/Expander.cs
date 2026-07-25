@@ -16,6 +16,7 @@ public class Expander : OwnerDrawnControl
     private const int _GlyphSize = 8;
     private const int _GlyphInset = 6;
     private const int _TextGap = 6;
+    private const int _CheckSize = 13;
 
     private int _expandedHeight;
 
@@ -51,6 +52,38 @@ public class Expander : OwnerDrawnControl
             this.OnExpandedChanged(EventArgs.Empty);
         }
     } = true;
+
+    /// <summary>
+    /// Turns the header's expand triangle into a check box — the checkable-group-box idiom, where ticking
+    /// the box opens the content and clearing it collapses it. <see cref="Checked"/> then mirrors
+    /// <see cref="Expanded"/>, so an application can bind the check state and drive the panel from it.
+    /// Defaults to <see langword="false"/> (the plain triangle).
+    /// </summary>
+    public bool ShowCheckBox
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>The header check box's state — an alias for <see cref="Expanded"/> (checked = open), so it
+    /// can be two-way bound. Meaningful mainly with <see cref="ShowCheckBox"/> on; setting it expands or
+    /// collapses either way.</summary>
+    public bool Checked
+    {
+        get => this.Expanded;
+        set => this.Expanded = value;
+    }
+
+    /// <summary>Raised after <see cref="Checked"/> (i.e. <see cref="Expanded"/>) changes — the binding hook
+    /// for the check-box state.</summary>
+    public event EventHandler? CheckedChanged;
 
     /// <summary>An optional icon painted in the header beside the caption (after the expand glyph);
     /// <see cref="TextImageRelation"/> places it before or after the text.</summary>
@@ -96,8 +129,12 @@ public class Expander : OwnerDrawnControl
     /// <inheritdoc/>
     protected override bool Focusable => true;
 
-    /// <summary>Raises <see cref="ExpandedChanged"/>.</summary>
-    protected virtual void OnExpandedChanged(EventArgs e) => this.ExpandedChanged?.Invoke(this, e);
+    /// <summary>Raises <see cref="ExpandedChanged"/> and, since the check state tracks it, <see cref="CheckedChanged"/>.</summary>
+    protected virtual void OnExpandedChanged(EventArgs e)
+    {
+        this.ExpandedChanged?.Invoke(this, e);
+        this.CheckedChanged?.Invoke(this, e);
+    }
 
     /// <summary>
     /// A collapsed expander hides its content wholesale. The child's <em>own</em> flag is what the
@@ -138,14 +175,25 @@ public class Expander : OwnerDrawnControl
         g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, this.Width, headerHeight));
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
 
-        var glyphTop = (headerHeight - _GlyphSize) / 2;
-        Glyphs.PaintTriangle(
-            g,
-            theme.ControlText,
-            new Rectangle(_GlyphInset, glyphTop, _GlyphSize, _GlyphSize),
-            this.Expanded ? GlyphDirection.Down : GlyphDirection.Right);
+        int glyphWidth;
+        if (this.ShowCheckBox)
+        {
+            var boxTop = (headerHeight - _CheckSize) / 2;
+            GlyphRenderer.DrawCheckBox(g, theme, new Rectangle(_GlyphInset, boxTop, _CheckSize, _CheckSize), this.Checked);
+            glyphWidth = _CheckSize;
+        }
+        else
+        {
+            var glyphTop = (headerHeight - _GlyphSize) / 2;
+            Glyphs.PaintTriangle(
+                g,
+                theme.ControlText,
+                new Rectangle(_GlyphInset, glyphTop, _GlyphSize, _GlyphSize),
+                this.Expanded ? GlyphDirection.Down : GlyphDirection.Right);
+            glyphWidth = _GlyphSize;
+        }
 
-        var contentLeft = _GlyphInset + _GlyphSize + _TextGap;
+        var contentLeft = _GlyphInset + glyphWidth + _TextGap;
         var content = new Rectangle(contentLeft, 0, Math.Max(0, this.Width - contentLeft), headerHeight);
         var image = this.Image;
         if (image is null)

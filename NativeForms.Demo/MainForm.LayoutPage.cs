@@ -81,7 +81,8 @@ internal sealed partial class MainForm
         var expander = new Expander
         {
             Bounds = new(500, 36, 300, 150),
-            Text = "Connection details",
+            Text = "Override connection details",
+            ShowCheckBox = true, // checkable-group-box mode: the header check opens/collapses the content
             Image = this.SquareImage(Color.MediumSeaGreen), // a header icon beside the caption
         };
         expander.Controls.Add(new Label { Bounds = new(12, 36, 80, 20), Text = "Host:" });
