@@ -266,6 +266,7 @@ internal sealed partial class MainForm
         });
 
         this.Publish("pickers.page", page);
+        this.Publish("pickers.breadcrumb", breadcrumb);
         this.Publish("pickers.open", openPicker);
         this.Publish("pickers.save", savePicker);
         this.Publish("pickers.multi", multiPicker);

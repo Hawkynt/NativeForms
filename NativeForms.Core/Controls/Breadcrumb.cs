@@ -31,6 +31,15 @@ public class Breadcrumb : OwnerDrawnControl
     private string _editorPrevText = string.Empty;
     private int _hot = -1;
 
+    // The suggestion drop-down: a non-grabbing list below the editor, so the editor keeps focus and typing
+    // keeps filtering. Allocated lazily on the first suggestion and only while editing.
+    private IPopupPeer? _suggestPopup;
+    private readonly List<string> _suggestions = [];
+    private int _suggestHover = -1;
+    private bool _suggestShown;
+    private Size _suggestSize;
+    private const int _MaxSuggestRows = 8;
+
     /// <summary>Creates an empty breadcrumb.</summary>
     public Breadcrumb() => this.Items = new(this);
 
@@ -120,6 +129,15 @@ public class Breadcrumb : OwnerDrawnControl
         if (_editor is not null)
             _editor.Text = text;
     }
+
+    /// <summary>The current suggestion list shown under the editor, for headless tests.</summary>
+    internal IReadOnlyList<string> SuggestionsForTest => _suggestions;
+
+    /// <summary>Whether the suggestion drop-down is currently shown, for headless tests.</summary>
+    internal bool SuggestionsShownForTest => _suggestShown;
+
+    /// <summary>Commits the suggestion at <paramref name="index"/> as the typed path, for headless tests.</summary>
+    internal void PickSuggestionForTest(int index) => this.ApplySuggestion(index);
 
     /// <summary>
     /// Turns committed edit text into the new set of segments. Left <see langword="null"/>, the text is
@@ -387,6 +405,8 @@ public class Breadcrumb : OwnerDrawnControl
         base.OnUnrealized();
         _menu?.CloseAll();
         _menu = null;
+        _suggestPopup?.Dispose();
+        _suggestPopup = null;
     }
 
     /// <summary>Switches the bar to its edit field, prefilled with <see cref="FullPath"/> and focused.</summary>
@@ -416,6 +436,7 @@ public class Breadcrumb : OwnerDrawnControl
             return;
 
         _editing = false;
+        this.HideSuggestions();
         var text = _editor!.Text;
         _editor.Visible = false;
         if (commit)
@@ -439,10 +460,33 @@ public class Breadcrumb : OwnerDrawnControl
 
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)
     {
+        var open = _suggestShown && _suggestions.Count > 0;
         switch (e.KeyCode)
         {
+            case Keys.Down when open:
+                _suggestHover = _suggestHover + 1 >= Math.Min(_suggestions.Count, _MaxSuggestRows) ? 0 : _suggestHover + 1;
+                _suggestPopup!.InvalidateAll();
+                e.Handled = true;
+                break;
+
+            case Keys.Up when open:
+                _suggestHover = _suggestHover <= 0 ? Math.Min(_suggestions.Count, _MaxSuggestRows) - 1 : _suggestHover - 1;
+                _suggestPopup!.InvalidateAll();
+                e.Handled = true;
+                break;
+
+            case Keys.Enter when open && _suggestHover >= 0:
+                this.ApplySuggestion(_suggestHover); // a highlighted suggestion commits as the path
+                e.Handled = true;
+                break;
+
             case Keys.Enter:
                 this.EndEdit(commit: true);
+                e.Handled = true;
+                break;
+
+            case Keys.Escape when open:
+                this.HideSuggestions(); // first Escape closes the list, a second one cancels the edit
                 e.Handled = true;
                 break;
 
@@ -453,34 +497,203 @@ public class Breadcrumb : OwnerDrawnControl
         }
     }
 
-    /// <summary>Appends the first matching completion (selected) as the user extends the typed text.</summary>
+    /// <summary>As the user types, lists every prefix match in a drop-down below the editor.</summary>
     private void OnEditorTextChanged(object? sender, EventArgs e)
     {
         if (_autoCompleting || _editor is null)
             return;
 
         var text = _editor.Text;
-        var grew = text.Length > _editorPrevText.Length;
         _editorPrevText = text;
-        if (!grew || this.AutoCompleteSource is not { } source || text.Length == 0)
+        if (this.AutoCompleteSource is not { } source || text.Length == 0)
+        {
+            this.HideSuggestions();
+            return;
+        }
+
+        _suggestions.Clear();
+        foreach (var candidate in source(text))
+            if (candidate.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+                _suggestions.Add(candidate);
+
+        this.ShowSuggestions();
+    }
+
+    /// <summary>Shows (or refreshes) the suggestion list below the editor, or hides it when empty. The
+    /// popup takes no grab, so the editor keeps focus and typing keeps filtering.</summary>
+    private void ShowSuggestions()
+    {
+        if (_suggestions.Count == 0 || this.Backend is not { } backend)
+        {
+            this.HideSuggestions();
+            return;
+        }
+
+        if (_suggestHover >= _suggestions.Count)
+            _suggestHover = -1;
+
+        var popup = _suggestPopup ??= this.CreateSuggestPopup(backend);
+        if (_suggestShown)
+        {
+            // Already open: just repaint the refiltered rows. Re-showing would re-take the grab and churn
+            // the keyboard the popup is forwarding back into the editor.
+            popup.InvalidateAll();
+            return;
+        }
+
+        var rows = Math.Min(_suggestions.Count, _MaxSuggestRows);
+        _suggestSize = new Size(Math.Max(1, this.Width), rows * this.Theme.RowHeight);
+        popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), _suggestSize);
+        popup.InvalidateAll();
+        _suggestShown = true;
+    }
+
+    private void HideSuggestions()
+    {
+        _suggestHover = -1;
+        if (!_suggestShown)
             return;
 
-        string? match = null;
-        foreach (var candidate in source(text))
-            if (candidate.Length > text.Length && candidate.StartsWith(text, StringComparison.OrdinalIgnoreCase))
-            {
-                match = candidate;
-                break;
-            }
+        _suggestShown = false;
+        _suggestPopup?.Hide();
 
-        if (match is null)
+        // Closing the list releases its grab; hand the keyboard back to the field so typing continues.
+        if (_editing)
+            _editor?.Focus();
+    }
+
+    private IPopupPeer CreateSuggestPopup(IPlatformBackend backend)
+    {
+        // A light-dismiss (grabbing) popup: it maps reliably below the field and catches the outside
+        // click that closes it. The grab moves the keyboard to the popup, so its key events are routed
+        // back into the editor — printable keys extend the typed text (refiltering), the rest navigate.
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => this.OnSuggestPaint(e.Graphics);
+        popup.MouseMove += (_, e) => this.OnSuggestMouseMove(e);
+        popup.MouseDown += (_, e) => this.OnSuggestMouseDown(e);
+        popup.KeyDown += (_, e) => this.OnSuggestKeyDown(e);
+        popup.KeyPress += (_, e) => this.OnSuggestKeyPress(e);
+        popup.Dismissed += (_, _) => this.OnSuggestDismissed();
+        return popup;
+    }
+
+    private void OnSuggestDismissed()
+    {
+        _suggestShown = false;
+        _suggestHover = -1;
+    }
+
+    /// <summary>Routes the grabbed popup's navigation keys: move the highlight, commit a highlighted
+    /// suggestion, close the list, or edit the typed text (Backspace) which refilters it.</summary>
+    private void OnSuggestKeyDown(KeyEventArgs e)
+    {
+        var count = Math.Min(_suggestions.Count, _MaxSuggestRows);
+        switch (e.KeyCode)
+        {
+            case Keys.Down:
+                _suggestHover = _suggestHover + 1 >= count ? 0 : _suggestHover + 1;
+                _suggestPopup?.InvalidateAll();
+                e.Handled = true;
+                break;
+
+            case Keys.Up:
+                _suggestHover = _suggestHover <= 0 ? count - 1 : _suggestHover - 1;
+                _suggestPopup?.InvalidateAll();
+                e.Handled = true;
+                break;
+
+            case Keys.Enter when _suggestHover >= 0:
+                this.ApplySuggestion(_suggestHover);
+                e.Handled = true;
+                break;
+
+            case Keys.Enter:
+                this.HideSuggestions();
+                this.EndEdit(commit: true); // commit exactly what was typed
+                e.Handled = true;
+                break;
+
+            case Keys.Escape:
+                this.HideSuggestions();
+                _editor?.Focus(); // back to the field, keeping the typed text
+                e.Handled = true;
+                break;
+
+            case Keys.Back when _editor is { } editor && editor.Text.Length > 0:
+                editor.Text = editor.Text[..^1]; // OnEditorTextChanged refilters and may close the list
+                e.Handled = true;
+                break;
+        }
+    }
+
+    /// <summary>A printable key routed from the grabbed popup extends the typed text, which refilters the
+    /// suggestions — so the user keeps typing to narrow the list without the field losing the keyboard.</summary>
+    private void OnSuggestKeyPress(KeyPressEventArgs e)
+    {
+        if (_editor is null || char.IsControl(e.KeyChar))
+            return;
+
+        _editor.Text += e.KeyChar;
+        e.Handled = true;
+    }
+
+    private void OnSuggestPaint(IGraphics g)
+    {
+        var theme = this.Theme;
+        var rowHeight = theme.RowHeight;
+        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, _suggestSize.Width, _suggestSize.Height));
+
+        var rows = Math.Min(_suggestions.Count, _MaxSuggestRows);
+        for (var i = 0; i < rows; ++i)
+        {
+            var rowRect = new Rectangle(0, i * rowHeight, _suggestSize.Width, rowHeight);
+            var hovered = i == _suggestHover;
+            if (hovered)
+                GlyphRenderer.FillSelection(g, theme, rowRect);
+
+            var text = new Rectangle(rowRect.X + _Padding, rowRect.Y, rowRect.Width - (2 * _Padding), rowRect.Height);
+            g.DrawText(_suggestions[i], theme.DefaultFont, hovered ? theme.SelectionText : theme.ControlText, text, ContentAlignment.MiddleLeft);
+        }
+
+        g.DrawRectangle(theme.Border, new Rectangle(0, 0, _suggestSize.Width - 1, _suggestSize.Height - 1));
+    }
+
+    private void OnSuggestMouseMove(MouseEventArgs e)
+    {
+        var index = this.SuggestRowAt(e.Y);
+        if (index == _suggestHover)
+            return;
+
+        _suggestHover = index;
+        _suggestPopup?.InvalidateAll();
+    }
+
+    private void OnSuggestMouseDown(MouseEventArgs e)
+    {
+        var index = this.SuggestRowAt(e.Y);
+        if (index >= 0)
+            this.ApplySuggestion(index);
+    }
+
+    private int SuggestRowAt(int y)
+    {
+        var rows = Math.Min(_suggestions.Count, _MaxSuggestRows);
+        var index = y / Math.Max(1, this.Theme.RowHeight);
+        return index >= 0 && index < rows ? index : -1;
+    }
+
+    /// <summary>Commits the chosen suggestion: it becomes the whole typed path and the edit ends.</summary>
+    private void ApplySuggestion(int index)
+    {
+        if (_editor is null || index < 0 || index >= _suggestions.Count)
             return;
 
         _autoCompleting = true;
-        _editor.Text = match;
-        _editor.SelectionStart = text.Length;         // select the appended tail, so typing replaces it
-        _editor.SelectionLength = match.Length - text.Length;
+        _editor.Text = _suggestions[index];
         _autoCompleting = false;
+        _editorPrevText = _editor.Text;
+        this.HideSuggestions();
+        this.EndEdit(commit: true);
     }
 
     private void CommitPath(string text)

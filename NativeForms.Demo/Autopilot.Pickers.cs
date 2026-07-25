@@ -15,6 +15,24 @@ internal sealed partial class Autopilot
         this.SelectTab("Pickers");
         var status = _form.Part<ToolStripStatusLabel>("chrome.statusLabel");
 
+        this.Check("Breadcrumb: typing in the edit field opens an autocomplete suggestion drop-down", () =>
+        {
+            var bc = _form.Part<Breadcrumb>("pickers.breadcrumb");
+            this.Do(() => bc.BeginEdit());
+            this.Settle(120);
+            this.Type("Computer/D");
+            this.Settle(250);
+
+            this.ExpectTrue("the breadcrumb is in its edit field", this.Read(() => bc.IsEditing));
+            this.ExpectTrue("a suggestion drop-down appeared under the editor", this.Popups().Count >= 1);
+            this.Screenshot("state-pickers-breadcrumb-suggestions");
+
+            this.Key(KeySym.Escape); // close the drop-down
+            this.Settle(80);
+            this.Key(KeySym.Escape); // leave the edit field
+            this.Settle(80);
+        });
+
         this.Check("FolderPicker: typing a path and pressing Enter commits it", () =>
         {
             var picker = _form.Part<FolderPicker>("pickers.folder");

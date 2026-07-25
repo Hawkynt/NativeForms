@@ -235,16 +235,41 @@ internal sealed class BreadcrumbTests
     }
 
     [Test]
-    public void The_edit_field_appends_the_first_matching_completion()
+    public void The_edit_field_lists_every_match_in_a_suggestion_drop_down()
     {
-        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) }; // empty, so the field starts blank
+        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };
         crumb.AutoCompleteSource = _ => ["Documents", "Downloads", "Music"];
         Realize(crumb, out _);
 
         crumb.BeginEdit();
-        crumb.TypeIntoEditorForTest("Do"); // matches Documents and Downloads → first wins
+        crumb.TypeIntoEditorForTest("Do"); // matches Documents and Downloads
 
-        Assert.That(crumb.EditorText, Is.EqualTo("Documents"), "the completion is appended for acceptance");
+        Assert.Multiple(() =>
+        {
+            Assert.That(crumb.SuggestionsShownForTest, Is.True, "the suggestion drop-down opened");
+            Assert.That(crumb.SuggestionsForTest, Is.EqualTo(new[] { "Documents", "Downloads" }), "every prefix match is listed");
+        });
+    }
+
+    [Test]
+    public void Picking_a_suggestion_commits_it_as_the_path()
+    {
+        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };
+        crumb.AutoCompleteSource = _ => ["Documents", "Downloads", "Music"];
+        string? entered = null;
+        crumb.PathEntered += (_, e) => entered = e.Path;
+        Realize(crumb, out _);
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("Do");
+        crumb.PickSuggestionForTest(1); // "Downloads"
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entered, Is.EqualTo("Downloads"), "the chosen suggestion is committed as the path");
+            Assert.That(crumb.IsEditing, Is.False, "committing the suggestion ends the edit");
+            Assert.That(crumb.SuggestionsShownForTest, Is.False, "the drop-down closes once a suggestion is picked");
+        });
     }
 
     [Test]
