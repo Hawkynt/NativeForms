@@ -37,6 +37,9 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     /// <inheritdoc />
     public Func<Point, bool>? OutsidePress { get; set; }
 
+    /// <inheritdoc />
+    public Action<Point>? OutsidePointerMove { get; set; }
+
     /// <summary>Creates the popup top-level, realizes the canvas into it and wires the dismissal signals.</summary>
     /// <param name="owner">The <c>GtkWindow</c> this surface belongs to, or zero when none is known.</param>
     internal GtkPopupPeer(nint owner)
@@ -65,7 +68,7 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         // they are menu interactions, never dismissals — while presses elsewhere in the application
         // are redirected here by the GTK grab, and keys the content left unhandled still bubble up,
         // which is what carries Escape.
-        NativeMethods.gtk_widget_add_events(_window, NativeMethods.GDK_BUTTON_PRESS_MASK | NativeMethods.GDK_KEY_PRESS_MASK);
+        NativeMethods.gtk_widget_add_events(_window, NativeMethods.GDK_BUTTON_PRESS_MASK | NativeMethods.GDK_KEY_PRESS_MASK | NativeMethods.GDK_POINTER_MOTION_MASK);
         var data = GCHandle.ToIntPtr(_selfHandle);
         unsafe
         {
@@ -73,6 +76,13 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
                 _window, "button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowButtonPress, data, 0, 0);
             NativeMethods.g_signal_connect_data(
                 _window, "key-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowKeyPress, data, 0, 0);
+
+            // The seat/GTK grab redirects motion over another window in the application to this one when it
+            // is the deepest menu level, but delivers it to the top-level rather than the canvas child — so
+            // the canvas motion pipeline never sees a move over a shallower menu level. Catching it here and
+            // reporting the screen point lets the menu re-highlight and cascade the level under the pointer.
+            NativeMethods.g_signal_connect_data(
+                _window, "motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowMotion, data, 0, 0);
 
             // A window manager stealing the pointer/keyboard — Alt-Tab to another application, another
             // app taking a grab — breaks our seat grab and fires grab-broken. That is the one focus
@@ -254,6 +264,26 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
 
         peer.Dismiss();
         return 1;
+    }
+
+    /// <summary>Native "motion-notify-event" handler on the popup top-level: motion the grab redirected
+    /// here from a shallower menu level (it arrives at the top-level, not the canvas) is reported to the
+    /// owner by screen point so the menu can track the level actually under the pointer.</summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int OnWindowMotion(nint widget, nint eventPtr, nint userData)
+    {
+        var peer = PopupFromData(userData);
+        if (peer?.OutsidePointerMove is not { } handler)
+            return 0;
+
+        unsafe
+        {
+            ref var e = ref Unsafe.AsRef<GdkEventMotion>((void*)eventPtr);
+            if (peer.IsOutside((int)e.XRoot, (int)e.YRoot))
+                handler(new Point((int)e.XRoot, (int)e.YRoot));
+        }
+
+        return 0;
     }
 
     /// <summary>

@@ -235,6 +235,7 @@ internal sealed class MenuDropDown
         popup.KeyDown += (_, e) => e.Handled = this.HandleKeyDown(e); // backends with a keyboard grab route keys here
         popup.KeyPress += (_, e) => e.Handled = this.HandleKeyPress(e.KeyChar);
         popup.OutsidePress = this.RouteOutsidePress; // a click on a shallower level is not an outside dismissal
+        popup.OutsidePointerMove = this.RouteOutsideMove; // motion the grab redirected here belongs to the level under it
         popup.Dismissed += (_, _) =>
         {
             if (_suppressDismiss)
@@ -346,9 +347,43 @@ internal sealed class MenuDropDown
         }
     }
 
+    /// <summary>
+    /// A pointer motion the deepest level's grab redirected here, in screen coordinates (the backend whose
+    /// grab reports out-of-surface motion). Delivers it to the level actually under the pointer via the same
+    /// dispatch the canvas path uses, so the parent re-highlights and can cascade a sibling submenu.
+    /// </summary>
+    private void RouteOutsideMove(Point screen)
+    {
+        if (_levels.Count == 0)
+            return;
+
+        var deepest = _levels[^1];
+        this.OnLevelMouseMove(deepest, new MouseEventArgs(MouseButtons.None, screen.X - deepest.Location.X, screen.Y - deepest.Location.Y, 0));
+    }
+
     /// <summary>Hover tracking: highlights the row under the pointer and cascades into submenus.</summary>
     private void OnLevelMouseMove(Level level, MouseEventArgs e)
     {
+        // The deepest level holds the grab, so the display server delivers motion that is really over a
+        // shallower level to this one instead. Reconstruct the screen point and dispatch to the level the
+        // pointer is actually over, so moving back onto the parent updates its highlight and can open a
+        // sibling submenu — without this, an open submenu freezes hover tracking on every level above it.
+        var screen = new Point(level.Location.X + e.X, level.Location.Y + e.Y);
+        for (var i = _levels.Count - 1; i >= 0; --i)
+        {
+            var over = _levels[i];
+            if (!new Rectangle(over.Location, over.Size).Contains(screen))
+                continue;
+
+            if (!ReferenceEquals(over, level))
+            {
+                this.OnLevelMouseMove(over, new MouseEventArgs(e.Button, screen.X - over.Location.X, screen.Y - over.Location.Y, e.Delta));
+                return;
+            }
+
+            break;
+        }
+
         var index = this.ItemAt(level, e.Y);
         if (index == level.HoverIndex)
             return;

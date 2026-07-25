@@ -35,6 +35,9 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
     public Func<Point, bool>? OutsidePress { get; set; }
 
     /// <inheritdoc/>
+    public Action<Point>? OutsidePointerMove { get; set; }
+
+    /// <inheritdoc/>
     public void ShowAt(Point screenLocation, Size size)
     {
         this.EnsureHandle();

@@ -304,6 +304,24 @@ internal struct GdkEventMotion
 
     /// <summary>Pointer y in widget coordinates.</summary>
     public double Y;
+
+    /// <summary>Device axis values (<c>gdouble*</c>).</summary>
+    public nint Axes;
+
+    /// <summary>Modifier state (<c>GdkModifierType</c>).</summary>
+    public uint State;
+
+    /// <summary>Whether this is a hint motion event (<c>gint16</c>); padded to the device pointer.</summary>
+    public short IsHint;
+
+    /// <summary>The device that produced the event (<c>GdkDevice*</c>).</summary>
+    public nint Device;
+
+    /// <summary>Pointer x in root (screen) coordinates — the only space shared across windows.</summary>
+    public double XRoot;
+
+    /// <summary>Pointer y in root (screen) coordinates — the only space shared across windows.</summary>
+    public double YRoot;
 }
 
 /// <summary>The leading fields of <c>GdkEventScroll</c> — enough to read position and direction.</summary>

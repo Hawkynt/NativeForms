@@ -976,6 +976,7 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
     public bool LightDismiss { get; set; } = true;
 
     public Func<Point, bool>? OutsidePress { get; set; }
+    public Action<Point>? OutsidePointerMove { get; set; }
 
     /// <summary>How many times the menu engine told this popup a grab handoff to a child is expected.</summary>
     public int ExpectGrabHandoffCount { get; private set; }
@@ -1031,6 +1032,11 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
 
         this.FireDismiss();
     }
+
+    /// <summary>Simulates pointer motion at a screen point that the grab redirected here from a shallower
+    /// surface — what a real backend reports to the top-level (not the canvas) when the grab-holding popup
+    /// catches a move beyond its own bounds.</summary>
+    public void FireOutsidePointerMove(Point screen) => this.OutsidePointerMove?.Invoke(screen);
 }
 
 /// <summary>

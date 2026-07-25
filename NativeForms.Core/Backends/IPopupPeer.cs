@@ -66,6 +66,16 @@ public interface IPopupPeer : ICanvasPeer
     Func<Point, bool>? OutsidePress { get; set; }
 
     /// <summary>
+    /// Offered pointer motion that landed outside this surface, in screen coordinates. The grab that keeps
+    /// a menu's deepest level catching outside clicks also redirects motion over shallower levels to it, so
+    /// without this hook moving back onto a parent menu would neither re-highlight its rows nor open a
+    /// sibling submenu — the hover would freeze the moment a submenu opened. A backend delivers this only
+    /// when its grab reports out-of-surface motion (GTK); one whose capture reports motion to the surface's
+    /// own canvas instead (Win32) leaves it unused, and a passive surface never sets it.
+    /// </summary>
+    Action<Point>? OutsidePointerMove { get; set; }
+
+    /// <summary>
     /// Raised when the user dismisses the surface: a click outside it, loss of the activation/grab
     /// that keeps it up, or Escape. The surface is hidden first, then the event is raised.
     /// </summary>

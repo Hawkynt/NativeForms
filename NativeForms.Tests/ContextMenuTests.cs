@@ -242,6 +242,80 @@ internal sealed class ContextMenuTests
     }
 
     [Test]
+    public void Moving_back_onto_the_parent_while_a_submenu_is_open_switches_to_a_sibling_submenu()
+    {
+        var menu = new ContextMenuStrip();
+        var one = new ToolStripMenuItem("One");
+        one.DropDownItems.Add(new ToolStripMenuItem("a1"));
+        var two = new ToolStripMenuItem("Two");
+        two.DropDownItems.Add(new ToolStripMenuItem("a2"));
+        menu.Items.Add(one);
+        menu.Items.Add(two);
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right); // menu opens at screen (430, 340)
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        var parentAt = parent.ShowCalls[0].Location;
+        var rowHeight = backend.Theme.RowHeight;
+        parent.RaiseMouseMove(20, (rowHeight / 2) + 1); // hover "One" → opens its submenu
+        var firstChild = backend.Created.OfType<HeadlessPopupPeer>().Single(p => !ReferenceEquals(p, parent));
+
+        // The child now holds the grab, so motion over "Two"'s parent row is delivered to the child.
+        // Point it back at "Two": screen = parent origin + (20, row 1 centre), expressed child-local.
+        var target = new Point(parentAt.X + 20, parentAt.Y + rowHeight + (rowHeight / 2) + 1);
+        var childAt = firstChild.ShowCalls[0].Location;
+        firstChild.RaiseMouseMove(target.X - childAt.X, target.Y - childAt.Y);
+
+        var deepest = backend.Created.OfType<HeadlessPopupPeer>().Where(p => p.IsShown && !ReferenceEquals(p, parent)).ToList();
+        Assert.That(deepest, Has.Count.EqualTo(1), "exactly one submenu is open after switching");
+        Assert.That(deepest[0].RaisePaint().DrewText("a2"), Is.True,
+            "the motion routed to the parent and opened Two's submenu instead of freezing on One's");
+    }
+
+    [Test]
+    public void Grab_redirected_motion_reported_to_the_top_level_still_reaches_the_parent_menu()
+    {
+        var menu = new ContextMenuStrip();
+        var one = new ToolStripMenuItem("One");
+        one.DropDownItems.Add(new ToolStripMenuItem("a1"));
+        var two = new ToolStripMenuItem("Two");
+        two.DropDownItems.Add(new ToolStripMenuItem("a2"));
+        menu.Items.Add(one);
+        menu.Items.Add(two);
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right);
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        var parentAt = parent.ShowCalls[0].Location;
+        var rowHeight = backend.Theme.RowHeight;
+        parent.RaiseMouseMove(20, (rowHeight / 2) + 1); // hover "One" → opens its submenu
+        var firstChild = backend.Created.OfType<HeadlessPopupPeer>().Single(p => !ReferenceEquals(p, parent));
+
+        // The GTK grab reports out-of-surface motion to the child top-level (not its canvas) as a screen
+        // point. Aimed at "Two"'s parent row, it must switch the cascade to Two's submenu.
+        firstChild.FireOutsidePointerMove(new Point(parentAt.X + 20, parentAt.Y + rowHeight + (rowHeight / 2) + 1));
+
+        var deepest = backend.Created.OfType<HeadlessPopupPeer>().Where(p => p.IsShown && !ReferenceEquals(p, parent)).ToList();
+        Assert.That(deepest, Has.Count.EqualTo(1));
+        Assert.That(deepest[0].RaisePaint().DrewText("a2"), Is.True,
+            "top-level-reported motion routed to the parent and opened Two's submenu");
+    }
+
+    [Test]
     public void A_press_outside_every_level_still_dismisses_the_cascade()
     {
         var menu = new ContextMenuStrip();
