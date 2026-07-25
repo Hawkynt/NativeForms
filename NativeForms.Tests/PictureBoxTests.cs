@@ -59,6 +59,28 @@ internal sealed class PictureBoxTests
     }
 
     [Test]
+    public void FitToWidth_fills_the_width_keeping_aspect_and_centers_vertically()
+    {
+        // 40x30 into 100x80: width→100, height=30*100/40=75, y=(80-75)/2=2.
+        var canvas = Realize(Box(40, 30, PictureBoxSizeMode.FitToWidth));
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations, Does.Contain("image 40x30 @0,2,100,75"));
+    }
+
+    [Test]
+    public void FitToHeight_fills_the_height_keeping_aspect_and_centers_horizontally()
+    {
+        // 40x30 into 100x80: height→80, width=40*80/30=106, x=(100-106)/2=-3 (overflows, clipped).
+        var canvas = Realize(Box(40, 30, PictureBoxSizeMode.FitToHeight));
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations, Does.Contain("image 40x30 @-3,0,106,80"));
+    }
+
+    [Test]
     public void Zoom_letterboxes_a_wide_image()
     {
         var canvas = Realize(Box(50, 25, PictureBoxSizeMode.Zoom));

@@ -1,6 +1,6 @@
 # PictureBox
 
-> An owner-drawn image surface: one `IImage` fitted per `SizeMode` — top-left at native size, stretched, centered, or aspect-fit zoomed — clipped to the client area, with an optional themed border.
+> An owner-drawn image surface: one `IImage` fitted per `SizeMode` — top-left at native size, stretched, centered, aspect-fit zoomed, or fit-to-width / fit-to-height — clipped to the client area, with an optional themed border.
 
 ![PictureBox in the NativeForms demo](../screenshots/20-toolbars.png)
 
@@ -41,6 +41,8 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
   - `StretchImage` — stretched to fill `C`, ignoring the aspect ratio.
   - `CenterImage` — native size at `((C.w − I.w)/2, (C.h − I.h)/2)`, clipped if larger.
   - `Zoom` — scaled to the largest size that fits, keeping the aspect ratio, centered; a wide image letterboxes, a tall one pillarboxes. The scale is computed with a cross product in integer math, so there are no fractions.
+  - `FitToWidth` — scaled so `I.w` fills `C.w`, keeping the aspect ratio, centered vertically; the height then over- or under-fills and is clipped to `C`.
+  - `FitToHeight` — scaled so `I.h` fills `C.h`, keeping the aspect ratio, centered horizontally; the width then over- or under-fills and is clipped to `C`.
 - The image always draws inside a pushed clip of the client rectangle, so oversized `Normal`/`CenterImage` content cannot bleed over neighbors; the clip is popped before the border paints.
 - The background fills with the theme's `ControlBackground`; an image whose `Width` or `Height` is 0 is treated as absent.
 - Purely visual — it takes no focus and handles no input.

@@ -7,8 +7,8 @@ namespace Hawkynt.NativeForms;
 /// <summary>
 /// An owner-drawn image surface. Shows one <see cref="IImage"/> — or an <see cref="AnimatedImage"/>,
 /// whose current frame is picked from elapsed time and repainted by the shared animation clock — under
-/// a <see cref="SizeMode"/> policy (top-left at native size, stretched, centered, or aspect-fit
-/// zoomed), clipped to the client area, with an optional themed single-line border.
+/// a <see cref="SizeMode"/> policy (top-left at native size, stretched, centered, aspect-fit zoomed, or
+/// fit-to-width / fit-to-height), clipped to the client area, with an optional themed single-line border.
 /// </summary>
 public class PictureBox : OwnerDrawnControl
 {
@@ -94,8 +94,26 @@ public class PictureBox : OwnerDrawnControl
             PictureBoxSizeMode.CenterImage
                 => new((client.Width - image.Width) / 2, (client.Height - image.Height) / 2, image.Width, image.Height),
             PictureBoxSizeMode.Zoom => Zoom(client, image),
+            PictureBoxSizeMode.FitToWidth => FitToWidth(client, image),
+            PictureBoxSizeMode.FitToHeight => FitToHeight(client, image),
             _ => new(Point.Empty, image),
         };
+
+    /// <summary>Scales the image so its width fills the client area (aspect kept) and centers it vertically.</summary>
+    private static Rectangle FitToWidth(Size client, Size image)
+    {
+        var width = client.Width;
+        var height = image.Height * client.Width / image.Width;
+        return new(0, (client.Height - height) / 2, width, height);
+    }
+
+    /// <summary>Scales the image so its height fills the client area (aspect kept) and centers it horizontally.</summary>
+    private static Rectangle FitToHeight(Size client, Size image)
+    {
+        var height = client.Height;
+        var width = image.Width * client.Height / image.Height;
+        return new((client.Width - width) / 2, 0, width, height);
+    }
 
     /// <summary>Aspect-fits the image into the client area and centers the result.</summary>
     private static Rectangle Zoom(Size client, Size image)
