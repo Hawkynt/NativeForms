@@ -566,6 +566,10 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial int ReleaseDC(nint hWnd, nint hDC);
 
+    /// <summary>Reads the colour of a pixel in a device context as a <c>0x00BBGGRR</c> COLORREF.</summary>
+    [LibraryImport("gdi32.dll")]
+    internal static partial uint GetPixel(nint hdc, int x, int y);
+
     /// <summary>Reads a window-style long (see <c>GWL_STYLE</c>).</summary>
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     internal static partial nint GetWindowLongPtrW(nint hWnd, int nIndex);

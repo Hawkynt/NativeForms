@@ -169,6 +169,38 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    public Color SampleScreenPixel(Point screen)
+    {
+        EnsureInitialized();
+        var root = NativeMethods.gdk_get_default_root_window();
+        if (root == 0)
+            return Color.Empty;
+
+        // Grabbing a 1×1 rectangle of the root window reads the desktop pixel under the point. A
+        // compositor that forbids reading other surfaces (Wayland) returns 0, so the eyedropper is a
+        // no-op there — screen sampling is an X11/Win32 capability.
+        var pixbuf = NativeMethods.gdk_pixbuf_get_from_window(root, screen.X, screen.Y, 1, 1);
+        if (pixbuf == 0)
+            return Color.Empty;
+
+        try
+        {
+            var pixels = NativeMethods.gdk_pixbuf_get_pixels(pixbuf);
+            if (pixels == 0)
+                return Color.Empty;
+
+            var r = Marshal.ReadByte(pixels, 0);
+            var g = Marshal.ReadByte(pixels, 1);
+            var b = Marshal.ReadByte(pixels, 2);
+            return Color.FromArgb(255, r, g, b);
+        }
+        finally
+        {
+            NativeMethods.g_object_unref(pixbuf);
+        }
+    }
+
+    /// <inheritdoc />
     public ITimerPeer CreateTimer()
     {
         EnsureInitialized();

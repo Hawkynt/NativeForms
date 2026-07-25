@@ -71,6 +71,13 @@ public interface IPlatformBackend
     /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
     IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);
 
+    /// <summary>
+    /// Reads the on-screen colour at a screen point — the eyedropper's source. Returns
+    /// <see cref="Color.Empty"/> when the platform cannot sample the screen (Wayland forbids reading
+    /// other surfaces, the placeholder backends do not implement it), so a caller falls back gracefully.
+    /// </summary>
+    Color SampleScreenPixel(Point screen) => Color.Empty;
+
     /// <summary>Creates a stopped UI-thread timer peer.</summary>
     ITimerPeer CreateTimer();
 

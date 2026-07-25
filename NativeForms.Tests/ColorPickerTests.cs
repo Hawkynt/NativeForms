@@ -131,6 +131,26 @@ internal sealed class ColorPickerTests
     }
 
     [Test]
+    public void The_eyedropper_samples_a_screen_pixel_into_the_colour()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        backend.ScreenPixel = Color.FromArgb(255, 10, 200, 30);
+        canvas.RaiseMouseDown(60, 13); // open
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.RaiseMouseDown(253, 187);              // arm the eyedropper button (top-right of the hex row)
+        popup.FireOutsidePress(new Point(500, 500)); // a click anywhere on screen becomes a sample
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.SelectedColor.R, Is.EqualTo(10).Within(1));
+            Assert.That(picker.SelectedColor.G, Is.EqualTo(200).Within(1));
+            Assert.That(picker.SelectedColor.B, Is.EqualTo(30).Within(1));
+            Assert.That(picker.DroppedDown, Is.True, "sampling keeps the mixer open");
+        });
+    }
+
+    [Test]
     public void The_mixer_blits_the_saturation_value_gradient()
     {
         var picker = Realize(out var backend, out var canvas);

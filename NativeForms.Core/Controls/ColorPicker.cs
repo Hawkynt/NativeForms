@@ -184,6 +184,8 @@ public class ColorPicker : OwnerDrawnControl
         return new Rectangle(_Pad + labelW, y + 4, this.NumericWidth - labelW - valueW, this.Theme.RowHeight - 8);
     }
 
+    private Rectangle EyedropperRect => new(this.PopupSize.Width - _Pad - 22, this.HexY, 22, this.Theme.RowHeight);
+
     // --- Popup wiring ------------------------------------------------------------------------------
 
     private IPopupPeer CreatePopup(IPlatformBackend backend)
@@ -193,6 +195,7 @@ public class ColorPicker : OwnerDrawnControl
         popup.MouseDown += (_, e) => this.OnMixerDown(e);
         popup.MouseMove += (_, e) => this.OnMixerMove(e);
         popup.MouseUp += (_, _) => { if (_mixer is { } m) { m.Drag = DragTarget.None; m.Channel = -1; } };
+        popup.OutsidePress = this.OnSampleClick; // the armed eyedropper turns the next outside click into a sample
         popup.Dismissed += (_, _) => this.CloseDropDown();
         return popup;
     }
@@ -235,7 +238,8 @@ public class ColorPicker : OwnerDrawnControl
         g.DrawRectangle(theme.Border, Border(this.CurrentRect));
 
         g.DrawText(ColorMath.ToHex(mixer.Color, this.HasAlpha), theme.DefaultFont, theme.ControlText,
-            new Rectangle(_Pad, this.HexY, size.Width - (2 * _Pad), theme.RowHeight), ContentAlignment.MiddleLeft);
+            new Rectangle(_Pad, this.HexY, size.Width - (3 * _Pad) - 22, theme.RowHeight), ContentAlignment.MiddleLeft);
+        this.PaintEyedropper(g, mixer);
 
         this.PaintSwatches(g, _Basic, _BasicCols, _BasicRows, this.BasicY);
         this.PaintSwatches(g, _custom, _CustomCols, _CustomRows, this.CustomY);
@@ -280,10 +284,52 @@ public class ColorPicker : OwnerDrawnControl
 
     // --- Mixer input -------------------------------------------------------------------------------
 
+    private void PaintEyedropper(IGraphics g, Mixer mixer)
+    {
+        var theme = this.Theme;
+        var r = this.EyedropperRect;
+        g.FillRectangle(mixer.Sampling ? theme.SelectionBackground : theme.HeaderBackground, r);
+        g.DrawRectangle(mixer.Sampling ? theme.Accent : theme.Border, Border(r));
+
+        // A small pipette: a diagonal body with a tip at the lower-left corner.
+        var ink = mixer.Sampling ? theme.SelectionText : theme.ControlText;
+        g.DrawLine(ink, r.X + 6, r.Bottom - 6, r.Right - 6, r.Y + 6, 2);
+        g.FillEllipse(ink, new Rectangle(r.X + 4, r.Bottom - 9, 4, 4));
+    }
+
+    /// <summary>Offered the outside click that would normally dismiss the mixer: when the eyedropper is
+    /// armed it becomes a screen colour sample instead, and the mixer stays open.</summary>
+    private bool OnSampleClick(Point screen)
+    {
+        if (_mixer is not { Sampling: true } mixer || this.Backend is not { } backend)
+            return false;
+
+        var sampled = backend.SampleScreenPixel(screen);
+        mixer.Sampling = false;
+        if (!sampled.IsEmpty)
+        {
+            mixer.Set(this.HasAlpha ? Color.FromArgb(mixer.A, sampled) : sampled);
+            this.Apply(mixer);
+        }
+        else
+        {
+            _popup?.InvalidateAll();
+        }
+
+        return true;
+    }
+
     private void OnMixerDown(MouseEventArgs e)
     {
         if (_mixer is not { } mixer)
             return;
+
+        if (this.EyedropperRect.Contains(e.X, e.Y))
+        {
+            mixer.Sampling = !mixer.Sampling; // arm/disarm the eyedropper
+            _popup?.InvalidateAll();
+            return;
+        }
 
         if (this.SvRect.Contains(e.X, e.Y))
         {
@@ -560,6 +606,7 @@ public class ColorPicker : OwnerDrawnControl
         internal DragTarget Drag;
         internal ColorSpace Space;
         internal int Channel = -1; // the numeric row being dragged, or -1
+        internal bool Sampling; // the eyedropper is armed: the next screen click is a colour sample
 
         private IImage? _sv;
         private int _svHue = -1;

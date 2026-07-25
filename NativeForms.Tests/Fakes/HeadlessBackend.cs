@@ -133,6 +133,11 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
     public IPopupPeer CreatePopup(IWindowPeer? owner) => this.Track(new HeadlessPopupPeer { OwnerWindow = owner });
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
+
+    /// <summary>The colour the fake eyedropper samples; <see cref="Color.Empty"/> models an unsupported screen.</summary>
+    public Color ScreenPixel { get; set; } = Color.Empty;
+
+    public Color SampleScreenPixel(Point screen) => this.ScreenPixel;
     public Size MeasureText(string text, Font font) => RecordingGraphics.Measure(text);
 
     public ITimerPeer CreateTimer()

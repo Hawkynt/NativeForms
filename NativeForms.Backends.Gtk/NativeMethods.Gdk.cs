@@ -185,6 +185,19 @@ internal static partial class NativeMethods
     [LibraryImport(GdkPixbuf)]
     internal static partial int gdk_pixbuf_get_rowstride(nint pixbuf);
 
+    /// <summary>Returns how many channels (3 = RGB, 4 = RGBA) each pixel carries.</summary>
+    [LibraryImport(GdkPixbuf)]
+    internal static partial int gdk_pixbuf_get_n_channels(nint pixbuf);
+
+    /// <summary>The root window of the default screen — the whole desktop, for the eyedropper.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_get_default_root_window();
+
+    /// <summary>Grabs a rectangle of a window's on-screen contents into a new pixbuf, or 0 when it cannot
+    /// (a compositor that forbids reading other surfaces). The caller unrefs the result.</summary>
+    [LibraryImport(Gdk)]
+    internal static partial nint gdk_pixbuf_get_from_window(nint window, int x, int y, int width, int height);
+
     // --- Clipboard ------------------------------------------------------------------------------
 
     /// <summary>Interns an atom by name; <c>"CLIPBOARD"</c> names the desktop clipboard selection.</summary>

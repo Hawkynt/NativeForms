@@ -84,6 +84,27 @@ public sealed partial class Win32Backend : IPlatformBackend
         => new Win32Image(width, height, argb);
 
     /// <inheritdoc/>
+    public Color SampleScreenPixel(Point screen)
+    {
+        var hdc = NativeMethods.GetDC(0);
+        if (hdc == 0)
+            return Color.Empty;
+
+        try
+        {
+            var bgr = NativeMethods.GetPixel(hdc, screen.X, screen.Y);
+            if (bgr == 0xFFFFFFFF) // CLR_INVALID — the point is off every monitor
+                return Color.Empty;
+
+            return Color.FromArgb(255, (int)(bgr & 0xFF), (int)((bgr >> 8) & 0xFF), (int)((bgr >> 16) & 0xFF));
+        }
+        finally
+        {
+            NativeMethods.ReleaseDC(0, hdc);
+        }
+    }
+
+    /// <inheritdoc/>
     public ITimerPeer CreateTimer() => new Win32TimerPeer();
 
     /// <inheritdoc/>
