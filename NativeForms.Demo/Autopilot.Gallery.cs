@@ -177,6 +177,17 @@ internal sealed partial class Autopilot
         this.Do(picker.OpenDropDown);
         this.Settle(200);
         this.Screenshot("25-colorpicker-mixer");
+
+        // Toggle the hue wheel on (its button sits left of the eyedropper on the hex row) and capture it.
+        var popups = this.Popups();
+        if (popups.Count > 0)
+        {
+            var b = this.Read(() => Injection.WindowBounds(popups[0]));
+            this.ClickAt(new Point(b.X + 253, b.Y + 187)); // the wheel toggle on the hex row
+            this.Settle(200);
+            this.Screenshot("26-colorpicker-wheel");
+        }
+
         this.Do(picker.CloseDropDown);
         this.Settle(80);
     }

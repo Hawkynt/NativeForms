@@ -131,6 +131,25 @@ internal sealed class ColorPickerTests
     }
 
     [Test]
+    public void The_hue_wheel_ring_sets_the_hue()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        picker.SelectedColor = Color.Red; // hue 0, full S and V
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.RaiseMouseDown(229, 187); // the wheel toggle (left of the eyedropper) → wheel mode
+        popup.RaiseMouseDown(26, 88);   // the ring left of centre (angle 180°) → cyan hue
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.SelectedColor.R, Is.LessThan(40), "red is pulled out at 180°");
+            Assert.That(picker.SelectedColor.G, Is.GreaterThan(200));
+            Assert.That(picker.SelectedColor.B, Is.GreaterThan(200), "green and blue dominate a cyan hue");
+        });
+    }
+
+    [Test]
     public void The_eyedropper_samples_a_screen_pixel_into_the_colour()
     {
         var picker = Realize(out var backend, out var canvas);
