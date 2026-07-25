@@ -237,6 +237,7 @@ internal sealed class BenchPopupPeer : BenchCanvasPeer, IPopupPeer
     public event EventHandler? Dismissed { add { } remove { } }
 
     public bool LightDismiss { get; set; } = true;
+    public Func<Point, bool>? OutsidePress { get; set; }
 
     public void ShowAt(Point screenLocation, Size size) { }
     public void Hide() { }

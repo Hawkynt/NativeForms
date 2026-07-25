@@ -57,6 +57,15 @@ public interface IPopupPeer : ICanvasPeer
     void SetParentPopup(IPopupPeer parent) { }
 
     /// <summary>
+    /// Offered a press that landed outside this surface, in screen coordinates, before it light-dismisses.
+    /// The owner returns <see langword="true"/> when it consumed the press — a menu whose deepest level holds
+    /// the grab uses this to recognize a click on a <em>shallower</em> level of the same cascade and route it
+    /// there rather than tearing the whole menu down. A false result, or no handler, dismisses as usual.
+    /// Without it the grab that catches genuine outside clicks also swallows clicks on the parent menu.
+    /// </summary>
+    Func<Point, bool>? OutsidePress { get; set; }
+
+    /// <summary>
     /// Raised when the user dismisses the surface: a click outside it, loss of the activation/grab
     /// that keeps it up, or Escape. The surface is hidden first, then the event is raised.
     /// </summary>

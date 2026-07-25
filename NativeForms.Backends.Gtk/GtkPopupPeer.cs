@@ -34,6 +34,9 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
     /// <inheritdoc />
     public bool LightDismiss { get; set; } = true;
 
+    /// <inheritdoc />
+    public Func<Point, bool>? OutsidePress { get; set; }
+
     /// <summary>Creates the popup top-level, realizes the canvas into it and wires the dismissal signals.</summary>
     /// <param name="owner">The <c>GtkWindow</c> this surface belongs to, or zero when none is known.</param>
     internal GtkPopupPeer(nint owner)
@@ -233,12 +236,21 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         if (peer is null)
             return 0;
 
+        Point screen;
         unsafe
         {
             ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
             if (!peer.IsOutside((int)e.XRoot, (int)e.YRoot))
                 return 0;
+
+            screen = new Point((int)e.XRoot, (int)e.YRoot);
         }
+
+        // The click landed outside this surface. Offer it to the owner first: a menu whose deeper level
+        // holds the grab routes a click on a shallower level there instead of dismissing the cascade. Only
+        // a click the owner does not claim is a genuine outside dismissal.
+        if (peer.OutsidePress?.Invoke(screen) == true)
+            return 1;
 
         peer.Dismiss();
         return 1;

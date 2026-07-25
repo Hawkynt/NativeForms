@@ -975,6 +975,8 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
 
     public bool LightDismiss { get; set; } = true;
 
+    public Func<Point, bool>? OutsidePress { get; set; }
+
     /// <summary>How many times the menu engine told this popup a grab handoff to a child is expected.</summary>
     public int ExpectGrabHandoffCount { get; private set; }
 
@@ -1018,6 +1020,17 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
     /// when a child popup takes the grab from this one. The surface stays shown (the child owns the
     /// grab), so this reproduces the async parent-dismissal that must not tear the cascade down.</summary>
     public void RaiseGrabBroken() => this.Dismissed?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Simulates a press at a screen point that landed outside this (grab-holding) surface:
+    /// offers it to the owner and, only if the owner does not claim it, light-dismisses — exactly what a
+    /// real backend does when its capture catches a click beyond the popup.</summary>
+    public void FireOutsidePress(Point screen)
+    {
+        if (this.OutsidePress?.Invoke(screen) == true)
+            return;
+
+        this.FireDismiss();
+    }
 }
 
 /// <summary>

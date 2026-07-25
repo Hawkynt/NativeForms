@@ -234,6 +234,7 @@ internal sealed class MenuDropDown
         popup.MouseDown += (_, e) => this.OnLevelMouseDown(level, e);
         popup.KeyDown += (_, e) => e.Handled = this.HandleKeyDown(e); // backends with a keyboard grab route keys here
         popup.KeyPress += (_, e) => e.Handled = this.HandleKeyPress(e.KeyChar);
+        popup.OutsidePress = this.RouteOutsidePress; // a click on a shallower level is not an outside dismissal
         popup.Dismissed += (_, _) =>
         {
             if (_suppressDismiss)
@@ -373,6 +374,32 @@ internal sealed class MenuDropDown
 
         level.HoverIndex = index;
         this.ActivateHover(level);
+    }
+
+    /// <summary>
+    /// A press outside the deepest (grab-holding) level, in screen coordinates. The grab that catches a
+    /// genuine outside click also redirects clicks on shallower levels of this same cascade — so a click on
+    /// an open parent menu would otherwise read as an outside dismissal. If the point lies on a shallower
+    /// level, close the levels below it and deliver the press there (switching submenu or committing the
+    /// row); only a point on no level at all is a real dismissal, left for the popup to perform.
+    /// </summary>
+    private bool RouteOutsidePress(Point screen)
+    {
+        for (var i = _levels.Count - 1; i >= 0; --i)
+        {
+            var level = _levels[i];
+            if (!new Rectangle(level.Location, level.Size).Contains(screen))
+                continue;
+
+            if (ReferenceEquals(level, _levels[^1]))
+                return false; // the deepest level itself — inside it, so not our concern
+
+            this.CloseBelow(level);
+            this.OnLevelMouseDown(level, new MouseEventArgs(MouseButtons.Left, screen.X - level.Location.X, screen.Y - level.Location.Y, 0));
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>The index of the visible row at client-space <paramref name="y"/>, or -1.</summary>

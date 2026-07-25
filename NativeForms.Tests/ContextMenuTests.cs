@@ -203,6 +203,71 @@ internal sealed class ContextMenuTests
     }
 
     [Test]
+    public void Clicking_a_parent_level_while_a_submenu_is_open_commits_it_instead_of_dismissing()
+    {
+        var menu = new ContextMenuStrip();
+        var cut = new ToolStripMenuItem("Cut");
+        var cutClicks = 0;
+        cut.Click += (_, _) => ++cutClicks;
+        var more = new ToolStripMenuItem("More");
+        more.DropDownItems.Add(new ToolStripMenuItem("Child"));
+        menu.Items.Add(cut);
+        menu.Items.Add(more);
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right); // opens the menu at screen (430, 340)
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        var rowHeight = backend.Theme.RowHeight;
+        parent.RaiseMouseMove(20, rowHeight + (rowHeight / 2) + 1); // hover "More" → opens the submenu
+        var child = backend.Created.OfType<HeadlessPopupPeer>().Single(p => !ReferenceEquals(p, parent));
+        Assert.That(child.IsShown, Is.True, "the submenu opened and holds the grab");
+
+        // The submenu's grab catches this press because it lands outside the child; its screen point,
+        // however, is on the parent's "Cut" row. It must commit Cut, not tear the whole menu down.
+        var parentShow = parent.ShowCalls[^1].Location;
+        child.FireOutsidePress(new Point(parentShow.X + 20, parentShow.Y + (rowHeight / 2) + 1));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cutClicks, Is.EqualTo(1), "the click on the parent row committed its item");
+            Assert.That(menu.IsOpen, Is.False, "committing a leaf closes the whole menu");
+        });
+    }
+
+    [Test]
+    public void A_press_outside_every_level_still_dismisses_the_cascade()
+    {
+        var menu = new ContextMenuStrip();
+        var more = new ToolStripMenuItem("More");
+        more.DropDownItems.Add(new ToolStripMenuItem("Child"));
+        menu.Items.Add(more);
+
+        var backend = new HeadlessBackend();
+        var host = new Panel { Bounds = new(10, 10, 200, 150), ContextMenuStrip = menu };
+        var form = new Form();
+        form.Controls.Add(host);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        canvas.ScreenOrigin = new(400, 300);
+        canvas.RaiseMouseDown(30, 40, MouseButtons.Right);
+
+        var parent = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        parent.RaiseMouseMove(20, (backend.Theme.RowHeight / 2) + 1); // hover "More" → opens the submenu
+        var child = backend.Created.OfType<HeadlessPopupPeer>().Single(p => !ReferenceEquals(p, parent));
+
+        child.FireOutsidePress(new Point(5000, 5000)); // far from every level
+
+        Assert.That(menu.IsOpen, Is.False, "a press on no level at all is a genuine outside dismissal");
+    }
+
+    [Test]
     public void Light_dismissal_closes_the_menu()
     {
         CreatePanel(out var menu, out _, out var canvas, out var backend);

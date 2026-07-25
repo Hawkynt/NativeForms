@@ -32,6 +32,9 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
     public bool LightDismiss { get; set; } = true;
 
     /// <inheritdoc/>
+    public Func<Point, bool>? OutsidePress { get; set; }
+
+    /// <inheritdoc/>
     public void ShowAt(Point screenLocation, Size size)
     {
         this.EnsureHandle();
@@ -92,6 +95,13 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
                 var y = HiWord(lParam);
                 if (x >= client.left && x < client.right && y >= client.top && y < client.bottom)
                     return false;
+
+                // Outside this surface. Offer it to the owner first (in screen space): a menu routes a
+                // click on a shallower level of the same cascade there rather than tearing the menu down.
+                var point = new NativeMethods.POINT { x = x, y = y };
+                NativeMethods.ClientToScreen(this.Handle, ref point);
+                if (this.OutsidePress?.Invoke(new Point(point.x, point.y)) == true)
+                    return true;
 
                 this.Dismiss();
                 return true;
