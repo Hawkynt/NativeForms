@@ -155,6 +155,7 @@ internal class BenchTextBoxPeer : BenchPeer, ITextBoxPeer
     public void SetPasswordChar(char passwordChar) { }
     public void SetReadOnly(bool readOnly) { }
     public void SetMaxLength(int maxLength) { }
+    public void SetHasFrame(bool hasFrame) { }
     public void SetSelection(int start, int length) { }
     public (int Start, int Length) GetSelection() => (0, 0);
     public string GetText() => _text;

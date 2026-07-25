@@ -34,7 +34,7 @@ public class SearchBox : OwnerDrawnControl
     /// <summary>Creates the search field and its hosted editor.</summary>
     public SearchBox()
     {
-        _editor = new() { PlaceholderText = Strings.SearchPlaceholder, TabStop = false };
+        _editor = new FramelessTextBox { PlaceholderText = Strings.SearchPlaceholder, TabStop = false };
         _editor.TextChanged += (_, _) => this.OnTextChanged(EventArgs.Empty);
         _editor.KeyDown += this.OnEditorKeyDown;
         this.Controls.Add(_editor);

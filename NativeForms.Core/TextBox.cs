@@ -134,6 +134,12 @@ public class TextBox : Control
         }
     }
 
+    /// <summary>Whether the editor draws its own border. A composite that frames a hosted editor itself
+    /// (<see cref="SearchBox"/>) hosts a <see cref="FramelessTextBox"/>, whose override clears it so the
+    /// border does not nest inside the drawn shell. A constant, not a stored field, to spend no footprint
+    /// on the common framed editor.</summary>
+    private protected virtual bool HasFrame => true;
+
     /// <summary>Whether Enter is kept by a multiline box (a newline) instead of activating the form's
     /// <see cref="Form.AcceptButton"/>. Steered through the peer key seam: while set on a multiline
     /// box, Enter is an <see cref="IsInputKey"/> the editor handles; otherwise it reaches the default
@@ -266,6 +272,8 @@ public class TextBox : Control
         textBox.SetPasswordChar(this.EffectivePasswordChar);
         textBox.SetReadOnly(this.ReadOnly);
         textBox.SetMaxLength(this.MaxLength);
+        if (!this.HasFrame)
+            textBox.SetHasFrame(false);
         textBox.SetSelection(_selectionStart, _selectionLength);
     }
 

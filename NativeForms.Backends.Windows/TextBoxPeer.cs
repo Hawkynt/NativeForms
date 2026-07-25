@@ -34,6 +34,7 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     private bool _inChange;
 
     private bool _multiline;
+    private bool _hasFrame = true;
     private string _placeholder = string.Empty;
     private char _passwordChar;
     private bool _readOnly;
@@ -55,7 +56,7 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     /// <inheritdoc/>
     protected override uint ExtraStyle
         => NativeMethods.WS_TABSTOP
-           | NativeMethods.WS_BORDER
+           | (_hasFrame ? NativeMethods.WS_BORDER : 0)
            | (_multiline
                ? NativeMethods.ES_MULTILINE | NativeMethods.ES_AUTOVSCROLL | NativeMethods.WS_VSCROLL
                : NativeMethods.ES_AUTOHSCROLL);
@@ -145,6 +146,26 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         // ES_MULTILINE cannot be toggled on a live EDIT window: capture the live text and selection
         // into the buffers, tear the HWND down and rebuild it with the new style bits. The control
         // id is reused, so the parent's WM_COMMAND routing keeps working unchanged.
+        this.SetText(this.GetText());
+        (_selectionStart, _selectionLength) = this.GetSelection();
+        this.Unsubclass();
+        NativeMethods.DestroyWindow(Handle);
+        Handle = 0;
+        this.CreateChildHandle(_parentHandle, _controlId);
+    }
+
+    /// <inheritdoc/>
+    public void SetHasFrame(bool hasFrame)
+    {
+        if (_hasFrame == hasFrame)
+            return;
+
+        _hasFrame = hasFrame;
+        if (Handle == 0)
+            return;
+
+        // WS_BORDER is a creation-time style on an EDIT, so rebuild the HWND with the new bit — the same
+        // capture-text/selection, destroy and recreate SetMultiline uses; the control id is reused.
         this.SetText(this.GetText());
         (_selectionStart, _selectionLength) = this.GetSelection();
         this.Unsubclass();

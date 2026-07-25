@@ -38,6 +38,14 @@ internal sealed class SearchBoxTests
     }
 
     [Test]
+    public void Hosts_a_frameless_editor_so_no_border_nests_inside_the_drawn_shell()
+    {
+        CreateBox(out _, out var editor);
+
+        Assert.That(editor.HasFrame, Is.False, "the search box frames the field itself, so the editor draws no border of its own");
+    }
+
+    [Test]
     public void Placeholder_is_forwardable()
     {
         var box = CreateBox(out _, out var editor);

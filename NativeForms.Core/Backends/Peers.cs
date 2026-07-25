@@ -317,6 +317,11 @@ public interface ITextBoxPeer : IControlPeer
     /// <summary>Caps the number of characters the user can type; 0 means unlimited.</summary>
     void SetMaxLength(int maxLength);
 
+    /// <summary>Shows or hides the widget's own border/frame. A composite that frames a hosted editor
+    /// itself (a search field, a spinner) turns it off so the editor blends into the drawn shell instead
+    /// of nesting a second border inside it.</summary>
+    void SetHasFrame(bool hasFrame);
+
     /// <summary>Selects <paramref name="length"/> characters starting at <paramref name="start"/> (length 0 places the caret).</summary>
     void SetSelection(int start, int length);
 

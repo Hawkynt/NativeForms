@@ -138,6 +138,14 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer
     }
 
     /// <inheritdoc />
+    public void SetHasFrame(bool hasFrame)
+    {
+        // The frame around a multiline editor is the scrolled window's shadow.
+        if (_widget != 0)
+            NativeMethods.gtk_scrolled_window_set_shadow_type(_widget, hasFrame ? 1 : 0); // GTK_SHADOW_IN : GTK_SHADOW_NONE
+    }
+
+    /// <inheritdoc />
     public void SetSelection(int start, int length)
     {
         _selectionStart = start;

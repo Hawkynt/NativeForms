@@ -412,6 +412,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_entry_set_max_length(nint entry, int max);
 
+    /// <summary>Shows or hides the entry's own border frame.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_entry_set_has_frame(nint entry, int hasFrame);
+
+    /// <summary>Sets a scrolled window's shadow type (0 = none), the frame around a multiline editor.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_scrolled_window_set_shadow_type(nint scrolledWindow, int shadowType);
+
     /// <summary>Toggles whether the user can edit the widget's text (<c>GtkEditable</c>).</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_editable_set_editable(nint editable, int isEditable);

@@ -672,6 +672,14 @@ internal class HeadlessTextBoxPeer : HeadlessPeer, ITextBoxPeer
         this.Calls.Add($"maxLength={maxLength}");
     }
 
+    public bool HasFrame { get; private set; } = true;
+
+    public void SetHasFrame(bool hasFrame)
+    {
+        this.HasFrame = hasFrame;
+        this.Calls.Add($"hasFrame={hasFrame}");
+    }
+
     public void SetSelection(int start, int length)
     {
         this.SelectionStart = start;

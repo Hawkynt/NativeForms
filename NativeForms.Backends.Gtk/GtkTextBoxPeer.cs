@@ -23,6 +23,7 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     private char _passwordChar;
     private bool _readOnly;
     private int _maxLength;
+    private bool _hasFrame = true;
     private int _selectionStart;
     private int _selectionLength;
 
@@ -227,6 +228,19 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     }
 
     /// <inheritdoc />
+    public void SetHasFrame(bool hasFrame)
+    {
+        _hasFrame = hasFrame;
+        if (_widget == 0)
+            return;
+
+        if (_multiline)
+            NativeMethods.gtk_scrolled_window_set_shadow_type(_widget, hasFrame ? 1 : 0); // GTK_SHADOW_IN : GTK_SHADOW_NONE
+        else
+            NativeMethods.gtk_entry_set_has_frame(_widget, Bool(hasFrame));
+    }
+
+    /// <inheritdoc />
     public void SetSelection(int start, int length)
     {
         _selectionStart = start;
@@ -286,6 +300,9 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer
     /// <summary>Pushes the edit-specific buffered state onto a freshly created widget.</summary>
     private void FlushEditState()
     {
+        if (!_hasFrame)
+            this.SetHasFrame(false);
+
         if (_multiline)
             NativeMethods.gtk_text_view_set_editable(_textView, Bool(!_readOnly));
         else
