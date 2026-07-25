@@ -59,6 +59,24 @@ internal sealed class PictureBoxTests
     }
 
     [Test]
+    public void A_transparency_grid_paints_a_two_colour_checkerboard_behind_the_image()
+    {
+        var box = Box(40, 30, PictureBoxSizeMode.Zoom);
+        box.TransparencyGridSize = 10;
+        box.TransparencyGridColor1 = Color.White;
+        box.TransparencyGridColor2 = Color.Gray;
+        var canvas = Realize(box);
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FFFFFFFF")), Is.True, "the light checker fills the ground");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF808080")), Is.True, "the dark checker tiles the alternating cells");
+        });
+    }
+
+    [Test]
     public void FitToWidth_fills_the_width_keeping_aspect_and_centers_vertically()
     {
         // 40x30 into 100x80: width→100, height=30*100/40=75, y=(80-75)/2=2.

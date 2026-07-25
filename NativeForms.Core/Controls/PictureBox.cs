@@ -65,13 +65,47 @@ public class PictureBox : OwnerDrawnControl
         }
     } = BorderStyle.None;
 
+    /// <summary>The checker tile size, in pixels, of a transparency backdrop drawn behind the image so
+    /// translucent regions read against a grid instead of a flat fill. <c>0</c> (the default) keeps the
+    /// plain <see cref="ITheme.ControlBackground"/> fill; any positive value turns the checkerboard on.</summary>
+    public int TransparencyGridSize
+    {
+        get => field;
+        set
+        {
+            value = Math.Max(0, value);
+            if (field == value)
+                return;
+
+            field = value;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>The two colours of the transparency backdrop checkerboard (see <see cref="TransparencyGridSize"/>).</summary>
+    public Color TransparencyGridColor1
+    {
+        get => field;
+        set { if (field != value) { field = value; this.Invalidate(); } }
+    } = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+
+    /// <inheritdoc cref="TransparencyGridColor1"/>
+    public Color TransparencyGridColor2
+    {
+        get => field;
+        set { if (field != value) { field = value; this.Invalidate(); } }
+    } = Color.FromArgb(0xFF, 0xCC, 0xCC, 0xCC);
+
     /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         var theme = this.Theme;
         var client = new Rectangle(0, 0, this.Width, this.Height);
-        g.FillRectangle(theme.ControlBackground, client);
+        if (this.TransparencyGridSize > 0)
+            this.PaintTransparencyGrid(g, client);
+        else
+            g.FillRectangle(theme.ControlBackground, client);
 
         // CurrentFrameOf resolves an animated image to its current frame (frozen and greyed while
         // disabled) and returns a still image unchanged, so one path serves both.
@@ -84,6 +118,23 @@ public class PictureBox : OwnerDrawnControl
 
         if (this.BorderStyle != BorderStyle.None)
             g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+    }
+
+    /// <summary>Fills the client with a two-colour checker so translucency shows against a grid.</summary>
+    private void PaintTransparencyGrid(IGraphics g, Rectangle client)
+    {
+        var size = this.TransparencyGridSize;
+        g.FillRectangle(this.TransparencyGridColor1, client);
+        for (var y = 0; y < client.Height; y += size)
+        for (var x = 0; x < client.Width; x += size)
+        {
+            if (((x / size) + (y / size)) % 2 == 0)
+                continue;
+
+            var w = Math.Min(size, client.Width - x);
+            var h = Math.Min(size, client.Height - y);
+            g.FillRectangle(this.TransparencyGridColor2, new Rectangle(x, y, w, h));
+        }
     }
 
     /// <summary>Computes the destination rectangle the image is drawn into for a given mode.</summary>
