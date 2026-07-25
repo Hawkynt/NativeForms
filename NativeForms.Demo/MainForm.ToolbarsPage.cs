@@ -35,7 +35,7 @@ internal sealed partial class MainForm
         combo.SelectedIndex = 0;
         var date = new DateTimePicker { Format = DateTimePickerFormat.Short };
         var time = new TimePicker { ShowSeconds = false };
-        var color = new ColorPicker { SelectedColor = Color.RoyalBlue };
+        var color = new ColorPicker { SelectedColor = Color.RoyalBlue, AlphaEnabled = true };
         var text = new TextBox { Text = "field" };
         var live = new CheckBox { Text = "Live" };
 
@@ -81,6 +81,7 @@ internal sealed partial class MainForm
             Caption("DropDownButton and SplitButton", 16, 286, 300),
             dropDown, splitBtn);
 
+        this.Publish("toolbars.color", color);
         this.Publish("toolbars.dropDown", dropDown);
         this.Publish("toolbars.splitButton", splitBtn);
         this.Publish("toolbars.strip", strip);

@@ -6,12 +6,16 @@ using Hawkynt.NativeForms.Tests.Fakes;
 namespace Hawkynt.NativeForms.Tests;
 
 /// <summary>
-/// <see cref="ColorPicker"/> shows a swatch, drops down a palette on a click, and picking a cell sets
-/// the colour, closes the drop-down and raises the change.
+/// <see cref="ColorPicker"/> shows a swatch, drops down a mixer on a click, and every edit — a basic
+/// swatch, an SV or hue drag — sets the colour and raises the change while the mixer stays open.
 /// </summary>
 [TestFixture]
 internal sealed class ColorPickerTests
 {
+    // Mixer layout mirrored from the control: the basic swatch grid sits below the SV square, the hex row
+    // and its own caption, at 8-pixel padding and 16-pixel cells (RowHeight = 22 in the headless theme).
+    private const int _BasicTop = 8 + 160 + 8 + 22 + 6; // _Pad + _SvH + 8 + RowHeight + 6
+
     private static ColorPicker Realize(out HeadlessBackend backend, out HeadlessCanvasPeer canvas)
     {
         var picker = new ColorPicker { Bounds = new(0, 0, 120, 26) };
@@ -38,7 +42,7 @@ internal sealed class ColorPickerTests
     }
 
     [Test]
-    public void Picking_a_swatch_sets_the_colour_closes_and_raises_the_change()
+    public void Picking_a_basic_swatch_sets_the_colour_and_keeps_the_mixer_open()
     {
         var picker = Realize(out var backend, out var canvas);
         Color? changed = null;
@@ -46,15 +50,59 @@ internal sealed class ColorPickerTests
 
         canvas.RaiseMouseDown(60, 13); // open
         var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
-        popup.RaiseMouseDown(28, 28); // cell index 9 (column 1, row 1) → Red
+        popup.RaiseMouseDown(8 + 16 + 8, _BasicTop + 16 + 8); // basic cell index 9 (column 1, row 1) → Red
 
         Assert.Multiple(() =>
         {
-            Assert.That(picker.SelectedColor, Is.EqualTo(ColorPicker.Palette[9]));
-            Assert.That(picker.SelectedColor, Is.EqualTo(Color.Red));
-            Assert.That(changed, Is.EqualTo(Color.Red), "the change fired");
-            Assert.That(picker.DroppedDown, Is.False, "the drop-down closed");
+            Assert.That(picker.SelectedColor.ToArgb(), Is.EqualTo(ColorPicker.Palette[9].ToArgb()));
+            Assert.That(picker.SelectedColor.ToArgb(), Is.EqualTo(Color.Red.ToArgb()));
+            Assert.That(changed?.ToArgb(), Is.EqualTo(Color.Red.ToArgb()), "the change fired");
+            Assert.That(picker.DroppedDown, Is.True, "the mixer stays open for further tuning");
         });
+    }
+
+    [Test]
+    public void Dragging_the_saturation_value_square_changes_the_colour()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        picker.SelectedColor = Color.Red; // hue 0, full S and V
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.RaiseMouseDown(8, 8); // top-left of the SV square = saturation 0, value 1 → white
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.SelectedColor.R, Is.EqualTo(255));
+            Assert.That(picker.SelectedColor.G, Is.EqualTo(255));
+            Assert.That(picker.SelectedColor.B, Is.EqualTo(255), "top-left of the square is white");
+        });
+    }
+
+    [Test]
+    public void Dragging_the_hue_bar_sweeps_the_hue()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        picker.SelectedColor = Color.Red;
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        // The hue bar runs 0→360 top→bottom; a third of the way down is ~120° (green).
+        popup.RaiseMouseDown(8 + 180 + 6 + 9, 8 + (160 / 3));
+
+        Assert.That(picker.SelectedColor.G, Is.GreaterThan(picker.SelectedColor.R), "the hue swept toward green");
+    }
+
+    [Test]
+    public void The_mixer_blits_the_saturation_value_gradient()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        var g = popup.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image 180x160")), Is.True, "the SV square is blitted as a bitmap");
     }
 
     [Test]

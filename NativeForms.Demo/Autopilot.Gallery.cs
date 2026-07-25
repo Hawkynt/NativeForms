@@ -32,6 +32,7 @@ internal sealed partial class Autopilot
         }
 
         this.CaptureComboDropDown();
+        this.CaptureColorMixer();
         this.CaptureCalendarDropDown();
         this.CaptureFileMenu();
         this.CaptureExpander();
@@ -164,6 +165,19 @@ internal sealed partial class Autopilot
         this.Settle(150);
         this.Screenshot("06-combobox-dropdown");
         this.Do(combo.CloseDropDown);
+        this.Settle(80);
+    }
+
+    /// <summary>The Tools page with the colour picker's mixer dropped down.</summary>
+    private void CaptureColorMixer()
+    {
+        this.SelectTab("Tools");
+        this.Pristine();
+        var picker = _form.Part<ColorPicker>("toolbars.color");
+        this.Do(picker.OpenDropDown);
+        this.Settle(200);
+        this.Screenshot("25-colorpicker-mixer");
+        this.Do(picker.CloseDropDown);
         this.Settle(80);
     }
 
