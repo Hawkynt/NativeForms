@@ -58,7 +58,7 @@ internal sealed partial class MainForm
                 Image = translucent,
             });
 
-        controls.Add(Caption("Over checkerboards (size · colours)", 710, 12, 240));
+        controls.Add(Caption("Over checkerboards", 710, 12, 200));
         var grids = new (int Size, Color A, Color B)[]
         {
             (6, Color.White, Color.Gainsboro),
