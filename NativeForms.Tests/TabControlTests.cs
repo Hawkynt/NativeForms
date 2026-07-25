@@ -132,6 +132,18 @@ internal sealed class TabControlTests
     }
 
     [Test]
+    public void Each_tab_is_outlined_with_a_border_so_it_reads_as_a_tab()
+    {
+        var tabs = TwoPages(out _, out _);
+        var canvas = Realize(tabs, out _);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("line #FFC8C8C8")), Is.True,
+            "tabs are outlined in the border colour rather than drawn as flat labels");
+    }
+
+    [Test]
     public void Header_paints_the_page_icon_from_the_ImageList()
     {
         var tabs = TwoPages(out var one, out _);

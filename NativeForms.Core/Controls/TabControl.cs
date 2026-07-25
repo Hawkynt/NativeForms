@@ -554,6 +554,8 @@ public class TabControl : OwnerDrawnControl
         if (active || index == _hotTab)
             g.FillRectangle(theme.ControlBackground, tab);
 
+        this.PaintTabBorder(g, theme, tab, active);
+
         if (active)
             g.FillRectangle(theme.Accent, this.AccentRect(tab));
 
@@ -578,6 +580,47 @@ public class TabControl : OwnerDrawnControl
             var ink = active ? theme.ControlText : theme.HeaderText;
             g.DrawLine(ink, box.Left, box.Top, box.Right, box.Bottom);
             g.DrawLine(ink, box.Left, box.Bottom, box.Right, box.Top);
+        }
+    }
+
+    /// <summary>Outlines one tab on the three edges that face away from the page, so every header reads as a
+    /// tab rather than a flat label. The active tab additionally erases the strip/page divider beneath it, so
+    /// it merges into the page well the way a selected WinForms tab does.</summary>
+    private void PaintTabBorder(IGraphics g, ITheme theme, Rectangle tab, bool active)
+    {
+        var border = theme.Border;
+        var right = tab.Right - 1;
+        var bottom = tab.Bottom - 1;
+        switch (_alignment)
+        {
+            case TabAlignment.Top:
+                g.DrawLine(border, tab.X, tab.Y, right, tab.Y);
+                g.DrawLine(border, tab.X, tab.Y, tab.X, bottom);
+                g.DrawLine(border, right, tab.Y, right, bottom);
+                if (active)
+                    g.DrawLine(theme.ControlBackground, tab.X + 1, bottom, right - 1, bottom);
+                break;
+            case TabAlignment.Bottom:
+                g.DrawLine(border, tab.X, bottom, right, bottom);
+                g.DrawLine(border, tab.X, tab.Y, tab.X, bottom);
+                g.DrawLine(border, right, tab.Y, right, bottom);
+                if (active)
+                    g.DrawLine(theme.ControlBackground, tab.X + 1, tab.Y, right - 1, tab.Y);
+                break;
+            case TabAlignment.Left:
+                g.DrawLine(border, tab.X, tab.Y, tab.X, bottom);
+                g.DrawLine(border, tab.X, tab.Y, right, tab.Y);
+                g.DrawLine(border, tab.X, bottom, right, bottom);
+                if (active)
+                    g.DrawLine(theme.ControlBackground, right, tab.Y + 1, right, bottom - 1);
+                break;
+            default: // Right
+                g.DrawLine(border, right, tab.Y, right, bottom);
+                g.DrawLine(border, tab.X, tab.Y, right, tab.Y);
+                g.DrawLine(border, tab.X, bottom, right, bottom);
+                if (active)
+                    g.DrawLine(theme.ControlBackground, tab.X, tab.Y + 1, tab.X, bottom - 1);
+                break;
         }
     }
 

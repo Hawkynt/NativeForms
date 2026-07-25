@@ -197,6 +197,8 @@ public partial class DockPanel
             else if (this.HotTab(group, i))
                 g.FillRectangle(theme.SelectionBackground, cell);
 
+            PaintDocumentTabBorder(g, theme, cell, edge, selected);
+
             if (selected)
                 g.FillRectangle(theme.Accent, TabAccentRect(cell, edge));
 
@@ -204,6 +206,46 @@ public partial class DockPanel
             g.PushClip(text);
             g.DrawText(group.Contents[i].Title, theme.DefaultFont, theme.ControlText, text, ContentAlignment.MiddleLeft);
             g.PopClip();
+        }
+    }
+
+    /// <summary>Outlines one document tab on the three edges facing away from the content it labels, so the
+    /// tabs read as tabs; the selected one erases the strip divider beneath it to merge into its content.</summary>
+    private static void PaintDocumentTabBorder(IGraphics g, ITheme theme, Rectangle cell, TabAlignment edge, bool selected)
+    {
+        var border = theme.Border;
+        var right = cell.Right - 1;
+        var bottom = cell.Bottom - 1;
+        switch (edge)
+        {
+            case TabAlignment.Top:
+                g.DrawLine(border, cell.X, cell.Y, right, cell.Y);
+                g.DrawLine(border, cell.X, cell.Y, cell.X, bottom);
+                g.DrawLine(border, right, cell.Y, right, bottom);
+                if (selected)
+                    g.DrawLine(theme.ControlBackground, cell.X + 1, bottom, right - 1, bottom);
+                break;
+            case TabAlignment.Bottom:
+                g.DrawLine(border, cell.X, bottom, right, bottom);
+                g.DrawLine(border, cell.X, cell.Y, cell.X, bottom);
+                g.DrawLine(border, right, cell.Y, right, bottom);
+                if (selected)
+                    g.DrawLine(theme.ControlBackground, cell.X + 1, cell.Y, right - 1, cell.Y);
+                break;
+            case TabAlignment.Left:
+                g.DrawLine(border, cell.X, cell.Y, cell.X, bottom);
+                g.DrawLine(border, cell.X, cell.Y, right, cell.Y);
+                g.DrawLine(border, cell.X, bottom, right, bottom);
+                if (selected)
+                    g.DrawLine(theme.ControlBackground, right, cell.Y + 1, right, bottom - 1);
+                break;
+            default: // Right
+                g.DrawLine(border, right, cell.Y, right, bottom);
+                g.DrawLine(border, cell.X, cell.Y, right, cell.Y);
+                g.DrawLine(border, cell.X, bottom, right, bottom);
+                if (selected)
+                    g.DrawLine(theme.ControlBackground, cell.X, cell.Y + 1, cell.X, bottom - 1);
+                break;
         }
     }
 
