@@ -87,14 +87,14 @@ internal sealed partial class MainForm
             BorderStyle = BorderStyle.FixedSingle,
         };
 
-        var link = new LinkLabel { Bounds = new(340, 114, 300, 20), Text = "Open the project page" };
+        var link = new LinkLabel { Bounds = new(340, 114, 300, 20), Text = "Open the project page 🔗" };
         link.LinkClicked += (_, _) =>
         {
             link.LinkVisited = true;
             this.SetStatus("LinkLabel clicked — now painted as visited.");
         };
 
-        var plainCheck = new CheckBox { Bounds = new(340, 166, 300, 20), Text = "Plain check box" };
+        var plainCheck = new CheckBox { Bounds = new(340, 166, 300, 20), Text = "Plain check box ☑️" };
         plainCheck.CheckedChanged += (_, _)
             => this.SetStatus($"The plain check box is {(plainCheck.Checked ? "checked" : "unchecked")}.");
         var preChecked = new CheckBox { Bounds = new(340, 192, 300, 20), Text = "Checked from the start", Checked = true };
@@ -126,10 +126,10 @@ internal sealed partial class MainForm
         var group = new GroupBox
         {
             Bounds = new(664, 36, 300, 108),
-            Text = "Size",
+            Text = "Size 📏",
             Image = this.DiscImage(Color.SteelBlue), // a header icon, before the caption by default
         };
-        var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small", Image = this.SquareImage(Color.MediumSeaGreen) };
+        var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small 🐣", Image = this.SquareImage(Color.MediumSeaGreen) };
         var medium = new RadioButton { Bounds = new(16, 52, 260, 20), Text = "Medium", Image = this.SquareImage(Color.Goldenrod) };
         var large = new RadioButton { Bounds = new(16, 78, 260, 20), Text = "Large", Image = this.SquareImage(Color.Crimson) };
         void Report(RadioButton radio) => radio.CheckedChanged += (_, _) =>

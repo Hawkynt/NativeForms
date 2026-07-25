@@ -25,13 +25,13 @@ internal sealed partial class MainForm
 
         var planets = new IconItem[]
         {
-            new("Mercury", this.DiscImage(Color.Silver), _IconFile),
-            new("Venus", this.DiscImage(Color.Gold), _IconYellow),
-            new("Earth", this.DiscImage(Color.RoyalBlue), _IconBlue),
-            new("Mars", this.DiscImage(Color.Crimson), _IconRed),
-            new("Jupiter", this.DiscImage(Color.Orange), _IconOpen),
-            new("Saturn", this.DiscImage(Color.Goldenrod), _IconFolder),
-            new("Neptune", this.DiscImage(Color.MediumOrchid), _IconPurple),
+            new("Mercury ☿️", this.DiscImage(Color.Silver), _IconFile),
+            new("Venus ♀️", this.DiscImage(Color.Gold), _IconYellow),
+            new("Earth 🌍", this.DiscImage(Color.RoyalBlue), _IconBlue),
+            new("Mars ♂️", this.DiscImage(Color.Crimson), _IconRed),
+            new("Jupiter 🪐", this.DiscImage(Color.Orange), _IconOpen),
+            new("Saturn 🪐", this.DiscImage(Color.Goldenrod), _IconFolder),
+            new("Neptune 🔵", this.DiscImage(Color.MediumOrchid), _IconPurple),
         };
 
         var listBox = new ListBox
@@ -104,7 +104,7 @@ internal sealed partial class MainForm
             new ColumnHeader("Type", 90),
         ]);
         details.Items.AddRange([
-            new ListViewItem("Readme.md", "4 KB", "Markdown") { Image = this.SquareImage(Color.CornflowerBlue) },
+            new ListViewItem("Readme.md 📄", "4 KB", "Markdown") { Image = this.SquareImage(Color.CornflowerBlue) },
             new ListViewItem("MainForm.cs", "12 KB", "Source") { Image = this.SquareImage(Color.MediumSeaGreen) },
             new ListViewItem("Logo.png", "48 KB", "Image") { Image = this.SquareImage(Color.Orange) },
             new ListViewItem("Data.bin", "1 MB", "Binary") { Image = this.SquareImage(Color.Silver) },
@@ -157,7 +157,7 @@ internal sealed partial class MainForm
             ItemHeight = 22,
             AllowReorder = true,
         };
-        var solution = new TreeNode("Solution") { ImageIndex = _IconFolder };
+        var solution = new TreeNode("Solution 🗂️") { ImageIndex = _IconFolder };
         var core = new TreeNode("Core") { ImageIndex = _IconFolder };
         var controlFile = new TreeNode("Control.cs") { ImageIndex = _IconFile, Checked = true };
         var formFile = new TreeNode("Form.cs") { ImageIndex = _IconFile };

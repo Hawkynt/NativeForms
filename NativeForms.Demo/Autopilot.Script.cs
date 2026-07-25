@@ -695,7 +695,7 @@ internal sealed partial class Autopilot
             this.ClickAt(new(bounds.X + 30, bounds.Y + (rowHeight * 3) + (rowHeight / 2)));
             this.Expect("ComboBox.SelectedIndex", this.Read(() => combo.SelectedIndex), 3);
             this.ExpectTrue("the drop-down stayed open", !this.Read(() => combo.DroppedDown));
-            this.Expect("the status line", this.Read(() => status.Text), "ComboBox: Mars picked.");
+            this.Expect("the status line", this.Read(() => status.Text), "ComboBox: Mars ♂️ picked.");
         });
 
         var details = _form.Part<ListView>("lists.details");
@@ -723,7 +723,7 @@ internal sealed partial class Autopilot
             this.Click(details, 60, header);
             this.Expect("the first row after sorting by Name", this.Read(() => details.Items[0].Text), "Data.bin");
             this.Click(details, 60, header);
-            this.Expect("the first row after the reverse sort", this.Read(() => details.Items[0].Text), "Readme.md");
+            this.Expect("the first row after the reverse sort", this.Read(() => details.Items[0].Text), "Readme.md 📄");
         });
 
         this.Check("ListView: check boxes toggle from a click on the box", () =>
