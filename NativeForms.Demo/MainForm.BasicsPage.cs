@@ -152,13 +152,14 @@ internal sealed partial class MainForm
         var fullLabel = new Label { Bounds = new(914, 224, 50, 18), Text = "100 %" };
         _toolTip.SetToolTip(marquee, "Style = Marquee sweeps forever.");
 
-        // A procedurally-built animation driven by the shared animation clock (no image file needed).
+        // Shows a procedural gradient by default; the context menu swaps in the shared-clock spinner
+        // animation, the other gradient, or clears it.
         var picture = new PictureBox
         {
             Bounds = new(664, 296, 300, 140),
             SizeMode = PictureBoxSizeMode.Zoom,
             BorderStyle = BorderStyle.FixedSingle,
-            Image = BuildSpinner(),
+            Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid)),
         };
         var pictureMenu = new ContextMenuStrip();
         var spin = new ToolStripMenuItem("Animated spinner");
