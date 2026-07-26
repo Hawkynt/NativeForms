@@ -5,10 +5,13 @@ using Hawkynt.NativeForms.Drawing;
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// A colour swatch that drops down a full mixer: a saturation/value square, a hue bar and an alpha bar,
-/// a hex field, new-versus-current preview and basic/custom swatch palettes — the toolbar/ribbon/dialog
-/// colour chooser. The face shows the current <see cref="SelectedColor"/> and a chevron; a click opens the
-/// light-dismiss mixer, and every edit sets the colour and raises <see cref="SelectedColorChanged"/>.
+/// A colour swatch that drops down a full mixer — the toolbar/ribbon/dialog colour chooser. The RGB/HSL/HSV/
+/// CMYK tab picks the whole visual: RGB shows a saturation/value square with a hue bar, HSV a hue ring with an
+/// inner square, HSL a hue ring with an inner triangle, and CMYK a colour disc — each beside a value/lightness/
+/// blackness bar and (when <see cref="AlphaEnabled"/>) an alpha bar. There are a hex field, new-versus-current
+/// preview, basic/custom swatch palettes, draggable numeric channel sliders and an eyedropper. The face shows
+/// the current <see cref="SelectedColor"/> and a chevron; a click opens the light-dismiss mixer, and every edit
+/// sets the colour and raises <see cref="SelectedColorChanged"/>.
 /// </summary>
 public class ColorPicker : OwnerDrawnControl
 {
@@ -185,7 +188,6 @@ public class ColorPicker : OwnerDrawnControl
     }
 
     private Rectangle EyedropperRect => new(this.PopupSize.Width - _Pad - 22, this.HexY, 22, this.Theme.RowHeight);
-    private Rectangle WheelToggleRect => new(this.EyedropperRect.X - 24, this.HexY, 22, this.Theme.RowHeight);
 
     // --- Popup wiring ------------------------------------------------------------------------------
 
@@ -210,13 +212,24 @@ public class ColorPicker : OwnerDrawnControl
         var size = this.PopupSize;
         g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, size.Width, size.Height));
 
-        // The saturation/value square (or hue wheel), the hue ramp and (optionally) the alpha ramp, each a
-        // cached ARGB bitmap blitted through DrawImage — IGraphics has no gradient primitive.
+        // The main visual is chosen by the active numeric tab: RGB → a saturation/value square, HSV → a hue
+        // ring + inner square, HSL → a hue ring + inner triangle, CMYK → a colour disc. Each is a cached ARGB
+        // bitmap blitted through DrawImage — IGraphics has no gradient primitive.
         this.PaintSvArea(g, backend, mixer);
 
-        g.DrawImage(mixer.HueImage(backend, this.HueRect.Size), this.HueRect);
-        g.DrawRectangle(theme.Border, Border(this.HueRect));
-        this.PaintBarMarker(g, this.HueRect, mixer.H / 360.0);
+        // The vertical bar beside it: the hue ramp in RGB, otherwise value / lightness / blackness.
+        if (mixer.Space == ColorSpace.Rgb)
+        {
+            g.DrawImage(mixer.HueImage(backend, this.HueRect.Size), this.HueRect);
+            g.DrawRectangle(theme.Border, Border(this.HueRect));
+            this.PaintBarMarker(g, this.HueRect, mixer.H / 360.0);
+        }
+        else
+        {
+            g.DrawImage(mixer.BarImage(backend, this.HueRect.Size, mixer.Space), this.HueRect);
+            g.DrawRectangle(theme.Border, Border(this.HueRect));
+            this.PaintBarMarker(g, this.HueRect, this.BarMarker(mixer));
+        }
 
         if (this.HasAlpha)
         {
@@ -235,8 +248,7 @@ public class ColorPicker : OwnerDrawnControl
         g.DrawRectangle(theme.Border, Border(this.CurrentRect));
 
         g.DrawText(ColorMath.ToHex(mixer.Color, this.HasAlpha), theme.DefaultFont, theme.ControlText,
-            new Rectangle(_Pad, this.HexY, size.Width - (3 * _Pad) - 48, theme.RowHeight), ContentAlignment.MiddleLeft);
-        this.PaintWheelToggle(g, mixer);
+            new Rectangle(_Pad, this.HexY, size.Width - (3 * _Pad) - 22, theme.RowHeight), ContentAlignment.MiddleLeft);
         this.PaintEyedropper(g, mixer);
 
         this.PaintSwatches(g, _Basic, _BasicCols, _BasicRows, this.BasicY);
@@ -268,69 +280,120 @@ public class ColorPicker : OwnerDrawnControl
     private void PaintSvArea(IGraphics g, IPlatformBackend backend, Mixer mixer)
     {
         var theme = this.Theme;
-        if (!mixer.Wheel)
+        var r = this.SvRect;
+        switch (mixer.Space)
         {
-            g.DrawImage(mixer.SvImage(backend, this.SvRect.Size), this.SvRect);
-            g.DrawRectangle(theme.Border, Border(this.SvRect));
-            this.PaintReticle(g, this.SvRect, new Point(
-                this.SvRect.X + (int)(mixer.S * (this.SvRect.Width - 1)),
-                this.SvRect.Y + (int)((1 - mixer.V) * (this.SvRect.Height - 1))));
-            return;
+            case ColorSpace.Rgb:
+                g.DrawImage(mixer.SvImage(backend, r.Size), r);
+                g.DrawRectangle(theme.Border, Border(r));
+                this.PaintReticle(g, r, new Point(r.X + (int)(mixer.S * (r.Width - 1)), r.Y + (int)((1 - mixer.V) * (r.Height - 1))));
+                return;
+
+            case ColorSpace.Hsv:
+                g.FillRectangle(theme.ControlBackground, r);
+                g.DrawImage(mixer.RingSquareImage(backend, r.Size), r);
+                g.DrawRectangle(theme.Border, Border(r));
+                this.PaintRingMarker(g, mixer);
+                Mixer.WheelGeometry(r.Size, out _, out _, out _, out _, out var inner);
+                var innerRect = new Rectangle(r.X + inner.X, r.Y + inner.Y, inner.Width, inner.Height);
+                this.PaintReticle(g, innerRect, new Point(
+                    innerRect.X + (int)(mixer.S * (inner.Width - 1)),
+                    innerRect.Y + (int)((1 - mixer.V) * (inner.Height - 1))));
+                return;
+
+            case ColorSpace.Hsl:
+                g.FillRectangle(theme.ControlBackground, r);
+                g.DrawImage(mixer.RingTriangleImage(backend, r.Size), r);
+                g.DrawRectangle(theme.Border, Border(r));
+                this.PaintRingMarker(g, mixer);
+                ColorMath.ColorToHsl(mixer.Color, out _, out var sl, out var ll);
+                Mixer.TriangleVertices(r.Size, mixer.H, out var a, out var b, out var c);
+                var w1 = sl; var w2 = ll; var w3 = 1 - w1 - w2;
+                this.PaintReticle(g, r, new Point(
+                    r.X + (int)((w1 * a.X) + (w2 * b.X) + (w3 * c.X)),
+                    r.Y + (int)((w1 * a.Y) + (w2 * b.Y) + (w3 * c.Y))));
+                return;
+
+            default: // Cmyk disc
+                g.FillRectangle(theme.ControlBackground, r);
+                g.DrawImage(mixer.DiscImage(backend, r.Size), r);
+                g.DrawRectangle(theme.Border, Border(r));
+                Mixer.WheelGeometry(r.Size, out var dcx, out var dcy, out var douterR, out _, out _);
+                var rad = mixer.H * Math.PI / 180;
+                var dist = mixer.S * douterR;
+                this.PaintReticle(g, r, new Point(
+                    r.X + dcx + (int)(Math.Cos(rad) * dist),
+                    r.Y + dcy + (int)(Math.Sin(rad) * dist)));
+                return;
         }
+    }
 
-        g.FillRectangle(theme.ControlBackground, this.SvRect);
-        g.DrawImage(mixer.WheelImage(backend, this.SvRect.Size), this.SvRect);
-        g.DrawRectangle(theme.Border, Border(this.SvRect));
-
-        Mixer.WheelGeometry(this.SvRect.Size, out var cx, out var cy, out var outerR, out var innerR, out var inner);
+    private void PaintRingMarker(IGraphics g, Mixer mixer)
+    {
+        Mixer.WheelGeometry(this.SvRect.Size, out var cx, out var cy, out var outerR, out var innerR, out _);
         var ringR = (outerR + innerR) / 2.0;
         var angle = mixer.H * Math.PI / 180;
         var hx = this.SvRect.X + cx + (int)(Math.Cos(angle) * ringR);
         var hy = this.SvRect.Y + cy + (int)(Math.Sin(angle) * ringR);
         g.DrawEllipse(Color.White, new Rectangle(hx - 4, hy - 4, 8, 8));
         g.DrawEllipse(Color.Black, new Rectangle(hx - 3, hy - 3, 6, 6));
-
-        var innerRect = new Rectangle(this.SvRect.X + inner.X, this.SvRect.Y + inner.Y, inner.Width, inner.Height);
-        this.PaintReticle(g, innerRect, new Point(
-            innerRect.X + (int)(mixer.S * (inner.Width - 1)),
-            innerRect.Y + (int)((1 - mixer.V) * (inner.Height - 1))));
     }
 
-    private void PaintWheelToggle(IGraphics g, Mixer mixer)
+    /// <summary>Where the mode bar's marker sits (top = 0): value/lightness read from the top, K from the top too.</summary>
+    private double BarMarker(Mixer mixer)
     {
-        var theme = this.Theme;
-        var r = this.WheelToggleRect;
-        g.FillRectangle(mixer.Wheel ? theme.SelectionBackground : theme.HeaderBackground, r);
-        g.DrawRectangle(mixer.Wheel ? theme.Accent : theme.Border, Border(r));
-
-        // A ring glyph while the square is showing (tap to go to the wheel), a square glyph while it is.
-        var ink = mixer.Wheel ? theme.SelectionText : theme.ControlText;
-        if (mixer.Wheel)
-            g.DrawRectangle(ink, new Rectangle(r.X + 6, r.Y + 6, r.Width - 12, r.Height - 12));
-        else
-            g.DrawEllipse(ink, new Rectangle(r.X + 5, r.Y + 5, r.Width - 10, r.Height - 10));
-    }
-
-    private void WheelDown(Mixer mixer, MouseEventArgs e)
-    {
-        Mixer.WheelGeometry(this.SvRect.Size, out var cx, out var cy, out var outerR, out _, out var inner);
-        var innerRect = new Rectangle(this.SvRect.X + inner.X, this.SvRect.Y + inner.Y, inner.Width, inner.Height);
-        if (innerRect.Contains(e.X, e.Y))
+        switch (mixer.Space)
         {
-            mixer.Drag = DragTarget.WheelSquare;
-            this.UpdateWheelSquare(mixer, e);
+            case ColorSpace.Hsl: ColorMath.ColorToHsl(mixer.Color, out _, out _, out var l); return 1 - l;
+            default: return 1 - mixer.V; // HSV value and the CMYK brightness bar both track V
+        }
+    }
+
+    /// <summary>A press in the wheel/disc area: the ring sets the hue, the inner square/triangle or the disc
+    /// sets the rest. Dispatched by the active space.</summary>
+    private void SvAreaDown(Mixer mixer, MouseEventArgs e)
+    {
+        var r = this.SvRect;
+        Mixer.WheelGeometry(r.Size, out var cx, out var cy, out var outerR, out _, out var inner);
+        double dx = (e.X - r.X) - cx, dy = (e.Y - r.Y) - cy;
+        var dist = Math.Sqrt((dx * dx) + (dy * dy));
+
+        if (mixer.Space == ColorSpace.Cmyk)
+        {
+            if (dist <= outerR + 2)
+            {
+                mixer.Drag = DragTarget.Disc;
+                this.UpdateDisc(mixer, e);
+            }
+
             return;
         }
 
-        double dx = (e.X - this.SvRect.X) - cx, dy = (e.Y - this.SvRect.Y) - cy;
-        if (Math.Sqrt((dx * dx) + (dy * dy)) <= outerR + 2)
+        // HSV / HSL: the outer ring is hue; inside it is the square (HSV) or triangle (HSL).
+        if (dist >= (outerR - Mixer.RingThickness - 1) && dist <= outerR + 2)
         {
-            mixer.Drag = DragTarget.WheelRing;
-            this.UpdateWheelRing(mixer, e);
+            mixer.Drag = DragTarget.Ring;
+            this.UpdateRing(mixer, e);
+            return;
+        }
+
+        if (mixer.Space == ColorSpace.Hsv)
+        {
+            var innerRect = new Rectangle(r.X + inner.X, r.Y + inner.Y, inner.Width, inner.Height);
+            if (innerRect.Contains(e.X, e.Y))
+            {
+                mixer.Drag = DragTarget.Square;
+                this.UpdateSquare(mixer, e);
+            }
+        }
+        else if (dist < outerR) // HSL triangle occupies the whole inner circle
+        {
+            mixer.Drag = DragTarget.Triangle;
+            this.UpdateTriangle(mixer, e);
         }
     }
 
-    private void UpdateWheelRing(Mixer mixer, MouseEventArgs e)
+    private void UpdateRing(Mixer mixer, MouseEventArgs e)
     {
         Mixer.WheelGeometry(this.SvRect.Size, out var cx, out var cy, out _, out _, out _);
         double dx = (e.X - this.SvRect.X) - cx, dy = (e.Y - this.SvRect.Y) - cy;
@@ -339,13 +402,56 @@ public class ColorPicker : OwnerDrawnControl
         this.Apply(mixer);
     }
 
-    private void UpdateWheelSquare(Mixer mixer, MouseEventArgs e)
+    private void UpdateSquare(Mixer mixer, MouseEventArgs e)
     {
         Mixer.WheelGeometry(this.SvRect.Size, out _, out _, out _, out _, out var inner);
-        var ix = this.SvRect.X + inner.X;
-        var iy = this.SvRect.Y + inner.Y;
-        mixer.S = Math.Clamp((e.X - ix) / (double)(inner.Width - 1), 0, 1);
-        mixer.V = 1 - Math.Clamp((e.Y - iy) / (double)(inner.Height - 1), 0, 1);
+        mixer.S = Math.Clamp((e.X - this.SvRect.X - inner.X) / (double)(inner.Width - 1), 0, 1);
+        mixer.V = 1 - Math.Clamp((e.Y - this.SvRect.Y - inner.Y) / (double)(inner.Height - 1), 0, 1);
+        this.Apply(mixer);
+    }
+
+    private void UpdateTriangle(Mixer mixer, MouseEventArgs e)
+    {
+        Mixer.TriangleVertices(this.SvRect.Size, mixer.H, out var a, out var b, out var c);
+        Mixer.Barycentric(a, b, c, e.X - this.SvRect.X, e.Y - this.SvRect.Y, out var w1, out var w2, out var w3);
+
+        // Snap a click outside the triangle onto the nearest edge by zeroing the negative weight.
+        if (w1 < 0) { w1 = 0; var t = w2 + w3; if (t > 0) { w2 /= t; w3 /= t; } else { w2 = w3 = 0.5; } }
+        else if (w2 < 0) { w2 = 0; var t = w1 + w3; if (t > 0) { w1 /= t; w3 /= t; } else { w1 = w3 = 0.5; } }
+        else if (w3 < 0) { w3 = 0; var t = w1 + w2; if (t > 0) { w1 /= t; w2 /= t; } else { w1 = w2 = 0.5; } }
+
+        var hue = mixer.H;
+        mixer.Set(ColorMath.HslToColor(hue, Math.Clamp(w1, 0, 1) * 100, Math.Clamp(w2, 0, 1) * 100, mixer.A));
+        mixer.H = hue; // preserve the hue the ring set, even at S or L extremes
+        this.Apply(mixer);
+    }
+
+    private void UpdateDisc(Mixer mixer, MouseEventArgs e)
+    {
+        // Angle → hue, radius → saturation; the brightness (value/blackness) is left to the bar.
+        Mixer.WheelGeometry(this.SvRect.Size, out var cx, out var cy, out var outerR, out _, out _);
+        double dx = (e.X - this.SvRect.X) - cx, dy = (e.Y - this.SvRect.Y) - cy;
+        var dist = Math.Min(Math.Sqrt((dx * dx) + (dy * dy)), outerR);
+        mixer.H = ((Math.Atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
+        mixer.S = dist / outerR;
+        mixer.InvalidateSv();
+        this.Apply(mixer);
+    }
+
+    private void UpdateBar(Mixer mixer, MouseEventArgs e)
+    {
+        var t = 1 - Math.Clamp((e.Y - this.HueRect.Y) / (double)(this.HueRect.Height - 1), 0, 1); // top = 1
+        switch (mixer.Space)
+        {
+            case ColorSpace.Hsl:
+                ColorMath.ColorToHsl(mixer.Color, out var h, out var s, out _);
+                mixer.Set(ColorMath.HslToColor(h, s, t, mixer.A));
+                break;
+            default: // HSV value or CMYK brightness — both are the HSV value axis (bottom = black = full K)
+                mixer.V = t;
+                break;
+        }
+
         this.Apply(mixer);
     }
 
@@ -413,23 +519,16 @@ public class ColorPicker : OwnerDrawnControl
             return;
         }
 
-        if (this.WheelToggleRect.Contains(e.X, e.Y))
-        {
-            mixer.Wheel = !mixer.Wheel; // swap the SV square for the hue wheel
-            _popup?.InvalidateAll();
-            return;
-        }
-
         if (this.SvRect.Contains(e.X, e.Y))
         {
-            if (mixer.Wheel)
-            {
-                this.WheelDown(mixer, e);
-            }
-            else
+            if (mixer.Space == ColorSpace.Rgb)
             {
                 mixer.Drag = DragTarget.Sv;
                 this.UpdateSv(mixer, e);
+            }
+            else
+            {
+                this.SvAreaDown(mixer, e); // ring + square / triangle / disc, per space
             }
 
             return;
@@ -437,8 +536,17 @@ public class ColorPicker : OwnerDrawnControl
 
         if (this.HueRect.Contains(e.X, e.Y))
         {
-            mixer.Drag = DragTarget.Hue;
-            this.UpdateHue(mixer, e);
+            if (mixer.Space == ColorSpace.Rgb)
+            {
+                mixer.Drag = DragTarget.Hue;
+                this.UpdateHue(mixer, e);
+            }
+            else
+            {
+                mixer.Drag = DragTarget.Bar;
+                this.UpdateBar(mixer, e);
+            }
+
             return;
         }
 
@@ -475,8 +583,11 @@ public class ColorPicker : OwnerDrawnControl
             case DragTarget.Hue: this.UpdateHue(mixer, e); break;
             case DragTarget.Alpha: this.UpdateAlpha(mixer, e); break;
             case DragTarget.Channel: this.UpdateChannel(mixer, e); break;
-            case DragTarget.WheelRing: this.UpdateWheelRing(mixer, e); break;
-            case DragTarget.WheelSquare: this.UpdateWheelSquare(mixer, e); break;
+            case DragTarget.Ring: this.UpdateRing(mixer, e); break;
+            case DragTarget.Square: this.UpdateSquare(mixer, e); break;
+            case DragTarget.Triangle: this.UpdateTriangle(mixer, e); break;
+            case DragTarget.Disc: this.UpdateDisc(mixer, e); break;
+            case DragTarget.Bar: this.UpdateBar(mixer, e); break;
         }
     }
 
@@ -690,7 +801,7 @@ public class ColorPicker : OwnerDrawnControl
     ];
 
     /// <summary>Which slider a mixer drag is tracking.</summary>
-    private enum DragTarget { None, Sv, Hue, Alpha, Channel, WheelRing, WheelSquare }
+    private enum DragTarget { None, Sv, Hue, Alpha, Channel, Ring, Square, Triangle, Disc, Bar }
 
     /// <summary>The numeric-tab colour space.</summary>
     private enum ColorSpace { Rgb, Hsl, Hsv, Cmyk }
@@ -706,15 +817,14 @@ public class ColorPicker : OwnerDrawnControl
         internal ColorSpace Space;
         internal int Channel = -1; // the numeric row being dragged, or -1
         internal bool Sampling; // the eyedropper is armed: the next screen click is a colour sample
-        internal bool Wheel;    // the SV area shows a hue ring + inner square instead of the SV square
 
-        private IImage? _sv;
-        private int _svHue = -1;
+        private IImage? _sv; private int _svHue = -1;
+        private IImage? _ringSquare; private int _ringSquareHue = -1;
+        private IImage? _ringTriangle; private int _ringTriangleHue = -1;
+        private IImage? _disc;
         private IImage? _hue;
-        private IImage? _alpha;
-        private int _alphaKey = -1;
-        private IImage? _wheel;
-        private int _wheelHue = -1;
+        private IImage? _alpha; private int _alphaKey = -1;
+        private IImage? _bar; private long _barKey = -1;
 
         internal Mixer(Color color)
         {
@@ -731,9 +841,9 @@ public class ColorPicker : OwnerDrawnControl
             this.InvalidateSv();
         }
 
-        internal void InvalidateSv() { _svHue = -1; _wheelHue = -1; }
+        internal void InvalidateSv() { _svHue = -1; _ringSquareHue = -1; _ringTriangleHue = -1; }
 
-        // --- Hue-wheel geometry (a ring of hues around an inscribed saturation/value square) -----------
+        // --- Wheel/ring geometry: a ring of hues around an inscribed square (HSV) or triangle (HSL) -----
         internal const int RingThickness = 14;
 
         internal static void WheelGeometry(Size size, out int cx, out int cy, out int outerR, out int innerR, out Rectangle inner)
@@ -746,45 +856,33 @@ public class ColorPicker : OwnerDrawnControl
             inner = new Rectangle(cx - half, cy - half, 2 * half, 2 * half);
         }
 
-        internal IImage WheelImage(IPlatformBackend backend, Size size)
+        /// <summary>The HSL triangle's vertices (pure hue, white, black), placed on the inner circle and
+        /// rotated so the pure-hue vertex points at the current hue on the ring.</summary>
+        internal static void TriangleVertices(Size size, double hueDeg, out (double X, double Y) a, out (double X, double Y) b, out (double X, double Y) c)
         {
-            var hue = (int)Math.Round(this.H);
-            if (_wheel is not null && _wheelHue == hue)
-                return _wheel;
-
-            WheelGeometry(size, out var cx, out var cy, out var outerR, out var innerR, out var inner);
-            var pixels = new int[size.Width * size.Height];
-            for (var y = 0; y < size.Height; ++y)
-            for (var x = 0; x < size.Width; ++x)
-            {
-                double dx = x - cx, dy = y - cy;
-                var dist = Math.Sqrt((dx * dx) + (dy * dy));
-                int argb;
-                if (dist <= outerR && dist >= innerR)
-                {
-                    var angle = (Math.Atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-                    argb = ColorMath.HsvToColor(angle, 1, 1).ToArgb();
-                }
-                else if (inner.Contains(x, y))
-                {
-                    var s = (x - inner.X) / (double)(inner.Width - 1);
-                    var v = 1 - ((y - inner.Y) / (double)(inner.Height - 1));
-                    argb = ColorMath.HsvToColor(hue, s, v).ToArgb();
-                }
-                else
-                {
-                    argb = 0; // transparent outside the ring and square
-                }
-
-                pixels[(y * size.Width) + x] = argb;
-            }
-
-            _wheel = backend.CreateImage(size.Width, size.Height, pixels);
-            _wheelHue = hue;
-            return _wheel;
+            WheelGeometry(size, out var cx, out var cy, out _, out var innerR, out _);
+            double triR = innerR - 2, rad = hueDeg * Math.PI / 180;
+            a = (cx + (triR * Math.Cos(rad)), cy + (triR * Math.Sin(rad)));
+            b = (cx + (triR * Math.Cos(rad + (2 * Math.PI / 3))), cy + (triR * Math.Sin(rad + (2 * Math.PI / 3))));
+            c = (cx + (triR * Math.Cos(rad + (4 * Math.PI / 3))), cy + (triR * Math.Sin(rad + (4 * Math.PI / 3))));
         }
 
-        internal IImage SvImage(IPlatformBackend backend, Size size)
+        /// <summary>Barycentric weights of a point in triangle A(hue)/B(white)/C(black): w1→saturation, w2→lightness.</summary>
+        internal static void Barycentric((double X, double Y) a, (double X, double Y) b, (double X, double Y) c, double px, double py, out double w1, out double w2, out double w3)
+        {
+            var denom = ((b.Y - c.Y) * (a.X - c.X)) + ((c.X - b.X) * (a.Y - c.Y));
+            if (Math.Abs(denom) < 1e-9)
+            {
+                w1 = w2 = w3 = 1.0 / 3;
+                return;
+            }
+
+            w1 = (((b.Y - c.Y) * (px - c.X)) + ((c.X - b.X) * (py - c.Y))) / denom;
+            w2 = (((c.Y - a.Y) * (px - c.X)) + ((a.X - c.X) * (py - c.Y))) / denom;
+            w3 = 1 - w1 - w2;
+        }
+
+        internal IImage SvImage(IPlatformBackend backend, Size size) // RGB: a plain saturation/value square
         {
             var hue = (int)Math.Round(this.H);
             if (_sv is not null && _svHue == hue)
@@ -799,6 +897,91 @@ public class ColorPicker : OwnerDrawnControl
             _sv = backend.CreateImage(size.Width, size.Height, pixels);
             _svHue = hue;
             return _sv;
+        }
+
+        internal IImage RingSquareImage(IPlatformBackend backend, Size size) // HSV: hue ring + inner square
+        {
+            var hue = (int)Math.Round(this.H);
+            if (_ringSquare is not null && _ringSquareHue == hue)
+                return _ringSquare;
+
+            WheelGeometry(size, out var cx, out var cy, out var outerR, out var innerR, out var inner);
+            var pixels = new int[size.Width * size.Height];
+            for (var y = 0; y < size.Height; ++y)
+            for (var x = 0; x < size.Width; ++x)
+            {
+                double dx = x - cx, dy = y - cy;
+                var dist = Math.Sqrt((dx * dx) + (dy * dy));
+                int argb;
+                if (dist <= outerR && dist >= innerR)
+                    argb = ColorMath.HsvToColor(((Math.Atan2(dy, dx) * 180 / Math.PI) + 360) % 360, 1, 1).ToArgb();
+                else if (inner.Contains(x, y))
+                    argb = ColorMath.HsvToColor(hue, (x - inner.X) / (double)(inner.Width - 1), 1 - ((y - inner.Y) / (double)(inner.Height - 1))).ToArgb();
+                else
+                    argb = 0;
+
+                pixels[(y * size.Width) + x] = argb;
+            }
+
+            _ringSquare = backend.CreateImage(size.Width, size.Height, pixels);
+            _ringSquareHue = hue;
+            return _ringSquare;
+        }
+
+        internal IImage RingTriangleImage(IPlatformBackend backend, Size size) // HSL: hue ring + inner triangle
+        {
+            var hue = (int)Math.Round(this.H);
+            if (_ringTriangle is not null && _ringTriangleHue == hue)
+                return _ringTriangle;
+
+            WheelGeometry(size, out var cx, out var cy, out var outerR, out var innerR, out _);
+            TriangleVertices(size, this.H, out var a, out var b, out var c);
+            var pixels = new int[size.Width * size.Height];
+            for (var y = 0; y < size.Height; ++y)
+            for (var x = 0; x < size.Width; ++x)
+            {
+                double dx = x - cx, dy = y - cy;
+                var dist = Math.Sqrt((dx * dx) + (dy * dy));
+                int argb;
+                if (dist <= outerR && dist >= innerR)
+                {
+                    argb = ColorMath.HsvToColor(((Math.Atan2(dy, dx) * 180 / Math.PI) + 360) % 360, 1, 1).ToArgb();
+                }
+                else
+                {
+                    Barycentric(a, b, c, x, y, out var w1, out var w2, out var w3);
+                    argb = w1 >= -0.01 && w2 >= -0.01 && w3 >= -0.01
+                        ? ColorMath.HslToColor(this.H, Math.Clamp(w1, 0, 1) * 100, Math.Clamp(w2, 0, 1) * 100).ToArgb()
+                        : 0;
+                }
+
+                pixels[(y * size.Width) + x] = argb;
+            }
+
+            _ringTriangle = backend.CreateImage(size.Width, size.Height, pixels);
+            _ringTriangleHue = hue;
+            return _ringTriangle;
+        }
+
+        internal IImage DiscImage(IPlatformBackend backend, Size size) // CMYK: a full colour disc (angle=hue, radius=sat)
+        {
+            if (_disc is not null)
+                return _disc;
+
+            WheelGeometry(size, out var cx, out var cy, out var outerR, out _, out _);
+            var pixels = new int[size.Width * size.Height];
+            for (var y = 0; y < size.Height; ++y)
+            for (var x = 0; x < size.Width; ++x)
+            {
+                double dx = x - cx, dy = y - cy;
+                var dist = Math.Sqrt((dx * dx) + (dy * dy));
+                pixels[(y * size.Width) + x] = dist <= outerR
+                    ? ColorMath.HsvToColor(((Math.Atan2(dy, dx) * 180 / Math.PI) + 360) % 360, dist / outerR, 1).ToArgb()
+                    : 0;
+            }
+
+            _disc = backend.CreateImage(size.Width, size.Height, pixels);
+            return _disc;
         }
 
         internal IImage HueImage(IPlatformBackend backend, Size size)
@@ -837,6 +1020,33 @@ public class ColorPicker : OwnerDrawnControl
             _alpha = backend.CreateImage(size.Width, size.Height, pixels);
             _alphaKey = key;
             return _alpha;
+        }
+
+        /// <summary>The vertical bar beside the wheel: value (HSV), lightness (HSL) or blackness/K (CMYK),
+        /// top = bright. RGB uses <see cref="HueImage"/> instead.</summary>
+        internal IImage BarImage(IPlatformBackend backend, Size size, ColorSpace space)
+        {
+            var c = this.Color;
+            long key = ((long)space << 40) | (uint)(c.ToArgb() & 0xFFFFFF);
+            if (_bar is not null && _barKey == key)
+                return _bar;
+
+            ColorMath.ColorToHsl(c, out var hl, out var sl, out _);
+            var pixels = new int[size.Width * size.Height];
+            for (var y = 0; y < size.Height; ++y)
+            {
+                var t = 1 - (y / (double)(size.Height - 1)); // top = 1
+                // HSL → lightness ramp; HSV and CMYK → value ramp (top = bright, bottom = black = full K).
+                var argb = space == ColorSpace.Hsl
+                    ? ColorMath.HslToColor(hl, sl, t).ToArgb()
+                    : ColorMath.HsvToColor(this.H, this.S, t).ToArgb();
+                for (var x = 0; x < size.Width; ++x)
+                    pixels[(y * size.Width) + x] = argb;
+            }
+
+            _bar = backend.CreateImage(size.Width, size.Height, pixels);
+            _barKey = key;
+            return _bar;
         }
     }
 }

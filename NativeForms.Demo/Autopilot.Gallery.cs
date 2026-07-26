@@ -176,16 +176,24 @@ internal sealed partial class Autopilot
         var picker = _form.Part<ColorPicker>("toolbars.color");
         this.Do(picker.OpenDropDown);
         this.Settle(200);
-        this.Screenshot("25-colorpicker-mixer");
+        this.Screenshot("25-colorpicker-mixer"); // RGB tab: the SV square
 
-        // Toggle the hue wheel on (its button sits left of the eyedropper on the hex row) and capture it.
+        // The numeric tab picks the whole visual: HSL → hue ring + triangle, CMYK → colour disc. The tab
+        // row sits near the popup bottom; each of the four tabs is a quarter of the ~280 px inner width.
         var popups = this.Popups();
         if (popups.Count > 0)
         {
             var b = this.Read(() => Injection.WindowBounds(popups[0]));
-            this.ClickAt(new Point(b.X + 253, b.Y + 187)); // the wheel toggle on the hex row
+            var rh = this.Read(() => Theme.RowHeight);
+            var tabY = b.Y + b.Height - (5 * rh) - 12 + (rh / 2);
+
+            this.ClickAt(new Point(b.X + 113, tabY)); // HSL tab
             this.Settle(200);
-            this.Screenshot("26-colorpicker-wheel");
+            this.Screenshot("26-colorpicker-hsl-triangle");
+
+            this.ClickAt(new Point(b.X + 253, tabY)); // CMYK tab
+            this.Settle(200);
+            this.Screenshot("27-colorpicker-cmyk-disc");
         }
 
         this.Do(picker.CloseDropDown);

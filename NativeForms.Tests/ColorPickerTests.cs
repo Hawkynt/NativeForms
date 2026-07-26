@@ -131,21 +131,40 @@ internal sealed class ColorPickerTests
     }
 
     [Test]
-    public void The_hue_wheel_ring_sets_the_hue()
+    public void Selecting_the_HSV_tab_shows_a_hue_ring_whose_click_sets_the_hue()
     {
         var picker = Realize(out var backend, out var canvas);
         picker.SelectedColor = Color.Red; // hue 0, full S and V
         canvas.RaiseMouseDown(60, 13);
         var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
 
-        popup.RaiseMouseDown(229, 187); // the wheel toggle (left of the eyedropper) → wheel mode
-        popup.RaiseMouseDown(26, 88);   // the ring left of centre (angle 180°) → cyan hue
+        popup.RaiseMouseDown(168, _TabsTop + 11); // the HSV tab → ring + inner-square view
+        popup.RaiseMouseDown(26, 88);             // the ring left of centre (angle 180°) → cyan hue
 
         Assert.Multiple(() =>
         {
             Assert.That(picker.SelectedColor.R, Is.LessThan(40), "red is pulled out at 180°");
             Assert.That(picker.SelectedColor.G, Is.GreaterThan(200));
             Assert.That(picker.SelectedColor.B, Is.GreaterThan(200), "green and blue dominate a cyan hue");
+        });
+    }
+
+    [Test]
+    public void Selecting_the_CMYK_tab_shows_a_disc_whose_click_sets_hue_and_saturation()
+    {
+        var picker = Realize(out var backend, out var canvas);
+        picker.SelectedColor = Color.White; // saturation 0
+        canvas.RaiseMouseDown(60, 13);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+
+        popup.RaiseMouseDown(232, _TabsTop + 11); // the CMYK tab (index 3 of 4) → disc view
+        popup.RaiseMouseDown(26, 88);             // out toward the rim on the left → a saturated cyan
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picker.SelectedColor.R, Is.LessThan(60), "clicking near the rim raises saturation away from white");
+            Assert.That(picker.SelectedColor.G, Is.GreaterThan(180));
+            Assert.That(picker.SelectedColor.B, Is.GreaterThan(180));
         });
     }
 

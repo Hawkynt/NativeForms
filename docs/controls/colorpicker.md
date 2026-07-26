@@ -31,10 +31,11 @@ Because it is an ordinary control, it drops straight into a `RibbonHostItem` or 
 
 ## The mixer
 
-- **Saturation/value square** for the current hue, with a draggable reticle; a **hue bar** (0→360) and,
-  with `AlphaEnabled`, an **alpha bar** over a checkerboard. Every drag updates `SelectedColor` live.
-- A **hue-wheel** toggle swaps the square for a rainbow ring with an inscribed saturation/value square —
-  the ring picks the hue, the square the saturation and value.
+- The **RGB / HSL / HSV / CMYK** tab picks the whole visual — as in the reference picker, the shape swaps
+  with the colour space: **RGB** → a saturation/value square + a **hue bar**; **HSV** → a hue **ring** with an
+  inner **square**; **HSL** → a hue ring with an inner **triangle** (rotated to the hue); **CMYK** → a colour
+  **disc** (angle = hue, radius = saturation). Beside it a vertical bar carries value / lightness / blackness
+  (the hue bar in RGB), and with `AlphaEnabled` an **alpha bar** over a checkerboard. Every drag is live.
 - **New / Current** preview swatches over a checkerboard, and the **hex** value (`#RRGGBB` or `#RRGGBBAA`).
 - **Basic** and **custom** swatch grids; an empty custom slot reads as a checkerboard hole.
 - **RGB / HSL / HSV / CMYK** numeric tabs, each a row of draggable channel sliders with a value read-out.
@@ -57,5 +58,4 @@ unrealized picker keeps its small footprint.
 ## Differences from WinForms
 
 WinForms has no inline colour-picker control (only the modal `ColorDialog`); this fills that gap with
-an embeddable swatch that drops down a full mixer. The hue-wheel's inner shape is a saturation/value
-square in every space (rather than an HSL triangle or CMYK disc).
+an embeddable swatch that drops down a full mixer whose shape follows the selected colour space.
