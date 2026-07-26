@@ -16,6 +16,11 @@ public sealed class RetrieveVirtualItemEventArgs(int itemIndex) : EventArgs
 
     /// <summary>Set by the handler to the item that represents the row.</summary>
     public ListViewItem? Item { get; set; }
+
+    /// <summary>Set by the handler (in the unknown-size virtual mode, <see cref="ListView.VirtualListSize"/>
+    /// = -1) when <see cref="ItemIndex"/> is past the end, so the list stops probing and fixes its extent.
+    /// Leaving <see cref="Item"/> null has the same effect.</summary>
+    public bool EndOfList { get; set; }
 }
 
 /// <summary>Carries the item whose check state just flipped; see <see cref="ListView.ItemChecked"/>.</summary>

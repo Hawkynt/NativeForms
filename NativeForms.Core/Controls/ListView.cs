@@ -127,17 +127,22 @@ public class ListView : OwnerDrawnControl
         }
     }
 
-    /// <summary>The row count exposed while <see cref="VirtualMode"/> is on. Setting it repaints.</summary>
+    /// <summary>The row count exposed while <see cref="VirtualMode"/> is on, or <c>-1</c> for an unknown
+    /// size: the list then probes a window past what it has confirmed, growing as you scroll until
+    /// <see cref="RetrieveVirtualItem"/> reports the end, at which point the scroll extent is fixed. Setting
+    /// it repaints.</summary>
     public int VirtualListSize
     {
         get => field;
         set
         {
-            value = Math.Max(0, value);
+            value = value < 0 ? -1 : value;
             if (field == value)
                 return;
 
             field = value;
+            _discoveredCount = 0;
+            _countFinal = false;
             if (this.VirtualMode)
             {
                 _flatDirty = true;
@@ -146,14 +151,33 @@ public class ListView : OwnerDrawnControl
         }
     }
 
+    private int _discoveredCount;   // confirmed rows in the unknown-size mode
+    private bool _countFinal;       // set once the provider reported the end
+
     /// <summary>Raised while <see cref="VirtualMode"/> is on to fetch the row at
     /// <see cref="RetrieveVirtualItemEventArgs.ItemIndex"/>; the handler sets
     /// <see cref="RetrieveVirtualItemEventArgs.Item"/>. Called once per visible row per paint — keep it cheap.</summary>
     public event EventHandler<RetrieveVirtualItemEventArgs>? RetrieveVirtualItem;
 
-    /// <summary>The number of rows the presentation draws from: <see cref="VirtualListSize"/> while
-    /// virtual, otherwise <see cref="Items"/>' count.</summary>
-    private int RowSourceCount => this.VirtualMode ? this.VirtualListSize : this.Items.Count;
+    /// <summary>Whether the list is in the unknown-size virtual mode.</summary>
+    private bool UnknownVirtualSize => this.VirtualMode && this.VirtualListSize < 0;
+
+    /// <summary>The number of rows the presentation draws from: the model count normally, the fixed
+    /// <see cref="VirtualListSize"/> in known virtual mode, or a probe window past the confirmed rows in the
+    /// unknown-size mode (so the user can scroll a little further to discover more, until the end is found).</summary>
+    private int RowSourceCount
+    {
+        get
+        {
+            if (!this.VirtualMode)
+                return this.Items.Count;
+
+            if (!this.UnknownVirtualSize)
+                return this.VirtualListSize;
+
+            return _countFinal ? _discoveredCount : Math.Max(_discoveredCount, _topIndex + (2 * this.VisibleRowCount));
+        }
+    }
 
     /// <summary>The item for a display row: fetched from <see cref="RetrieveVirtualItem"/> while virtual
     /// (falling back to a shared blank placeholder), otherwise the model item.</summary>
@@ -164,6 +188,18 @@ public class ListView : OwnerDrawnControl
 
         var args = new RetrieveVirtualItemEventArgs(index);
         this.RetrieveVirtualItem?.Invoke(this, args);
+
+        if (this.UnknownVirtualSize)
+        {
+            if (args.EndOfList || args.Item is null)
+            {
+                _countFinal = true;
+                _discoveredCount = index; // rows [0, index) exist; this one does not
+            }
+            else if (index + 1 > _discoveredCount)
+                _discoveredCount = index + 1;
+        }
+
         return args.Item ?? (_virtualPlaceholder ??= new ListViewItem(string.Empty));
     }
 
@@ -465,6 +501,35 @@ public class ListView : OwnerDrawnControl
 
     /// <summary>The number of fully visible rows (of cells, in the icon views) in the item area.</summary>
     protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.CellSize.Height);
+
+    // --- Vertical scroll bar (overlay on the right; visible only when the content overflows) ---------
+
+    private const int _ScrollBarWidth = 14;
+    private bool _draggingScroll;
+    private int _scrollDragOffset;
+
+    /// <summary>Whether the content is taller than the item area, so the scroll bar is drawn.</summary>
+    private bool ScrollBarVisible => this.FlatRowCount > this.VisibleRowCount;
+
+    private Rectangle ScrollTrack => new(this.Width - _ScrollBarWidth, this.HeaderHeight, _ScrollBarWidth, Math.Max(0, this.Height - this.HeaderHeight));
+
+    private Rectangle ScrollThumb
+    {
+        get
+        {
+            var track = this.ScrollTrack;
+            var total = this.FlatRowCount;
+            var visible = this.VisibleRowCount;
+            if (total <= visible || track.Height <= 0)
+                return Rectangle.Empty;
+
+            var thumbHeight = Math.Max(20, track.Height * visible / total);
+            var maxTop = total - visible;
+            var travel = track.Height - thumbHeight;
+            var y = track.Y + (maxTop <= 0 ? 0 : travel * Math.Clamp(_topIndex, 0, maxTop) / maxTop);
+            return new Rectangle(track.X, y, track.Width, thumbHeight);
+        }
+    }
 
     /// <summary>Whether the current view lays cells out in a left-to-right grid.</summary>
     private bool IsGridView => this.View is ListViewView.LargeIcon or ListViewView.SmallIcon or ListViewView.Tile;
@@ -1292,6 +1357,12 @@ public class ListView : OwnerDrawnControl
 
         this.EndEdit(cancel: false); // a click anywhere is a commit point for a pending label edit
 
+        if (this.ScrollBarVisible && e.X >= this.Width - _ScrollBarWidth && e.Y >= this.HeaderHeight)
+        {
+            this.BeginScrollDrag(e.Y);
+            return;
+        }
+
         if (this.View == ListViewView.Details && this.ShowColumnHeaders && e.Y < this.HeaderHeight)
         {
             this.HandleHeaderClick(e.X);
@@ -1336,6 +1407,53 @@ public class ListView : OwnerDrawnControl
         _lastClickIndex = index;
         _lastClickTicks = now;
     }
+
+    // Starts a thumb drag, or pages toward a click on the track above/below the thumb.
+    private void BeginScrollDrag(int y)
+    {
+        var thumb = this.ScrollThumb;
+        if (thumb.IsEmpty)
+            return;
+
+        if (y < thumb.Y)
+            _topIndex -= this.VisibleRowCount;
+        else if (y >= thumb.Bottom)
+            _topIndex += this.VisibleRowCount;
+        else
+        {
+            _draggingScroll = true;
+            _scrollDragOffset = y - thumb.Y;
+        }
+
+        this.ClampScroll();
+        this.Invalidate();
+    }
+
+    private void ScrollDragTo(int y)
+    {
+        var track = this.ScrollTrack;
+        var total = this.FlatRowCount;
+        var visible = this.VisibleRowCount;
+        var maxTop = total - visible;
+        if (maxTop <= 0)
+            return;
+
+        var thumbHeight = Math.Max(20, track.Height * visible / total);
+        var travel = track.Height - thumbHeight;
+        _topIndex = travel <= 0 ? 0 : (y - _scrollDragOffset - track.Y) * maxTop / travel;
+        this.ClampScroll();
+        this.Invalidate();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_draggingScroll)
+            this.ScrollDragTo(e.Y);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseEventArgs e) => _draggingScroll = false;
 
     /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -1472,7 +1590,22 @@ public class ListView : OwnerDrawnControl
             y += rowHeight;
         }
 
+        this.PaintScrollBar(g, theme);
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
+    }
+
+    private void PaintScrollBar(IGraphics g, ITheme theme)
+    {
+        if (!this.ScrollBarVisible)
+            return;
+
+        var track = this.ScrollTrack;
+        g.FillRectangle(theme.ControlBackground, track);
+        g.DrawLine(theme.Border, track.X, track.Y, track.X, track.Bottom);
+
+        var thumb = this.ScrollThumb;
+        if (!thumb.IsEmpty)
+            g.FillRoundedRectangle(theme.Border, new Rectangle(thumb.X + 2, thumb.Y + 1, thumb.Width - 4, thumb.Height - 2), (thumb.Width - 4) / 2);
     }
 
     /// <summary>Draws the themed direction triangle on the active sort column's header.</summary>

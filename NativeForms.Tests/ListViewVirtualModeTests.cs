@@ -109,6 +109,64 @@ internal sealed class ListViewVirtualModeTests
     }
 
     [Test]
+    public void A_scrollbar_thumb_is_drawn_and_dragging_it_scrolls()
+    {
+        var list = new ListView { Bounds = new(0, 0, 300, 220), View = ListViewView.List };
+        list.VirtualMode = true;
+        list.VirtualListSize = 10_000;
+        list.RetrieveVirtualItem += (_, e) => e.Item = new ListViewItem("Row" + e.ItemIndex);
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(list);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        var g = canvas.RaisePaint();
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fillround")), Is.True, "the scroll thumb is drawn");
+
+        // Drag the thumb from the top of the track toward the bottom.
+        canvas.RaiseMouseDown(300 - 7, 4);      // grab the thumb near the top
+        canvas.RaiseMouseMove(300 - 7, 200);    // drag to the bottom of the track
+        canvas.RaiseMouseUp(300 - 7, 200);
+
+        var g2 = canvas.RaisePaint();
+        Assert.That(g2.Operations.Exists(o => o.Contains("\"Row0\"")), Is.False, "scrolled away from the first row");
+    }
+
+    [Test]
+    public void An_unknown_size_list_probes_until_the_provider_reports_the_end()
+    {
+        var list = new ListView { Bounds = new(0, 0, 300, 220), View = ListViewView.List };
+        list.VirtualMode = true;
+        list.VirtualListSize = -1; // unknown
+        list.RetrieveVirtualItem += (_, e) =>
+        {
+            if (e.ItemIndex >= 42)
+                e.EndOfList = true;
+            else
+                e.Item = new ListViewItem("Row" + e.ItemIndex);
+        };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(list);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        // Scroll to the bottom; the probe window keeps growing until index 42 reports the end.
+        for (var i = 0; i < 20; ++i)
+        {
+            canvas.RaiseMouseWheel(-120, 150, 150);
+            canvas.RaisePaint();
+        }
+
+        // Selecting past the discovered end is rejected, proving the extent fixed at 42.
+        list.SelectedIndex = 100;
+        Assert.That(list.SelectedIndex, Is.EqualTo(-1), "the fixed extent rejects an out-of-range index");
+        list.SelectedIndex = 41;
+        Assert.That(list.SelectedIndex, Is.EqualTo(41), "the last discovered row is selectable");
+    }
+
+    [Test]
     public void Leaving_virtual_mode_clears_the_selection()
     {
         var list = new ListView { Bounds = new(0, 0, 300, 220), View = ListViewView.List };
