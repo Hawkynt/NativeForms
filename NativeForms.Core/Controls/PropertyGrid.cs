@@ -21,6 +21,14 @@ public enum PropertyGridEditor
 
     /// <summary>A colour swatch plus its hex value in a text field.</summary>
     Color,
+
+    /// <summary>A three-state check box cycling <c>"True"</c> → <c>"False"</c> → <c>""</c> (null), for a
+    /// <c>bool?</c>.</summary>
+    TriState,
+
+    /// <summary>A 3×3 alignment picker whose value is a <see cref="System.Drawing.ContentAlignment"/> name
+    /// (e.g. <c>"MiddleCenter"</c>).</summary>
+    Align,
 }
 
 /// <summary>
@@ -50,6 +58,18 @@ public sealed class PropertyGridRow(string name, Func<string> get, Action<string
 
     /// <summary>The options for a <see cref="PropertyGridEditor.Choice"/> row.</summary>
     public IReadOnlyList<string>? Choices { get; set; }
+
+    /// <summary>The inclusive lower bound a <see cref="PropertyGridEditor.Number"/> commit is clamped to,
+    /// or <see langword="null"/> for none.</summary>
+    public double? Minimum { get; set; }
+
+    /// <summary>The inclusive upper bound a <see cref="PropertyGridEditor.Number"/> commit is clamped to,
+    /// or <see langword="null"/> for none.</summary>
+    public double? Maximum { get; set; }
+
+    /// <summary>Whether an empty value is allowed (a <c>null</c> number, or the third state of a
+    /// <see cref="PropertyGridEditor.TriState"/>). Defaults to <see langword="false"/>.</summary>
+    public bool AllowNull { get; set; }
 }
 
 /// <summary>
@@ -239,9 +259,17 @@ public class PropertyGrid : OwnerDrawnControl
                 g.DrawText(value, this.Font, theme.ControlText, new Rectangle(swatch.Right + _CellPad, y, valueRect.Width - _SwatchSize, rowHeight), ContentAlignment.MiddleLeft);
                 break;
 
-            case PropertyGridEditor.Choice:
+            case PropertyGridEditor.Choice or PropertyGridEditor.Align:
                 g.DrawText(value, this.Font, theme.ControlText, valueRect, ContentAlignment.MiddleLeft);
                 GlyphRenderer.DrawComboArrow(g, theme.ControlText, new Rectangle(this.Width - 18, y, 14, rowHeight));
+                break;
+
+            case PropertyGridEditor.TriState:
+                var tri = new Rectangle(splitX + _CellPad, y + ((rowHeight - GlyphRenderer.CheckBoxSize) / 2), GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize);
+                var isNull = value.Length == 0 || string.Equals(value, "null", StringComparison.OrdinalIgnoreCase);
+                GlyphRenderer.DrawCheckBox(g, theme, tri, string.Equals(value, "True", StringComparison.OrdinalIgnoreCase));
+                if (isNull)
+                    g.FillRectangle(theme.Accent, new Rectangle(tri.X + 3, tri.Y + 3, tri.Width - 6, tri.Height - 6)); // indeterminate square
                 break;
 
             default:
@@ -380,14 +408,34 @@ public class PropertyGrid : OwnerDrawnControl
                 this.Commit(row, next);
                 break;
 
+            case PropertyGridEditor.TriState:
+                this.Commit(row, NextTriState(row.Get(), row.AllowNull));
+                break;
+
             case PropertyGridEditor.Choice:
                 this.OpenChoice(visual, row);
+                break;
+
+            case PropertyGridEditor.Align:
+                this.OpenAlign(visual, row);
                 break;
 
             default:
                 this.BeginEdit(visual, row);
                 break;
         }
+    }
+
+    // True → False → (null) → True. The null third state only appears when the row allows it.
+    private static string NextTriState(string value, bool allowNull)
+    {
+        if (string.Equals(value, "True", StringComparison.OrdinalIgnoreCase))
+            return "False";
+
+        if (string.Equals(value, "False", StringComparison.OrdinalIgnoreCase))
+            return allowNull ? string.Empty : "True";
+
+        return "True";
     }
 
     // --- Hosted text editor ----------------------------------------------------------------------
@@ -432,12 +480,36 @@ public class PropertyGrid : OwnerDrawnControl
 
     private void Commit(PropertyGridRow row, string value)
     {
+        value = Normalize(row, value);
         var old = row.Get();
         row.Set?.Invoke(value);
         var applied = row.Get();
         this.Invalidate();
         if (!string.Equals(old, applied, StringComparison.Ordinal))
             this.OnPropertyValueChanged(new PropertyValueChangedEventArgs(row, old, applied));
+    }
+
+    // Clamps a numeric commit to the row's Min/Max and honours AllowNull; a value that will not parse is
+    // rejected by returning the current value unchanged.
+    private static string Normalize(PropertyGridRow row, string value)
+    {
+        if (row.Editor != PropertyGridEditor.Number)
+            return value;
+
+        var text = value.Trim();
+        if (text.Length == 0)
+            return row.AllowNull ? string.Empty : row.Get();
+
+        if (!double.TryParse(text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.CurrentCulture, out var d)
+            && !double.TryParse(text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out d))
+            return row.Get(); // unparseable → keep the old value
+
+        if (row.Minimum is { } min)
+            d = Math.Max(d, min);
+        if (row.Maximum is { } max)
+            d = Math.Min(d, max);
+
+        return d.ToString(System.Globalization.CultureInfo.CurrentCulture);
     }
 
     // --- Choice drop-down ------------------------------------------------------------------------
@@ -544,5 +616,79 @@ public class PropertyGrid : OwnerDrawnControl
                 return i;
 
         return -1;
+    }
+
+    // --- 3×3 alignment picker --------------------------------------------------------------------
+
+    private static readonly string[] _AlignNames =
+    [
+        "TopLeft", "TopCenter", "TopRight",
+        "MiddleLeft", "MiddleCenter", "MiddleRight",
+        "BottomLeft", "BottomCenter", "BottomRight",
+    ];
+
+    private const int _AlignCell = 22;
+
+    private IPopupPeer? _alignPopup;
+    private int _alignVisual = -1;
+
+    private void OpenAlign(int visual, PropertyGridRow row)
+    {
+        if (this.Backend is not { } backend)
+            return;
+
+        _alignVisual = visual;
+        var popup = _alignPopup ??= this.CreateAlignPopup(backend);
+        var size = new Size((3 * _AlignCell) + 2, (3 * _AlignCell) + 2);
+        var y = (visual + 1) * this.RowHeight;
+        popup.ShowAt(this.PointToScreen(new Point(this.SplitX, y)), size);
+        popup.InvalidateAll();
+    }
+
+    private IPopupPeer CreateAlignPopup(IPlatformBackend backend)
+    {
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => this.OnAlignPaint(e.Graphics);
+        popup.MouseDown += (_, e) => this.OnAlignMouseDown(e);
+        popup.Dismissed += (_, _) => _alignVisual = -1;
+        return popup;
+    }
+
+    private void OnAlignPaint(IGraphics g)
+    {
+        var theme = this.Theme;
+        var current = _alignVisual >= 0 && _alignVisual < _visual.Count && _visual[_alignVisual].RowIndex >= 0
+            ? _rows[_visual[_alignVisual].RowIndex].Get() : string.Empty;
+
+        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, (3 * _AlignCell) + 2, (3 * _AlignCell) + 2));
+        for (var i = 0; i < 9; ++i)
+        {
+            var cell = new Rectangle(1 + ((i % 3) * _AlignCell), 1 + ((i / 3) * _AlignCell), _AlignCell, _AlignCell);
+            var selected = string.Equals(_AlignNames[i], current, StringComparison.Ordinal);
+            if (selected)
+                g.FillRectangle(theme.Accent, cell);
+
+            g.DrawRectangle(theme.Border, cell);
+
+            // A small dot in the corner/edge/centre the alignment points at.
+            var dot = new Rectangle(cell.X + 3 + ((i % 3) * ((cell.Width - 9) / 2)), cell.Y + 3 + ((i / 3) * ((cell.Height - 9) / 2)), 3, 3);
+            g.FillRectangle(selected ? theme.SelectionText : theme.ControlText, dot);
+        }
+
+        g.DrawRectangle(theme.Border, new Rectangle(0, 0, (3 * _AlignCell) + 1, (3 * _AlignCell) + 1));
+    }
+
+    private void OnAlignMouseDown(MouseEventArgs e)
+    {
+        var col = Math.Clamp((e.X - 1) / _AlignCell, 0, 2);
+        var rowIndex = Math.Clamp((e.Y - 1) / _AlignCell, 0, 2);
+        var picked = _AlignNames[(rowIndex * 3) + col];
+        var visual = _alignVisual;
+        _alignPopup?.Hide();
+        _alignVisual = -1;
+        if (visual >= 0 && visual < _visual.Count && _visual[visual].RowIndex >= 0)
+            this.Commit(_rows[_visual[visual].RowIndex], picked);
+
+        this.Focus();
     }
 }

@@ -133,6 +133,65 @@ internal sealed class PropertyGridTests
     }
 
     [Test]
+    public void A_tristate_row_cycles_true_false_null()
+    {
+        var value = "True";
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddRow(new PropertyGridRow("Flag", () => value, v => value = v) { Editor = PropertyGridEditor.TriState, AllowNull = true });
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // Flag row (row 1) value cell → True→False
+        Assert.That(value, Is.EqualTo("False"));
+        canvas.RaiseMouseDown(200, 33); // False→null
+        Assert.That(value, Is.EqualTo(string.Empty));
+        canvas.RaiseMouseDown(200, 33); // null→True
+        Assert.That(value, Is.EqualTo("True"));
+    }
+
+    [Test]
+    public void A_number_row_clamps_to_its_min_and_max()
+    {
+        var value = "5";
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddRow(new PropertyGridRow("Size", () => value, v => value = v) { Editor = PropertyGridEditor.Number, Minimum = 0, Maximum = 10 });
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // open the hosted editor over "Size"
+        var editor = backend.Created.OfType<HeadlessTextBoxPeer>().Single();
+        editor.SimulateUserInput("99");
+        editor.SimulateKeyDown(Keys.Enter);
+
+        Assert.That(value, Is.EqualTo("10"), "the commit is clamped to the maximum");
+    }
+
+    [Test]
+    public void An_align_row_opens_a_3x3_picker_and_commits_the_chosen_cell()
+    {
+        var value = "TopLeft";
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddRow(new PropertyGridRow("Align", () => value, v => value = v) { Editor = PropertyGridEditor.Align });
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // open the align picker
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        popup.RaiseMouseDown(1 + 22 + 11, 1 + 22 + 11); // centre cell (col 1, row 1) → MiddleCenter
+
+        Assert.That(value, Is.EqualTo("MiddleCenter"));
+    }
+
+    [Test]
     public void Selecting_a_row_shows_its_description()
     {
         var grid = Create(new Model(), out _, out var canvas);

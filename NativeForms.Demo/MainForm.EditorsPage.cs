@@ -10,8 +10,10 @@ internal sealed partial class MainForm
     {
         public string Name = "Save button";
         public bool Enabled = true;
+        public bool? Visible = null;
         public int Width = 120;
-        public string Align = "Center";
+        public string Align = "MiddleCenter";
+        public string TextAlign = "MiddleLeft";
         public string Accent = "#FF0078D4";
     }
 
@@ -39,18 +41,32 @@ internal sealed partial class MainForm
             Editor = PropertyGridEditor.Boolean,
             Description = "Whether the widget responds to input.",
         });
+        grid.AddRow(new PropertyGridRow("Visible", () => model.Visible switch { true => "True", false => "False", null => "" }, v => model.Visible = v switch { "True" => true, "False" => false, _ => (bool?)null })
+        {
+            Category = "Behavior",
+            Editor = PropertyGridEditor.TriState,
+            AllowNull = true,
+            Description = "A three-state flag (True / False / inherit).",
+        });
         grid.AddRow(new PropertyGridRow("Width", () => model.Width.ToString(), v => { if (int.TryParse(v, out var w)) model.Width = w; })
         {
             Category = "Layout",
             Editor = PropertyGridEditor.Number,
-            Description = "The widget width in pixels.",
+            Minimum = 0,
+            Maximum = 400,
+            Description = "The widget width in pixels (0–400).",
         });
         grid.AddRow(new PropertyGridRow("Align", () => model.Align, v => model.Align = v)
         {
             Category = "Layout",
-            Editor = PropertyGridEditor.Choice,
-            Choices = new[] { "Left", "Center", "Right" },
-            Description = "Horizontal alignment of the caption.",
+            Editor = PropertyGridEditor.Align,
+            Description = "Where the widget sits in its cell (3×3 picker).",
+        });
+        grid.AddRow(new PropertyGridRow("TextAlign", () => model.TextAlign, v => model.TextAlign = v)
+        {
+            Category = "Layout",
+            Editor = PropertyGridEditor.Align,
+            Description = "Caption alignment inside the widget (3×3 picker).",
         });
         grid.PropertyValueChanged += (_, e) => this.SetStatus($"PropertyGrid: {e.Row.Name} = {e.NewValue}.");
 
