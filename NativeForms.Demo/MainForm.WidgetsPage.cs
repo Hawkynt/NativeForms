@@ -39,6 +39,13 @@ internal sealed partial class MainForm
             .Where(s => s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
         tokens.TokensChanged += (_, _) => this.SetStatus($"TokenBox: {tokens.Tokens.Count} tag(s).");
 
+        var virtualList = new ListView { Bounds = new(16, 400, 500, 220), View = ListViewView.Details, VirtualMode = true, VirtualListSize = 1_000_000 };
+        virtualList.Columns.Add(new ColumnHeader { Text = "#", Width = 90 });
+        virtualList.Columns.Add(new ColumnHeader { Text = "Generated row", Width = 380 });
+        virtualList.RetrieveVirtualItem += (_, e) =>
+            e.Item = new ListViewItem(e.ItemIndex.ToString("N0"), $"Row {e.ItemIndex:N0} — served on demand");
+        virtualList.SelectedIndexChanged += (_, _) => this.SetStatus($"Virtual ListView: row {virtualList.SelectedIndex:N0} of 1,000,000.");
+
         var nav = new NavigationView { Bounds = new(560, 36, 170, 240), ImageList = _icons };
         nav.AddItem("Home", _IconBlue);
         nav.AddItem("Files", _IconFolder);
@@ -64,6 +71,8 @@ internal sealed partial class MainForm
             toastButton,
             Caption("TokenBox (chips · × / Backspace delete · autocomplete)", 16, 276, 500),
             tokens,
+            Caption("Virtual ListView (1,000,000 rows served on demand)", 16, 376, 500),
+            virtualList,
             Caption("NavigationView (side rail · hamburger collapses to icons)", 560, 12, 420),
             nav,
             navContent,

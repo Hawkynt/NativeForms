@@ -634,7 +634,7 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `ZoomPanel` / zoomable-pannable canvas (owner) — a scrollable viewport that scales and pans its
       content (mouse-wheel zoom, drag-pan, fit/actual-size), optional rulers; the image editor's working
       surface and a document/media viewport. `PictureBox` only displays; `Panel.AutoScroll` only scrolls
-- [ ] Virtual list mode — `VirtualMode` on `ListView` (and later `DataGridView`/`TreeView`): rows served
+- [x] Virtual list mode — `VirtualMode` on `ListView` (and later `DataGridView`/`TreeView`): rows served
       by a `RetrieveVirtualItem`-style delegate over a `VirtualListSize`, so a huge folder or search
       result never materialises every item. Currently every row is a live object
 - [x] `TreeView` inline label editing — finish the existing `BeginEdit` TODO: `LabelEdit`, an overlaid

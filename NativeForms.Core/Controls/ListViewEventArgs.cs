@@ -7,6 +7,17 @@ public sealed class ColumnClickEventArgs(int column) : EventArgs
     public int Column { get; } = column;
 }
 
+/// <summary>Requests the row at <see cref="ItemIndex"/> while a <see cref="ListView"/> is in
+/// <see cref="ListView.VirtualMode"/>; the handler assigns <see cref="Item"/>.</summary>
+public sealed class RetrieveVirtualItemEventArgs(int itemIndex) : EventArgs
+{
+    /// <summary>The zero-based index of the row being fetched.</summary>
+    public int ItemIndex { get; } = itemIndex;
+
+    /// <summary>Set by the handler to the item that represents the row.</summary>
+    public ListViewItem? Item { get; set; }
+}
+
 /// <summary>Carries the item whose check state just flipped; see <see cref="ListView.ItemChecked"/>.</summary>
 public sealed class ItemCheckedEventArgs(ListViewItem item) : EventArgs
 {

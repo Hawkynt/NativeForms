@@ -79,6 +79,8 @@ public class ListView : OwnerDrawnControl
     private int _lastClickIndex = -1;
     private long _lastClickTicks;
 
+    private ListViewItem? _virtualPlaceholder;
+
     /// <summary>Creates a list view.</summary>
     public ListView()
     {
@@ -102,6 +104,68 @@ public class ListView : OwnerDrawnControl
 
     /// <summary>The groups items can join via <see cref="ListViewItem.Group"/>, rendered in this order.</summary>
     public ObservableList<ListViewGroup> Groups { get; }
+
+    /// <summary>
+    /// Whether rows are served on demand by <see cref="RetrieveVirtualItem"/> over a
+    /// <see cref="VirtualListSize"/> instead of from <see cref="Items"/>, so a huge folder or search
+    /// result never materialises every row. Selection and keyboard navigation stay index-based; grouping,
+    /// sorting, check boxes and label editing are inert while virtual. Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool VirtualMode
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.FinishSelectionGesture(this.ClearSelectionCore());
+            _focusedIndex = _anchorIndex = -1;
+            _flatDirty = true;
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>The row count exposed while <see cref="VirtualMode"/> is on. Setting it repaints.</summary>
+    public int VirtualListSize
+    {
+        get => field;
+        set
+        {
+            value = Math.Max(0, value);
+            if (field == value)
+                return;
+
+            field = value;
+            if (this.VirtualMode)
+            {
+                _flatDirty = true;
+                this.Invalidate();
+            }
+        }
+    }
+
+    /// <summary>Raised while <see cref="VirtualMode"/> is on to fetch the row at
+    /// <see cref="RetrieveVirtualItemEventArgs.ItemIndex"/>; the handler sets
+    /// <see cref="RetrieveVirtualItemEventArgs.Item"/>. Called once per visible row per paint — keep it cheap.</summary>
+    public event EventHandler<RetrieveVirtualItemEventArgs>? RetrieveVirtualItem;
+
+    /// <summary>The number of rows the presentation draws from: <see cref="VirtualListSize"/> while
+    /// virtual, otherwise <see cref="Items"/>' count.</summary>
+    private int RowSourceCount => this.VirtualMode ? this.VirtualListSize : this.Items.Count;
+
+    /// <summary>The item for a display row: fetched from <see cref="RetrieveVirtualItem"/> while virtual
+    /// (falling back to a shared blank placeholder), otherwise the model item.</summary>
+    private ListViewItem GetRowItem(int index)
+    {
+        if (!this.VirtualMode)
+            return this.Items[index];
+
+        var args = new RetrieveVirtualItemEventArgs(index);
+        this.RetrieveVirtualItem?.Invoke(this, args);
+        return args.Item ?? (_virtualPlaceholder ??= new ListViewItem(string.Empty));
+    }
 
     /// <summary>How items are arranged. Defaults to <see cref="ListViewView.Details"/>. Changing the
     /// view commits a pending label edit.</summary>
@@ -291,7 +355,7 @@ public class ListView : OwnerDrawnControl
         get => _selectedIndices.Count > 0 ? _selectedIndices[0] : -1;
         set
         {
-            var clamped = value < -1 || value >= this.Items.Count ? -1 : value;
+            var clamped = value < -1 || value >= this.RowSourceCount ? -1 : value;
             if (clamped >= 0)
             {
                 _focusedIndex = clamped;
@@ -321,7 +385,7 @@ public class ListView : OwnerDrawnControl
         get
         {
             var index = this.SelectedIndex;
-            return index >= 0 ? this.Items[index] : null;
+            return index >= 0 && index < this.RowSourceCount ? this.GetRowItem(index) : null;
         }
         set => this.SelectedIndex = value is null ? -1 : this.Items.IndexOf(value);
     }
@@ -407,7 +471,7 @@ public class ListView : OwnerDrawnControl
 
     /// <summary>Whether items are rendered under group headers right now. The List view never
     /// groups, matching <c>System.Windows.Forms.ListView</c>.</summary>
-    private bool GroupingActive => this.ShowGroups && this.Groups.Count > 0 && this.View != ListViewView.List;
+    private bool GroupingActive => !this.VirtualMode && this.ShowGroups && this.Groups.Count > 0 && this.View != ListViewView.List;
 
     /// <summary>The icon size of the large-icon views: the large image list's size, or 32×32.</summary>
     private Size LargeIconSize => this.LargeImageList?.ImageSize ?? new Size(32, 32);
@@ -571,7 +635,7 @@ public class ListView : OwnerDrawnControl
                 return rows.Count;
 
             var itemsPerRow = this.ItemsPerRow;
-            return (this.Items.Count + itemsPerRow - 1) / itemsPerRow;
+            return (this.RowSourceCount + itemsPerRow - 1) / itemsPerRow;
         }
     }
 
@@ -583,7 +647,7 @@ public class ListView : OwnerDrawnControl
 
         var itemsPerRow = this.ItemsPerRow;
         var start = rowIndex * itemsPerRow;
-        return new(-1, start, Math.Min(itemsPerRow, this.Items.Count - start));
+        return new(-1, start, Math.Min(itemsPerRow, this.RowSourceCount - start));
     }
 
     /// <summary>The pixel height of a flat row: headers at <see cref="ItemHeight"/>, item rows at the cell height.</summary>
@@ -627,7 +691,7 @@ public class ListView : OwnerDrawnControl
     public Rectangle GetItemBounds(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.Items.Count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.RowSourceCount);
 
         var position = this.DisplayPosOf(index);
         var row = this.RowOfDisplayPos(position);
@@ -647,7 +711,7 @@ public class ListView : OwnerDrawnControl
     /// <summary>Scrolls so the given item index is visible.</summary>
     public void EnsureVisible(int index)
     {
-        if (index < 0 || index >= this.Items.Count)
+        if (index < 0 || index >= this.RowSourceCount)
             return;
 
         var row = this.RowOfDisplayPos(this.DisplayPosOf(index));
@@ -827,13 +891,21 @@ public class ListView : OwnerDrawnControl
     /// <summary>Whether the row at the given index is selected.</summary>
     private bool IsSelected(int index) => _selectedIndices.BinarySearch(index) >= 0;
 
+    /// <summary>Mirrors the selection onto the model item's own flag; a no-op in virtual mode, whose rows
+    /// are transient and carry no persistent flag.</summary>
+    private void SyncItemSelected(int index, bool value)
+    {
+        if (!this.VirtualMode && index >= 0 && index < this.Items.Count)
+            this.Items[index].SetSelectedCore(value);
+    }
+
     private bool ClearSelectionCore()
     {
         if (_selectedIndices.Count == 0)
             return false;
 
         for (var i = 0; i < _selectedIndices.Count; ++i)
-            this.Items[_selectedIndices[i]].SetSelectedCore(false);
+            this.SyncItemSelected(_selectedIndices[i], false);
 
         _selectedIndices.Clear();
         return true;
@@ -846,7 +918,7 @@ public class ListView : OwnerDrawnControl
 
         this.ClearSelectionCore();
         _selectedIndices.Add(index);
-        this.Items[index].SetSelectedCore(true);
+        this.SyncItemSelected(index, true);
         return true;
     }
 
@@ -856,12 +928,12 @@ public class ListView : OwnerDrawnControl
         if (pos >= 0)
         {
             _selectedIndices.RemoveAt(pos);
-            this.Items[index].SetSelectedCore(false);
+            this.SyncItemSelected(index, false);
         }
         else
         {
             _selectedIndices.Insert(~pos, index);
-            this.Items[index].SetSelectedCore(true);
+            this.SyncItemSelected(index, true);
         }
 
         return true;
@@ -878,7 +950,7 @@ public class ListView : OwnerDrawnControl
         for (var i = low; i <= high; ++i)
         {
             _selectedIndices.Add(i);
-            this.Items[i].SetSelectedCore(true);
+            this.SyncItemSelected(i, true);
         }
 
         return true;
@@ -943,6 +1015,9 @@ public class ListView : OwnerDrawnControl
     /// <summary>Flips the check state of every selected item (or of the caret item with no selection).</summary>
     private void ToggleSelectionChecks()
     {
+        if (this.VirtualMode)
+            return; // transient virtual rows carry no persistent check state
+
         if (_selectedIndices.Count == 0)
         {
             if (_focusedIndex >= 0 && _focusedIndex < this.Items.Count)
@@ -1053,6 +1128,9 @@ public class ListView : OwnerDrawnControl
     {
         if (!this.LabelEdit)
             throw new InvalidOperationException("LabelEdit must be enabled to edit item labels.");
+
+        if (this.VirtualMode)
+            throw new InvalidOperationException("Label editing is unavailable in virtual mode.");
 
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.Items.Count);
@@ -1227,7 +1305,7 @@ public class ListView : OwnerDrawnControl
             return;
         }
 
-        if (this.CheckBoxes && this.IsInCheckGlyph(e.X, e.Y, cellBounds))
+        if (this.CheckBoxes && !this.VirtualMode && this.IsInCheckGlyph(e.X, e.Y, cellBounds))
         {
             _lastClickIndex = -1;
             this.RequestItemCheckAt(index, this.Items[index], !this.Items[index].Checked);
@@ -1286,7 +1364,7 @@ public class ListView : OwnerDrawnControl
             return;
         }
 
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         if (e.KeyCode == Keys.Enter)
         {
             if (_focusedIndex >= 0 && _focusedIndex < count)
@@ -1315,7 +1393,7 @@ public class ListView : OwnerDrawnControl
             return;
         }
 
-        if (e.KeyCode == Keys.F2 && this.LabelEdit && _focusedIndex >= 0 && _focusedIndex < count)
+        if (e.KeyCode == Keys.F2 && this.LabelEdit && !this.VirtualMode && _focusedIndex >= 0 && _focusedIndex < count)
         {
             this.BeginEdit(_focusedIndex);
             e.Handled = true;
@@ -1425,7 +1503,7 @@ public class ListView : OwnerDrawnControl
     /// <summary>Draws one item cell in the current view.</summary>
     private void PaintItem(IGraphics g, ITheme theme, int index, int cellX, int y, int cellWidth, int rowHeight)
     {
-        var item = this.Items[index];
+        var item = this.GetRowItem(index);
         var selected = this.IsSelected(index);
         switch (this.View)
         {
