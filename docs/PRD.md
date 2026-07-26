@@ -639,7 +639,7 @@ strategy (may differ per platform; note exceptions inline).
       result never materialises every item. Currently every row is a live object
 - [ ] `TreeView` inline label editing — finish the existing `BeginEdit` TODO: `LabelEdit`, an overlaid
       hosted `TextBox`, `BeforeLabelEdit`/`AfterLabelEdit` (F2/click-to-rename), mirroring `ListView`
-- [ ] `RangeSlider` (owner) — a two-thumb `TrackBar`: a lower and upper value over a min/max, the span
+- [x] `RangeSlider` (owner) — a two-thumb `TrackBar`: a lower and upper value over a min/max, the span
       between them filled, keyboard + drag per thumb, `RangeChanged`. Media trim, level/curve endpoints,
       numeric filter ranges
 - [ ] `TokenBox` / tag-and-chip input (owner) — a text field that turns committed entries into removable

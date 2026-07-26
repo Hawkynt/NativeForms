@@ -14,9 +14,14 @@ internal sealed partial class MainForm
         segmented.SetSegments("Day", "Week", "Month");
         segmented.SelectedIndexChanged += (_, _) => this.SetStatus($"SegmentedControl: {segmented.SelectedSegment}.");
 
+        var range = new RangeSlider { Bounds = new(16, 100, 300, 26), Minimum = 0, Maximum = 100, LowerValue = 25, UpperValue = 75 };
+        range.RangeChanged += (_, _) => this.SetStatus($"RangeSlider: {range.LowerValue}–{range.UpperValue}.");
+
         page.Controls.AddRange(
             Caption("SegmentedControl (mutually-exclusive toggle group)", 16, 12, 360),
-            segmented);
+            segmented,
+            Caption("RangeSlider (two-thumb range)", 16, 76, 360),
+            range);
 
         return page;
     }
