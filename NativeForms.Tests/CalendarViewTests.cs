@@ -436,7 +436,7 @@ internal sealed class CalendarViewTests
     }
 
     [Test]
-    public void Resizing_in_month_view_previews_a_ghost_over_every_covered_day()
+    public void Resizing_in_month_view_reflows_the_chip_across_every_covered_day()
     {
         var calendar = CreateCalendar(out var canvas);
         calendar.ViewMode = CalendarViewMode.Month;
@@ -449,10 +449,10 @@ internal sealed class CalendarViewTests
         canvas.RaiseMouseMove(edge + 100, cy); // extend the end one day right — the drag is live now
 
         var g = canvas.RaisePaint();
-        var ghosts = g.Operations.FindAll(o => o.StartsWith("fill #78D03030")).Count; // the translucent red ghost
+        var chips = g.Operations.FindAll(o => o.StartsWith("text ") && o.Contains("Standup")).Count;
         canvas.RaiseMouseUp(edge + 100, cy);
 
-        Assert.That(ghosts, Is.EqualTo(2), "a ghost is drawn over both the original day and the new end day");
+        Assert.That(chips, Is.EqualTo(2), "the appointment reflows as a chip in both the original and the new day cell");
     }
 
     [Test]

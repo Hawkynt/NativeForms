@@ -525,6 +525,7 @@ public class CalendarView : OwnerDrawnControl
 
         var dayStart = day.Date;
         var dayEnd = dayStart.AddDays(1);
+        var previewing = this.IsMonth && _moving && _moveIndex >= 0 && _moveIndex < _count;
         var from = this.LowerBound(dayStart.Ticks - _maxDurationTicks);
         for (var i = from; i < _count; ++i)
         {
@@ -532,14 +533,25 @@ public class CalendarView : OwnerDrawnControl
             if (appt.Start >= dayEnd)
                 break;
 
-            if (appt.AllDay != allDay)
-                continue;
+            if (appt.AllDay != allDay || (previewing && i == _moveIndex))
+                continue; // the dragged appointment is placed at its preview position below
 
             var overlaps = allDay
                 ? appt.Start.Date <= dayStart && appt.End.Date >= dayStart
                 : appt.End > dayStart && appt.Start < dayEnd;
             if (overlaps)
                 _dayScratch.Add(i);
+        }
+
+        // While a month-view move/resize is live, the dragged appointment reflows into the day cells its
+        // previewed span now covers, so the rest of the month rearranges around it instead of it overdrawing.
+        if (previewing && _appointments[_moveIndex].AllDay == allDay)
+        {
+            var overlaps = allDay
+                ? _previewStart.Date <= dayStart && _previewEnd.Date >= dayStart
+                : _previewEnd > dayStart && _previewStart < dayEnd;
+            if (overlaps)
+                _dayScratch.Add(_moveIndex);
         }
     }
 
@@ -1036,18 +1048,8 @@ public class CalendarView : OwnerDrawnControl
         for (var i = 0; i < _layout.Count; ++i)
             this.PaintChip(g, theme, _layout[i], _layout[i].Rect, compact: true);
 
-        // The ghost of an appointment being dragged or resized: a chip in every day cell the previewed
-        // span now covers, so a resize shows the whole run of days growing or shrinking, not just one.
-        if (_moving && _moveFixed)
-        {
-            var startCell = (int)(_previewStart.Date - first.Date).TotalDays;
-            var lastDay = _previewEnd.TimeOfDay == TimeSpan.Zero && _previewEnd > _previewStart
-                ? _previewEnd.Date.AddDays(-1) // an exclusive-midnight end covers through the previous day
-                : _previewEnd.Date;
-            var endCell = (int)(lastDay - first.Date).TotalDays;
-            for (var cell = Math.Max(0, startCell); cell <= endCell && cell < 42; ++cell)
-                this.PaintGhost(g, theme, new(((cell % 7) * cellWidth) + 2, top + ((cell / 7) * cellHeight) + this.Theme.RowHeight, Math.Max(1, cellWidth - 4), this.ChipHeight));
-        }
+        // No ghost overlay: while a move/resize is live the dragged appointment reflows into its previewed
+        // day cells through GatherDay, so the whole month rearranges around it rather than it overdrawing.
     }
 
     /// <summary>Paints one appointment chip: a category-coloured face, an accent bar down its left,
@@ -1575,7 +1577,14 @@ public class CalendarView : OwnerDrawnControl
             }
 
             this.UpdateMovePreview(e);
-            this.Invalidate();
+
+            // In month view the preview reflows the layout (the dragged chip moves between cells), so the
+            // layout must rebuild; the time grid keeps its stale layout and just repaints the ghost.
+            if (this.IsMonth)
+                this.InvalidateLayout();
+            else
+                this.Invalidate();
+
             return;
         }
 
