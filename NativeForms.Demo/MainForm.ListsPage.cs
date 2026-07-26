@@ -156,6 +156,7 @@ internal sealed partial class MainForm
             ImageList = _icons,
             ItemHeight = 22,
             AllowReorder = true,
+            LabelEdit = true,
         };
         var solution = new TreeNode("Solution 🗂️") { ImageIndex = _IconFolder };
         var core = new TreeNode("Core") { ImageIndex = _IconFolder };
@@ -193,6 +194,7 @@ internal sealed partial class MainForm
             => this.SetStatus($"TreeView: \"{e.Node?.Text}\" is {(e.Node?.Checked == true ? "checked" : "unchecked")}.");
         tree.AfterSelect += (_, e) => this.SetStatus($"TreeView: \"{e.Node?.Text}\" selected.");
         tree.NodeDrop += (_, e) => this.SetStatus($"TreeView: dropped \"{e.DraggedNode.Text}\" {e.Location} \"{e.TargetNode?.Text}\".");
+        tree.AfterLabelEdit += (_, e) => this.SetStatus($"TreeView: renamed to \"{e.Label}\".");
 
         var treeList = new TreeListView
         {
@@ -222,7 +224,7 @@ internal sealed partial class MainForm
         treeList.AfterSelect += (_, e) => this.SetStatus($"TreeListView: \"{e.Node?.Text}\" selected.");
 
         page.Controls.AddRange(
-            Caption("TreeView (icons + check boxes)", 664, 12),
+            Caption("TreeView (icons · check boxes · F2 renames)", 664, 12),
             tree,
             Caption("TreeListView (SetDataSource, 3 columns)", 664, 268),
             treeList);

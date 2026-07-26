@@ -637,7 +637,7 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] Virtual list mode — `VirtualMode` on `ListView` (and later `DataGridView`/`TreeView`): rows served
       by a `RetrieveVirtualItem`-style delegate over a `VirtualListSize`, so a huge folder or search
       result never materialises every item. Currently every row is a live object
-- [ ] `TreeView` inline label editing — finish the existing `BeginEdit` TODO: `LabelEdit`, an overlaid
+- [x] `TreeView` inline label editing — finish the existing `BeginEdit` TODO: `LabelEdit`, an overlaid
       hosted `TextBox`, `BeforeLabelEdit`/`AfterLabelEdit` (F2/click-to-rename), mirroring `ListView`
 - [x] `RangeSlider` (owner) — a two-thumb `TrackBar`: a lower and upper value over a min/max, the span
       between them filled, keyboard + drag per thumb, `RangeChanged`. Media trim, level/curve endpoints,

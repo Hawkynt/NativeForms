@@ -12,7 +12,7 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 /// <remarks>
 /// Connector lines are drawn solid in the theme's disabled-text color because <see cref="IGraphics"/>
-/// has no dashed strokes. TODO: label editing (<c>BeginEdit</c>, waits on the text-box overlay),
+/// has no dashed strokes. Label editing (<c>LabelEdit</c>/<c>BeginEdit</c>, F2) overlays a hosted text box,
 /// multi-selection, and a virtual-mode node API.
 /// </remarks>
 public class TreeView : OwnerDrawnControl, ITreeNodeHost
@@ -28,6 +28,8 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     private int? _itemHeight;
     private TreeNode? _lastClickNode;
     private long _lastClickTicks;
+    private TextBox? _labelEditor;
+    private TreeNode? _editNode;
 
     // Drag-and-drop state. All null/zero until a press on a node with AllowDrop on.
     private TreeNode? _pressedNode;   // node under the last left mouse-down — a drag candidate
@@ -347,6 +349,7 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
     {
+        this.EndEdit(cancel: false); // a click elsewhere commits a pending rename
         this.Focus();
         if (e.Button != MouseButtons.Left)
             return;
@@ -622,7 +625,141 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
 
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
-        => e.Handled = TreeNavigation.HandleKey(this, _rows, this.VisibleRowCount, this.CheckBoxes, e);
+    {
+        if (e.KeyCode == Keys.F2 && this.LabelEdit && _selectedNode is { } node)
+        {
+            this.BeginEdit(node);
+            e.Handled = true;
+            return;
+        }
+
+        e.Handled = TreeNavigation.HandleKey(this, _rows, this.VisibleRowCount, this.CheckBoxes, e);
+    }
+
+    /// <inheritdoc/>
+    /// <summary>Whether a node label can be renamed in place (F2 or <see cref="BeginEdit"/>).</summary>
+    public bool LabelEdit { get; set; }
+
+    /// <summary>Whether a label edit is currently open.</summary>
+    public bool IsEditing => _editNode is not null;
+
+    /// <summary>Raised before a label edit starts; a <see cref="NodeLabelEditEventArgs.CancelEdit"/> vetoes it.</summary>
+    public event EventHandler<NodeLabelEditEventArgs>? BeforeLabelEdit;
+
+    /// <summary>Raised after a label edit finished; a handler may still veto the commit.</summary>
+    public event EventHandler<NodeLabelEditEventArgs>? AfterLabelEdit;
+
+    /// <summary>Raises <see cref="BeforeLabelEdit"/>.</summary>
+    protected virtual void OnBeforeLabelEdit(NodeLabelEditEventArgs e) => this.BeforeLabelEdit?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="AfterLabelEdit"/>.</summary>
+    protected virtual void OnAfterLabelEdit(NodeLabelEditEventArgs e) => this.AfterLabelEdit?.Invoke(this, e);
+
+    /// <summary>Opens an inline editor over <paramref name="node"/>'s label, pre-filled and selected.</summary>
+    /// <exception cref="InvalidOperationException"><see cref="LabelEdit"/> is disabled.</exception>
+    public void BeginEdit(TreeNode node)
+    {
+        if (!this.LabelEdit)
+            throw new InvalidOperationException("LabelEdit must be enabled to edit node labels.");
+
+        ArgumentNullException.ThrowIfNull(node);
+        this.EndEdit(cancel: false);
+
+        var pending = new NodeLabelEditEventArgs(node, node.Text);
+        this.OnBeforeLabelEdit(pending);
+        if (pending.CancelEdit)
+            return;
+
+        var bounds = this.GetNodeLabelBounds(node);
+        if (bounds.IsEmpty)
+            return; // node is scrolled out of view
+
+        var editor = _labelEditor;
+        if (editor is null)
+        {
+            _labelEditor = editor = new() { Visible = false, TabStop = false };
+            editor.KeyDown += this.OnLabelEditorKeyDown;
+            this.Controls.Add(editor);
+        }
+
+        _editNode = node;
+        editor.Bounds = bounds;
+        editor.Text = node.Text;
+        editor.SelectionStart = 0;
+        editor.SelectionLength = node.Text.Length;
+        editor.Visible = true;
+        editor.Focus();
+        this.Invalidate();
+    }
+
+    /// <summary>Ends a pending label edit, committing the text unless <paramref name="cancel"/>. A no-op while idle.</summary>
+    public void EndEdit(bool cancel)
+    {
+        var node = _editNode;
+        if (node is null)
+            return;
+
+        _editNode = null;
+        var editor = _labelEditor!;
+        var text = editor.Text;
+        editor.Visible = false;
+
+        var args = new NodeLabelEditEventArgs(node, cancel ? null : text);
+        this.OnAfterLabelEdit(args);
+        if (!cancel && !args.CancelEdit)
+            node.Text = text;
+
+        this.Focus();
+        this.Invalidate();
+    }
+
+    private void OnLabelEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.KeyCode)
+        {
+            case Keys.Enter:
+                this.EndEdit(cancel: false);
+                e.Handled = true;
+                break;
+            case Keys.Escape:
+                this.EndEdit(cancel: true);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    /// <summary>The rectangle the label (and its hosted editor) occupies for a visible node, mirroring
+    /// the row-paint geometry; empty when the node is not on a visible row.</summary>
+    private Rectangle GetNodeLabelBounds(TreeNode node)
+    {
+        var row = -1;
+        for (var i = 0; i < _rows.Count; ++i)
+            if (ReferenceEquals(_rows[i], node))
+            {
+                row = i;
+                break;
+            }
+
+        var top = _rows.TopIndex;
+        if (row < top || row >= top + this.VisibleRowCount + 1)
+            return Rectangle.Empty;
+
+        var rowHeight = this.ItemHeight;
+        var y = (row - top) * rowHeight;
+        var x = this.GlyphCellLeft(node) + rowHeight; // content left (glyph cell + indent)
+        if (this.CheckBoxes)
+            x += _CheckCellWidth;
+
+        var images = this.ImageList;
+        if (images is not null && this.Backend is not null)
+        {
+            var index = node.ResolveIconIndex(images, ReferenceEquals(node, _selectedNode));
+            if (index >= 0 && index < images.Count)
+                x += (rowHeight - 4) + _IconGap;
+        }
+
+        return new Rectangle(x + _TextPad, y, Math.Max(24, this.Width - x - (2 * _TextPad)), rowHeight);
+    }
 
     /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
@@ -725,6 +862,9 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost
         }
 
         x = this.PaintImage(g, node, selected, x, y, rowHeight);
+
+        if (ReferenceEquals(node, _editNode))
+            return; // the hosted editor covers the label while renaming
 
         var textColor = selected ? theme.SelectionText : this.ForeColor;
         var textRect = new Rectangle(x + _TextPad, y, this.Width - x - (2 * _TextPad), rowHeight);
