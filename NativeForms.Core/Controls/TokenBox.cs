@@ -4,6 +4,21 @@ using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
+/// <summary>A per-chip visual style returned by <see cref="TokenBox.ChipStyleProvider"/>. Any
+/// <see langword="null"/> colour falls back to the accent-tinted default; <see cref="FontStyle.Regular"/>
+/// keeps the control font.</summary>
+public readonly struct TokenChipStyle
+{
+    /// <summary>The chip fill, or <see langword="null"/> for the default accent tint.</summary>
+    public Color? BackColor { get; init; }
+
+    /// <summary>The chip text and × colour, or <see langword="null"/> for the theme text colour.</summary>
+    public Color? ForeColor { get; init; }
+
+    /// <summary>The chip font style (e.g. <see cref="FontStyle.Italic"/>/<see cref="FontStyle.Bold"/>).</summary>
+    public FontStyle FontStyle { get; init; }
+}
+
 /// <summary>
 /// A tag / chip input: a text field whose committed entries become removable chips. Enter or a comma
 /// turns the typed text into a chip; each chip carries an × zone that deletes it and Backspace on the
@@ -57,6 +72,15 @@ public class TokenBox : OwnerDrawnControl
     /// <summary>A filter over a typed prefix producing suggestions dropped down under the editor, or
     /// <see langword="null"/> for no autocomplete.</summary>
     public Func<string, IReadOnlyList<string>>? AutoCompleteSource { get; set; }
+
+    /// <summary>An optional per-chip style (fill, text colour, font style) chosen from the token text, so a
+    /// host can colour-code chips or italicise/bolden them. <see langword="null"/> uses the accent-tinted
+    /// default.</summary>
+    public Func<string, TokenChipStyle>? ChipStyleProvider
+    {
+        get => field;
+        set { field = value; this.Invalidate(); }
+    }
 
     /// <summary>Raised whenever the chip set changes (add or remove).</summary>
     public event EventHandler? TokensChanged;
@@ -188,20 +212,25 @@ public class TokenBox : OwnerDrawnControl
 
         var chips = new List<Rectangle>(_tokens.Count);
         this.FlowLayout(chips);
-        var chipFill = Blend(theme.Accent, theme.FieldBackground, 0.16);
+        var defaultFill = Blend(theme.Accent, theme.FieldBackground, 0.16);
         for (var i = 0; i < chips.Count; ++i)
         {
             var chip = chips[i];
-            g.FillRoundedRectangle(chipFill, chip, _ChipHeight / 2);
-            g.DrawText(_tokens[i], this.Font, theme.ControlText,
+            var style = this.ChipStyleProvider?.Invoke(_tokens[i]) ?? default;
+            var fill = style.BackColor ?? defaultFill;
+            var ink = style.ForeColor ?? theme.ControlText;
+            var font = style.FontStyle == FontStyle.Regular ? this.Font : this.Font.WithStyle(style.FontStyle);
+
+            g.FillRoundedRectangle(fill, chip, _ChipHeight / 2);
+            g.DrawText(_tokens[i], font, ink,
                 new Rectangle(chip.X + _ChipPadX, chip.Y, chip.Width - (2 * _ChipPadX) - _RemoveZone + _ChipPadX, chip.Height),
                 ContentAlignment.MiddleLeft);
 
             // The × in the trailing remove zone.
             var cx = chip.Right - (_RemoveZone / 2) - 2;
             var cy = chip.Y + (chip.Height / 2);
-            g.DrawLine(theme.ControlText, cx - 3, cy - 3, cx + 3, cy + 3);
-            g.DrawLine(theme.ControlText, cx - 3, cy + 3, cx + 3, cy - 3);
+            g.DrawLine(ink, cx - 3, cy - 3, cx + 3, cy + 3);
+            g.DrawLine(ink, cx - 3, cy + 3, cx + 3, cy - 3);
         }
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));

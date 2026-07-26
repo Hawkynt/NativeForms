@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Drawing;
 using System.Linq;
 
 namespace Hawkynt.NativeForms.Demo;
@@ -37,6 +38,12 @@ internal sealed partial class MainForm
         tokens.AddToken("urgent");
         tokens.AutoCompleteSource = prefix => new[] { "backend", "bug", "design", "docs", "feature", "urgent" }
             .Where(s => s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
+        tokens.ChipStyleProvider = t => t switch
+        {
+            "urgent" => new TokenChipStyle { BackColor = Color.FromArgb(0xFF, 0xE8, 0x11, 0x23), ForeColor = Color.White, FontStyle = FontStyle.Bold },
+            "bug" => new TokenChipStyle { BackColor = Color.FromArgb(0xFF, 0xE8, 0x8A, 0x00), ForeColor = Color.Black, FontStyle = FontStyle.Italic },
+            _ => default,
+        };
         tokens.TokensChanged += (_, _) => this.SetStatus($"TokenBox: {tokens.Tokens.Count} tag(s).");
 
         var virtualList = new ListView { Bounds = new(16, 400, 500, 205), View = ListViewView.Details, VirtualMode = true, VirtualListSize = 1_000_000 };

@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
@@ -114,6 +115,21 @@ internal sealed class TokenBoxTests
             Assert.That(box.SuggestionsShownForTest, Is.True);
             Assert.That(box.SuggestionsForTest, Is.EqualTo(new[] { "apple", "apricot" }));
         });
+    }
+
+    [Test]
+    public void The_chip_style_provider_colours_a_chip()
+    {
+        var box = Create(out var backend, out _);
+        box.ChipStyleProvider = t => t == "hot"
+            ? new TokenChipStyle { BackColor = Color.FromArgb(0xFF, 0xE8, 0x11, 0x23), FontStyle = FontStyle.Italic }
+            : default;
+        box.AddToken("hot");
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fillround") && o.Contains("#FFE81123")), Is.True, "the chip uses the provided fill");
     }
 
     [Test]
