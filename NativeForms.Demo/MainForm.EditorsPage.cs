@@ -3,29 +3,31 @@ using System.Linq;
 
 namespace Hawkynt.NativeForms.Demo;
 
+internal enum WidgetDock { None, Left, Top, Right, Bottom, Fill }
+
+[System.Flags]
+internal enum WidgetEdges { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
+
+/// <summary>A model the property grid inspects through delegate get/set (never reflection).</summary>
+internal sealed class WidgetModel
+{
+    public string Name = "Save button";
+    public bool Enabled = true;
+    public bool? Visible = null;
+    public int Width = 120;
+    public WidgetDock Dock = WidgetDock.Top;
+    public WidgetEdges Anchor = WidgetEdges.Left | WidgetEdges.Top;
+    public System.DateOnly Created = new(2026, 7, 26);
+    public System.TimeOnly Reminder = new(9, 30);
+    public string Align = "MiddleCenter";
+    public Color Accent = Color.FromArgb(0xFF, 0x00, 0x78, 0xD4);
+}
+
 internal sealed partial class MainForm
 {
-    private enum WidgetDock { None, Left, Top, Right, Bottom, Fill }
-
-    [System.Flags]
-    private enum WidgetEdges { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
-
-    /// <summary>A model the property grid inspects through delegate get/set (never reflection).</summary>
-    private sealed class WidgetModel
-    {
-        public string Name = "Save button";
-        public bool Enabled = true;
-        public bool? Visible = null;
-        public int Width = 120;
-        public WidgetDock Dock = WidgetDock.Top;
-        public WidgetEdges Anchor = WidgetEdges.Left | WidgetEdges.Top;
-        public System.DateOnly Created = new(2026, 7, 26);
-        public System.TimeOnly Reminder = new(9, 30);
-        public string Align = "MiddleCenter";
-        public Color Accent = Color.FromArgb(0xFF, 0x00, 0x78, 0xD4);
-    }
-
-    /// <summary>The Editors page (§7.10): a reflection-free <see cref="PropertyGrid"/> inspecting a model.</summary>
+    /// <summary>The Editors page (§7.10): a reflection-free <see cref="PropertyGrid"/> built with the
+    /// strongly-typed row builder and hand-built spatial pickers. (The <c>[GridEditable]</c> source generator
+    /// that emits these rows from attributes is exercised in the test project.)</summary>
     private TabPage BuildEditorsPage()
     {
         var page = new TabPage("Editors") { ImageIndex = _IconPurple };

@@ -24,6 +24,9 @@
     <!-- For GtkNativeSizingTests, which asserts against real GTK widgets; the fixture skips itself
          on any machine without a display, so the reference costs nothing elsewhere. -->
     <ProjectReference Include="..\NativeForms.Backends.Gtk\NativeForms.Backends.Gtk.csproj" />
+    <!-- The property-grid populator source generator (compile-time only; no runtime assembly). -->
+    <ProjectReference Include="..\NativeForms.Generators\NativeForms.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
