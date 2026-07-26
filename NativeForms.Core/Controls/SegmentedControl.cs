@@ -99,11 +99,11 @@ public class SegmentedControl : OwnerDrawnControl
         for (var i = 0; i < n; ++i)
         {
             var left = i * this.Width / n;
-            var right = (i + 1) * this.Width / n;
-            var cell = new Rectangle(left, 0, right - left, this.Height);
+            var right = i == n - 1 ? outer.Right : (i + 1) * this.Width / n;
+            var cell = new Rectangle(left, outer.Y, right - left, outer.Height);
             var selected = i == this.SelectedIndex;
             if (selected)
-                g.FillRectangle(this.Enabled ? theme.Accent : theme.Border, cell);
+                this.FillSegment(g, this.Enabled ? theme.Accent : theme.Border, cell, roundLeft: i == 0, roundRight: i == n - 1);
 
             if (i > 0)
                 g.DrawLine(theme.Border, left, 1, left, this.Height - 2); // divider between segments
@@ -115,5 +115,24 @@ public class SegmentedControl : OwnerDrawnControl
         g.DrawRoundedRectangle(theme.Border, outer, _Radius);
         if (this.Focused)
             GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(2, 2, this.Width - 5, this.Height - 5));
+    }
+
+    /// <summary>Fills a segment cell rounding only the corners that sit on the strip's outer edge, so the
+    /// accent never overhangs the rounded border (a square fill would leave the border arc floating in the
+    /// corner). A middle cell squares off both sides; an end cell keeps its outer corners rounded.</summary>
+    private void FillSegment(IGraphics g, Color color, Rectangle cell, bool roundLeft, bool roundRight)
+    {
+        if (!roundLeft && !roundRight)
+        {
+            g.FillRectangle(color, cell);
+            return;
+        }
+
+        g.FillRoundedRectangle(color, cell, _Radius);
+        if (!roundLeft)
+            g.FillRectangle(color, new Rectangle(cell.X, cell.Y, _Radius, cell.Height));   // square the inner (left) side
+
+        if (!roundRight)
+            g.FillRectangle(color, new Rectangle(cell.Right - _Radius, cell.Y, _Radius, cell.Height)); // square the inner (right) side
     }
 }
