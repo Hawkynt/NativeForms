@@ -485,6 +485,11 @@ public class Breadcrumb : OwnerDrawnControl
                 e.Handled = true;
                 break;
 
+            case Keys.Tab:
+                this.OnTab();
+                e.Handled = true;
+                break;
+
             case Keys.Escape when open:
                 this.HideSuggestions(); // first Escape closes the list, a second one cancels the edit
                 e.Handled = true;
@@ -495,6 +500,24 @@ public class Breadcrumb : OwnerDrawnControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    /// <summary>Tab completes the field with the highlighted (or first) suggestion when there is more to
+    /// fill, keeping the edit field open; once the text already equals that suggestion — or there is nothing
+    /// to complete — Tab leaves the edit field, so a second Tab moves on rather than staying in text mode.</summary>
+    private void OnTab()
+    {
+        if (_suggestShown && _suggestions.Count > 0 && _editor is { } editor)
+        {
+            var pick = _suggestHover >= 0 ? _suggestHover : 0;
+            if (!string.Equals(editor.Text, _suggestions[pick], StringComparison.Ordinal))
+            {
+                this.CompleteWith(pick); // fill the completion and stay
+                return;
+            }
+        }
+
+        this.EndEdit(commit: true); // nothing left to complete → leave the edit field
     }
 
     /// <summary>As the user types, lists every prefix match in a drop-down below the editor.</summary>
@@ -602,10 +625,8 @@ public class Breadcrumb : OwnerDrawnControl
                 e.Handled = true;
                 break;
 
-            case Keys.Tab when _suggestions.Count > 0:
-                // Tab completes the field with the highlighted suggestion (or the first) but stays in the
-                // edit field — the caret lands at the end and the list refilters, so the user can keep typing.
-                this.CompleteWith(_suggestHover >= 0 ? _suggestHover : 0);
+            case Keys.Tab:
+                this.OnTab();
                 e.Handled = true;
                 break;
 

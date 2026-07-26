@@ -272,6 +272,25 @@ internal sealed class BreadcrumbTests
     }
 
     [Test]
+    public void A_second_Tab_with_nothing_left_to_complete_leaves_the_edit_field()
+    {
+        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };
+        crumb.AutoCompleteSource = _ => ["Documents", "Downloads", "Music"];
+        Realize(crumb, out var backend);
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("Do");
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        popup.RaiseKeyDown(Keys.Down); // highlight "Documents"
+        popup.RaiseKeyDown(Keys.Tab);  // completes → "Documents", stays editing
+        Assert.That(crumb.IsEditing, Is.True);
+
+        popup.RaiseKeyDown(Keys.Tab);  // nothing left to complete → leaves the edit field
+
+        Assert.That(crumb.IsEditing, Is.False, "the field no longer traps Tab once the completion is in");
+    }
+
+    [Test]
     public void Picking_a_suggestion_commits_it_as_the_path()
     {
         var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };
