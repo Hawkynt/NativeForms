@@ -66,6 +66,19 @@ internal sealed class NavigationViewTests
     }
 
     [Test]
+    public void Collapsing_narrows_the_rail_and_expanding_restores_its_width()
+    {
+        var nav = Create(out var canvas);
+        Assert.That(nav.Width, Is.EqualTo(200));
+
+        canvas.RaiseMouseDown(100, 17); // hamburger → collapse
+        Assert.That(nav.Width, Is.EqualTo(44), "collapsed to the icons-only strip");
+
+        canvas.RaiseMouseDown(20, 17); // hamburger (now inside the 44-px strip) → expand
+        Assert.That(nav.Width, Is.EqualTo(200), "expanding restores the previous width");
+    }
+
+    [Test]
     public void The_selected_row_carries_an_accent_stripe()
     {
         var nav = Create(out var canvas);

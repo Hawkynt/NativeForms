@@ -57,11 +57,27 @@ public class NavigationView : OwnerDrawnControl
 
     private int _selectedIndex = -1;
 
-    /// <summary>Whether the rail is collapsed to an icons-only strip. Toggled by the hamburger button.</summary>
+    private int _expandedWidth;
+
+    /// <summary>Whether the rail is collapsed to an icons-only strip. Toggled by the hamburger button.
+    /// Collapsing narrows the rail to <see cref="_CollapsedWidth"/> and expanding restores the width it
+    /// had before, so the content region beside it reflows automatically.</summary>
     public bool Collapsed
     {
         get => field;
-        set { if (field != value) { field = value; this.Invalidate(); this.OnCollapsedChanged(EventArgs.Empty); } }
+        set
+        {
+            if (field == value)
+                return;
+
+            if (value)
+                _expandedWidth = this.Width;
+
+            field = value;
+            this.Width = value ? _CollapsedWidth : Math.Max(_CollapsedWidth, _expandedWidth);
+            this.Invalidate();
+            this.OnCollapsedChanged(EventArgs.Empty);
+        }
     }
 
     /// <summary>Raised when <see cref="SelectedIndex"/> changes.</summary>
