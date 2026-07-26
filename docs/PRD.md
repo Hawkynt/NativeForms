@@ -642,7 +642,7 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `RangeSlider` (owner) — a two-thumb `TrackBar`: a lower and upper value over a min/max, the span
       between them filled, keyboard + drag per thumb, `RangeChanged`. Media trim, level/curve endpoints,
       numeric filter ranges
-- [ ] `TokenBox` / tag-and-chip input (owner) — a text field that turns committed entries into removable
+- [x] `TokenBox` / tag-and-chip input (owner) — a text field that turns committed entries into removable
       chips (× to delete, Backspace deletes the last), a delegate `AutoCompleteSource`, `Tokens` +
       `TokensChanged`. Tags, recipients, search scopes
 - [x] `NavigationView` / side-bar shell (owner) — a collapsible left navigation pane of icon+caption

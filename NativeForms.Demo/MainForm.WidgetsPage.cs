@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 
 namespace Hawkynt.NativeForms.Demo;
 
@@ -31,6 +32,13 @@ internal sealed partial class MainForm
         var toastButton = new Button { Bounds = new(16, 220, 160, 30), Text = "Show a toast" };
         toastButton.Click += (_, _) => Toast.Show(this, "Saved", "Your changes are saved.", InfoBarSeverity.Success);
 
+        var tokens = new TokenBox { Bounds = new(16, 300, 500, 60), PlaceholderText = "Add a tag…" };
+        tokens.AddToken("design");
+        tokens.AddToken("urgent");
+        tokens.AutoCompleteSource = prefix => new[] { "backend", "bug", "design", "docs", "feature", "urgent" }
+            .Where(s => s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
+        tokens.TokensChanged += (_, _) => this.SetStatus($"TokenBox: {tokens.Tokens.Count} tag(s).");
+
         var nav = new NavigationView { Bounds = new(560, 36, 170, 240), ImageList = _icons };
         nav.AddItem("Home", _IconBlue);
         nav.AddItem("Files", _IconFolder);
@@ -46,6 +54,8 @@ internal sealed partial class MainForm
             Caption("InfoBar (inline banner · severity · action · dismiss)", 16, 140, 500),
             info,
             toastButton,
+            Caption("TokenBox (chips · × / Backspace delete · autocomplete)", 16, 276, 500),
+            tokens,
             Caption("NavigationView (side rail · hamburger collapses to icons)", 560, 12, 420),
             nav,
             navContent);
