@@ -252,6 +252,26 @@ internal sealed class BreadcrumbTests
     }
 
     [Test]
+    public void Tab_completes_with_the_highlighted_suggestion_but_stays_editing()
+    {
+        var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };
+        crumb.AutoCompleteSource = _ => ["Documents", "Downloads", "Music"];
+        Realize(crumb, out var backend);
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("Do"); // opens the drop-down with Documents, Downloads
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        popup.RaiseKeyDown(Keys.Down); // highlight "Documents"
+        popup.RaiseKeyDown(Keys.Tab);  // complete with it
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(crumb.EditorText, Is.EqualTo("Documents"), "the field is completed with the highlighted suggestion");
+            Assert.That(crumb.IsEditing, Is.True, "Tab stays in the edit field rather than committing");
+        });
+    }
+
+    [Test]
     public void Picking_a_suggestion_commits_it_as_the_path()
     {
         var crumb = new Breadcrumb { Bounds = new(0, 0, 400, 24) };

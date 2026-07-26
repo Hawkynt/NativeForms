@@ -602,6 +602,13 @@ public class Breadcrumb : OwnerDrawnControl
                 e.Handled = true;
                 break;
 
+            case Keys.Tab when _suggestions.Count > 0:
+                // Tab completes the field with the highlighted suggestion (or the first) but stays in the
+                // edit field — the caret lands at the end and the list refilters, so the user can keep typing.
+                this.CompleteWith(_suggestHover >= 0 ? _suggestHover : 0);
+                e.Handled = true;
+                break;
+
             case Keys.Enter when _suggestHover >= 0:
                 this.ApplySuggestion(_suggestHover);
                 e.Handled = true;
@@ -694,6 +701,17 @@ public class Breadcrumb : OwnerDrawnControl
         _editorPrevText = _editor.Text;
         this.HideSuggestions();
         this.EndEdit(commit: true);
+    }
+
+    /// <summary>Fills the editor with a suggestion but stays in the edit field — Tab-completion. The text
+    /// change refilters the list so what remains typed keeps offering completions.</summary>
+    private void CompleteWith(int index)
+    {
+        if (_editor is not { } editor || index < 0 || index >= _suggestions.Count)
+            return;
+
+        editor.Text = _suggestions[index]; // not guarded by _autoCompleting, so OnEditorTextChanged refilters
+        editor.SelectionStart = editor.Text.Length; // caret at the end, ready to keep typing
     }
 
     private void CommitPath(string text)
