@@ -119,19 +119,28 @@ public static class Toast
                 if (entry.Life <= 0)
                     entry.Leaving = true;
 
-                var targetY = entry.Leaving ? entry.TargetY + _BarHeight + _Gap : entry.TargetY;
-                var targetOpacity = entry.Leaving ? 0.0 : 1.0;
-
                 var bar = entry.Bar;
-                var newY = (int)Math.Round(bar.Bounds.Y + ((targetY - bar.Bounds.Y) * _Ease));
-                bar.Bounds = new Rectangle(bar.Bounds.X, newY, bar.Bounds.Width, bar.Bounds.Height);
-                bar.Opacity += (targetOpacity - bar.Opacity) * _Ease;
-
-                if (entry.Leaving && bar.Opacity <= 0.03)
+                if (entry.Leaving)
                 {
-                    bar.Parent?.Controls.Remove(bar);
-                    _entries.RemoveAt(i);
-                    this.Relayout();
+                    // Exit by collapsing toward the bottom edge (bottom pinned) and fading — never past the
+                    // form's client area, so the window is not resized to fit a child that slid off-screen.
+                    var bottom = entry.TargetY + _BarHeight;
+                    var newHeight = (int)Math.Round(bar.Bounds.Height * (1 - _Ease));
+                    bar.Opacity += (0.0 - bar.Opacity) * _Ease;
+                    bar.Bounds = new Rectangle(bar.Bounds.X, bottom - newHeight, bar.Bounds.Width, Math.Max(0, newHeight));
+
+                    if (bar.Opacity <= 0.05 || newHeight <= 2)
+                    {
+                        bar.Parent?.Controls.Remove(bar);
+                        _entries.RemoveAt(i);
+                        this.Relayout();
+                    }
+                }
+                else
+                {
+                    var newY = (int)Math.Round(bar.Bounds.Y + ((entry.TargetY - bar.Bounds.Y) * _Ease));
+                    bar.Bounds = new Rectangle(bar.Bounds.X, newY, bar.Bounds.Width, _BarHeight);
+                    bar.Opacity += (1.0 - bar.Opacity) * _Ease;
                 }
             }
 
