@@ -192,7 +192,7 @@ internal sealed class PropertyGridTests
     }
 
     [Test]
-    public void A_color_row_opens_a_palette_and_commits_the_picked_swatch()
+    public void A_color_row_hosts_the_real_ColorPicker_and_commits_its_colour()
     {
         var value = "#FFFFFFFF";
         var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
@@ -203,11 +203,11 @@ internal sealed class PropertyGridTests
         Application.Run(form, backend);
         var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
 
-        canvas.RaiseMouseDown(200, 33); // open the palette
-        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
-        popup.RaiseMouseDown(10, 10); // the first swatch (Black)
+        canvas.RaiseMouseDown(200, 33); // open the hosted ColorPicker over the "Fill" cell
+        var picker = grid.Controls.OfType<ColorPicker>().Single();
+        picker.SelectedColor = Color.FromArgb(0xFF, 0x11, 0x22, 0x33);
 
-        Assert.That(value, Is.EqualTo("#000000FF"));
+        Assert.That(value, Is.EqualTo("#112233FF"), "the row commits the picker's colour as hex");
     }
 
     [Test]

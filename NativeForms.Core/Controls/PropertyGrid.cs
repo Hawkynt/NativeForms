@@ -240,7 +240,10 @@ public class PropertyGrid : OwnerDrawnControl
         g.DrawText(row.Name, this.Font, nameColor, new Rectangle(_Indent + _CellPad, y, splitX - _Indent - (2 * _CellPad), rowHeight), ContentAlignment.MiddleLeft);
 
         if (_editVisual >= 0 && _visual[_editVisual].RowIndex >= 0 && ReferenceEquals(_rows[_visual[_editVisual].RowIndex], row))
-            return; // the hosted editor covers this value cell
+            return; // the hosted text editor covers this value cell
+
+        if (this.IsColorEditing(row))
+            return; // the hosted colour picker covers this value cell
 
         var valueRect = new Rectangle(splitX + _CellPad, y, this.Width - splitX - (2 * _CellPad), rowHeight);
         var value = row.Get();
@@ -302,6 +305,7 @@ public class PropertyGrid : OwnerDrawnControl
 
         this.EnsureVisual();
         this.EndEdit(commit: true);
+        this.EndColorEdit();
 
         if (Math.Abs(e.X - this.SplitX) <= 3 && e.Y < this.GridBottom)
         {
@@ -698,70 +702,60 @@ public class PropertyGrid : OwnerDrawnControl
 
     // --- Colour palette picker -------------------------------------------------------------------
 
-    private const int _SwatchCell = 18;
-    private const int _PaletteCols = 8;
-
-    private static readonly Color[] _Palette =
-    [
-        Color.Black, Color.DimGray, Color.Gray, Color.Silver, Color.Gainsboro, Color.White, Color.Snow, Color.Ivory,
-        Color.Firebrick, Color.Red, Color.OrangeRed, Color.Orange, Color.Gold, Color.Yellow, Color.GreenYellow, Color.Lime,
-        Color.SeaGreen, Color.Green, Color.Teal, Color.Turquoise, Color.DeepSkyBlue, Color.DodgerBlue, Color.RoyalBlue, Color.Navy,
-        Color.Indigo, Color.BlueViolet, Color.MediumOrchid, Color.Violet, Color.HotPink, Color.DeepPink, Color.Brown, Color.SaddleBrown,
-    ];
-
-    private IPopupPeer? _colorPopup;
-    private int _colorVisual = -1;
+    // A Color row hosts the real ColorPicker over its value cell (re-using its full mixer, numeric tabs and
+    // eyedropper) rather than a bespoke palette — one colour UI across the toolkit.
+    private ColorPicker? _colorEditor;
+    private int _colorEditVisual = -1;
 
     private void OpenColor(int visual, PropertyGridRow row)
     {
-        if (this.Backend is not { } backend)
-            return;
-
-        _colorVisual = visual;
-        var popup = _colorPopup ??= this.CreateColorPopup(backend);
-        var rows = (_Palette.Length + _PaletteCols - 1) / _PaletteCols;
-        var size = new Size((_PaletteCols * _SwatchCell) + 2, (rows * _SwatchCell) + 2);
-        var y = (visual + 1) * this.RowHeight;
-        popup.ShowAt(this.PointToScreen(new Point(this.SplitX, y)), size);
-        popup.InvalidateAll();
-    }
-
-    private IPopupPeer CreateColorPopup(IPlatformBackend backend)
-    {
-        var popup = backend.CreatePopup(this.OwnerWindowPeer);
-        popup.Paint += (_, e) => this.OnColorPaint(e.Graphics);
-        popup.MouseDown += (_, e) => this.OnColorMouseDown(e);
-        popup.Dismissed += (_, _) => _colorVisual = -1;
-        return popup;
-    }
-
-    private void OnColorPaint(IGraphics g)
-    {
-        var theme = this.Theme;
-        var rows = (_Palette.Length + _PaletteCols - 1) / _PaletteCols;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, (_PaletteCols * _SwatchCell) + 2, (rows * _SwatchCell) + 2));
-        for (var i = 0; i < _Palette.Length; ++i)
+        if (_colorEditor is null)
         {
-            var cell = new Rectangle(1 + ((i % _PaletteCols) * _SwatchCell), 1 + ((i / _PaletteCols) * _SwatchCell), _SwatchCell, _SwatchCell);
-            g.FillRectangle(_Palette[i], new Rectangle(cell.X + 1, cell.Y + 1, cell.Width - 2, cell.Height - 2));
-            g.DrawRectangle(theme.Border, cell);
+            _colorEditor = new ColorPicker { Visible = false, TabStop = false };
+            _colorEditor.SelectedColorChanged += this.OnColorEditorChanged;
+            this.Controls.Add(_colorEditor);
         }
+
+        _colorEditVisual = visual;
+        var y = visual * this.RowHeight;
+        var splitX = this.SplitX;
+        _colorEditor.Bounds = new Rectangle(splitX + _CellPad, y, this.Width - splitX - (2 * _CellPad), this.RowHeight);
+        if (ColorMath.TryParseHex(row.Get(), out var current))
+            _colorEditor.SelectedColor = current;
+
+        _colorEditor.Visible = true;
+        _colorEditor.Focus();
+        _colorEditor.OpenDropDown();
+        this.Invalidate();
     }
 
-    private void OnColorMouseDown(MouseEventArgs e)
+    private void OnColorEditorChanged(object? sender, EventArgs e)
     {
-        var col = (e.X - 1) / _SwatchCell;
-        var rowIndex = (e.Y - 1) / _SwatchCell;
-        var index = (rowIndex * _PaletteCols) + col;
-        var visual = _colorVisual;
-        _colorPopup?.Hide();
-        _colorVisual = -1;
-        if (col < 0 || col >= _PaletteCols || index < 0 || index >= _Palette.Length)
+        if (_colorEditVisual < 0 || _colorEditVisual >= _visual.Count)
             return;
 
-        if (visual >= 0 && visual < _visual.Count && _visual[visual].RowIndex >= 0)
-            this.Commit(_rows[_visual[visual].RowIndex], ColorMath.ToHex(_Palette[index], withAlpha: true));
+        var rowIndex = _visual[_colorEditVisual].RowIndex;
+        if (rowIndex >= 0)
+            this.Commit(_rows[rowIndex], ColorMath.ToHex(_colorEditor!.SelectedColor, withAlpha: true));
+    }
 
-        this.Focus();
+    /// <summary>Whether the given row is the one the hosted colour picker currently covers.</summary>
+    private bool IsColorEditing(PropertyGridRow row)
+        => _colorEditVisual >= 0 && _colorEditVisual < _visual.Count && _visual[_colorEditVisual].RowIndex >= 0
+            && ReferenceEquals(_rows[_visual[_colorEditVisual].RowIndex], row);
+
+    private void EndColorEdit()
+    {
+        if (_colorEditVisual < 0)
+            return;
+
+        _colorEditVisual = -1;
+        if (_colorEditor is { } editor)
+        {
+            editor.CloseDropDown();
+            editor.Visible = false;
+        }
+
+        this.Invalidate();
     }
 }
