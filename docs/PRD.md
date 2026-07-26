@@ -651,7 +651,7 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `InfoBar` / banner + in-app `Toast` (owner) — an inline dismissible message strip (info/success/
       warning/error severity with an icon, title, message and optional action button) and a transient
       corner toast over the form. `NotifyIcon` is only the OS tray; there is no in-window messaging surface
-- [ ] `SegmentedControl` (owner) — a horizontal group of mutually-exclusive toggle segments (the
+- [x] `SegmentedControl` (owner) — a horizontal group of mutually-exclusive toggle segments (the
       button-styled radio group / iOS-style picker), `SelectedIndex` + `SelectedIndexChanged`. Composable
       from `RadioButton` today but wanted as one control for toolbars and settings
 
