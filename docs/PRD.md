@@ -648,7 +648,7 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `NavigationView` / side-bar shell (owner) — a collapsible left navigation pane of icon+caption
       items (and sub-items), a selected-item accent, an optional hamburger collapse to icons-only, and a
       content region; the modern settings/browser app frame. `Accordion` is close but is not a nav shell
-- [ ] `InfoBar` / banner + in-app `Toast` (owner) — an inline dismissible message strip (info/success/
+- [x] `InfoBar` / banner + in-app `Toast` (owner) — an inline dismissible message strip (info/success/
       warning/error severity with an icon, title, message and optional action button) and a transient
       corner toast over the form. `NotifyIcon` is only the OS tray; there is no in-window messaging surface
 - [x] `SegmentedControl` (owner) — a horizontal group of mutually-exclusive toggle segments (the
