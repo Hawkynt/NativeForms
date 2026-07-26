@@ -623,7 +623,7 @@ strategy (may differ per platform; note exceptions inline).
       Tab to complete-and-stay, a second Tab to leave the field)
 
 ### 7.10 App-shell & advanced controls (planned — the pieces a file explorer / image editor / media player / coding IDE / browser shell / settings app still need)
-- [ ] `PropertyGrid` (owner) — two-column name/value editor grouped by category, with per-row typed
+- [x] `PropertyGrid` (owner) — two-column name/value editor grouped by category, with per-row typed
       inline editors (text, checkbox/bool, numeric, dropdown/enum, colour, browse); reflection-free
       (delegate/selector-driven rows), expandable categories, a description strip, `SelectedObject` via
       a supplied row model, and `PropertyValueChanged`. Used by settings, the IDE and file properties
