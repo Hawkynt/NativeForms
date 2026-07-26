@@ -619,7 +619,41 @@ strategy (may differ per platform; note exceptions inline).
       virtual namespaces (archives, remote trees) supported — with a configurable `PathSeparator`.
       `Editable` turns an empty-space click into a hosted `TextBox` path field: Enter reparses through a
       `PathParser` delegate and raises `PathEntered`, Escape reverts, and an `AutoCompleteSource`
-      delegate appends the first matching completion for acceptance
+      delegate drops down a suggestion list that filters as you type (arrow/Enter/click to pick,
+      Tab to complete-and-stay, a second Tab to leave the field)
+
+### 7.10 App-shell & advanced controls (planned — the pieces a file explorer / image editor / media player / coding IDE / browser shell / settings app still need)
+- [ ] `PropertyGrid` (owner) — two-column name/value editor grouped by category, with per-row typed
+      inline editors (text, checkbox/bool, numeric, dropdown/enum, colour, browse); reflection-free
+      (delegate/selector-driven rows), expandable categories, a description strip, `SelectedObject` via
+      a supplied row model, and `PropertyValueChanged`. Used by settings, the IDE and file properties
+- [ ] `CodeTextBox` / syntax-highlighting editor (owner) — a multiline text surface with a line-number
+      gutter, current-line highlight, tab/indent handling, and a pluggable delegate tokenizer for
+      colouring (keyword/string/comment spans); optional autocomplete popup reusing the light-dismiss
+      `IPopupPeer`. The IDE's centrepiece; `RichTextBox` only covers basic RTF
+- [ ] `ZoomPanel` / zoomable-pannable canvas (owner) — a scrollable viewport that scales and pans its
+      content (mouse-wheel zoom, drag-pan, fit/actual-size), optional rulers; the image editor's working
+      surface and a document/media viewport. `PictureBox` only displays; `Panel.AutoScroll` only scrolls
+- [ ] Virtual list mode — `VirtualMode` on `ListView` (and later `DataGridView`/`TreeView`): rows served
+      by a `RetrieveVirtualItem`-style delegate over a `VirtualListSize`, so a huge folder or search
+      result never materialises every item. Currently every row is a live object
+- [ ] `TreeView` inline label editing — finish the existing `BeginEdit` TODO: `LabelEdit`, an overlaid
+      hosted `TextBox`, `BeforeLabelEdit`/`AfterLabelEdit` (F2/click-to-rename), mirroring `ListView`
+- [ ] `RangeSlider` (owner) — a two-thumb `TrackBar`: a lower and upper value over a min/max, the span
+      between them filled, keyboard + drag per thumb, `RangeChanged`. Media trim, level/curve endpoints,
+      numeric filter ranges
+- [ ] `TokenBox` / tag-and-chip input (owner) — a text field that turns committed entries into removable
+      chips (× to delete, Backspace deletes the last), a delegate `AutoCompleteSource`, `Tokens` +
+      `TokensChanged`. Tags, recipients, search scopes
+- [ ] `NavigationView` / side-bar shell (owner) — a collapsible left navigation pane of icon+caption
+      items (and sub-items), a selected-item accent, an optional hamburger collapse to icons-only, and a
+      content region; the modern settings/browser app frame. `Accordion` is close but is not a nav shell
+- [ ] `InfoBar` / banner + in-app `Toast` (owner) — an inline dismissible message strip (info/success/
+      warning/error severity with an icon, title, message and optional action button) and a transient
+      corner toast over the form. `NotifyIcon` is only the OS tray; there is no in-window messaging surface
+- [ ] `SegmentedControl` (owner) — a horizontal group of mutually-exclusive toggle segments (the
+      button-styled radio group / iOS-style picker), `SelectedIndex` + `SelectedIndexChanged`. Composable
+      from `RadioButton` today but wanted as one control for toolbars and settings
 
 ---
 
