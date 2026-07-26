@@ -631,7 +631,7 @@ strategy (may differ per platform; note exceptions inline).
       gutter, current-line highlight, tab/indent handling, and a pluggable delegate tokenizer for
       colouring (keyword/string/comment spans); optional autocomplete popup reusing the light-dismiss
       `IPopupPeer`. The IDE's centrepiece; `RichTextBox` only covers basic RTF
-- [ ] `ZoomPanel` / zoomable-pannable canvas (owner) — a scrollable viewport that scales and pans its
+- [x] `ZoomPanel` / zoomable-pannable canvas (owner) — a scrollable viewport that scales and pans its
       content (mouse-wheel zoom, drag-pan, fit/actual-size), optional rulers; the image editor's working
       surface and a document/media viewport. `PictureBox` only displays; `Panel.AutoScroll` only scrolls
 - [ ] Virtual list mode — `VirtualMode` on `ListView` (and later `DataGridView`/`TreeView`): rows served

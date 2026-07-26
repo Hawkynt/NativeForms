@@ -46,6 +46,14 @@ internal sealed partial class MainForm
         var navContent = new Label { Bounds = new(742, 44, 260, 22), Text = "NavigationView content: Home" };
         nav.SelectedIndexChanged += (_, _) => navContent.Text = $"NavigationView content: {nav.Items[nav.SelectedIndex]}";
 
+        var zoom = new ZoomPanel { Bounds = new(560, 300, 440, 300), ShowRulers = true };
+        zoom.Image = _backend.CreateImage(320, 200, GradientPixels(320, 200, Color.RoyalBlue, Color.Orange));
+        zoom.ZoomChanged += (_, _) => this.SetStatus($"ZoomPanel: {zoom.Zoom * 100:F0}%.");
+        var fitButton = new Button { Bounds = new(560, 606, 90, 26), Text = "Fit" };
+        fitButton.Click += (_, _) => zoom.FitToWindow();
+        var actualButton = new Button { Bounds = new(658, 606, 90, 26), Text = "100%" };
+        actualButton.Click += (_, _) => zoom.ActualSize();
+
         page.Controls.AddRange(
             Caption("SegmentedControl (mutually-exclusive toggle group)", 16, 12, 360),
             segmented,
@@ -58,7 +66,11 @@ internal sealed partial class MainForm
             tokens,
             Caption("NavigationView (side rail · hamburger collapses to icons)", 560, 12, 420),
             nav,
-            navContent);
+            navContent,
+            Caption("ZoomPanel (wheel-zoom · drag-pan · rulers · fit/actual)", 560, 276, 440),
+            zoom,
+            fitButton,
+            actualButton);
 
         return page;
     }
