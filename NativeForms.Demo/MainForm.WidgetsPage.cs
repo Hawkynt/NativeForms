@@ -31,6 +31,13 @@ internal sealed partial class MainForm
         var toastButton = new Button { Bounds = new(16, 220, 160, 30), Text = "Show a toast" };
         toastButton.Click += (_, _) => Toast.Show(this, "Saved", "Your changes are saved.", InfoBarSeverity.Success);
 
+        var nav = new NavigationView { Bounds = new(560, 36, 170, 240), ImageList = _icons };
+        nav.AddItem("Home", _IconBlue);
+        nav.AddItem("Files", _IconFolder);
+        nav.AddItem("Settings", _IconOpen);
+        var navContent = new Label { Bounds = new(742, 44, 260, 22), Text = "NavigationView content: Home" };
+        nav.SelectedIndexChanged += (_, _) => navContent.Text = $"NavigationView content: {nav.Items[nav.SelectedIndex]}";
+
         page.Controls.AddRange(
             Caption("SegmentedControl (mutually-exclusive toggle group)", 16, 12, 360),
             segmented,
@@ -38,7 +45,10 @@ internal sealed partial class MainForm
             range,
             Caption("InfoBar (inline banner · severity · action · dismiss)", 16, 140, 500),
             info,
-            toastButton);
+            toastButton,
+            Caption("NavigationView (side rail · hamburger collapses to icons)", 560, 12, 420),
+            nav,
+            navContent);
 
         return page;
     }

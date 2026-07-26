@@ -645,7 +645,7 @@ strategy (may differ per platform; note exceptions inline).
 - [ ] `TokenBox` / tag-and-chip input (owner) — a text field that turns committed entries into removable
       chips (× to delete, Backspace deletes the last), a delegate `AutoCompleteSource`, `Tokens` +
       `TokensChanged`. Tags, recipients, search scopes
-- [ ] `NavigationView` / side-bar shell (owner) — a collapsible left navigation pane of icon+caption
+- [x] `NavigationView` / side-bar shell (owner) — a collapsible left navigation pane of icon+caption
       items (and sub-items), a selected-item accent, an optional hamburger collapse to icons-only, and a
       content region; the modern settings/browser app frame. `Accordion` is close but is not a nav shell
 - [x] `InfoBar` / banner + in-app `Toast` (owner) — an inline dismissible message strip (info/success/
