@@ -420,6 +420,10 @@ public class PropertyGrid : OwnerDrawnControl
                 this.OpenAlign(visual, row);
                 break;
 
+            case PropertyGridEditor.Color:
+                this.OpenColor(visual, row);
+                break;
+
             default:
                 this.BeginEdit(visual, row);
                 break;
@@ -688,6 +692,75 @@ public class PropertyGrid : OwnerDrawnControl
         _alignVisual = -1;
         if (visual >= 0 && visual < _visual.Count && _visual[visual].RowIndex >= 0)
             this.Commit(_rows[_visual[visual].RowIndex], picked);
+
+        this.Focus();
+    }
+
+    // --- Colour palette picker -------------------------------------------------------------------
+
+    private const int _SwatchCell = 18;
+    private const int _PaletteCols = 8;
+
+    private static readonly Color[] _Palette =
+    [
+        Color.Black, Color.DimGray, Color.Gray, Color.Silver, Color.Gainsboro, Color.White, Color.Snow, Color.Ivory,
+        Color.Firebrick, Color.Red, Color.OrangeRed, Color.Orange, Color.Gold, Color.Yellow, Color.GreenYellow, Color.Lime,
+        Color.SeaGreen, Color.Green, Color.Teal, Color.Turquoise, Color.DeepSkyBlue, Color.DodgerBlue, Color.RoyalBlue, Color.Navy,
+        Color.Indigo, Color.BlueViolet, Color.MediumOrchid, Color.Violet, Color.HotPink, Color.DeepPink, Color.Brown, Color.SaddleBrown,
+    ];
+
+    private IPopupPeer? _colorPopup;
+    private int _colorVisual = -1;
+
+    private void OpenColor(int visual, PropertyGridRow row)
+    {
+        if (this.Backend is not { } backend)
+            return;
+
+        _colorVisual = visual;
+        var popup = _colorPopup ??= this.CreateColorPopup(backend);
+        var rows = (_Palette.Length + _PaletteCols - 1) / _PaletteCols;
+        var size = new Size((_PaletteCols * _SwatchCell) + 2, (rows * _SwatchCell) + 2);
+        var y = (visual + 1) * this.RowHeight;
+        popup.ShowAt(this.PointToScreen(new Point(this.SplitX, y)), size);
+        popup.InvalidateAll();
+    }
+
+    private IPopupPeer CreateColorPopup(IPlatformBackend backend)
+    {
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => this.OnColorPaint(e.Graphics);
+        popup.MouseDown += (_, e) => this.OnColorMouseDown(e);
+        popup.Dismissed += (_, _) => _colorVisual = -1;
+        return popup;
+    }
+
+    private void OnColorPaint(IGraphics g)
+    {
+        var theme = this.Theme;
+        var rows = (_Palette.Length + _PaletteCols - 1) / _PaletteCols;
+        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, (_PaletteCols * _SwatchCell) + 2, (rows * _SwatchCell) + 2));
+        for (var i = 0; i < _Palette.Length; ++i)
+        {
+            var cell = new Rectangle(1 + ((i % _PaletteCols) * _SwatchCell), 1 + ((i / _PaletteCols) * _SwatchCell), _SwatchCell, _SwatchCell);
+            g.FillRectangle(_Palette[i], new Rectangle(cell.X + 1, cell.Y + 1, cell.Width - 2, cell.Height - 2));
+            g.DrawRectangle(theme.Border, cell);
+        }
+    }
+
+    private void OnColorMouseDown(MouseEventArgs e)
+    {
+        var col = (e.X - 1) / _SwatchCell;
+        var rowIndex = (e.Y - 1) / _SwatchCell;
+        var index = (rowIndex * _PaletteCols) + col;
+        var visual = _colorVisual;
+        _colorPopup?.Hide();
+        _colorVisual = -1;
+        if (col < 0 || col >= _PaletteCols || index < 0 || index >= _Palette.Length)
+            return;
+
+        if (visual >= 0 && visual < _visual.Count && _visual[visual].RowIndex >= 0)
+            this.Commit(_rows[_visual[visual].RowIndex], ColorMath.ToHex(_Palette[index], withAlpha: true));
 
         this.Focus();
     }

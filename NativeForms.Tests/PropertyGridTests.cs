@@ -192,6 +192,25 @@ internal sealed class PropertyGridTests
     }
 
     [Test]
+    public void A_color_row_opens_a_palette_and_commits_the_picked_swatch()
+    {
+        var value = "#FFFFFFFF";
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddRow(new PropertyGridRow("Fill", () => value, v => value = v) { Editor = PropertyGridEditor.Color });
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // open the palette
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        popup.RaiseMouseDown(10, 10); // the first swatch (Black)
+
+        Assert.That(value, Is.EqualTo("#000000FF"));
+    }
+
+    [Test]
     public void Selecting_a_row_shows_its_description()
     {
         var grid = Create(new Model(), out _, out var canvas);
