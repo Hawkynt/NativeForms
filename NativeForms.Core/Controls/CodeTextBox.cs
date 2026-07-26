@@ -94,6 +94,11 @@ public class CodeTextBox : OwnerDrawnControl
 
     private int CharWidth => _charWidth ??= Math.Max(1, this.Backend?.MeasureText("0", this.Font).Width ?? 7);
     private int LineHeight => _lineHeight ??= Math.Max(1, this.Backend?.MeasureText("Ag", this.Font).Height ?? 16);
+
+    /// <summary>The pixel width of a text run in the current font — measured, not a monospace estimate, so
+    /// the caret and coloured spans line up under a proportional font too.</summary>
+    private int MeasureWidth(string text)
+        => text.Length == 0 ? 0 : this.Backend?.MeasureText(text, this.Font).Width ?? (text.Length * this.CharWidth);
     private int VisibleLines => Math.Max(1, this.Height / this.LineHeight);
     private int GutterWidth => this.ShowLineNumbers ? (Math.Max(2, _lines.Count.ToString().Length) * this.CharWidth) + (2 * _GutterPad) : 0;
     private int TextLeft => this.GutterWidth + _TextPad;
@@ -195,7 +200,8 @@ public class CodeTextBox : OwnerDrawnControl
             return;
 
         var slice = text.Substring(start, length);
-        g.DrawText(slice, this.Font, color, new Rectangle(textLeft + (start * charWidth), y, length * charWidth * 2, lineHeight), ContentAlignment.MiddleLeft);
+        var x = textLeft + this.MeasureWidth(text[..start]);
+        g.DrawText(slice, this.Font, color, new Rectangle(x, y, this.MeasureWidth(slice) + charWidth, lineHeight), ContentAlignment.MiddleLeft);
     }
 
     private void PaintSelection(IGraphics g, ITheme theme, int lineIndex, int y, int textLeft, int charWidth, int lineHeight)
@@ -207,10 +213,14 @@ public class CodeTextBox : OwnerDrawnControl
         if (lineIndex < startLine || lineIndex > endLine)
             return;
 
+        var line = _lines[lineIndex];
         var from = lineIndex == startLine ? startCol : 0;
-        var to = lineIndex == endLine ? endCol : _lines[lineIndex].Length + 1; // +1 shows the trailing newline
-        var x = textLeft + (from * charWidth);
-        g.FillRectangle(theme.SelectionBackground, new Rectangle(x, y, Math.Max(charWidth / 2, (to - from) * charWidth), lineHeight));
+        var to = lineIndex == endLine ? endCol : line.Length;
+        var x = textLeft + this.MeasureWidth(line[..Math.Min(from, line.Length)]);
+        var width = this.MeasureWidth(line[Math.Min(from, line.Length)..Math.Min(to, line.Length)]);
+        if (lineIndex != endLine)
+            width += charWidth; // a trailing sliver hints the wrapped newline is part of the selection
+        g.FillRectangle(theme.SelectionBackground, new Rectangle(x, y, Math.Max(charWidth / 2, width), lineHeight));
     }
 
     private void PaintCaret(IGraphics g, ITheme theme, int textLeft, int charWidth, int lineHeight)
@@ -218,7 +228,7 @@ public class CodeTextBox : OwnerDrawnControl
         if (_caretLine < _topLine || _caretLine >= _topLine + this.VisibleLines + 1)
             return;
 
-        var x = textLeft + (_caretCol * charWidth);
+        var x = textLeft + this.MeasureWidth(_lines[_caretLine][.._caretCol]);
         var y = (_caretLine - _topLine) * lineHeight;
         g.DrawLine(theme.ControlText, x, y + 1, x, y + lineHeight - 1);
     }
@@ -276,8 +286,23 @@ public class CodeTextBox : OwnerDrawnControl
     private void CaretFromPoint(int x, int y, out int line, out int col)
     {
         line = Math.Clamp(_topLine + (y / this.LineHeight), 0, _lines.Count - 1);
-        var rawCol = (x - this.TextLeft + (this.CharWidth / 2)) / this.CharWidth;
-        col = Math.Clamp(rawCol, 0, _lines[line].Length);
+
+        // Walk columns, accumulating measured widths, and land on the glyph boundary nearest the click.
+        var text = _lines[line];
+        var target = x - this.TextLeft;
+        var prev = 0;
+        col = text.Length;
+        for (var i = 1; i <= text.Length; ++i)
+        {
+            var w = this.MeasureWidth(text[..i]);
+            if (w >= target)
+            {
+                col = target - prev < w - target ? i - 1 : i;
+                return;
+            }
+
+            prev = w;
+        }
     }
 
     /// <inheritdoc/>
