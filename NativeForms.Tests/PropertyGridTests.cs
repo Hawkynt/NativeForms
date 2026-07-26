@@ -210,6 +210,67 @@ internal sealed class PropertyGridTests
         Assert.That(value, Is.EqualTo("#112233FF"), "the row commits the picker's colour as hex");
     }
 
+    private enum Fruit { Apple, Banana, Cherry }
+
+    [Test]
+    public void Typed_AddRow_infers_the_editor_from_the_value_type()
+    {
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        var flag = true;
+        var maybe = (bool?)null;
+        var count = 3;
+        var tint = Color.Red;
+        var r1 = grid.AddRow("Flag", () => flag, v => flag = v);
+        var r2 = grid.AddRow("Maybe", () => maybe, v => maybe = v);
+        var r3 = grid.AddRow("Count", () => count, v => count = v, minimum: 0, maximum: 10);
+        var r4 = grid.AddRow("Tint", () => tint, v => tint = v);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(r1.Editor, Is.EqualTo(PropertyGridEditor.Boolean));
+            Assert.That(r2.Editor, Is.EqualTo(PropertyGridEditor.TriState));
+            Assert.That(r2.AllowNull, Is.True);
+            Assert.That(r3.Editor, Is.EqualTo(PropertyGridEditor.Number));
+            Assert.That(r3.Maximum, Is.EqualTo(10));
+            Assert.That(r4.Editor, Is.EqualTo(PropertyGridEditor.Color));
+        });
+    }
+
+    [Test]
+    public void Typed_AddRow_round_trips_the_value_through_its_editor()
+    {
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        var count = 3;
+        var row = grid.AddRow("Count", () => count, v => count = v, minimum: 0, maximum: 10);
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        Assert.That(row.Get(), Is.EqualTo("3"), "the getter formats the typed value");
+
+        canvas.RaiseMouseDown(200, 33); // open the hosted editor
+        var editor = backend.Created.OfType<HeadlessTextBoxPeer>().Single();
+        editor.SimulateUserInput("99");
+        editor.SimulateKeyDown(Keys.Enter);
+
+        Assert.That(count, Is.EqualTo(10), "the typed setter parses and the number editor clamps to the max");
+    }
+
+    [Test]
+    public void AddEnumRow_lists_the_enum_names_and_commits_a_pick()
+    {
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        var fruit = Fruit.Apple;
+        var row = grid.AddEnumRow("Fruit", () => fruit, v => fruit = v);
+
+        Assert.That(row.Choices, Is.EqualTo(new[] { "Apple", "Banana", "Cherry" }));
+
+        row.Set!("Cherry");
+        Assert.That(fruit, Is.EqualTo(Fruit.Cherry));
+    }
+
     [Test]
     public void Selecting_a_row_shows_its_description()
     {

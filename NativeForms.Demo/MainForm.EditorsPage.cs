@@ -5,6 +5,8 @@ namespace Hawkynt.NativeForms.Demo;
 
 internal sealed partial class MainForm
 {
+    private enum WidgetDock { None, Left, Top, Right, Bottom, Fill }
+
     /// <summary>A model the property grid inspects through delegate get/set (never reflection).</summary>
     private sealed class WidgetModel
     {
@@ -12,9 +14,10 @@ internal sealed partial class MainForm
         public bool Enabled = true;
         public bool? Visible = null;
         public int Width = 120;
+        public WidgetDock Dock = WidgetDock.Top;
         public string Align = "MiddleCenter";
         public string TextAlign = "MiddleLeft";
-        public string Accent = "#FF0078D4";
+        public Color Accent = Color.FromArgb(0xFF, 0x00, 0x78, 0xD4);
     }
 
     /// <summary>The Editors page (§7.10): a reflection-free <see cref="PropertyGrid"/> inspecting a model.</summary>
@@ -24,38 +27,14 @@ internal sealed partial class MainForm
         var model = new WidgetModel();
 
         var grid = new PropertyGrid { Bounds = new(16, 36, 380, 380) };
-        grid.AddRow(new PropertyGridRow("Name", () => model.Name, v => model.Name = v)
-        {
-            Category = "Appearance",
-            Description = "The caption shown on the widget.",
-        });
-        grid.AddRow(new PropertyGridRow("Accent", () => model.Accent, v => model.Accent = v)
-        {
-            Category = "Appearance",
-            Editor = PropertyGridEditor.Color,
-            Description = "The widget's accent colour (hex RRGGBBAA).",
-        });
-        grid.AddRow(new PropertyGridRow("Enabled", () => model.Enabled ? "True" : "False", v => model.Enabled = v == "True")
-        {
-            Category = "Behavior",
-            Editor = PropertyGridEditor.Boolean,
-            Description = "Whether the widget responds to input.",
-        });
-        grid.AddRow(new PropertyGridRow("Visible", () => model.Visible switch { true => "True", false => "False", null => "" }, v => model.Visible = v switch { "True" => true, "False" => false, _ => (bool?)null })
-        {
-            Category = "Behavior",
-            Editor = PropertyGridEditor.TriState,
-            AllowNull = true,
-            Description = "A three-state flag (True / False / inherit).",
-        });
-        grid.AddRow(new PropertyGridRow("Width", () => model.Width.ToString(), v => { if (int.TryParse(v, out var w)) model.Width = w; })
-        {
-            Category = "Layout",
-            Editor = PropertyGridEditor.Number,
-            Minimum = 0,
-            Maximum = 400,
-            Description = "The widget width in pixels (0–400).",
-        });
+
+        // The strongly-typed builder infers the editor, formatting and parsing from the field type.
+        grid.AddRow("Name", () => model.Name, v => model.Name = v, category: "Appearance", description: "The caption shown on the widget.");
+        grid.AddRow("Accent", () => model.Accent, v => model.Accent = v, category: "Appearance", description: "The widget's accent colour.");
+        grid.AddRow("Enabled", () => model.Enabled, v => model.Enabled = v, category: "Behavior", description: "Whether the widget responds to input.");
+        grid.AddRow("Visible", () => model.Visible, v => model.Visible = v, category: "Behavior", description: "A three-state flag (True / False / inherit).");
+        grid.AddRow("Width", () => model.Width, v => model.Width = v, category: "Layout", description: "The widget width in pixels (0–400).", minimum: 0, maximum: 400);
+        grid.AddEnumRow("Dock", () => model.Dock, v => model.Dock = v, category: "Layout", description: "Which edge the widget docks to.");
         grid.AddRow(new PropertyGridRow("Align", () => model.Align, v => model.Align = v)
         {
             Category = "Layout",

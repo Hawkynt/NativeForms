@@ -125,6 +125,131 @@ public class PropertyGrid : OwnerDrawnControl
         this.Invalidate();
     }
 
+    /// <summary>
+    /// Adds a strongly-typed row, inferring the editor and the value's text formatting / parsing from
+    /// <typeparamref name="T"/> at compile time — no per-row <see cref="PropertyGridRow.Get"/>/<see
+    /// cref="PropertyGridRow.Set"/> string plumbing and no reflection: <c>bool</c> → check box,
+    /// <c>bool?</c> → tristate, a numeric type → number (clamped to <paramref name="minimum"/>/
+    /// <paramref name="maximum"/>, or nullable → allows empty), <see cref="System.Drawing.Color"/> →
+    /// colour picker, everything else → text. Use <see cref="AddEnumRow{TEnum}"/> for an enum drop-down.
+    /// </summary>
+    public PropertyGridRow AddRow<T>(
+        string name,
+        Func<T> get,
+        Action<T> set,
+        string? category = null,
+        string? description = null,
+        double? minimum = null,
+        double? maximum = null)
+    {
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(set);
+
+        var nullable = Nullable.GetUnderlyingType(typeof(T)) is not null;
+        var underlying = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+        var row = new PropertyGridRow(name, () => FormatValue(get()), s =>
+        {
+            try { set(ParseValue<T>(s)); }
+            catch (FormatException) { /* keep the old value on bad input */ }
+            catch (OverflowException) { }
+            catch (ArgumentException) { }
+        })
+        {
+            Editor = EditorFor(underlying, nullable),
+            Minimum = minimum,
+            Maximum = maximum,
+            AllowNull = nullable,
+            Description = description,
+        };
+
+        if (category is not null)
+            row.Category = category;
+
+        this.AddRow(row);
+        return row;
+    }
+
+    /// <summary>Adds a drop-down row for an enum, its options being the enum's names — fully generic, so it
+    /// stays reflection-free and AOT-safe.</summary>
+    public PropertyGridRow AddEnumRow<TEnum>(
+        string name,
+        Func<TEnum> get,
+        Action<TEnum> set,
+        string? category = null,
+        string? description = null)
+        where TEnum : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(set);
+
+        var row = new PropertyGridRow(name, () => get().ToString(), s =>
+        {
+            if (Enum.TryParse<TEnum>(s, out var value))
+                set(value);
+        })
+        {
+            Editor = PropertyGridEditor.Choice,
+            Choices = Enum.GetNames<TEnum>(),
+            Description = description,
+        };
+
+        if (category is not null)
+            row.Category = category;
+
+        this.AddRow(row);
+        return row;
+    }
+
+    private static PropertyGridEditor EditorFor(Type underlying, bool nullable)
+        => underlying == typeof(bool) ? (nullable ? PropertyGridEditor.TriState : PropertyGridEditor.Boolean)
+            : underlying == typeof(Color) ? PropertyGridEditor.Color
+            : IsNumeric(underlying) ? PropertyGridEditor.Number
+            : PropertyGridEditor.Text;
+
+    private static bool IsNumeric(Type t)
+        => t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte)
+            || t == typeof(uint) || t == typeof(ulong) || t == typeof(ushort)
+            || t == typeof(double) || t == typeof(float) || t == typeof(decimal);
+
+    private static string FormatValue<T>(T value) => value switch
+    {
+        null => string.Empty,
+        bool b => b ? "True" : "False",
+        Color c => ColorMath.ToHex(c, withAlpha: true),
+        string s => s,
+        IFormattable f => f.ToString(null, System.Globalization.CultureInfo.CurrentCulture),
+        _ => value.ToString() ?? string.Empty,
+    };
+
+    private static T ParseValue<T>(string text)
+    {
+        var nullableUnderlying = Nullable.GetUnderlyingType(typeof(T));
+        if (nullableUnderlying is not null && string.IsNullOrWhiteSpace(text))
+            return default!; // an empty value on a nullable type is null
+
+        var target = nullableUnderlying ?? typeof(T);
+        object parsed;
+        if (target == typeof(bool))
+            parsed = string.Equals(text.Trim(), "True", StringComparison.OrdinalIgnoreCase);
+        else if (target == typeof(Color))
+        {
+            ColorMath.TryParseHex(text, out var c);
+            parsed = c;
+        }
+        else if (target == typeof(string))
+            return (T)(object)text;
+        else if (target == typeof(DateTime))
+            parsed = DateTime.Parse(text, System.Globalization.CultureInfo.CurrentCulture);
+        else if (target == typeof(DateOnly))
+            parsed = DateOnly.Parse(text, System.Globalization.CultureInfo.CurrentCulture);
+        else if (target == typeof(TimeOnly))
+            parsed = TimeOnly.Parse(text, System.Globalization.CultureInfo.CurrentCulture);
+        else
+            parsed = Convert.ChangeType(text, target, System.Globalization.CultureInfo.CurrentCulture);
+
+        return (T)parsed;
+    }
+
     /// <summary>Removes every row.</summary>
     public void ClearRows()
     {
