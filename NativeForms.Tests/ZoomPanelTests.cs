@@ -130,6 +130,26 @@ internal sealed class ZoomPanelTests
     }
 
     [Test]
+    public void Clicking_the_readout_opens_an_editor_that_sets_an_exact_zoom()
+    {
+        var panel = new ZoomPanel { Bounds = new(0, 0, 400, 300) };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(panel);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        panel.ActualSize();
+
+        // The read-out is the trailing 42 px of the control: x ≈ 400-8-1 = 391, y ≈ 283.
+        canvas.RaiseMouseDown(400 - 12, 283);
+        var editor = backend.Created.OfType<HeadlessTextBoxPeer>().Single();
+        editor.SimulateUserInput("250");
+        editor.SimulateKeyDown(Keys.Enter);
+
+        Assert.That(panel.Zoom, Is.EqualTo(2.5).Within(0.001), "typing 250 sets 250%");
+    }
+
+    [Test]
     public void The_grid_draws_lines_when_enabled_and_zoomed_in()
     {
         var panel = new ZoomPanel { Bounds = new(0, 0, 400, 300), ShowZoomControl = false };

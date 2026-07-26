@@ -325,6 +325,11 @@ public class ZoomPanel : OwnerDrawnControl
         get { var r = this.ZoomControlRect; return new Rectangle(r.X + _ZoomButton, r.Y, _ZoomBarWidth, r.Height); }
     }
 
+    private Rectangle ZoomReadoutRect
+    {
+        get { var r = this.ZoomControlRect; return new Rectangle(r.Right - 42, r.Y, 42, r.Height); }
+    }
+
     private void PaintZoomControl(IGraphics g, ITheme theme, Rectangle view)
     {
         if (view.Width < 260 || view.Height < 60)
@@ -348,8 +353,58 @@ public class ZoomPanel : OwnerDrawnControl
         var thumbX = slider.X + (int)Math.Round(t * slider.Width);
         g.FillRectangle(theme.Accent, new Rectangle(thumbX - 2, slider.Y + 2, 4, slider.Height - 4));
 
-        // The percentage read-out.
-        g.DrawText($"{Math.Round(_zoom * 100)}%", this.Font, theme.ControlText, new Rectangle(plus.Right + 2, r.Y, 42, r.Height), ContentAlignment.MiddleLeft);
+        // The percentage read-out (click to type an exact level; hidden while its editor is open).
+        if (_zoomEditor is not { Visible: true })
+            g.DrawText($"{Math.Round(_zoom * 100)}%", this.Font, theme.ControlText, this.ZoomReadoutRect, ContentAlignment.MiddleLeft);
+    }
+
+    // A tiny hosted editor over the percentage read-out: click it, type a level, Enter applies it.
+    private TextBox? _zoomEditor;
+
+    private void OpenZoomEditor()
+    {
+        if (_zoomEditor is null)
+        {
+            _zoomEditor = new FramelessTextBox { TabStop = false };
+            _zoomEditor.KeyDown += this.OnZoomEditorKeyDown;
+            this.Controls.Add(_zoomEditor);
+        }
+
+        _zoomEditor.Bounds = this.ZoomReadoutRect;
+        _zoomEditor.Text = ((int)Math.Round(_zoom * 100)).ToString();
+        _zoomEditor.Visible = true;
+        _zoomEditor.SelectionStart = 0;
+        _zoomEditor.SelectionLength = _zoomEditor.Text.Length;
+        _zoomEditor.Focus();
+        this.Invalidate();
+    }
+
+    private void OnZoomEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Enter)
+        {
+            var text = _zoomEditor!.Text.Replace("%", string.Empty).Trim();
+            if (double.TryParse(text, out var percent) && percent > 0)
+                this.Zoom = percent / 100.0;
+
+            this.CloseZoomEditor();
+            e.Handled = true;
+        }
+        else if (e.KeyCode == Keys.Escape)
+        {
+            this.CloseZoomEditor();
+            e.Handled = true;
+        }
+    }
+
+    private void CloseZoomEditor()
+    {
+        if (_zoomEditor is not { Visible: true })
+            return;
+
+        _zoomEditor.Visible = false;
+        this.Focus();
+        this.Invalidate();
     }
 
     private double ZoomToFraction(double zoom)
@@ -409,6 +464,8 @@ public class ZoomPanel : OwnerDrawnControl
             _draggingZoom = true;
             this.ZoomFromSlider(x);
         }
+        else if (this.ZoomReadoutRect.Contains(x, y))
+            this.OpenZoomEditor();
         else if (x < slider.X)
             this.Zoom = _zoom / _WheelStep;
         else
