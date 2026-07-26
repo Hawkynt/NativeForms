@@ -1,25 +1,35 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 
 /// <summary>
 /// A multiline plain-text code surface: a line-number gutter, a current-line highlight, tab/indent
-/// handling, and a pluggable delegate <see cref="Tokenizer"/> that colours keyword / string / comment /
-/// number spans per line. The caret and selection are managed by the control (it owner-draws the text,
-/// so colouring stays native-themed). The editing centrepiece an IDE builds on — richer than
-/// <see cref="RichTextBox"/>'s flat RTF for source code.
+/// handling, a pluggable delegate <see cref="Tokenizer"/> that colours keyword / string / comment /
+/// number spans per line, and an optional <see cref="CompletionProvider"/> autocomplete drop-down. The
+/// caret and selection are managed by the control (it owner-draws the text, so colouring stays
+/// native-themed). The editing centrepiece an IDE builds on — richer than <see cref="RichTextBox"/>'s flat
+/// RTF for source code.
 /// </summary>
 public class CodeTextBox : OwnerDrawnControl
 {
     private const int _GutterPad = 6;
     private const int _TextPad = 4;
+    private const int _MaxCompletionRows = 8;
 
     private readonly List<string> _lines = [""];
     private int _caretLine, _caretCol;
     private int _anchorLine, _anchorCol;   // selection origin; equals the caret when there is no selection
     private int _topLine;                  // first visible line
     private int? _charWidth, _lineHeight;
+
+    // The autocomplete drop-down: a grabbing popup whose keys are routed back into the editor.
+    private IPopupPeer? _completionPopup;
+    private readonly List<string> _completions = [];
+    private int _completionHover = -1;
+    private bool _completionShown;
+    private int _completionWordStart;
 
     /// <summary>The tab stop width in spaces. Tab inserts this many spaces. Defaults to 4.</summary>
     public int TabWidth
@@ -49,6 +59,17 @@ public class CodeTextBox : OwnerDrawnControl
         get => field;
         set { field = value; this.Invalidate(); }
     }
+
+    /// <summary>Produces completion candidates for the identifier prefix before the caret, or
+    /// <see langword="null"/> for no autocomplete. Invoked on Ctrl+Space and as an identifier is typed;
+    /// picking a candidate replaces the current word. Return an empty list to close the drop-down.</summary>
+    public Func<string, IReadOnlyList<string>>? CompletionProvider { get; set; }
+
+    /// <summary>Whether the completion drop-down is open — for headless tests.</summary>
+    internal bool CompletionShownForTest => _completionShown;
+
+    /// <summary>The current completion candidates — for headless tests.</summary>
+    internal IReadOnlyList<string> CompletionsForTest => _completions;
 
     /// <summary>The whole document. Getting joins the lines with '\n'; setting splits on newlines and
     /// resets the caret to the start.</summary>
@@ -321,6 +342,7 @@ public class CodeTextBox : OwnerDrawnControl
 
         this.InsertText(e.KeyChar.ToString());
         e.Handled = true;
+        this.MaybeAutoComplete();
     }
 
     /// <inheritdoc/>
@@ -337,6 +359,7 @@ public class CodeTextBox : OwnerDrawnControl
             case Keys.PageUp: this.MoveCaret(-this.VisibleLines, 0, e.Shift); break;
             case Keys.PageDown: this.MoveCaret(this.VisibleLines, 0, e.Shift); break;
             case Keys.A when e.Control: this.SelectAll(); break;
+            case Keys.Space when e.Control: this.ShowCompletion(); e.Handled = true; return;
             case Keys.Enter: this.InsertNewLine(); break;
             case Keys.Tab: this.InsertText(new string(' ', this.TabWidth)); break;
             case Keys.Back: this.Backspace(); break;
@@ -354,6 +377,175 @@ public class CodeTextBox : OwnerDrawnControl
         _anchorLine = _anchorCol = 0;
         _caretLine = _lines.Count - 1;
         _caretCol = _lines[_caretLine].Length;
+    }
+
+    // --- Autocomplete drop-down ------------------------------------------------------------------
+
+    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+    private int WordStart()
+    {
+        var line = _lines[_caretLine];
+        var i = _caretCol;
+        while (i > 0 && IsWordChar(line[i - 1]))
+            --i;
+
+        return i;
+    }
+
+    /// <summary>Auto-opens (or refilters) the completion list as an identifier is typed.</summary>
+    private void MaybeAutoComplete()
+    {
+        if (this.CompletionProvider is null)
+            return;
+
+        if (_caretCol > 0 && IsWordChar(_lines[_caretLine][_caretCol - 1]))
+            this.ShowCompletion();
+        else
+            this.HideCompletion();
+    }
+
+    /// <summary>Opens or refilters the completion list for the identifier before the caret.</summary>
+    public void ShowCompletion()
+    {
+        if (this.CompletionProvider is not { } provider || this.Backend is not { } backend)
+            return;
+
+        _completionWordStart = this.WordStart();
+        var prefix = _lines[_caretLine][_completionWordStart.._caretCol];
+
+        _completions.Clear();
+        foreach (var candidate in provider(prefix))
+        {
+            _completions.Add(candidate);
+            if (_completions.Count >= _MaxCompletionRows)
+                break;
+        }
+
+        if (_completions.Count == 0)
+        {
+            this.HideCompletion();
+            return;
+        }
+
+        if (_completionHover >= _completions.Count)
+            _completionHover = 0;
+        else if (_completionHover < 0)
+            _completionHover = 0;
+
+        var popup = _completionPopup ??= this.CreateCompletionPopup(backend);
+        var rows = Math.Min(_completions.Count, _MaxCompletionRows);
+        var y = ((_caretLine - _topLine) + 1) * this.LineHeight;
+        var x = this.TextLeft + this.MeasureWidth(_lines[_caretLine][.._completionWordStart]);
+        if (_completionShown)
+        {
+            popup.InvalidateAll();
+            return;
+        }
+
+        popup.ShowAt(this.PointToScreen(new Point(x, y)), new Size(180, rows * this.LineHeight));
+        popup.InvalidateAll();
+        _completionShown = true;
+    }
+
+    private void HideCompletion()
+    {
+        _completionHover = -1;
+        if (!_completionShown)
+            return;
+
+        _completionShown = false;
+        _completionPopup?.Hide();
+        this.Focus();
+    }
+
+    private IPopupPeer CreateCompletionPopup(IPlatformBackend backend)
+    {
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => this.OnCompletionPaint(e.Graphics);
+        popup.MouseMove += (_, e) => this.OnCompletionMouseMove(e);
+        popup.MouseDown += (_, e) => this.OnCompletionMouseDown(e);
+        popup.KeyDown += (_, e) => this.OnCompletionKeyDown(e);
+        popup.KeyPress += (_, e) => this.OnCompletionKeyPress(e);
+        popup.Dismissed += (_, _) => { _completionShown = false; _completionHover = -1; };
+        return popup;
+    }
+
+    private void OnCompletionPaint(IGraphics g)
+    {
+        var theme = this.Theme;
+        var lineHeight = this.LineHeight;
+        var rows = Math.Min(_completions.Count, _MaxCompletionRows);
+        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, 180, rows * lineHeight));
+        for (var i = 0; i < rows; ++i)
+        {
+            var row = new Rectangle(0, i * lineHeight, 180, lineHeight);
+            if (i == _completionHover)
+                GlyphRenderer.FillSelection(g, theme, row);
+
+            g.DrawText(_completions[i], this.Font, i == _completionHover ? theme.SelectionText : theme.ControlText,
+                new Rectangle(row.X + 4, row.Y, row.Width - 8, row.Height), ContentAlignment.MiddleLeft);
+        }
+
+        g.DrawRectangle(theme.Border, new Rectangle(0, 0, 179, (rows * lineHeight) - 1));
+    }
+
+    private void OnCompletionMouseMove(MouseEventArgs e)
+    {
+        var hover = e.Y / this.LineHeight;
+        if (hover == _completionHover || hover < 0 || hover >= Math.Min(_completions.Count, _MaxCompletionRows))
+            return;
+
+        _completionHover = hover;
+        _completionPopup?.InvalidateAll();
+    }
+
+    private void OnCompletionMouseDown(MouseEventArgs e) => this.AcceptCompletion(e.Y / this.LineHeight);
+
+    private void OnCompletionKeyDown(KeyEventArgs e)
+    {
+        var count = Math.Min(_completions.Count, _MaxCompletionRows);
+        switch (e.KeyCode)
+        {
+            case Keys.Down: _completionHover = _completionHover + 1 >= count ? 0 : _completionHover + 1; _completionPopup?.InvalidateAll(); e.Handled = true; break;
+            case Keys.Up: _completionHover = _completionHover <= 0 ? count - 1 : _completionHover - 1; _completionPopup?.InvalidateAll(); e.Handled = true; break;
+            case Keys.Enter or Keys.Tab: this.AcceptCompletion(_completionHover); e.Handled = true; break;
+            case Keys.Escape: this.HideCompletion(); e.Handled = true; break;
+            case Keys.Back:
+                this.HideCompletion();
+                this.Backspace();
+                this.EnsureCaretVisible();
+                this.Invalidate();
+                this.MaybeAutoComplete();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnCompletionKeyPress(KeyPressEventArgs e)
+    {
+        if (char.IsControl(e.KeyChar))
+            return;
+
+        this.InsertText(e.KeyChar.ToString());
+        this.MaybeAutoComplete(); // refilter against the extended prefix
+    }
+
+    /// <summary>Replaces the current word with the completion at <paramref name="index"/>.</summary>
+    private void AcceptCompletion(int index)
+    {
+        if (index < 0 || index >= Math.Min(_completions.Count, _MaxCompletionRows))
+            return;
+
+        var pick = _completions[index];
+        var line = _lines[_caretLine];
+        _lines[_caretLine] = line[.._completionWordStart] + pick + line[_caretCol..];
+        _caretCol = _completionWordStart + pick.Length;
+        this.ClearSelection();
+        this.HideCompletion();
+        this.EnsureCaretVisible();
+        this.Invalidate();
+        this.OnTextChanged(EventArgs.Empty);
     }
 
     private void MoveCaret(int dLine, int dCol, bool select)

@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
@@ -124,6 +125,63 @@ internal sealed class CodeTextBoxTests
 
         Assert.That(g.Operations.Exists(o => o.Contains("\"int\"") && o.Contains("#FF0000FF")), Is.True,
             "the keyword span is drawn in the keyword colour");
+    }
+
+    private static CodeTextBox CreateWithBackend(out HeadlessBackend backend, out HeadlessCanvasPeer canvas)
+    {
+        var box = new CodeTextBox { Bounds = new(0, 0, 400, 200) };
+        backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(box);
+        Application.Run(form, backend);
+        canvas = backend.Created.OfType<HeadlessCanvasPeer>().First();
+        return box;
+    }
+
+    [Test]
+    public void Ctrl_Space_opens_the_completion_list()
+    {
+        var box = CreateWithBackend(out _, out var canvas);
+        box.CompletionProvider = _ => new[] { "foo", "bar" };
+
+        canvas.RaiseKeyDown(Keys.Space, KeyModifiers.Control);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.CompletionShownForTest, Is.True);
+            Assert.That(box.CompletionsForTest, Is.EqualTo(new[] { "foo", "bar" }));
+        });
+    }
+
+    [Test]
+    public void Typing_an_identifier_opens_completion_and_Enter_accepts_it()
+    {
+        var box = CreateWithBackend(out var backend, out var canvas);
+        box.CompletionProvider = p => new[] { "Console", "Convert" }
+            .Where(s => s.StartsWith(p, StringComparison.OrdinalIgnoreCase)).ToArray();
+
+        canvas.RaiseKeyPress('C'); // auto-opens
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Last();
+        popup.RaiseKeyDown(Keys.Enter); // accept the first candidate
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.Lines[0], Is.EqualTo("Console"));
+            Assert.That(box.CompletionShownForTest, Is.False);
+        });
+    }
+
+    [Test]
+    public void Clicking_a_completion_row_inserts_that_candidate()
+    {
+        var box = CreateWithBackend(out var backend, out var canvas);
+        box.CompletionProvider = _ => new[] { "alpha", "beta" };
+
+        canvas.RaiseKeyDown(Keys.Space, KeyModifiers.Control);
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Last();
+        popup.RaiseMouseDown(5, 20); // second row (16-px lines) → "beta"
+
+        Assert.That(box.Lines[0], Is.EqualTo("beta"));
     }
 
     [Test]

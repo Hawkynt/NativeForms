@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 
 namespace Hawkynt.NativeForms.Demo;
 
@@ -55,6 +56,14 @@ internal sealed partial class MainForm
 
         var code = new CodeTextBox { Bounds = new(420, 36, 580, 380), TabWidth = 4 };
         code.Tokenizer = TokenizeCSharp;
+        code.CompletionProvider = prefix => new[]
+            {
+                "public", "private", "protected", "internal", "static", "void", "int", "string", "var",
+                "return", "class", "struct", "interface", "namespace", "using", "new", "if", "else", "for",
+                "foreach", "while", "switch", "Console", "Convert", "Contains",
+            }
+            .Where(s => s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !string.Equals(s, prefix, StringComparison.Ordinal))
+            .ToArray();
         code.Text = string.Join('\n',
             "// a tiny sample",
             "public int Add(int a, int b)",
