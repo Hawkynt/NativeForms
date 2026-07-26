@@ -27,4 +27,23 @@ internal sealed class ToastTests
             Assert.That(bar.Bounds.Bottom, Is.LessThanOrEqualTo(form.ClientSize.Height));
         });
     }
+
+    [Test]
+    public void Multiple_toasts_stack_upward_without_overlapping()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 600, 400) };
+        Application.Run(form, backend);
+
+        Toast.Show(form, "First", "one", InfoBarSeverity.Info, 3000);
+        Toast.Show(form, "Second", "two", InfoBarSeverity.Info, 3000);
+
+        var bars = form.Controls.OfType<InfoBar>().OrderBy(b => b.Bounds.Y).ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(bars, Has.Count.EqualTo(2), "both toasts are live");
+            Assert.That(bars[0].Bounds.Bottom, Is.LessThanOrEqualTo(bars[1].Bounds.Y), "the older toast sits fully above the newer one");
+            Assert.That(bars[1].Bounds.Bottom, Is.LessThanOrEqualTo(form.ClientSize.Height));
+        });
+    }
 }

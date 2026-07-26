@@ -3,42 +3,152 @@ using System.Drawing;
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// Shows a transient in-app notification — a small <see cref="InfoBar"/> anchored to the bottom-right of a
-/// form that auto-dismisses after a delay (or when its × is clicked). The in-window counterpart of the OS
-/// tray balloon, for "Saved", "Update available" and the like.
+/// Shows transient in-app notifications — small <see cref="InfoBar"/>s anchored to the bottom-right of a
+/// form that fade in, stack upward when several are live at once, and fade out while sliding down when they
+/// expire or are dismissed. The in-window counterpart of the OS tray balloon, for "Saved", "Update
+/// available" and the like.
 /// </summary>
 public static class Toast
 {
-    /// <summary>Pops a toast on <paramref name="form"/> with the given text and severity; it removes itself
-    /// after <paramref name="durationMs"/> milliseconds or when dismissed.</summary>
+    private const int _Gap = 8;
+    private const int _Margin = 12;
+    private const int _BarHeight = 36;
+
+    // One live stack per form, holding its animation timer and the ordered toasts (newest at the bottom).
+    private static readonly List<ToastStack> _stacks = [];
+
+    /// <summary>Pops a toast on <paramref name="form"/> with the given text and severity; it stacks above any
+    /// live toasts and removes itself after <paramref name="durationMs"/> milliseconds or when dismissed.</summary>
     public static void Show(Form form, string title, string message, InfoBarSeverity severity = InfoBarSeverity.Info, int durationMs = 3000)
     {
         ArgumentNullException.ThrowIfNull(form);
+        StackFor(form).Add(title, message, severity, Math.Max(1, durationMs));
+    }
 
-        var width = Math.Min(360, Math.Max(160, form.ClientSize.Width - 24));
-        var bar = new InfoBar
+    /// <summary>The live toasts on a form, newest last — for headless tests.</summary>
+    internal static IReadOnlyList<InfoBar> ActiveToasts(Form form)
+    {
+        foreach (var stack in _stacks)
+            if (ReferenceEquals(stack.Form, form))
+                return stack.Bars;
+
+        return [];
+    }
+
+    private static ToastStack StackFor(Form form)
+    {
+        foreach (var stack in _stacks)
+            if (ReferenceEquals(stack.Form, form))
+                return stack;
+
+        var created = new ToastStack(form, () => _stacks.RemoveAll(s => ReferenceEquals(s.Form, form)));
+        _stacks.Add(created);
+        return created;
+    }
+
+    /// <summary>The animated toast column for one form.</summary>
+    private sealed class ToastStack
+    {
+        private const int _StepMs = 16;
+        private const double _Ease = 0.28;    // fraction of the remaining distance closed each frame
+
+        private readonly List<Entry> _entries = [];
+        private readonly Timer _timer;
+        private readonly Action _onEmpty;
+
+        public ToastStack(Form form, Action onEmpty)
         {
-            Title = title,
-            Message = message,
-            Severity = severity,
-            Bounds = new Rectangle(form.ClientSize.Width - width - 12, form.ClientSize.Height - 48, width, 36),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-        };
-
-        var timer = new Timer { Interval = Math.Max(1, durationMs) };
-
-        void Dismiss()
-        {
-            timer.Stop();
-            timer.Dispose();
-            if (bar.Parent is { } parent)
-                parent.Controls.Remove(bar);
+            this.Form = form;
+            _onEmpty = onEmpty;
+            _timer = new Timer { Interval = _StepMs };
+            _timer.Tick += (_, _) => this.Step();
         }
 
-        timer.Tick += (_, _) => Dismiss();
-        bar.Closed += (_, _) => Dismiss();
+        public Form Form { get; }
 
-        form.Controls.Add(bar);
-        timer.Start();
+        public IReadOnlyList<InfoBar> Bars => _entries.ConvertAll(e => e.Bar);
+
+        public void Add(string title, string message, InfoBarSeverity severity, int durationMs)
+        {
+            var width = Math.Min(360, Math.Max(160, this.Form.ClientSize.Width - (2 * _Margin)));
+            var bar = new InfoBar
+            {
+                Title = title,
+                Message = message,
+                Severity = severity,
+                Opacity = 0,
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Bounds = new Rectangle(this.Form.ClientSize.Width - width - _Margin, this.Form.ClientSize.Height - _BarHeight - _Margin, width, _BarHeight),
+            };
+
+            var entry = new Entry(bar, durationMs);
+            bar.Closed += (_, _) => entry.Leaving = true;
+            _entries.Add(entry);
+            this.Form.Controls.Add(bar);
+            this.Relayout();
+            _timer.Start();
+        }
+
+        // Newest toast sits at the bottom; older ones stack above it. Sets each entry's resting Y target and
+        // snaps non-leaving toasts to it, so the column is correctly stacked even before the first animation
+        // frame; the timer then only drives the fade and the leaving slide-down.
+        private void Relayout()
+        {
+            var y = this.Form.ClientSize.Height - _Margin;
+            for (var i = _entries.Count - 1; i >= 0; --i)
+            {
+                var entry = _entries[i];
+                y -= _BarHeight;
+                entry.TargetY = y;
+                if (!entry.Leaving)
+                {
+                    var b = entry.Bar.Bounds;
+                    entry.Bar.Bounds = new Rectangle(b.X, y, b.Width, b.Height);
+                }
+
+                y -= _Gap;
+            }
+        }
+
+        private void Step()
+        {
+            for (var i = _entries.Count - 1; i >= 0; --i)
+            {
+                var entry = _entries[i];
+                entry.Life -= _StepMs;
+                if (entry.Life <= 0)
+                    entry.Leaving = true;
+
+                var targetY = entry.Leaving ? entry.TargetY + _BarHeight + _Gap : entry.TargetY;
+                var targetOpacity = entry.Leaving ? 0.0 : 1.0;
+
+                var bar = entry.Bar;
+                var newY = (int)Math.Round(bar.Bounds.Y + ((targetY - bar.Bounds.Y) * _Ease));
+                bar.Bounds = new Rectangle(bar.Bounds.X, newY, bar.Bounds.Width, bar.Bounds.Height);
+                bar.Opacity += (targetOpacity - bar.Opacity) * _Ease;
+
+                if (entry.Leaving && bar.Opacity <= 0.03)
+                {
+                    bar.Parent?.Controls.Remove(bar);
+                    _entries.RemoveAt(i);
+                    this.Relayout();
+                }
+            }
+
+            if (_entries.Count != 0)
+                return;
+
+            _timer.Stop();
+            _timer.Dispose();
+            _onEmpty();
+        }
+
+        private sealed class Entry(InfoBar bar, int life)
+        {
+            public InfoBar Bar { get; } = bar;
+            public double Life { get; set; } = life;
+            public bool Leaving { get; set; }
+            public int TargetY { get; set; }
+        }
     }
 }

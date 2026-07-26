@@ -67,6 +67,18 @@ public class InfoBar : OwnerDrawnControl
         set { if (field != value) { field = value; this.Invalidate(); } }
     } = true;
 
+    /// <summary>The bar's opacity in [0, 1], used by the <see cref="Toast"/> fade animation. Every drawn
+    /// colour is blended toward the parent background as this drops, so it fades regardless of whether the
+    /// backend composites child alpha. Defaults to 1 (opaque).</summary>
+    public double Opacity
+    {
+        get => field;
+        set { value = Math.Clamp(value, 0, 1); if (field != value) { field = value; this.Invalidate(); } }
+    } = 1.0;
+
+    private Color Fade(Color c)
+        => this.Opacity >= 1.0 ? c : Blend(c, this.Parent?.BackColor ?? this.Theme.WindowBackground, this.Opacity);
+
     /// <summary>Raised when the close button is clicked; the bar hides itself first.</summary>
     public event EventHandler? Closed;
 
@@ -100,21 +112,21 @@ public class InfoBar : OwnerDrawnControl
 
         // A light tint of the severity colour over the control background, plus a full frame and stripe.
         var tint = Blend(accent, theme.ControlBackground, 0.14);
-        g.FillRectangle(tint, new Rectangle(0, 0, this.Width, this.Height));
-        g.FillRectangle(accent, new Rectangle(0, 0, _Stripe, this.Height));
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+        g.FillRectangle(this.Fade(tint), new Rectangle(0, 0, this.Width, this.Height));
+        g.FillRectangle(this.Fade(accent), new Rectangle(0, 0, _Stripe, this.Height));
+        g.DrawRectangle(this.Fade(theme.Border), new Rectangle(0, 0, this.Width - 1, this.Height - 1));
 
         // The severity icon: a filled disc with a white glyph.
         var mid = this.Height / 2;
         var disc = new Rectangle(_Stripe + _Pad, mid - 8, 16, 16);
-        g.FillEllipse(accent, disc);
+        g.FillEllipse(this.Fade(accent), disc);
         g.DrawText(this.Severity switch
         {
             InfoBarSeverity.Success => "✓",
             InfoBarSeverity.Warning => "!",
             InfoBarSeverity.Error => "×",
             _ => "i",
-        }, theme.DefaultFont, Color.White, disc, ContentAlignment.MiddleCenter);
+        }, theme.DefaultFont, this.Fade(Color.White), disc, ContentAlignment.MiddleCenter);
 
         var textLeft = _Stripe + _IconZone + _Pad;
         var textRight = (this.ActionText.Length > 0 ? this.ActionRect.X : this.ShowCloseButton ? this.CloseRect.X : this.Width) - _Pad;
@@ -123,22 +135,22 @@ public class InfoBar : OwnerDrawnControl
         if (this.Title.Length > 0)
         {
             var titleWidth = g.MeasureText(this.Title, theme.DefaultFont).Width;
-            g.DrawText(this.Title, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
+            g.DrawText(this.Title, theme.DefaultFont, this.Fade(theme.ControlText), textRect, ContentAlignment.MiddleLeft);
             textRect = new Rectangle(textRect.X + titleWidth + _Pad, textRect.Y, Math.Max(0, textRect.Width - titleWidth - _Pad), textRect.Height);
         }
 
         if (this.Message.Length > 0)
-            g.DrawText(this.Message, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
+            g.DrawText(this.Message, theme.DefaultFont, this.Fade(theme.ControlText), textRect, ContentAlignment.MiddleLeft);
 
         if (this.ActionText.Length > 0)
-            g.DrawText(this.ActionText, theme.DefaultFont, theme.Accent, this.ActionRect, ContentAlignment.MiddleCenter);
+            g.DrawText(this.ActionText, theme.DefaultFont, this.Fade(theme.Accent), this.ActionRect, ContentAlignment.MiddleCenter);
 
         if (this.ShowCloseButton)
         {
             var c = this.CloseRect;
             var box = new Rectangle(c.X + ((c.Width - 8) / 2), mid - 4, 8, 8);
-            g.DrawLine(theme.ControlText, box.Left, box.Top, box.Right, box.Bottom);
-            g.DrawLine(theme.ControlText, box.Left, box.Bottom, box.Right, box.Top);
+            g.DrawLine(this.Fade(theme.ControlText), box.Left, box.Top, box.Right, box.Bottom);
+            g.DrawLine(this.Fade(theme.ControlText), box.Left, box.Bottom, box.Right, box.Top);
         }
     }
 

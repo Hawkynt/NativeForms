@@ -31,7 +31,12 @@ internal sealed partial class MainForm
         info.Closed += (_, _) => this.SetStatus("InfoBar: dismissed.");
 
         var toastButton = new Button { Bounds = new(16, 220, 160, 30), Text = "Show a toast" };
-        toastButton.Click += (_, _) => Toast.Show(this, "Saved", "Your changes are saved.", InfoBarSeverity.Success);
+        var toastCount = 0;
+        toastButton.Click += (_, _) =>
+        {
+            var severity = (InfoBarSeverity)(toastCount % 4);
+            Toast.Show(this, $"Toast #{++toastCount}", $"A {severity} notification.", severity, 4000);
+        };
 
         var tokens = new TokenBox { Bounds = new(16, 300, 500, 60), PlaceholderText = "Add a tag…" };
         tokens.AddToken("design");
