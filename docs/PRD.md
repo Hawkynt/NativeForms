@@ -627,7 +627,7 @@ strategy (may differ per platform; note exceptions inline).
       inline editors (text, checkbox/bool, numeric, dropdown/enum, colour, browse); reflection-free
       (delegate/selector-driven rows), expandable categories, a description strip, `SelectedObject` via
       a supplied row model, and `PropertyValueChanged`. Used by settings, the IDE and file properties
-- [ ] `CodeTextBox` / syntax-highlighting editor (owner) — a multiline text surface with a line-number
+- [x] `CodeTextBox` / syntax-highlighting editor (owner) — a multiline text surface with a line-number
       gutter, current-line highlight, tab/indent handling, and a pluggable delegate tokenizer for
       colouring (keyword/string/comment spans); optional autocomplete popup reusing the light-dismiss
       `IPopupPeer`. The IDE's centrepiece; `RichTextBox` only covers basic RTF

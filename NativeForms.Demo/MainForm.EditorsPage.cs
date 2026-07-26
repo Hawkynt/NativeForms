@@ -53,10 +53,74 @@ internal sealed partial class MainForm
         });
         grid.PropertyValueChanged += (_, e) => this.SetStatus($"PropertyGrid: {e.Row.Name} = {e.NewValue}.");
 
+        var code = new CodeTextBox { Bounds = new(420, 36, 580, 380), TabWidth = 4 };
+        code.Tokenizer = TokenizeCSharp;
+        code.Text = string.Join('\n',
+            "// a tiny sample",
+            "public int Add(int a, int b)",
+            "{",
+            "    var name = \"sum\";",
+            "    return a + b; // 42",
+            "}");
+        code.TextChanged += (_, _) => this.SetStatus($"CodeTextBox: line {code.CaretLine + 1}, col {code.CaretColumn + 1}.");
+
         page.Controls.AddRange(
             Caption("PropertyGrid (categories · typed inline editors · reflection-free)", 16, 12, 480),
-            grid);
+            grid,
+            Caption("CodeTextBox (gutter · current-line · delegate tokenizer)", 420, 12, 560),
+            code);
 
         return page;
+    }
+
+    private static readonly System.Collections.Generic.HashSet<string> _csKeywords =
+        new(System.StringComparer.Ordinal) { "public", "private", "int", "var", "return", "void", "static", "class", "new", "if", "else", "for", "while" };
+
+    /// <summary>A deliberately small C#-flavoured tokenizer for the demo: line comments, string literals,
+    /// numbers and a handful of keywords.</summary>
+    private static System.Collections.Generic.IReadOnlyList<CodeToken> TokenizeCSharp(string line)
+    {
+        var tokens = new System.Collections.Generic.List<CodeToken>();
+        var comment = line.IndexOf("//", System.StringComparison.Ordinal);
+        var limit = comment < 0 ? line.Length : comment;
+
+        var i = 0;
+        while (i < limit)
+        {
+            var c = line[i];
+            if (c == '"')
+            {
+                var end = line.IndexOf('"', i + 1);
+                if (end < 0)
+                    end = limit - 1;
+
+                tokens.Add(new CodeToken(i, end - i + 1, CodeTokenKind.String));
+                i = end + 1;
+            }
+            else if (char.IsDigit(c))
+            {
+                var start = i;
+                while (i < limit && (char.IsLetterOrDigit(line[i]) || line[i] == '.'))
+                    ++i;
+
+                tokens.Add(new CodeToken(start, i - start, CodeTokenKind.Number));
+            }
+            else if (char.IsLetter(c) || c == '_')
+            {
+                var start = i;
+                while (i < limit && (char.IsLetterOrDigit(line[i]) || line[i] == '_'))
+                    ++i;
+
+                if (_csKeywords.Contains(line[start..i]))
+                    tokens.Add(new CodeToken(start, i - start, CodeTokenKind.Keyword));
+            }
+            else
+                ++i;
+        }
+
+        if (comment >= 0)
+            tokens.Add(new CodeToken(comment, line.Length - comment, CodeTokenKind.Comment));
+
+        return tokens;
     }
 }
