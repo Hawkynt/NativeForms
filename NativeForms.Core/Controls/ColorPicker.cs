@@ -306,9 +306,13 @@ public class ColorPicker : OwnerDrawnControl
                 g.DrawImage(mixer.RingTriangleImage(backend, r.Size), r);
                 g.DrawRectangle(theme.Border, Border(r));
                 this.PaintRingMarker(g, mixer);
-                ColorMath.ColorToHsl(mixer.Color, out _, out var sl, out var ll);
+                var col = mixer.Color;
+                double cmax = Math.Max(col.R, Math.Max(col.G, col.B)) / 255.0;
+                double cmin = Math.Min(col.R, Math.Min(col.G, col.B)) / 255.0;
+                var w1 = cmax - cmin;      // chroma → weight of the pure-hue corner
+                var w2 = cmin;             // grey floor → weight of the white corner
+                var w3 = 1 - w1 - w2;      // remainder → weight of the black corner
                 Mixer.TriangleVertices(r.Size, mixer.H, out var a, out var b, out var c);
-                var w1 = sl; var w2 = ll; var w3 = 1 - w1 - w2;
                 this.PaintReticle(g, r, new Point(
                     r.X + (int)((w1 * a.X) + (w2 * b.X) + (w3 * c.X)),
                     r.Y + (int)((w1 * a.Y) + (w2 * b.Y) + (w3 * c.Y))));
@@ -421,8 +425,9 @@ public class ColorPicker : OwnerDrawnControl
         else if (w3 < 0) { w3 = 0; var t = w1 + w2; if (t > 0) { w1 /= t; w2 /= t; } else { w1 = w2 = 0.5; } }
 
         var hue = mixer.H;
-        mixer.Set(ColorMath.HslToColor(hue, Math.Clamp(w1, 0, 1) * 100, Math.Clamp(w2, 0, 1) * 100, mixer.A));
-        mixer.H = hue; // preserve the hue the ring set, even at S or L extremes
+        var ph = ColorMath.HsvToColor(hue, 1, 1);
+        mixer.Set(Color.FromArgb(mixer.A, Mixer.Blend(w1, ph.R, w2), Mixer.Blend(w1, ph.G, w2), Mixer.Blend(w1, ph.B, w2)));
+        mixer.H = hue; // preserve the hue the ring set, even at the grey corners
         this.Apply(mixer);
     }
 
@@ -867,7 +872,12 @@ public class ColorPicker : OwnerDrawnControl
             c = (cx + (triR * Math.Cos(rad + (4 * Math.PI / 3))), cy + (triR * Math.Sin(rad + (4 * Math.PI / 3))));
         }
 
-        /// <summary>Barycentric weights of a point in triangle A(hue)/B(white)/C(black): w1→saturation, w2→lightness.</summary>
+        /// <summary>One channel of the triangle blend: <paramref name="w1"/> of the hue channel plus
+        /// <paramref name="w2"/> of white (255), clamped to a byte.</summary>
+        internal static int Blend(double w1, int hueChannel, double w2)
+            => (int)Math.Round(Math.Clamp((w1 * hueChannel) + (w2 * 255), 0, 255));
+
+        /// <summary>Barycentric weights of a point in triangle A(hue)/B(white)/C(black).</summary>
         internal static void Barycentric((double X, double Y) a, (double X, double Y) b, (double X, double Y) c, double px, double py, out double w1, out double w2, out double w3)
         {
             var denom = ((b.Y - c.Y) * (a.X - c.X)) + ((c.X - b.X) * (a.Y - c.Y));
@@ -936,6 +946,7 @@ public class ColorPicker : OwnerDrawnControl
 
             WheelGeometry(size, out var cx, out var cy, out var outerR, out var innerR, out _);
             TriangleVertices(size, this.H, out var a, out var b, out var c);
+            var ph = ColorMath.HsvToColor(this.H, 1, 1); // the pure-hue corner; white and black are the others
             var pixels = new int[size.Width * size.Height];
             for (var y = 0; y < size.Height; ++y)
             for (var x = 0; x < size.Width; ++x)
@@ -950,8 +961,10 @@ public class ColorPicker : OwnerDrawnControl
                 else
                 {
                     Barycentric(a, b, c, x, y, out var w1, out var w2, out var w3);
+                    // Blend the three corner colours: w1·hue + w2·white + w3·black. White adds 255 to every
+                    // channel, black nothing — so the pure-hue vertex reads as the hue, not as flat black.
                     argb = w1 >= -0.01 && w2 >= -0.01 && w3 >= -0.01
-                        ? ColorMath.HslToColor(this.H, Math.Clamp(w1, 0, 1) * 100, Math.Clamp(w2, 0, 1) * 100).ToArgb()
+                        ? Color.FromArgb(255, Blend(w1, ph.R, w2), Blend(w1, ph.G, w2), Blend(w1, ph.B, w2)).ToArgb()
                         : 0;
                 }
 
