@@ -212,6 +212,87 @@ internal sealed class PropertyGridTests
 
     private enum Fruit { Apple, Banana, Cherry }
 
+    [Flags]
+    private enum Sides { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
+
+    [Test]
+    public void A_date_row_hosts_a_DateTimePicker_and_commits_its_date()
+    {
+        var value = new DateOnly(2020, 5, 1);
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddRow("When", () => value, v => value = v);
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // open the hosted DateTimePicker
+        var picker = grid.Controls.OfType<DateTimePicker>().Single();
+        picker.Value = new DateTime(2030, 1, 15, 9, 0, 0);
+
+        Assert.That(value, Is.EqualTo(new DateOnly(2030, 1, 15)));
+    }
+
+    [Test]
+    public void A_time_row_hosts_a_TimePicker_and_commits_its_time()
+    {
+        var value = new TimeOnly(8, 0);
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddRow("At", () => value, v => value = v);
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33);
+        var picker = grid.Controls.OfType<TimePicker>().Single();
+        picker.Value = new TimeSpan(14, 30, 0);
+
+        Assert.That(value, Is.EqualTo(new TimeOnly(14, 30)));
+    }
+
+    [Test]
+    public void A_flags_row_opens_a_checkbox_flyout_and_commits_the_selected_set()
+    {
+        var value = Sides.Left;
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddFlagsEnumRow("Edges", () => value, v => value = v);
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // open the flags flyout
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        // Members are Left(0), Top(1), Right(2), Bottom(3) at 22-px rows; toggle Top on.
+        popup.RaiseMouseDown(10, 33);
+
+        Assert.That(value, Is.EqualTo(Sides.Left | Sides.Top));
+    }
+
+    [Test]
+    public void A_grid_enum_row_maps_the_3x3_cells_to_enum_values()
+    {
+        var value = Fruit.Apple;
+        var grid = new PropertyGrid { Bounds = new(0, 0, 300, 300) };
+        grid.AddGridEnumRow("Slot", () => value, v => value = v,
+            new[] { "", "Banana", "", "", "Cherry", "", "", "Apple", "" });
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(200, 33); // open the 3×3 flyout
+        var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+        popup.RaiseMouseDown(1 + 22 + 11, 1 + 11); // top-centre cell → "Banana"
+
+        Assert.That(value, Is.EqualTo(Fruit.Banana));
+    }
+
     [Test]
     public void Typed_AddRow_infers_the_editor_from_the_value_type()
     {

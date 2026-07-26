@@ -7,6 +7,9 @@ internal sealed partial class MainForm
 {
     private enum WidgetDock { None, Left, Top, Right, Bottom, Fill }
 
+    [System.Flags]
+    private enum WidgetEdges { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
+
     /// <summary>A model the property grid inspects through delegate get/set (never reflection).</summary>
     private sealed class WidgetModel
     {
@@ -15,8 +18,10 @@ internal sealed partial class MainForm
         public bool? Visible = null;
         public int Width = 120;
         public WidgetDock Dock = WidgetDock.Top;
+        public WidgetEdges Anchor = WidgetEdges.Left | WidgetEdges.Top;
+        public System.DateOnly Created = new(2026, 7, 26);
+        public System.TimeOnly Reminder = new(9, 30);
         public string Align = "MiddleCenter";
-        public string TextAlign = "MiddleLeft";
         public Color Accent = Color.FromArgb(0xFF, 0x00, 0x78, 0xD4);
     }
 
@@ -33,19 +38,18 @@ internal sealed partial class MainForm
         grid.AddRow("Accent", () => model.Accent, v => model.Accent = v, category: "Appearance", description: "The widget's accent colour.");
         grid.AddRow("Enabled", () => model.Enabled, v => model.Enabled = v, category: "Behavior", description: "Whether the widget responds to input.");
         grid.AddRow("Visible", () => model.Visible, v => model.Visible = v, category: "Behavior", description: "A three-state flag (True / False / inherit).");
+        grid.AddRow("Created", () => model.Created, v => model.Created = v, category: "Behavior", description: "The creation date (calendar drop-down).");
+        grid.AddRow("Reminder", () => model.Reminder, v => model.Reminder = v, category: "Behavior", description: "A time-of-day (clock picker).");
         grid.AddRow("Width", () => model.Width, v => model.Width = v, category: "Layout", description: "The widget width in pixels (0–400).", minimum: 0, maximum: 400);
-        grid.AddEnumRow("Dock", () => model.Dock, v => model.Dock = v, category: "Layout", description: "Which edge the widget docks to.");
+        grid.AddGridEnumRow("Dock", () => model.Dock, v => model.Dock = v,
+            new[] { "", "Top", "", "Left", "Fill", "Right", "None", "Bottom", "" },
+            category: "Layout", description: "Which edge the widget docks to (spatial 3×3 flyout).");
+        grid.AddFlagsEnumRow("Anchor", () => model.Anchor, v => model.Anchor = v, category: "Layout", description: "The edges the widget anchors to (checkbox flyout).");
         grid.AddRow(new PropertyGridRow("Align", () => model.Align, v => model.Align = v)
         {
             Category = "Layout",
             Editor = PropertyGridEditor.Align,
-            Description = "Where the widget sits in its cell (3×3 picker).",
-        });
-        grid.AddRow(new PropertyGridRow("TextAlign", () => model.TextAlign, v => model.TextAlign = v)
-        {
-            Category = "Layout",
-            Editor = PropertyGridEditor.Align,
-            Description = "Caption alignment inside the widget (3×3 picker).",
+            Description = "Where the caption sits in its cell (3×3 picker).",
         });
         grid.PropertyValueChanged += (_, e) => this.SetStatus($"PropertyGrid: {e.Row.Name} = {e.NewValue}.");
 

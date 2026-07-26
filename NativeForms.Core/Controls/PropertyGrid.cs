@@ -27,8 +27,22 @@ public enum PropertyGridEditor
     TriState,
 
     /// <summary>A 3×3 alignment picker whose value is a <see cref="System.Drawing.ContentAlignment"/> name
-    /// (e.g. <c>"MiddleCenter"</c>).</summary>
+    /// (e.g. <c>"MiddleCenter"</c>), or the row's <see cref="PropertyGridRow.GridValues"/> when supplied
+    /// (a spatial enum picker such as dock).</summary>
     Align,
+
+    /// <summary>A hosted <see cref="DateTimePicker"/> (date only) — for a <see cref="DateOnly"/>.</summary>
+    Date,
+
+    /// <summary>A hosted <see cref="TimePicker"/> — for a <see cref="TimeOnly"/>.</summary>
+    Time,
+
+    /// <summary>A hosted <see cref="DateTimePicker"/> with a date+time format — for a <see cref="DateTime"/>.</summary>
+    DateTime,
+
+    /// <summary>A check-box flyout of the members of a <c>[Flags]</c> enum; the value is the comma-separated
+    /// set of selected names.</summary>
+    Flags,
 }
 
 /// <summary>
@@ -56,8 +70,14 @@ public sealed class PropertyGridRow(string name, Func<string> get, Action<string
     /// <summary>Which editor the value cell uses. Defaults to <see cref="PropertyGridEditor.Text"/>.</summary>
     public PropertyGridEditor Editor { get; set; } = PropertyGridEditor.Text;
 
-    /// <summary>The options for a <see cref="PropertyGridEditor.Choice"/> row.</summary>
+    /// <summary>The options for a <see cref="PropertyGridEditor.Choice"/> or <see cref="PropertyGridEditor.Flags"/> row.</summary>
     public IReadOnlyList<string>? Choices { get; set; }
+
+    /// <summary>For an <see cref="PropertyGridEditor.Align"/> row, the nine values the 3×3 flyout cells map
+    /// to (row-major; an empty entry disables that cell). <see langword="null"/> uses the default
+    /// <see cref="System.Drawing.ContentAlignment"/> names — set it to repurpose the grid for a spatial enum
+    /// (dock, anchor).</summary>
+    public IReadOnlyList<string>? GridValues { get; set; }
 
     /// <summary>The inclusive lower bound a <see cref="PropertyGridEditor.Number"/> commit is clamped to,
     /// or <see langword="null"/> for none.</summary>
@@ -200,9 +220,82 @@ public class PropertyGrid : OwnerDrawnControl
         return row;
     }
 
+    /// <summary>Adds a check-box flyout row for a <c>[Flags]</c> enum: each member is a toggle, and the value
+    /// is the comma-separated set of selected names. Fully generic, so it stays reflection-free.</summary>
+    public PropertyGridRow AddFlagsEnumRow<TEnum>(
+        string name,
+        Func<TEnum> get,
+        Action<TEnum> set,
+        string? category = null,
+        string? description = null)
+        where TEnum : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(set);
+
+        // The togglable members are every name except the zero member (the "None" of a flags enum).
+        var members = new List<string>();
+        foreach (var member in Enum.GetNames<TEnum>())
+            if (!Enum.Parse<TEnum>(member).Equals(default(TEnum)))
+                members.Add(member);
+
+        var row = new PropertyGridRow(name, () => get().ToString(), s =>
+        {
+            if (Enum.TryParse<TEnum>(s, out var value))
+                set(value);
+        })
+        {
+            Editor = PropertyGridEditor.Flags,
+            Choices = members,
+            Description = description,
+        };
+
+        if (category is not null)
+            row.Category = category;
+
+        this.AddRow(row);
+        return row;
+    }
+
+    /// <summary>Adds a 3×3 spatial flyout row for an enum (dock, anchor): <paramref name="gridValues"/> maps
+    /// the nine cells (row-major, empty = disabled) to enum names. Reflection-free.</summary>
+    public PropertyGridRow AddGridEnumRow<TEnum>(
+        string name,
+        Func<TEnum> get,
+        Action<TEnum> set,
+        IReadOnlyList<string> gridValues,
+        string? category = null,
+        string? description = null)
+        where TEnum : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(set);
+        ArgumentNullException.ThrowIfNull(gridValues);
+
+        var row = new PropertyGridRow(name, () => get().ToString(), s =>
+        {
+            if (Enum.TryParse<TEnum>(s, out var value))
+                set(value);
+        })
+        {
+            Editor = PropertyGridEditor.Align,
+            GridValues = gridValues,
+            Description = description,
+        };
+
+        if (category is not null)
+            row.Category = category;
+
+        this.AddRow(row);
+        return row;
+    }
+
     private static PropertyGridEditor EditorFor(Type underlying, bool nullable)
         => underlying == typeof(bool) ? (nullable ? PropertyGridEditor.TriState : PropertyGridEditor.Boolean)
             : underlying == typeof(Color) ? PropertyGridEditor.Color
+            : underlying == typeof(DateOnly) ? PropertyGridEditor.Date
+            : underlying == typeof(TimeOnly) ? PropertyGridEditor.Time
+            : underlying == typeof(System.DateTime) ? PropertyGridEditor.DateTime
             : IsNumeric(underlying) ? PropertyGridEditor.Number
             : PropertyGridEditor.Text;
 
@@ -367,7 +460,7 @@ public class PropertyGrid : OwnerDrawnControl
         if (_editVisual >= 0 && _visual[_editVisual].RowIndex >= 0 && ReferenceEquals(_rows[_visual[_editVisual].RowIndex], row))
             return; // the hosted text editor covers this value cell
 
-        if (this.IsColorEditing(row))
+        if (this.IsPickerEditing(row))
             return; // the hosted colour picker covers this value cell
 
         var valueRect = new Rectangle(splitX + _CellPad, y, this.Width - splitX - (2 * _CellPad), rowHeight);
@@ -387,7 +480,8 @@ public class PropertyGrid : OwnerDrawnControl
                 g.DrawText(value, this.Font, theme.ControlText, new Rectangle(swatch.Right + _CellPad, y, valueRect.Width - _SwatchSize, rowHeight), ContentAlignment.MiddleLeft);
                 break;
 
-            case PropertyGridEditor.Choice or PropertyGridEditor.Align:
+            case PropertyGridEditor.Choice or PropertyGridEditor.Align or PropertyGridEditor.Date
+                or PropertyGridEditor.Time or PropertyGridEditor.DateTime or PropertyGridEditor.Flags:
                 g.DrawText(value, this.Font, theme.ControlText, valueRect, ContentAlignment.MiddleLeft);
                 GlyphRenderer.DrawComboArrow(g, theme.ControlText, new Rectangle(this.Width - 18, y, 14, rowHeight));
                 break;
@@ -430,7 +524,7 @@ public class PropertyGrid : OwnerDrawnControl
 
         this.EnsureVisual();
         this.EndEdit(commit: true);
-        this.EndColorEdit();
+        this.EndPickerEdit();
 
         if (Math.Abs(e.X - this.SplitX) <= 3 && e.Y < this.GridBottom)
         {
@@ -551,6 +645,22 @@ public class PropertyGrid : OwnerDrawnControl
 
             case PropertyGridEditor.Color:
                 this.OpenColor(visual, row);
+                break;
+
+            case PropertyGridEditor.Date:
+                this.OpenDate(visual, row, withTime: false);
+                break;
+
+            case PropertyGridEditor.DateTime:
+                this.OpenDate(visual, row, withTime: true);
+                break;
+
+            case PropertyGridEditor.Time:
+                this.OpenTime(visual, row);
+                break;
+
+            case PropertyGridEditor.Flags:
+                this.OpenFlags(visual, row);
                 break;
 
             default:
@@ -787,9 +897,19 @@ public class PropertyGrid : OwnerDrawnControl
         return popup;
     }
 
+    // The nine cell values for the row being grid-edited: its GridValues (spatial enum) or the default
+    // alignment names.
+    private IReadOnlyList<string> CurrentGridCells()
+        => _alignVisual >= 0 && _alignVisual < _visual.Count && _visual[_alignVisual].RowIndex >= 0
+            && _rows[_visual[_alignVisual].RowIndex].GridValues is { Count: > 0 } custom
+                ? custom
+                : _AlignNames;
+
     private void OnAlignPaint(IGraphics g)
     {
         var theme = this.Theme;
+        var cells = this.CurrentGridCells();
+        var isAlign = ReferenceEquals(cells, _AlignNames);
         var current = _alignVisual >= 0 && _alignVisual < _visual.Count && _visual[_alignVisual].RowIndex >= 0
             ? _rows[_visual[_alignVisual].RowIndex].Get() : string.Empty;
 
@@ -797,15 +917,27 @@ public class PropertyGrid : OwnerDrawnControl
         for (var i = 0; i < 9; ++i)
         {
             var cell = new Rectangle(1 + ((i % 3) * _AlignCell), 1 + ((i / 3) * _AlignCell), _AlignCell, _AlignCell);
-            var selected = string.Equals(_AlignNames[i], current, StringComparison.Ordinal);
+            var name = i < cells.Count ? cells[i] : string.Empty;
+            var enabled = name.Length > 0;
+            var selected = enabled && string.Equals(name, current, StringComparison.Ordinal);
             if (selected)
                 g.FillRectangle(theme.Accent, cell);
 
-            g.DrawRectangle(theme.Border, cell);
+            g.DrawRectangle(enabled ? theme.Border : theme.DisabledText, cell);
+            if (!enabled)
+                continue;
 
-            // A small dot in the corner/edge/centre the alignment points at.
-            var dot = new Rectangle(cell.X + 3 + ((i % 3) * ((cell.Width - 9) / 2)), cell.Y + 3 + ((i / 3) * ((cell.Height - 9) / 2)), 3, 3);
-            g.FillRectangle(selected ? theme.SelectionText : theme.ControlText, dot);
+            if (isAlign)
+            {
+                // A small dot in the corner/edge/centre the alignment points at.
+                var dot = new Rectangle(cell.X + 3 + ((i % 3) * ((cell.Width - 9) / 2)), cell.Y + 3 + ((i / 3) * ((cell.Height - 9) / 2)), 3, 3);
+                g.FillRectangle(selected ? theme.SelectionText : theme.ControlText, dot);
+            }
+            else
+            {
+                var label = name.Length <= 2 ? name : name[..2];
+                g.DrawText(label, this.Font, selected ? theme.SelectionText : theme.ControlText, cell, ContentAlignment.MiddleCenter);
+            }
         }
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, (3 * _AlignCell) + 1, (3 * _AlignCell) + 1));
@@ -813,10 +945,15 @@ public class PropertyGrid : OwnerDrawnControl
 
     private void OnAlignMouseDown(MouseEventArgs e)
     {
+        var cells = this.CurrentGridCells();
         var col = Math.Clamp((e.X - 1) / _AlignCell, 0, 2);
         var rowIndex = Math.Clamp((e.Y - 1) / _AlignCell, 0, 2);
-        var picked = _AlignNames[(rowIndex * 3) + col];
+        var index = (rowIndex * 3) + col;
+        var picked = index < cells.Count ? cells[index] : string.Empty;
         var visual = _alignVisual;
+        if (picked.Length == 0)
+            return; // an empty (disabled) cell
+
         _alignPopup?.Hide();
         _alignVisual = -1;
         if (visual >= 0 && visual < _visual.Count && _visual[visual].RowIndex >= 0)
@@ -825,62 +962,188 @@ public class PropertyGrid : OwnerDrawnControl
         this.Focus();
     }
 
-    // --- Colour palette picker -------------------------------------------------------------------
+    // --- Flags checkbox flyout -------------------------------------------------------------------
 
-    // A Color row hosts the real ColorPicker over its value cell (re-using its full mixer, numeric tabs and
-    // eyedropper) rather than a bespoke palette — one colour UI across the toolkit.
+    private IPopupPeer? _flagsPopup;
+    private int _flagsVisual = -1;
+    private readonly HashSet<string> _flagsChecked = new(StringComparer.Ordinal);
+
+    private void OpenFlags(int visual, PropertyGridRow row)
+    {
+        if (row.Choices is not { Count: > 0 } names || this.Backend is not { } backend)
+            return;
+
+        _flagsVisual = visual;
+        _flagsChecked.Clear();
+        foreach (var part in row.Get().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            _flagsChecked.Add(part);
+
+        var popup = _flagsPopup ??= this.CreateFlagsPopup(backend);
+        var rows = Math.Min(names.Count, _MaxPopupRows);
+        var y = (visual + 1) * this.RowHeight;
+        popup.ShowAt(this.PointToScreen(new Point(this.SplitX, y)), new Size(Math.Max(120, this.Width - this.SplitX), rows * this.RowHeight));
+        popup.InvalidateAll();
+    }
+
+    private IReadOnlyList<string> FlagNames
+        => _flagsVisual >= 0 && _flagsVisual < _visual.Count && _visual[_flagsVisual].RowIndex >= 0
+            ? _rows[_visual[_flagsVisual].RowIndex].Choices ?? [] : [];
+
+    private IPopupPeer CreateFlagsPopup(IPlatformBackend backend)
+    {
+        var popup = backend.CreatePopup(this.OwnerWindowPeer);
+        popup.Paint += (_, e) => this.OnFlagsPaint(e.Graphics);
+        popup.MouseDown += (_, e) => this.OnFlagsMouseDown(e);
+        popup.Dismissed += (_, _) => _flagsVisual = -1;
+        return popup;
+    }
+
+    private void OnFlagsPaint(IGraphics g)
+    {
+        var theme = this.Theme;
+        var names = this.FlagNames;
+        var rowHeight = this.RowHeight;
+        var width = Math.Max(120, this.Width - this.SplitX);
+        var rows = Math.Min(names.Count, _MaxPopupRows);
+        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, rows * rowHeight));
+        for (var i = 0; i < rows; ++i)
+        {
+            var r = new Rectangle(0, i * rowHeight, width, rowHeight);
+            var box = new Rectangle(r.X + 4, r.Y + ((rowHeight - GlyphRenderer.CheckBoxSize) / 2), GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize);
+            GlyphRenderer.DrawCheckBox(g, theme, box, _flagsChecked.Contains(names[i]));
+            g.DrawText(names[i], this.Font, theme.ControlText, new Rectangle(box.Right + 6, r.Y, r.Width - box.Right - 8, r.Height), ContentAlignment.MiddleLeft);
+        }
+
+        g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, (rows * rowHeight) - 1));
+    }
+
+    private void OnFlagsMouseDown(MouseEventArgs e)
+    {
+        var names = this.FlagNames;
+        var index = e.Y / this.RowHeight;
+        if (index < 0 || index >= Math.Min(names.Count, _MaxPopupRows))
+            return;
+
+        var name = names[index];
+        if (!_flagsChecked.Remove(name))
+            _flagsChecked.Add(name);
+
+        // Commit the new set (in the enum's declared order) as a comma-separated value.
+        var selected = new List<string>();
+        foreach (var n in names)
+            if (_flagsChecked.Contains(n))
+                selected.Add(n);
+
+        var value = selected.Count == 0 ? "0" : string.Join(", ", selected); // "0" parses to the enum's zero member
+        if (_flagsVisual >= 0 && _flagsVisual < _visual.Count && _visual[_flagsVisual].RowIndex >= 0)
+            this.Commit(_rows[_visual[_flagsVisual].RowIndex], value);
+
+        _flagsPopup?.InvalidateAll();
+    }
+
+    // --- Hosted picker controls (Color / Date / Time reuse the toolkit's own controls) -----------
+    //
+    // Only one is open at a time, so a single slot tracks the active control, the row it covers, and a
+    // delegate that reads the control's current value and commits it as the row's string.
+
     private ColorPicker? _colorEditor;
-    private int _colorEditVisual = -1;
+    private DateTimePicker? _dateEditor;
+    private TimePicker? _timeEditor;
+
+    private Control? _picker;          // the control currently hosted over a cell
+    private int _pickerVisual = -1;
+    private Action? _pickerCommit;     // reads _picker's value and commits it to the edited row
 
     private void OpenColor(int visual, PropertyGridRow row)
     {
         if (_colorEditor is null)
         {
             _colorEditor = new ColorPicker { Visible = false, TabStop = false };
-            _colorEditor.SelectedColorChanged += this.OnColorEditorChanged;
+            _colorEditor.SelectedColorChanged += (_, _) => this.PickerCommit();
             this.Controls.Add(_colorEditor);
         }
 
-        _colorEditVisual = visual;
-        var y = visual * this.RowHeight;
-        var splitX = this.SplitX;
-        _colorEditor.Bounds = new Rectangle(splitX + _CellPad, y, this.Width - splitX - (2 * _CellPad), this.RowHeight);
         if (ColorMath.TryParseHex(row.Get(), out var current))
             _colorEditor.SelectedColor = current;
 
-        _colorEditor.Visible = true;
-        _colorEditor.Focus();
+        this.BeginPicker(visual, _colorEditor, () => ColorMath.ToHex(_colorEditor!.SelectedColor, withAlpha: true));
         _colorEditor.OpenDropDown();
+    }
+
+    private void OpenDate(int visual, PropertyGridRow row, bool withTime)
+    {
+        if (_dateEditor is null)
+        {
+            _dateEditor = new DateTimePicker { Visible = false, TabStop = false };
+            _dateEditor.ValueChanged += (_, _) => this.PickerCommit();
+            this.Controls.Add(_dateEditor);
+        }
+
+        _dateEditor.Format = withTime ? DateTimePickerFormat.Custom : DateTimePickerFormat.Short;
+        _dateEditor.CustomFormat = withTime ? "yyyy-MM-dd HH:mm" : string.Empty;
+        if (System.DateTime.TryParse(row.Get(), out var dt))
+            _dateEditor.Value = dt;
+
+        this.BeginPicker(visual, _dateEditor, () => withTime
+            ? _dateEditor!.Value.ToString(System.Globalization.CultureInfo.CurrentCulture)
+            : DateOnly.FromDateTime(_dateEditor!.Value).ToString(System.Globalization.CultureInfo.CurrentCulture));
+    }
+
+    private void OpenTime(int visual, PropertyGridRow row)
+    {
+        if (_timeEditor is null)
+        {
+            _timeEditor = new TimePicker { Visible = false, TabStop = false };
+            _timeEditor.ValueChanged += (_, _) => this.PickerCommit();
+            this.Controls.Add(_timeEditor);
+        }
+
+        if (TimeOnly.TryParse(row.Get(), out var t))
+            _timeEditor.Value = t.ToTimeSpan();
+        else if (System.TimeSpan.TryParse(row.Get(), out var ts))
+            _timeEditor.Value = ts;
+
+        this.BeginPicker(visual, _timeEditor, () => TimeOnly.FromTimeSpan(_timeEditor!.Value).ToString(System.Globalization.CultureInfo.CurrentCulture));
+    }
+
+    private void BeginPicker(int visual, Control picker, Func<string> read)
+    {
+        _pickerVisual = visual;
+        _picker = picker;
+        _pickerCommit = () =>
+        {
+            if (_pickerVisual >= 0 && _pickerVisual < _visual.Count && _visual[_pickerVisual].RowIndex >= 0)
+                this.Commit(_rows[_visual[_pickerVisual].RowIndex], read());
+        };
+
+        var y = visual * this.RowHeight;
+        var splitX = this.SplitX;
+        picker.Bounds = new Rectangle(splitX + _CellPad, y, this.Width - splitX - (2 * _CellPad), this.RowHeight);
+        picker.Visible = true;
+        picker.Focus();
         this.Invalidate();
     }
 
-    private void OnColorEditorChanged(object? sender, EventArgs e)
+    private void PickerCommit() => _pickerCommit?.Invoke();
+
+    /// <summary>Whether the given row is the one a hosted picker currently covers.</summary>
+    private bool IsPickerEditing(PropertyGridRow row)
+        => _pickerVisual >= 0 && _pickerVisual < _visual.Count && _visual[_pickerVisual].RowIndex >= 0
+            && ReferenceEquals(_rows[_visual[_pickerVisual].RowIndex], row);
+
+    private void EndPickerEdit()
     {
-        if (_colorEditVisual < 0 || _colorEditVisual >= _visual.Count)
+        if (_pickerVisual < 0)
             return;
 
-        var rowIndex = _visual[_colorEditVisual].RowIndex;
-        if (rowIndex >= 0)
-            this.Commit(_rows[rowIndex], ColorMath.ToHex(_colorEditor!.SelectedColor, withAlpha: true));
-    }
+        _pickerVisual = -1;
+        _pickerCommit = null;
+        if (_picker is ColorPicker cp)
+            cp.CloseDropDown();
+        if (_picker is { } p)
+            p.Visible = false;
 
-    /// <summary>Whether the given row is the one the hosted colour picker currently covers.</summary>
-    private bool IsColorEditing(PropertyGridRow row)
-        => _colorEditVisual >= 0 && _colorEditVisual < _visual.Count && _visual[_colorEditVisual].RowIndex >= 0
-            && ReferenceEquals(_rows[_visual[_colorEditVisual].RowIndex], row);
-
-    private void EndColorEdit()
-    {
-        if (_colorEditVisual < 0)
-            return;
-
-        _colorEditVisual = -1;
-        if (_colorEditor is { } editor)
-        {
-            editor.CloseDropDown();
-            editor.Visible = false;
-        }
-
+        _picker = null;
         this.Invalidate();
     }
 }
