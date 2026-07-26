@@ -41,6 +41,7 @@ public class ZoomPanel : OwnerDrawnControl
     private double _offX, _offY;             // view-space (viewport-local) position of content (0,0)
     private Size _contentSize;
     private bool _panning;
+    private bool _draggingZoom;
     private int _panLastX, _panLastY;
 
     /// <summary>The image shown as the content, or <see langword="null"/>. Setting it adopts its size as
@@ -101,6 +102,31 @@ public class ZoomPanel : OwnerDrawnControl
             this.Invalidate();
         }
     }
+
+    /// <summary>Whether a bottom-right zoom control (−, a slider, +, and a percentage read-out) is drawn.
+    /// Defaults to <see langword="true"/>.</summary>
+    public bool ShowZoomControl
+    {
+        get => field;
+        set { if (field != value) { field = value; this.Invalidate(); } }
+    } = true;
+
+    /// <summary>The content-space spacing of an overlaid grid, in pixels; <c>0</c> (the default) draws no
+    /// grid. The grid is only drawn once a cell is at least a few device pixels wide.</summary>
+    public int GridSize
+    {
+        get => field;
+        set { value = Math.Max(0, value); if (field != value) { field = value; this.Invalidate(); } }
+    }
+
+    /// <summary>The grid line colour. Defaults to the theme grid line.</summary>
+    public Color GridColor
+    {
+        get => _gridColor ?? this.Theme.GridLine;
+        set { _gridColor = value; this.Invalidate(); }
+    }
+
+    private Color? _gridColor;
 
     /// <summary>Raised whenever <see cref="Zoom"/> changes.</summary>
     public event EventHandler? ZoomChanged;
@@ -204,13 +230,35 @@ public class ZoomPanel : OwnerDrawnControl
             g.DrawImage(image, dst);
         }
 
+        if (this.GridSize > 0)
+            this.PaintGrid(g, view, origin);
+
         this.PaintContent?.Invoke(this, new ZoomPanelPaintEventArgs(g, _zoom, origin, view));
         g.PopClip();
 
         if (this.ShowRulers)
             this.PaintRulers(g, theme, view);
 
+        if (this.ShowZoomControl)
+            this.PaintZoomControl(g, theme, view);
+
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+    }
+
+    private void PaintGrid(IGraphics g, Rectangle view, PointF origin)
+    {
+        var spacing = this.GridSize * _zoom;
+        if (spacing < 4)
+            return; // too dense to be legible
+
+        var color = this.GridColor;
+        var firstX = origin.X - ((float)Math.Floor((origin.X - view.X) / spacing) * spacing);
+        for (var x = firstX; x < view.Right; x += (float)spacing)
+            g.DrawLine(color, (int)Math.Round(x), view.Y, (int)Math.Round(x), view.Bottom);
+
+        var firstY = origin.Y - ((float)Math.Floor((origin.Y - view.Y) / spacing) * spacing);
+        for (var y = firstY; y < view.Bottom; y += (float)spacing)
+            g.DrawLine(color, view.X, (int)Math.Round(y), view.Right, (int)Math.Round(y));
     }
 
     private void PaintRulers(IGraphics g, ITheme theme, Rectangle view)
@@ -237,7 +285,8 @@ public class ZoomPanel : OwnerDrawnControl
             g.DrawText(cx.ToString(), this.Font, label, new Rectangle(vx + 1, 0, 40, _RulerSize - 4), ContentAlignment.TopLeft);
         }
 
-        // Left ruler: content y = k·step maps to view y.
+        // Left ruler: content y = k·step maps to view y; the number is drawn stacked one digit per line
+        // (there is no rotated text) so the vertical ruler carries values too.
         var firstY = (int)Math.Floor((-_offY / _zoom) / step) * (int)step;
         for (var cy = firstY; ; cy += (int)step)
         {
@@ -248,7 +297,73 @@ public class ZoomPanel : OwnerDrawnControl
                 continue;
 
             g.DrawLine(tick, _RulerSize - 5, vy, _RulerSize, vy);
+            var digits = cy.ToString();
+            for (var d = 0; d < digits.Length; ++d)
+                g.DrawText(digits[d].ToString(), this.Font, label, new Rectangle(1, vy + 1 + (d * 9), _RulerSize, 9), ContentAlignment.TopCenter);
         }
+    }
+
+    // The bottom-right zoom control: [ − ][ slider ][ + ]  NNN%. The slider maps [MinZoom, MaxZoom] on a
+    // log scale so equal pixel steps multiply the zoom by a constant factor.
+    private const int _ZoomBarWidth = 120;
+    private const int _ZoomBarHeight = 18;
+    private const int _ZoomButton = 18;
+    private const int _ZoomMargin = 8;
+
+    private Rectangle ZoomControlRect
+    {
+        get
+        {
+            var view = this.Viewport;
+            var width = (2 * _ZoomButton) + _ZoomBarWidth + 44; // buttons + slider + "NNN%"
+            return new Rectangle(view.Right - width - _ZoomMargin, view.Bottom - _ZoomBarHeight - _ZoomMargin, width, _ZoomBarHeight);
+        }
+    }
+
+    private Rectangle ZoomSliderRect
+    {
+        get { var r = this.ZoomControlRect; return new Rectangle(r.X + _ZoomButton, r.Y, _ZoomBarWidth, r.Height); }
+    }
+
+    private void PaintZoomControl(IGraphics g, ITheme theme, Rectangle view)
+    {
+        if (view.Width < 260 || view.Height < 60)
+            return;
+
+        var r = this.ZoomControlRect;
+        g.FillRoundedRectangle(theme.ControlBackground, r, 4);
+        g.DrawRoundedRectangle(theme.Border, r, 4);
+
+        // − and + buttons.
+        var minus = new Rectangle(r.X, r.Y, _ZoomButton, r.Height);
+        var plus = new Rectangle(r.Right - 44 - _ZoomButton, r.Y, _ZoomButton, r.Height);
+        g.DrawText("−", this.Font, theme.ControlText, minus, ContentAlignment.MiddleCenter);
+        g.DrawText("+", this.Font, theme.ControlText, plus, ContentAlignment.MiddleCenter);
+
+        // The slider groove and thumb.
+        var slider = this.ZoomSliderRect;
+        var grooveY = slider.Y + (slider.Height / 2);
+        g.DrawLine(theme.Border, slider.X, grooveY, slider.Right, grooveY, 2);
+        var t = this.ZoomToFraction(_zoom);
+        var thumbX = slider.X + (int)Math.Round(t * slider.Width);
+        g.FillRectangle(theme.Accent, new Rectangle(thumbX - 2, slider.Y + 2, 4, slider.Height - 4));
+
+        // The percentage read-out.
+        g.DrawText($"{Math.Round(_zoom * 100)}%", this.Font, theme.ControlText, new Rectangle(plus.Right + 2, r.Y, 42, r.Height), ContentAlignment.MiddleLeft);
+    }
+
+    private double ZoomToFraction(double zoom)
+    {
+        var lo = Math.Log(this.MinZoom);
+        var hi = Math.Log(this.MaxZoom);
+        return hi <= lo ? 0 : Math.Clamp((Math.Log(zoom) - lo) / (hi - lo), 0, 1);
+    }
+
+    private double FractionToZoom(double fraction)
+    {
+        var lo = Math.Log(this.MinZoom);
+        var hi = Math.Log(this.MaxZoom);
+        return Math.Exp(lo + (Math.Clamp(fraction, 0, 1) * (hi - lo)));
     }
 
     // Rounds a raw spacing up to a 1/2/5·10^n step so ruler labels stay readable at any zoom.
@@ -270,14 +385,53 @@ public class ZoomPanel : OwnerDrawnControl
         if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle)
             return;
 
+        if (e.Button == MouseButtons.Left && this.ShowZoomControl && this.HandleZoomControl(e.X, e.Y))
+            return;
+
         _panning = true;
         _panLastX = e.X;
         _panLastY = e.Y;
     }
 
+    // The bottom-right zoom control: − / + step, or a click/drag on the slider sets the zoom directly.
+    private bool HandleZoomControl(int x, int y)
+    {
+        if (this.Viewport.Width < 260 || this.Viewport.Height < 60)
+            return false;
+
+        var r = this.ZoomControlRect;
+        if (!r.Contains(x, y))
+            return false;
+
+        var slider = this.ZoomSliderRect;
+        if (slider.Contains(x, y))
+        {
+            _draggingZoom = true;
+            this.ZoomFromSlider(x);
+        }
+        else if (x < slider.X)
+            this.Zoom = _zoom / _WheelStep;
+        else
+            this.Zoom = _zoom * _WheelStep;
+
+        return true;
+    }
+
+    private void ZoomFromSlider(int x)
+    {
+        var slider = this.ZoomSliderRect;
+        this.Zoom = this.FractionToZoom((double)(x - slider.X) / Math.Max(1, slider.Width));
+    }
+
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        if (_draggingZoom)
+        {
+            this.ZoomFromSlider(e.X);
+            return;
+        }
+
         if (!_panning)
             return;
 
@@ -289,7 +443,11 @@ public class ZoomPanel : OwnerDrawnControl
     }
 
     /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e) => _panning = false;
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _panning = false;
+        _draggingZoom = false;
+    }
 
     /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)

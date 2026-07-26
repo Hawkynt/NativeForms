@@ -65,7 +65,7 @@ internal sealed partial class MainForm
         var navContent = new Label { Bounds = new(742, 44, 260, 22), Text = "NavigationView content: Home" };
         nav.SelectedIndexChanged += (_, _) => navContent.Text = $"NavigationView content: {nav.Items[nav.SelectedIndex]}";
 
-        var zoom = new ZoomPanel { Bounds = new(560, 300, 440, 268), ShowRulers = true };
+        var zoom = new ZoomPanel { Bounds = new(560, 300, 440, 268), ShowRulers = true, GridSize = 16 };
         zoom.Image = _backend.CreateImage(320, 200, GradientPixels(320, 200, Color.RoyalBlue, Color.Orange));
         zoom.ZoomChanged += (_, _) => this.SetStatus($"ZoomPanel: {zoom.Zoom * 100:F0}%.");
         var fitButton = new Button { Bounds = new(560, 576, 90, 26), Text = "Fit" };

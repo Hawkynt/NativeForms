@@ -111,6 +111,42 @@ internal sealed class ZoomPanelTests
         Assert.That(mapped, Is.Not.Null, "the host overlay ran");
     }
 
+    [Test]
+    public void The_zoom_control_plus_button_zooms_in()
+    {
+        var panel = new ZoomPanel { Bounds = new(0, 0, 400, 300) };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(panel);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        panel.ActualSize();
+
+        // The control sits bottom-right: width = 18+120+18+44 = 200, at x = 400-200-8 = 192, y = 300-18-8 = 274.
+        // The + button is just left of the read-out at x ≈ 192+18+120 = 330.
+        canvas.RaiseMouseDown(330 + 9, 283);
+
+        Assert.That(panel.Zoom, Is.GreaterThan(1.0), "the + button zoomed in");
+    }
+
+    [Test]
+    public void The_grid_draws_lines_when_enabled_and_zoomed_in()
+    {
+        var panel = new ZoomPanel { Bounds = new(0, 0, 400, 300), ShowZoomControl = false };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(panel);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        panel.ContentSize = new Size(400, 400);
+        panel.GridSize = 32;
+        panel.Zoom = 2.0; // 32 × 2 = 64 px cells, well above the density floor
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("line")), Is.True, "grid lines are drawn");
+    }
+
     private static Rectangle FirstImageRect(HeadlessCanvasPeer canvas)
     {
         var g = canvas.RaisePaint();
