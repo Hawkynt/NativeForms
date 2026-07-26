@@ -87,6 +87,11 @@ internal static partial class NativeMethods
     [LibraryImport(Cairo)]
     internal static partial void cairo_arc(nint cr, double xc, double yc, double radius, double angle1, double angle2);
 
+    /// <summary>Begins a new sub-path so a following <c>cairo_arc</c> does not draw a connecting line from
+    /// the previous current point into the arc's start.</summary>
+    [LibraryImport(Cairo)]
+    internal static partial void cairo_new_sub_path(nint cr);
+
     /// <summary>Closes the current sub-path with a straight line back to its starting point.</summary>
     [LibraryImport(Cairo)]
     internal static partial void cairo_close_path(nint cr);

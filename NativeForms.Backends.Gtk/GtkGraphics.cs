@@ -252,6 +252,7 @@ internal sealed class GtkGraphics : IGraphics, IDisposable
         NativeMethods.cairo_save(_cr);
         NativeMethods.cairo_translate(_cr, bounds.X + bounds.Width / 2.0, bounds.Y + bounds.Height / 2.0);
         NativeMethods.cairo_scale(_cr, bounds.Width / 2.0, bounds.Height / 2.0);
+        NativeMethods.cairo_new_sub_path(_cr); // detach from any pending point so the arc has no lead-in line
         NativeMethods.cairo_arc(_cr, 0, 0, 1, 0, 2 * Math.PI);
         NativeMethods.cairo_restore(_cr);
     }
@@ -260,6 +261,7 @@ internal sealed class GtkGraphics : IGraphics, IDisposable
     private void AddRoundedRectPath(double x, double y, double w, double h, double r)
     {
         const double HalfPi = Math.PI / 2;
+        NativeMethods.cairo_new_sub_path(_cr); // no lead-in line from a pending point into the first corner arc
         NativeMethods.cairo_arc(_cr, x + w - r, y + r, r, -HalfPi, 0);           // top-right
         NativeMethods.cairo_arc(_cr, x + w - r, y + h - r, r, 0, HalfPi);        // bottom-right
         NativeMethods.cairo_arc(_cr, x + r, y + h - r, r, HalfPi, Math.PI);      // bottom-left
