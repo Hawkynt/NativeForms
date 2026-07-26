@@ -39,7 +39,7 @@ internal sealed partial class MainForm
             .Where(s => s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
         tokens.TokensChanged += (_, _) => this.SetStatus($"TokenBox: {tokens.Tokens.Count} tag(s).");
 
-        var virtualList = new ListView { Bounds = new(16, 400, 500, 220), View = ListViewView.Details, VirtualMode = true, VirtualListSize = 1_000_000 };
+        var virtualList = new ListView { Bounds = new(16, 400, 500, 205), View = ListViewView.Details, VirtualMode = true, VirtualListSize = 1_000_000 };
         virtualList.Columns.Add(new ColumnHeader { Text = "#", Width = 90 });
         virtualList.Columns.Add(new ColumnHeader { Text = "Generated row", Width = 380 });
         virtualList.RetrieveVirtualItem += (_, e) =>
@@ -53,16 +53,16 @@ internal sealed partial class MainForm
         var navContent = new Label { Bounds = new(742, 44, 260, 22), Text = "NavigationView content: Home" };
         nav.SelectedIndexChanged += (_, _) => navContent.Text = $"NavigationView content: {nav.Items[nav.SelectedIndex]}";
 
-        var zoom = new ZoomPanel { Bounds = new(560, 300, 440, 300), ShowRulers = true };
+        var zoom = new ZoomPanel { Bounds = new(560, 300, 440, 268), ShowRulers = true };
         zoom.Image = _backend.CreateImage(320, 200, GradientPixels(320, 200, Color.RoyalBlue, Color.Orange));
         zoom.ZoomChanged += (_, _) => this.SetStatus($"ZoomPanel: {zoom.Zoom * 100:F0}%.");
-        var fitButton = new Button { Bounds = new(560, 606, 90, 26), Text = "Fit" };
+        var fitButton = new Button { Bounds = new(560, 576, 90, 26), Text = "Fit" };
         fitButton.Click += (_, _) => zoom.FitToWindow();
-        var actualButton = new Button { Bounds = new(658, 606, 90, 26), Text = "100%" };
+        var actualButton = new Button { Bounds = new(658, 576, 90, 26), Text = "100%" };
         actualButton.Click += (_, _) => zoom.ActualSize();
 
         page.Controls.AddRange(
-            Caption("SegmentedControl (mutually-exclusive toggle group)", 16, 12, 360),
+            Caption("SegmentedControl (exclusive toggle group)", 16, 12, 400),
             segmented,
             Caption("RangeSlider (two-thumb range)", 16, 76, 360),
             range,

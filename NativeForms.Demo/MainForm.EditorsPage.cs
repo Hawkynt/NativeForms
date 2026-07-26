@@ -65,7 +65,7 @@ internal sealed partial class MainForm
         code.TextChanged += (_, _) => this.SetStatus($"CodeTextBox: line {code.CaretLine + 1}, col {code.CaretColumn + 1}.");
 
         page.Controls.AddRange(
-            Caption("PropertyGrid (categories · typed inline editors · reflection-free)", 16, 12, 480),
+            Caption("PropertyGrid (typed inline editors)", 16, 12, 398),
             grid,
             Caption("CodeTextBox (gutter · current-line · delegate tokenizer)", 420, 12, 560),
             code);

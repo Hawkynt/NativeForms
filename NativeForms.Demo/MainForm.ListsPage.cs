@@ -224,7 +224,7 @@ internal sealed partial class MainForm
         treeList.AfterSelect += (_, e) => this.SetStatus($"TreeListView: \"{e.Node?.Text}\" selected.");
 
         page.Controls.AddRange(
-            Caption("TreeView (icons · check boxes · F2 renames)", 664, 12),
+            Caption("TreeView (icons · checks · F2 rename)", 664, 12, 340),
             tree,
             Caption("TreeListView (SetDataSource, 3 columns)", 664, 268),
             treeList);
