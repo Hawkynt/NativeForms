@@ -1036,11 +1036,16 @@ public class CalendarView : OwnerDrawnControl
         for (var i = 0; i < _layout.Count; ++i)
             this.PaintChip(g, theme, _layout[i], _layout[i].Rect, compact: true);
 
-        // The ghost of an appointment being dragged to another day cell (day granularity).
+        // The ghost of an appointment being dragged or resized: a chip in every day cell the previewed
+        // span now covers, so a resize shows the whole run of days growing or shrinking, not just one.
         if (_moving && _moveFixed)
         {
-            var cell = (int)(_previewStart.Date - first.Date).TotalDays;
-            if (cell >= 0 && cell < 42)
+            var startCell = (int)(_previewStart.Date - first.Date).TotalDays;
+            var lastDay = _previewEnd.TimeOfDay == TimeSpan.Zero && _previewEnd > _previewStart
+                ? _previewEnd.Date.AddDays(-1) // an exclusive-midnight end covers through the previous day
+                : _previewEnd.Date;
+            var endCell = (int)(lastDay - first.Date).TotalDays;
+            for (var cell = Math.Max(0, startCell); cell <= endCell && cell < 42; ++cell)
                 this.PaintGhost(g, theme, new(((cell % 7) * cellWidth) + 2, top + ((cell / 7) * cellHeight) + this.Theme.RowHeight, Math.Max(1, cellWidth - 4), this.ChipHeight));
         }
     }

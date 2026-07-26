@@ -436,6 +436,26 @@ internal sealed class CalendarViewTests
     }
 
     [Test]
+    public void Resizing_in_month_view_previews_a_ghost_over_every_covered_day()
+    {
+        var calendar = CreateCalendar(out var canvas);
+        calendar.ViewMode = CalendarViewMode.Month;
+        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
+        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+        var edge = bounds.Right - 3;
+        var cy = bounds.Y + (bounds.Height / 2);
+
+        canvas.RaiseMouseDown(edge, cy);
+        canvas.RaiseMouseMove(edge + 100, cy); // extend the end one day right — the drag is live now
+
+        var g = canvas.RaisePaint();
+        var ghosts = g.Operations.FindAll(o => o.StartsWith("fill #78D03030")).Count; // the translucent red ghost
+        canvas.RaiseMouseUp(edge + 100, cy);
+
+        Assert.That(ghosts, Is.EqualTo(2), "a ghost is drawn over both the original day and the new end day");
+    }
+
+    [Test]
     public void Dragging_a_month_chips_left_edge_resizes_the_start_day()
     {
         var calendar = CreateCalendar(out var canvas);
