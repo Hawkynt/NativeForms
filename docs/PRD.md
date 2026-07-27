@@ -807,8 +807,10 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
 - **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `DataGridView`/`TreeView`. `[ ]`
-- **M13 — Attribute-driven grids (§14).** Extend the `[GridEditable]` source generator so one annotated
-  model emits both the `PropertyGrid` rows and the `DataGridView` columns. `[ ]`
+- **M13 — Attribute-driven grids & lists (§14).** Extend the `[GridEditable]` source generator so one
+  annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns,
+  with every member reference resolved (and diagnosed) at compile time. Includes the three grid gaps
+  it depends on: conditional row visibility, per-row height, conditional row selectability. `[ ]`
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -983,9 +985,10 @@ next change starts from a considered list instead of an inbox.
    `OwnerDrawnControl` (UIA on Windows, AT-SPI on Linux), or lean on §12 promotion for the controls
    that can become real widgets. Realistically both. Without this the toolkit is unusable for anyone
    who needs assistive tech, which also blocks public-sector adoption.
-2. **Attribute-driven `DataGridView` columns.** Extend the Roslyn generator so one `[GridEditable]`
-   model emits both `PopulateGrid(PropertyGrid)` and `PopulateColumns(DataGridView)` — the
-   `WindowsFormsExtensions`-style ergonomic without `TypeDescriptor`. Specified in **§14**.
+2. **Attribute-driven grids & lists.** Extend the Roslyn generator so one `[GridEditable]` model emits
+   `PopulateColumns(DataGridView)` (and later `ListView`) alongside the shipped
+   `PopulateGrid(PropertyGrid)` — the `C--FrameworkExtensions` ergonomic, with every member reference
+   resolved at compile time instead of by reflection. Specified in **§14**.
 3. **`DataGridView` virtual mode.** `ListView` gained `VirtualMode` + unknown-size probing; the grid
    is the control that most needs it (a million-row query is its native use case) and the row-source
    indirection is already designed.
@@ -1014,71 +1017,95 @@ next change starts from a considered list instead of an inbox.
 
 ---
 
-## 14. Attribute-driven grids — extend the generator from inspector rows to grid columns
 
-**Where we are.** `[GridEditable]` makes the Roslyn generator emit `PopulateGrid(PropertyGrid)`: one row
-per public settable property, editor inferred from the property type, category/description/range read
-from the `Grid*` attributes at compile time. One marker, one populator, zero reflection.
+## 14. Attribute-driven grids & lists — extend the generator to `DataGridView`
 
-**The goal.** The *same* marker should also emit `PopulateColumns(DataGridView)`, so a `List<T>` of
-annotated models becomes a fully configured grid in one call — the ergonomic
-`Hawkynt.WindowsFormsExtensions` gives WinForms, but reached through a source generator instead of
-`TypeDescriptor`/`DataSource`, which §1.3 forbids.
+**The reference.** `Hawkynt/C--FrameworkExtensions` (`System.Windows.Forms.Extensions`) drives a
+`DataGridView` entirely from attributes on the bound row type: you annotate the model, call
+`grid.EnableExtendedAttributes()`, set `DataSource`, and the grid configures itself. Its design has one
+idea worth copying wholesale: **an attribute never carries a delegate — it carries the *name* of
+another member on the model** (`conditionalPropertyName`, `isReadOnlyWhen`, `onClickMethodName`,
+`foreColorPropertyName`). That is what lets declarative attributes express dynamic, per-row behavior.
 
-**Why the generator is the right mechanism here.** `DataGridViewColumn` is already
-*delegate*-configured — `ValueSelector`, `ValueSetter`, `CheckedSelector`/`CheckedSetter`,
-`ProgressSelector`, `ImageSelector`, `TooltipSelector`, `CellStyleSelector`, `SortComparison`. Those
-delegates are exactly what a generator can synthesize as strongly-typed lambdas
-(`row => ((T)row!).Total`), which is why this fits without inventing new runtime machinery: the
-generator writes the selector boilerplate a developer writes by hand today.
+**Why we can do it better.** There the names are resolved by reflection at run time, so a typo is a
+silent no-op or a run-time throw — and reflection is banned here (§1.3). A **source generator** resolves
+those same names against the Roslyn symbol model at **compile time**: a misspelled
+`conditionalPropertyName`, a wrong-typed condition property, or a missing click method becomes a build
+error instead of a mystery. Same ergonomics, strictly better failure mode, and AOT-clean.
+
+**The goal.** One `[GridEditable]` model emits both `PopulateGrid(PropertyGrid)` (shipped) and
+`PopulateColumns(DataGridView)` (this section), wiring our existing delegate-based column surface —
+`ValueSelector`/`ValueSetter`, `CheckedSelector`/`CheckedSetter`, `ProgressSelector`, `ImageSelector`,
+`ImagesSelector`, `TooltipSelector`, `CellStyleSelector`, `EnabledSelector`, `ReadOnlyCellSelector`,
+`SortComparison` — from generated, strongly-typed lambdas.
+
+### Capability parity map
+
+Each row: what the reference offers, and how it lands here. `Kind` values refer to the 15 members of
+`DataGridViewColumnKind` we already ship.
+
+| Reference attribute | Capability | Our target |
+|---|---|---|
+| `DataGridViewButtonColumnAttribute` | Button column; `onClickMethodName`, `isEnabledWhenPropertyName` | `Kind.Button` + `EnabledSelector`; click method resolved at compile time |
+| `DataGridViewCellDisplayTextAttribute` | Cell text from another property | `ValueSelector` pointed at the named property |
+| `DataGridViewCellStyleAttribute` | Per-cell fore/back/format/alignment/wrap, each either literal or from a named property, gated by `conditionalPropertyName` | `CellStyleSelector` |
+| `DataGridViewCellTooltipAttribute` | Tooltip literal or from a property, with format + condition | `TooltipSelector` |
+| `DataGridViewCheckboxColumnAttribute` | Bool column | `Kind.Check` + `CheckedSelector`/`CheckedSetter` |
+| `DataGridViewClickableAttribute` | `onClickMethodName` / `onDoubleClickMethodName` per cell | `CellContentClick` routing to the resolved method |
+| `DataGridViewColumnSortModeAttribute` | Per-column sort mode | `SortMode` (+ `SortComparison`) |
+| `DataGridViewColumnWidthAttribute` | Width in pixels, character count, or a sample string; auto-size mode | `Width` / `AutoSizeMode` |
+| `DataGridViewComboboxColumnAttribute` | Items from a named property; `valueMember`/`displayMember`; enabled-when | `Kind.ComboBox` + `ItemsSelector` |
+| `DataGridViewConditionalReadOnlyAttribute` | Read-only when a named bool property is true | `ReadOnlyCellSelector` |
+| `DataGridViewConditionalRowHiddenAttribute` | Hide a row when a named property is true | row filter — **new**, needs a row-visibility hook |
+| `DataGridViewFullMergedRowAttribute` | Row rendered as one merged heading cell | we already have merged rows; bind to the named heading property |
+| `DataGridViewImageColumnAttribute` | Image from an image-list property; click/double-click; tooltip | `Kind.Text` + `ImageSelector`, or a dedicated image kind |
+| `DataGridViewMultiImageColumnAttribute` | Several images per cell, padding/margin, click + tooltip provider | `Kind.MultiImage` + `ImagesSelector` |
+| `DataGridViewNumericUpDownColumnAttribute` | Numeric editor column | `Kind.NumericUpDown` |
+| `DataGridViewProgressBarColumnAttribute` | Progress column with min/max | `Kind.Progress` + `ProgressSelector` |
+| `DataGridViewRowHeightAttribute` | Fixed height, or height from a named property, gated by a condition | row height — **new**, currently uniform |
+| `DataGridViewRowSelectableAttribute` | Row selectable only when a named property is true | selection filter — **new** |
+| `DataGridViewRowStyleAttribute` | Per-row fore/back/format + bold/italic/underline/strikeout, literal or property-sourced, condition-gated | `CellStyleSelector` applied row-wide |
+
+Beyond the grid, the same library annotates `ListView` (`ListViewColumnAttribute`,
+`ListViewColumnColorAttribute`, `ListItemImageAttribute`, `ListItemStyleAttribute`). Our
+[`ListView`](controls/listview.md) has the matching surface, so it is a cheap follow-on once the grid
+walk exists — same generator, different populator.
 
 ### Design rules
 
-- [ ] **One marker, two populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)` *and*
-      `PopulateColumns(DataGridView)`, so a model drives an inspector and a grid interchangeably.
-      Emitting the grid populator only when the type is actually used with a grid is a nice-to-have,
-      not a requirement — dead generated methods are trimmed.
-- [ ] **Column kind inferred from the property type**, mapped onto the 15 kinds the grid already has:
-      `bool` → `Check`, numeric → `NumericUpDown` (or `Progress` when a `[GridRange]` bounds it and the
-      model opts in), `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`, `Color` → `Color`,
-      `enum` → `ComboBox` (items from `Enum.GetNames<T>()`), `[Flags]` enum → `CheckedListBox`,
-      anything else → `Text`. An explicit attribute overrides the inference.
-- [ ] **Shared vocabulary where the meaning is shared.** `[GridDisplayName]` → `HeaderText`,
-      `[GridIgnore]` → skip the column, `[GridDescription]` → `TooltipSelector`, `[GridRange]` → cell
-      validation and the `Progress` bounds. Grid-only concerns (width, display order, frozen,
-      auto-size, sort mode, alignment, read-only) get their own attributes rather than overloading the
-      inspector ones.
-- [ ] **Read/write without reflection or boxing surprises.** The generator emits both a `ValueSelector`
-      and, for settable properties, a `ValueSetter`, so grid editing writes straight back into the
-      model.
-- [ ] **Virtual-mode friendly.** The generated populator configures *columns only*; it never
-      materializes rows, so it composes with §13's `DataGridView` virtual mode rather than fighting it.
-- [ ] **Degrades exactly like the inspector path.** Without the analyzer the attributes still compile
-      and hand-built columns still work; only the generated method is absent.
+- [ ] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)`,
+      `PopulateColumns(DataGridView)` and later `PopulateColumns(ListView)`. A model drives an
+      inspector, a grid and a list interchangeably.
+- [ ] **Member references are `nameof`-friendly strings resolved at compile time.** Adopt the
+      reference's `…PropertyName` / `…MethodName` convention, but every one of them is checked by the
+      generator: unresolved name, wrong type (a condition that is not `bool`), or a click method with
+      the wrong signature is a diagnostic (`NFG002`…), never a run-time surprise.
+- [ ] **Column kind inferred from the property type, overridable by attribute.** `bool` → `Check`,
+      numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
+      `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
+- [ ] **Reuse the inspector vocabulary where the meaning is identical** (`[GridIgnore]`,
+      `[GridDisplayName]`, `[GridDescription]`, `[GridRange]`) instead of a parallel set; grid-only
+      concerns get grid-only attributes.
+- [ ] **Columns only.** The populator never materializes rows, so it composes with §13's virtual mode.
+- [ ] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
+      hand-built columns still work; only the generated method is absent.
 
-### Open decisions (settle before implementing)
+### Gaps to close in `DataGridView` first
 
-- [ ] **Attribute names.** Mirror `WindowsFormsExtensions`' vocabulary where it maps cleanly so porting
-      is muscle memory, rather than inventing a parallel set. Resolve against that library's actual
-      surface — this PRD deliberately does not guess the names.
-- [ ] **Conditional row/cell styling.** Attributes cannot carry delegates, and per-row colouring is the
-      feature that makes the reference library worth copying. Candidate encodings: name a static method
-      (`[GridCellStyle(nameof(StyleRow))]`) that the generator wires into `CellStyleSelector`; or have
-      the generator declare a `partial` hook the model implements. Pick one — a string-named method
-      that silently mismatches is the failure mode to avoid, so whichever is chosen must produce a
-      compile-time diagnostic (`NFG0xx`) when it does not resolve.
-- [ ] **Column ordering.** Declaration order, or an explicit index attribute, or both with the explicit
-      one winning.
+The parity map above needs three capabilities the grid does not have yet; each is useful on its own:
+
+- [ ] **Conditional row visibility** (a row filter predicate).
+- [ ] **Per-row height** (currently uniform).
+- [ ] **Conditional row selectability.**
 
 ### Acceptance
 
-- [ ] A `[GridEditable]` model with mixed property types generates a `DataGridView` whose column kinds,
-      headers and order match the annotations, asserted headlessly.
+- [ ] An annotated model generates a grid whose column kinds, headers, widths, order and per-row
+      styling match the annotations, asserted headlessly.
 - [ ] Editing a generated cell writes through to the model instance.
-- [ ] The same model still generates a working `PropertyGrid` — the two populators do not interfere.
-- [ ] A misresolved styling hook fails the build with a generator diagnostic, not at run time.
-- [ ] `dotnet publish -p:PublishAot=true` on a consumer stays clean (the generated code is plain
-      delegates; nothing reflective is introduced).
-- [ ] [`docs/controls/datagridview.md`](controls/datagridview.md) and
-      [`docs/controls/propertygrid.md`](controls/propertygrid.md) both document the shared attribute
-      vocabulary.
+- [ ] A misspelled `…PropertyName`/`…MethodName`, a non-`bool` condition, and a click method with the
+      wrong signature each fail the **build** with a generator diagnostic.
+- [ ] The same model still generates a working `PropertyGrid`.
+- [ ] `dotnet publish -p:PublishAot=true` on a consumer stays clean.
+- [ ] [`datagridview.md`](controls/datagridview.md) and [`propertygrid.md`](controls/propertygrid.md)
+      document the shared vocabulary, with a porting table from the reference library's names.
