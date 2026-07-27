@@ -175,7 +175,13 @@ internal static unsafe partial class Capture
         // that state trips `gtk_widget_draw: assertion '!widget->priv->alloc_needed'` and paints the
         // child widgets without the dialog's own background — buttons floating on the parent window.
         // Running the loop lets the queued resize land, so the toplevel draws complete.
+        // Two drains around a short quiet period, because a queued resize can be waiting on a frame
+        // callback rather than on the event queue — non-blocking iterations alone never run it, which is
+        // what still tripped the assertion under Wayland.
         Injection.Drain();
+        System.Threading.Thread.Sleep(20);
+        Injection.Drain();
+
         foreach (var layer in layers)
             gtk_test_widget_wait_for_draw(layer.Widget);
 
