@@ -76,9 +76,39 @@ public sealed class DataGridViewColumn
         }
     }
 
-    /// <summary>Optional selector producing a per-cell icon painted before the text;
-    /// <see langword="null"/> for none.</summary>
+    /// <summary>Optional selector producing a per-cell icon painted beside the text;
+    /// <see langword="null"/> for none. <see cref="TextImageRelation"/> decides which side.</summary>
     public Func<object?, IImage?>? ImageSelector { get; set; }
+
+    /// <summary>Where the <see cref="ImageSelector"/> icon sits relative to the cell text. Defaults to
+    /// <see cref="Drawing.TextImageRelation.ImageBeforeText"/>, the classic leading icon.</summary>
+    public TextImageRelation TextImageRelation { get; set; } = TextImageRelation.ImageBeforeText;
+
+    /// <summary>The fixed box the cell icon is drawn into, or <see cref="Size.Empty"/> (the default) to
+    /// size it to the row height. See <see cref="KeepImageAspectRatio"/>.</summary>
+    public Size ImageSize { get; set; }
+
+    /// <summary>Whether an icon drawn into an explicit <see cref="ImageSize"/> keeps its aspect ratio,
+    /// letterboxed inside that box rather than stretched. Defaults to <see langword="true"/>.</summary>
+    public bool KeepImageAspectRatio { get; set; } = true;
+
+    /// <summary>The largest edge, in pixels, of one icon in a
+    /// <see cref="DataGridViewColumnKind.MultiImage"/> cell, or <c>0</c> (the default) to fill the row
+    /// height. Icons stay square.</summary>
+    public int MaxImageSize { get; set; }
+
+    /// <summary>The gap between adjacent icons in a <see cref="DataGridViewColumnKind.MultiImage"/>
+    /// cell. Defaults to <c>4</c>.</summary>
+    public int ImageGap { get; set; } = 4;
+
+    /// <summary>The inset from the cell edges for a <see cref="DataGridViewColumnKind.MultiImage"/>
+    /// cell's icon strip. Defaults to <c>2</c>.</summary>
+    public int ImagePadding { get; set; } = 2;
+
+    /// <summary>Optional per-icon tooltip for a <see cref="DataGridViewColumnKind.MultiImage"/> cell,
+    /// taking the row item and the icon index; <see langword="null"/> falls back to
+    /// <see cref="TooltipSelector"/>.</summary>
+    public Func<object?, int, string?>? ImageTooltipSelector { get; set; }
 
     /// <summary>Whether every cell in this column refuses edits and check toggling. Combined with the
     /// grid and per-cell levels by <see cref="DataGridView.IsCellReadOnly"/>.</summary>

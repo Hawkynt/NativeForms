@@ -591,4 +591,106 @@ internal sealed class DataGridViewColumnTypesTests
             Assert.That(ended, Is.EqualTo(1), "the edit cycle still closes");
         });
     }
+
+    [Test]
+    public void TextBeforeImage_puts_the_icon_after_the_text()
+    {
+        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
+        {
+            ImageSelector = static _ => new HeadlessImage(8, 8),
+            TextImageRelation = TextImageRelation.TextBeforeImage,
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        // The 18px icon box now trails the 35px text: 4 + 35 + 4 = 43.
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @43,24")), Is.True, "icon after text");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@4,22")), Is.True, "text leads");
+        });
+    }
+
+    [Test]
+    public void An_explicit_ImageSize_letterboxes_the_icon_to_its_aspect_ratio()
+    {
+        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
+        {
+            ImageSelector = static _ => new HeadlessImage(8, 4),   // 2:1
+            ImageSize = new Size(20, 20),
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x4 @") && o.EndsWith(",20,10")), Is.True,
+            "a 2:1 icon in a 20x20 box is drawn 20x10, not stretched");
+    }
+
+    [Test]
+    public void KeepImageAspectRatio_false_stretches_into_the_box()
+    {
+        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
+        {
+            ImageSelector = static _ => new HeadlessImage(8, 4),
+            ImageSize = new Size(20, 20),
+            KeepImageAspectRatio = false,
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x4 @") && o.EndsWith(",20,20")), Is.True);
+    }
+
+    [Test]
+    public void MaxImageSize_caps_the_multi_image_icons_and_moves_the_hit_test_with_them()
+    {
+        var clicks = new List<int>();
+        var grid = MakeGrid(new("Icons", static o => null)
+        {
+            Kind = DataGridViewColumnKind.MultiImage,
+            ImagesSelector = static _ => new IImage[] { new HeadlessImage(8, 8), new HeadlessImage(8, 8) },
+            MaxImageSize = 10,
+            ImageGap = 6,
+        });
+        grid.Items.Add(new Row());
+        var canvas = Realize(grid);
+        grid.CellContentClick += (_, e) => clicks.Add(e.ContentIndex);
+
+        var g = canvas.RaisePaint();
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @4,") && o.EndsWith(",10,10")), Is.True, "first icon capped to 10px");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @20,") && o.EndsWith(",10,10")), Is.True, "second icon one 16px stride along");
+        });
+
+        canvas.RaiseMouseDown(22, 22 + 5); // inside the second icon
+        Assert.That(clicks, Is.EqualTo(new[] { 1 }), "the per-icon hit-test follows the same metrics");
+    }
+
+    [Test]
+    public void ImageTooltipSelector_gives_each_icon_its_own_tip()
+    {
+        var grid = MakeGrid(new("Icons", static o => null)
+        {
+            Kind = DataGridViewColumnKind.MultiImage,
+            ImagesSelector = static _ => new IImage[] { new HeadlessImage(8, 8), new HeadlessImage(8, 8) },
+            TooltipSelector = static _ => "whole cell",
+            ImageTooltipSelector = static (_, index) => index == 1 ? "second icon" : null,
+        });
+        grid.Items.Add(new Row());
+        Realize(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GetCellTooltip(0, 0, 1), Is.EqualTo("second icon"));
+            Assert.That(grid.GetCellTooltip(0, 0, 0), Is.EqualTo("whole cell"), "a null per-icon tip falls back to the cell tip");
+            Assert.That(grid.GetCellTooltip(0, 0), Is.EqualTo("whole cell"), "the cell-wide overload is unchanged");
+        });
+    }
 }

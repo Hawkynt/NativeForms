@@ -109,6 +109,7 @@ public class DataGridView : OwnerDrawnControl
 
     private int _hoverRowIndex = -1;
     private int _hoverColumnIndex = -1;
+    private int _hoverImageIndex = -1;   // the hovered icon of a MultiImage cell, for per-icon tooltips
     private Point _hoverPoint;
     private Timer? _tipTimer;
     private IPopupPeer? _tipPopup;
@@ -616,12 +617,47 @@ public class DataGridView : OwnerDrawnControl
 
     /// <summary>The tooltip text the column's <see cref="DataGridViewColumn.TooltipSelector"/> yields
     /// for the given cell, or <see langword="null"/>. Indices are model (Items/Columns) indices.</summary>
-    public string? GetCellTooltip(int rowIndex, int columnIndex)
+    public string? GetCellTooltip(int rowIndex, int columnIndex) => this.GetCellTooltip(rowIndex, columnIndex, -1);
+
+    /// <summary>The tooltip text for a cell, preferring the column's
+    /// <see cref="DataGridViewColumn.ImageTooltipSelector"/> when <paramref name="imageIndex"/> names an
+    /// icon of a <see cref="DataGridViewColumnKind.MultiImage"/> cell, and falling back to the
+    /// cell-wide <see cref="DataGridViewColumn.TooltipSelector"/>. Indices are model indices.</summary>
+    public string? GetCellTooltip(int rowIndex, int columnIndex, int imageIndex)
     {
         if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
             return null;
 
-        return _columns[columnIndex].TooltipSelector?.Invoke(this.Items[rowIndex]);
+        var column = _columns[columnIndex];
+        var item = this.Items[rowIndex];
+        if (imageIndex >= 0 && column.ImageTooltipSelector is { } perImage && perImage(item, imageIndex) is { } text)
+            return text;
+
+        return column.TooltipSelector?.Invoke(item);
+    }
+
+    /// <summary>The index of the icon under a point inside a <see cref="DataGridViewColumnKind.MultiImage"/>
+    /// cell, or <c>-1</c>. Mirrors the per-icon hit-test used for clicks.</summary>
+    private int HitTestCellImage(int rowIndex, int columnIndex, int cellX, int rowHeight)
+    {
+        if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
+            return -1;
+
+        var column = _columns[columnIndex];
+        if (column.Kind != DataGridViewColumnKind.MultiImage)
+            return -1;
+
+        var images = column.ImagesSelector?.Invoke(this.Items[rowIndex]);
+        var (iconSize, slot, _) = MultiImageMetrics(column, rowHeight);
+        if (images is null || iconSize <= 0)
+            return -1;
+
+        var relative = cellX - _CellPadding;
+        if (relative < 0)
+            return -1;
+
+        var index = relative / slot;
+        return index < images.Count && (relative % slot) < iconSize ? index : -1;
     }
 
     /// <summary>
@@ -1522,7 +1558,7 @@ public class DataGridView : OwnerDrawnControl
             case DataGridViewColumnKind.MultiImage:
             {
                 var images = column.ImagesSelector?.Invoke(item);
-                var iconSize = rowHeight - 4;
+                var (iconSize, slot, _) = MultiImageMetrics(column, rowHeight);
                 if (images is null || iconSize <= 0)
                     break;
 
@@ -1530,7 +1566,6 @@ public class DataGridView : OwnerDrawnControl
                 if (relative < 0)
                     break;
 
-                var slot = iconSize + _IconGap;
                 var index = relative / slot;
                 if (index < images.Count && (relative % slot) < iconSize)
                     this.OnCellContentClick(new(rowIndex, columnIndex, index));
@@ -1991,15 +2026,16 @@ public class DataGridView : OwnerDrawnControl
             case DataGridViewColumnKind.MultiImage:
             {
                 var images = column.ImagesSelector?.Invoke(item);
-                var iconSize = cellRect.Height - 4;
+                var (iconSize, stride, inset) = MultiImageMetrics(column, cellRect.Height);
                 if (images is null || iconSize <= 0)
                     break;
 
                 var x = cellRect.X + _CellPadding;
+                var iconTop = cellRect.Y + inset + Math.Max(0, (cellRect.Height - (2 * inset) - iconSize) / 2);
                 for (var i = 0; i < images.Count; ++i)
                 {
-                    g.DrawImage(images[i], new Rectangle(x, cellRect.Y + 2, iconSize, iconSize));
-                    x += iconSize + _IconGap;
+                    g.DrawImage(images[i], new Rectangle(x, iconTop, iconSize, iconSize));
+                    x += stride;
                 }
 
                 break;
@@ -2043,22 +2079,87 @@ public class DataGridView : OwnerDrawnControl
 
             default:
             {
-                var textLeft = cellRect.X + _CellPadding;
+                var text = this.GetDisplayText(column, item, modelIndex);
                 var icon = column.ImageSelector?.Invoke(item);
-                if (icon is not null)
+                if (icon is null)
                 {
-                    var iconSize = cellRect.Height - 4;
-                    g.DrawImage(icon, new Rectangle(cellRect.X + _CellPadding, cellRect.Y + 2, iconSize, iconSize));
-                    textLeft += iconSize + _IconGap;
+                    var plain = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - (2 * _CellPadding)), cellRect.Height);
+                    g.DrawText(text, theme.DefaultFont, foreColor, plain, alignment);
+                    break;
                 }
 
-                var textRect = new Rectangle(textLeft, cellRect.Y, Math.Max(0, cellRect.Right - textLeft), cellRect.Height);
-                g.DrawText(this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, foreColor, textRect, alignment);
+                // Image + text share the shared ContentLayout geometry (PRD §5), so a grid cell places
+                // its icon exactly like every other icon+text control.
+                var content = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - (2 * _CellPadding)), cellRect.Height);
+                var box = ImageBox(column, icon, cellRect.Height);
+                ContentLayout.Arrange(
+                    content,
+                    box,
+                    text.Length == 0 ? Size.Empty : g.MeasureText(text, theme.DefaultFont),
+                    column.TextImageRelation,
+                    alignment,
+                    out var imageRect,
+                    out var textRect);
+
+                if (!imageRect.IsEmpty)
+                    g.DrawImage(icon, imageRect);
+
+                if (text.Length > 0)
+                {
+                    // Side-by-side relations keep the classic full-height text band so the column's
+                    // ContentAlignment still governs the text exactly as it does without an icon; the
+                    // stacked relations use the arranged rectangle.
+                    var (band, bandAlignment) = column.TextImageRelation switch
+                    {
+                        TextImageRelation.ImageBeforeText => (
+                            new Rectangle(imageRect.Right + ContentLayout.Gap, cellRect.Y, Math.Max(0, content.Right - imageRect.Right - ContentLayout.Gap), cellRect.Height),
+                            alignment),
+                        TextImageRelation.TextBeforeImage => (
+                            new Rectangle(content.X, cellRect.Y, Math.Max(0, imageRect.X - ContentLayout.Gap - content.X), cellRect.Height),
+                            alignment),
+                        _ => (textRect, ContentAlignment.MiddleLeft),
+                    };
+
+                    g.DrawText(text, theme.DefaultFont, foreColor, band, bandAlignment);
+                }
+
                 break;
             }
         }
 
         g.PopClip();
+    }
+
+    /// <summary>The box a cell icon occupies: the column's explicit <see cref="DataGridViewColumn.ImageSize"/>
+    /// (letterboxed to the icon's aspect ratio unless the column opts out), otherwise a square inset from
+    /// the row height — the historical behavior.</summary>
+    private static Size ImageBox(DataGridViewColumn column, IImage icon, int rowHeight)
+    {
+        var explicitBox = column.ImageSize;
+        if (explicitBox.Width <= 0 || explicitBox.Height <= 0)
+        {
+            var square = Math.Max(0, rowHeight - 4);
+            return new Size(square, square);
+        }
+
+        if (!column.KeepImageAspectRatio || icon.Width <= 0 || icon.Height <= 0)
+            return explicitBox;
+
+        // Letterbox: the largest rectangle with the icon's ratio that fits the requested box.
+        var scale = Math.Min((double)explicitBox.Width / icon.Width, (double)explicitBox.Height / icon.Height);
+        return new Size(Math.Max(1, (int)Math.Round(icon.Width * scale)), Math.Max(1, (int)Math.Round(icon.Height * scale)));
+    }
+
+    /// <summary>The icon edge and stride of a <see cref="DataGridViewColumnKind.MultiImage"/> cell, shared
+    /// by its painting and its per-icon hit-testing so the two never drift apart.</summary>
+    private static (int Size, int Stride, int Inset) MultiImageMetrics(DataGridViewColumn column, int rowHeight)
+    {
+        var inset = Math.Max(0, column.ImagePadding);
+        var size = Math.Max(0, rowHeight - (2 * inset));
+        if (column.MaxImageSize > 0)
+            size = Math.Min(size, column.MaxImageSize);
+
+        return (size, size + Math.Max(0, column.ImageGap), inset);
     }
 
     /// <summary>Paints the row-header column: themed strip, per-row separators and the marker
@@ -3339,16 +3440,20 @@ public class DataGridView : OwnerDrawnControl
         if (!this.ShowCellToolTips || this.Backend is null)
             return;
 
-        var rowIndex = e.Y >= this.HeaderHeight ? this.HitTestRow(e.Y, out _, out _) : -1;
-        var columnIndex = rowIndex >= 0 ? this.HitTestColumn(e.X, out _) : -1;
+        var hoverRowHeight = 0;
+        var hoverCellX = 0;
+        var rowIndex = e.Y >= this.HeaderHeight ? this.HitTestRow(e.Y, out hoverRowHeight, out _) : -1;
+        var columnIndex = rowIndex >= 0 ? this.HitTestColumn(e.X, out hoverCellX) : -1;
+        var imageIndex = columnIndex >= 0 ? this.HitTestCellImage(rowIndex, columnIndex, hoverCellX, hoverRowHeight) : -1;
         _hoverPoint = e.Location;
-        if (rowIndex == _hoverRowIndex && columnIndex == _hoverColumnIndex)
+        if (rowIndex == _hoverRowIndex && columnIndex == _hoverColumnIndex && imageIndex == _hoverImageIndex)
             return;
 
         _hoverRowIndex = rowIndex;
         _hoverColumnIndex = columnIndex;
+        _hoverImageIndex = imageIndex;
         this.HideCellToolTip();
-        if (rowIndex < 0 || columnIndex < 0 || this.GetCellTooltip(rowIndex, columnIndex) is null)
+        if (rowIndex < 0 || columnIndex < 0 || this.GetCellTooltip(rowIndex, columnIndex, imageIndex) is null)
             return;
 
         var timer = this.EnsureTipTimer();
@@ -3380,7 +3485,7 @@ public class DataGridView : OwnerDrawnControl
             return;
         }
 
-        if (this.Backend is not { } backend || this.GetCellTooltip(_hoverRowIndex, _hoverColumnIndex) is not { } text)
+        if (this.Backend is not { } backend || this.GetCellTooltip(_hoverRowIndex, _hoverColumnIndex, _hoverImageIndex) is not { } text)
             return;
 
         _tipText = text;

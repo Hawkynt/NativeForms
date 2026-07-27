@@ -810,9 +810,9 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
 - **M13 — Attribute-driven grids & lists (§14).** Extend the `[GridEditable]` source generator so one
   annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns —
   column kind, width, sort, images, tooltips, per-cell/row styling and click handlers — with every
-  member reference resolved (and diagnosed) at compile time. Includes the grid capabilities it depends
-  on: conditional row visibility, per-row height, conditional row selectability, `TextImageRelation`,
-  fixed image boxes and stackable conditional image overlays. `[ ]`
+  member reference resolved (and diagnosed) at compile time. The grid capabilities it depends on now
+  all ship — row hooks (`RowHiddenSelector`, `RowHeightSelector`, `RowSelectableSelector`) and the image
+  surface of §14.2 — leaving the generator work itself. `[ ]`
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -1078,17 +1078,20 @@ that needs new grid capability rather than new plumbing:
 |---|---|---|
 | Image from an `ImageList` + key/index property | `imageListPropertyName` + `imageKeyPropertyName` | expressible — the generated `ImageSelector` closes over our [`ImageList`](controls/imagelist.md) |
 | Image straight from a property | `imagePropertyName` | expressible — `ImageSelector` |
-| Several images per cell | `DataGridViewMultiImageColumnAttribute` (+ max size, padding, margin, per-image click and tooltip provider) | `ImagesSelector`; **per-image size/padding/margin, click and tooltip are missing** |
-| Image *and* text in one cell, with relation | `textImageRelation` (`ImageBeforeText`, …) | `ImageSelector` draws before the text only — **no `TextImageRelation`** |
-| Fixed image box + aspect ratio | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio` | **missing** |
+| Several images per cell | `DataGridViewMultiImageColumnAttribute` (+ max size, padding, margin, per-image click and tooltip provider) | `ImagesSelector` + `MaxImageSize`/`ImageGap`/`ImagePadding`/`ImageTooltipSelector`; per-icon click reports its index via `CellContentClick` (shipped) |
+| Image *and* text in one cell, with relation | `textImageRelation` (`ImageBeforeText`, …) | `ImageSelector` + `TextImageRelation` (shipped) |
+| Fixed image box + aspect ratio | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio` | `ImageSize` + `KeepImageAspectRatio` (shipped) |
 | Conditional image overlay, stackable | `SupportsConditionalImageAttribute` (`AllowMultiple`) | **missing** |
 | Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side) | **missing** |
 
-- [ ] Add `TextImageRelation` to `DataGridViewColumn` (we already have the enum, used by
-      [`IconLabel`](controls/iconlabel.md) and [`Button`](controls/button.md)).
-- [ ] Add a fixed image box with aspect-ratio control to image-bearing cells.
-- [ ] Add per-image hit-testing metadata to `MultiImage` (size, padding, margin) so per-image click and
-      tooltip callbacks can be wired.
+- [x] Add `TextImageRelation` to `DataGridViewColumn` (we already have the enum, used by
+      [`IconLabel`](controls/iconlabel.md) and [`Button`](controls/button.md)) — placed through the shared
+      `ContentLayout` helper, so a grid cell arranges its icon exactly like every other icon+text control.
+- [x] Add a fixed image box with aspect-ratio control to image-bearing cells (`ImageSize`,
+      `KeepImageAspectRatio`; an unset size keeps the historical row-height square).
+- [x] Add per-image metadata to `MultiImage` (`MaxImageSize`, `ImageGap`, `ImagePadding`) plus
+      `ImageTooltipSelector`; painting and per-icon hit-testing share one metrics helper so they cannot
+      drift apart.
 - [ ] Add a conditional image overlay list, so several conditional badges can stack on one cell.
 
 ### 14.3 The rest of the parity map
@@ -1102,10 +1105,10 @@ that needs new grid capability rather than new plumbing:
 | `DataGridViewColumnSortModeAttribute` | Per-column sort mode | `SortMode` (+ `SortComparison`) |
 | `DataGridViewColumnWidthAttribute` | Width in pixels, in characters, or sized to a sample string; auto-size mode | `Width` / `AutoSizeMode` |
 | `DataGridViewConditionalReadOnlyAttribute` | Read-only while a named `bool` property is true | `ReadOnlyCellSelector` |
-| `DataGridViewConditionalRowHiddenAttribute` | Hide the row while a named property is true | **new** — row-visibility filter |
+| `DataGridViewConditionalRowHiddenAttribute` | Hide the row while a named property is true | `RowHiddenSelector` (shipped) |
 | `DataGridViewFullMergedRowAttribute` | Row drawn as one merged heading cell, heading text from a property | bind to our existing merged rows |
-| `DataGridViewRowHeightAttribute` | Fixed height, or height from a named property, condition-gated | **new** — per-row height |
-| `DataGridViewRowSelectableAttribute` | Row selectable only while a named property is true | **new** — selection filter |
+| `DataGridViewRowHeightAttribute` | Fixed height, or height from a named property, condition-gated | `RowHeightSelector` (shipped) |
+| `DataGridViewRowSelectableAttribute` | Row selectable only while a named property is true | `RowSelectableSelector` (shipped) |
 | `DataGridViewRowStyleAttribute` | Per-row fore/back/format + bold/italic/underline/strikeout, literal or property-sourced, condition-gated; stackable | `CellStyleSelector` applied row-wide |
 
 Beyond the grid the same library annotates `ListView` — `ListViewColumnAttribute`,

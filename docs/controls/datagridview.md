@@ -136,14 +136,21 @@ Core members:
 | `FormatSelector` | `Func<object?, string>?` | `null` | Formats the `ValueSelector` result into display text — the reflection-free `CellFormatting` seam. Shapes the displayed text only (editors still seed from the raw value); the result is cached per cell until the row changes. |
 | `Frozen` | `bool` | `false` | Pins the column at the left edge: frozen columns form the leading display run and stay put while `HorizontalOffset` scrolls the rest underneath. |
 | `HeaderText` | `string` | ctor | Text painted in the column header. |
-| `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional per-cell icon before the text (text kinds); `null` result means none. |
+| `ImageGap` | `int` | `4` | Gap between adjacent icons of a `MultiImage` cell. |
+| `ImagePadding` | `int` | `2` | Inset from the cell edges for a `MultiImage` cell's icon strip. |
+| `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional per-cell icon beside the text (text kinds); `null` result means none. `TextImageRelation` picks the side. |
+| `ImageSize` | `Size` | `Empty` | Fixed box for the `ImageSelector` icon; empty sizes it to the row height. |
+| `ImageTooltipSelector` | `Func<object?, int, string?>?` | `null` | Per-icon tooltip for a `MultiImage` cell, taking the row item and icon index; a `null` result falls back to `TooltipSelector`. |
+| `KeepImageAspectRatio` | `bool` | `true` | Whether an icon drawn into an explicit `ImageSize` is letterboxed rather than stretched. |
 | `Kind` | `DataGridViewColumnKind` | `Text` | How the column renders and reacts to clicks (see *Column kinds*). |
+| `MaxImageSize` | `int` | `0` | Largest edge of one icon in a `MultiImage` cell; `0` fills the row height. |
 | `MinimumWidth` | `int` | `8` | The narrowest width the column accepts (floored at 2 px): the lower bound of a divider drag and of a `Fill` column's share. |
 | `ReadOnly` | `bool` | `false` | Whether every cell in the column refuses edits and check toggling. |
 | `ReadOnlyCellSelector` | `Func<object?, bool>?` | `null` | Per-cell read-only predicate over the row item. |
 | `Resizable` | `DataGridViewTriState` | `NotSet` | Whether the user may drag this column's divider: `True`/`False` override the grid's `AllowUserToResizeColumns`; `NotSet` inherits it — WinForms semantics. |
 | `SortComparison` | `Comparison<object?>?` | `null` | Row-item comparison used when this column sorts; `null` compares the `ValueSelector` values. |
 | `SortMode` | `DataGridViewColumnSortMode` | `NotSortable` | `Automatic` makes a header click toggle ascending/descending. |
+| `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | Where the `ImageSelector` icon sits relative to the cell text. Side-by-side relations keep the column's `Alignment` governing the text; the stacked relations centre it. |
 | `TooltipSelector` | `Func<object?, string?>?` | `null` | Per-cell tooltip text, surfaced through `GetCellTooltip`. |
 | `ValueSelector` | `Func<object?, object?>` | ctor | Maps a row item to the cell value, rendered via `ToString()`. |
 | `Width` | `int` | `100` | Column width in pixels. |
@@ -176,7 +183,7 @@ Kind-specific content and editing members:
 
 | `DataGridViewColumnKind` | Renders | Click / edit behavior |
 |---|---|---|
-| `Text` | `ValueSelector` text, optional `ImageSelector` icon before it | Edits in a hosted `TextBox` when `TextSetter` is set. |
+| `Text` | `ValueSelector` text, optional `ImageSelector` icon placed by `TextImageRelation` | Edits in a hosted `TextBox` when `TextSetter` is set. |
 | `Check` | Themed check glyph from `CheckedSelector` | Click raises `CellContentClick` and toggles through `CheckedSetter` unless read-only. |
 | `Button` | Themed button face with the cell text | Click raises `CellContentClick` while `EnabledSelector` allows it. |
 | `Link` | Accent-colored, underlined text | Click raises `CellContentClick`. |
