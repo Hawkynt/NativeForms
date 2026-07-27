@@ -808,9 +808,11 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `DataGridView`/`TreeView`. `[ ]`
 - **M13 — Attribute-driven grids & lists (§14).** Extend the `[GridEditable]` source generator so one
-  annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns,
-  with every member reference resolved (and diagnosed) at compile time. Includes the three grid gaps
-  it depends on: conditional row visibility, per-row height, conditional row selectability. `[ ]`
+  annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns —
+  column kind, width, sort, images, tooltips, per-cell/row styling and click handlers — with every
+  member reference resolved (and diagnosed) at compile time. Includes the grid capabilities it depends
+  on: conditional row visibility, per-row height, conditional row selectability, `TextImageRelation`,
+  fixed image boxes and stackable conditional image overlays. `[ ]`
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -1018,93 +1020,126 @@ next change starts from a considered list instead of an inbox.
 ---
 
 
+
 ## 14. Attribute-driven grids & lists — extend the generator to `DataGridView`
 
 **The reference.** `Hawkynt/C--FrameworkExtensions` (`System.Windows.Forms.Extensions`) drives a
-`DataGridView` entirely from attributes on the bound row type: you annotate the model, call
-`grid.EnableExtendedAttributes()`, set `DataSource`, and the grid configures itself. Its design has one
-idea worth copying wholesale: **an attribute never carries a delegate — it carries the *name* of
-another member on the model** (`conditionalPropertyName`, `isReadOnlyWhen`, `onClickMethodName`,
-`foreColorPropertyName`). That is what lets declarative attributes express dynamic, per-row behavior.
+`DataGridView` entirely from attributes on the bound row type: annotate the model, call
+`grid.EnableExtendedAttributes()`, set `DataSource`, and the grid configures itself — **column type,
+width, sort mode, images, tooltips, per-cell and per-row styling, conditional read-only/hidden/
+selectable, row height and click handlers**. Its central idea is worth copying wholesale: **an
+attribute never carries a delegate — it carries the *name* of another member on the model**
+(`conditionalPropertyName`, `isReadOnlyWhen`, `onClickMethodName`, `imageListPropertyName`). That is
+what lets a static annotation express dynamic, per-row behavior.
 
-**Why we can do it better.** There the names are resolved by reflection at run time, so a typo is a
+**Why we can do it better.** There those names are resolved by reflection at run time, so a typo is a
 silent no-op or a run-time throw — and reflection is banned here (§1.3). A **source generator** resolves
-those same names against the Roslyn symbol model at **compile time**: a misspelled
-`conditionalPropertyName`, a wrong-typed condition property, or a missing click method becomes a build
-error instead of a mystery. Same ergonomics, strictly better failure mode, and AOT-clean.
+the same names against the Roslyn symbol model at **compile time**: a misspelled property, a condition
+that is not `bool`, or a click method with the wrong signature becomes a build error. Same ergonomics,
+strictly better failure mode, AOT-clean.
 
 **The goal.** One `[GridEditable]` model emits both `PopulateGrid(PropertyGrid)` (shipped) and
 `PopulateColumns(DataGridView)` (this section), wiring our existing delegate-based column surface —
 `ValueSelector`/`ValueSetter`, `CheckedSelector`/`CheckedSetter`, `ProgressSelector`, `ImageSelector`,
 `ImagesSelector`, `TooltipSelector`, `CellStyleSelector`, `EnabledSelector`, `ReadOnlyCellSelector`,
-`SortComparison` — from generated, strongly-typed lambdas.
+`ItemsSelector`, `SortComparison` — from generated, strongly-typed lambdas.
 
-### Capability parity map
+### 14.1 Column types
 
-Each row: what the reference offers, and how it lands here. `Kind` values refer to the 15 members of
-`DataGridViewColumnKind` we already ship.
+The reference ships custom column types plus attributes that select them. Ours already has 15 kinds, so
+this is mostly a mapping exercise — and we cover more kinds than the reference does.
+
+| Reference column / attribute | Our `DataGridViewColumnKind` |
+|---|---|
+| `DataGridViewBoundComboBoxColumn` · `DataGridViewComboboxColumnAttribute` | `ComboBox` + `ItemsSelector` |
+| `DataGridViewDateTimePickerColumn` | `DateTime` |
+| `DataGridViewDisableButtonColumn` · `DataGridViewButtonColumnAttribute` | `Button` + `EnabledSelector` |
+| `DataGridViewImageAndTextColumn` · `DataGridViewImageAndTextColumnAttribute` | `Text` + `ImageSelector` |
+| `DataGridViewMultiImageColumn` · `DataGridViewMultiImageColumnAttribute` | `MultiImage` + `ImagesSelector` |
+| `DataGridViewNumericUpDownColumn` · `DataGridViewNumericUpDownColumnAttribute` | `NumericUpDown` |
+| `DataGridViewProgressBarColumn` · `DataGridViewProgressBarColumnAttribute` | `Progress` + `ProgressSelector` |
+| `DataGridViewCheckboxColumnAttribute` | `Check` + `CheckedSelector`/`CheckedSetter` |
+| `DataGridViewImageColumnAttribute` | `Text` + `ImageSelector` (image-only cell) |
+| — (no reference equivalent) | `Link`, `MaskedText`, `DomainUpDown`, `Color`, `ListBox`, `CheckedListBox`, `TimePicker` |
+
+- [ ] Attributes must be able to select **every one of our 15 kinds**, not only the nine the reference
+      covers — the extra seven get attributes of their own so the annotation route is never weaker than
+      hand-built columns.
+- [ ] Kind is **inferred from the property type** and overridable by attribute: `bool` → `Check`,
+      numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
+      `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
+
+### 14.2 Images
+
+The reference has a richer image model than a single selector, and this is the part of the parity map
+that needs new grid capability rather than new plumbing:
+
+| Capability | Reference | Ours today |
+|---|---|---|
+| Image from an `ImageList` + key/index property | `imageListPropertyName` + `imageKeyPropertyName` | expressible — the generated `ImageSelector` closes over our [`ImageList`](controls/imagelist.md) |
+| Image straight from a property | `imagePropertyName` | expressible — `ImageSelector` |
+| Several images per cell | `DataGridViewMultiImageColumnAttribute` (+ max size, padding, margin, per-image click and tooltip provider) | `ImagesSelector`; **per-image size/padding/margin, click and tooltip are missing** |
+| Image *and* text in one cell, with relation | `textImageRelation` (`ImageBeforeText`, …) | `ImageSelector` draws before the text only — **no `TextImageRelation`** |
+| Fixed image box + aspect ratio | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio` | **missing** |
+| Conditional image overlay, stackable | `SupportsConditionalImageAttribute` (`AllowMultiple`) | **missing** |
+| Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side) | **missing** |
+
+- [ ] Add `TextImageRelation` to `DataGridViewColumn` (we already have the enum, used by
+      [`IconLabel`](controls/iconlabel.md) and [`Button`](controls/button.md)).
+- [ ] Add a fixed image box with aspect-ratio control to image-bearing cells.
+- [ ] Add per-image hit-testing metadata to `MultiImage` (size, padding, margin) so per-image click and
+      tooltip callbacks can be wired.
+- [ ] Add a conditional image overlay list, so several conditional badges can stack on one cell.
+
+### 14.3 The rest of the parity map
 
 | Reference attribute | Capability | Our target |
 |---|---|---|
-| `DataGridViewButtonColumnAttribute` | Button column; `onClickMethodName`, `isEnabledWhenPropertyName` | `Kind.Button` + `EnabledSelector`; click method resolved at compile time |
-| `DataGridViewCellDisplayTextAttribute` | Cell text from another property | `ValueSelector` pointed at the named property |
-| `DataGridViewCellStyleAttribute` | Per-cell fore/back/format/alignment/wrap, each either literal or from a named property, gated by `conditionalPropertyName` | `CellStyleSelector` |
-| `DataGridViewCellTooltipAttribute` | Tooltip literal or from a property, with format + condition | `TooltipSelector` |
-| `DataGridViewCheckboxColumnAttribute` | Bool column | `Kind.Check` + `CheckedSelector`/`CheckedSetter` |
-| `DataGridViewClickableAttribute` | `onClickMethodName` / `onDoubleClickMethodName` per cell | `CellContentClick` routing to the resolved method |
+| `DataGridViewCellDisplayTextAttribute` | Cell text sourced from another property | `ValueSelector` pointed at the named property |
+| `DataGridViewCellStyleAttribute` | Per-cell fore/back/format/alignment/wrap — each literal *or* from a named property — gated by `conditionalPropertyName`; stackable | `CellStyleSelector` |
+| `DataGridViewCellTooltipAttribute` | Tooltip literal or property-sourced, with format + condition; stackable | `TooltipSelector` |
+| `DataGridViewClickableAttribute` | `onClickMethodName` / `onDoubleClickMethodName` per cell | `CellContentClick` routed to the resolved method |
 | `DataGridViewColumnSortModeAttribute` | Per-column sort mode | `SortMode` (+ `SortComparison`) |
-| `DataGridViewColumnWidthAttribute` | Width in pixels, character count, or a sample string; auto-size mode | `Width` / `AutoSizeMode` |
-| `DataGridViewComboboxColumnAttribute` | Items from a named property; `valueMember`/`displayMember`; enabled-when | `Kind.ComboBox` + `ItemsSelector` |
-| `DataGridViewConditionalReadOnlyAttribute` | Read-only when a named bool property is true | `ReadOnlyCellSelector` |
-| `DataGridViewConditionalRowHiddenAttribute` | Hide a row when a named property is true | row filter — **new**, needs a row-visibility hook |
-| `DataGridViewFullMergedRowAttribute` | Row rendered as one merged heading cell | we already have merged rows; bind to the named heading property |
-| `DataGridViewImageColumnAttribute` | Image from an image-list property; click/double-click; tooltip | `Kind.Text` + `ImageSelector`, or a dedicated image kind |
-| `DataGridViewMultiImageColumnAttribute` | Several images per cell, padding/margin, click + tooltip provider | `Kind.MultiImage` + `ImagesSelector` |
-| `DataGridViewNumericUpDownColumnAttribute` | Numeric editor column | `Kind.NumericUpDown` |
-| `DataGridViewProgressBarColumnAttribute` | Progress column with min/max | `Kind.Progress` + `ProgressSelector` |
-| `DataGridViewRowHeightAttribute` | Fixed height, or height from a named property, gated by a condition | row height — **new**, currently uniform |
-| `DataGridViewRowSelectableAttribute` | Row selectable only when a named property is true | selection filter — **new** |
-| `DataGridViewRowStyleAttribute` | Per-row fore/back/format + bold/italic/underline/strikeout, literal or property-sourced, condition-gated | `CellStyleSelector` applied row-wide |
+| `DataGridViewColumnWidthAttribute` | Width in pixels, in characters, or sized to a sample string; auto-size mode | `Width` / `AutoSizeMode` |
+| `DataGridViewConditionalReadOnlyAttribute` | Read-only while a named `bool` property is true | `ReadOnlyCellSelector` |
+| `DataGridViewConditionalRowHiddenAttribute` | Hide the row while a named property is true | **new** — row-visibility filter |
+| `DataGridViewFullMergedRowAttribute` | Row drawn as one merged heading cell, heading text from a property | bind to our existing merged rows |
+| `DataGridViewRowHeightAttribute` | Fixed height, or height from a named property, condition-gated | **new** — per-row height |
+| `DataGridViewRowSelectableAttribute` | Row selectable only while a named property is true | **new** — selection filter |
+| `DataGridViewRowStyleAttribute` | Per-row fore/back/format + bold/italic/underline/strikeout, literal or property-sourced, condition-gated; stackable | `CellStyleSelector` applied row-wide |
 
-Beyond the grid, the same library annotates `ListView` (`ListViewColumnAttribute`,
-`ListViewColumnColorAttribute`, `ListItemImageAttribute`, `ListItemStyleAttribute`). Our
-[`ListView`](controls/listview.md) has the matching surface, so it is a cheap follow-on once the grid
-walk exists — same generator, different populator.
+Beyond the grid the same library annotates `ListView` — `ListViewColumnAttribute`,
+`ListViewColumnColorAttribute`, `ListItemImageAttribute` (image list + key/index),
+`ListItemStyleAttribute`, `ListViewRepeatedImageAttribute`. Our [`ListView`](controls/listview.md) has
+the matching surface, so it is a cheap follow-on from the same symbol walk: same generator, different
+populator.
 
-### Design rules
+### 14.4 Design rules
 
 - [ ] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)`,
-      `PopulateColumns(DataGridView)` and later `PopulateColumns(ListView)`. A model drives an
+      `PopulateColumns(DataGridView)` and later `PopulateColumns(ListView)`, so one model drives an
       inspector, a grid and a list interchangeably.
-- [ ] **Member references are `nameof`-friendly strings resolved at compile time.** Adopt the
-      reference's `…PropertyName` / `…MethodName` convention, but every one of them is checked by the
-      generator: unresolved name, wrong type (a condition that is not `bool`), or a click method with
-      the wrong signature is a diagnostic (`NFG002`…), never a run-time surprise.
-- [ ] **Column kind inferred from the property type, overridable by attribute.** `bool` → `Check`,
-      numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
-      `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
+- [ ] **Member references are `nameof`-friendly strings, resolved at compile time.** Adopt the
+      reference's `…PropertyName` / `…MethodName` convention, but the generator checks every one:
+      unresolved name, wrong type, or a bad handler signature is a diagnostic (`NFG002`…).
+- [ ] **Stackable attributes stay stackable.** Style, tooltip and conditional-image attributes are
+      `AllowMultiple` in the reference and must remain so here — first matching condition wins, with
+      the evaluation order documented.
 - [ ] **Reuse the inspector vocabulary where the meaning is identical** (`[GridIgnore]`,
-      `[GridDisplayName]`, `[GridDescription]`, `[GridRange]`) instead of a parallel set; grid-only
-      concerns get grid-only attributes.
+      `[GridDisplayName]`, `[GridDescription]`, `[GridRange]`); grid-only concerns get grid-only
+      attributes.
 - [ ] **Columns only.** The populator never materializes rows, so it composes with §13's virtual mode.
 - [ ] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
       hand-built columns still work; only the generated method is absent.
 
-### Gaps to close in `DataGridView` first
+### 14.5 Acceptance
 
-The parity map above needs three capabilities the grid does not have yet; each is useful on its own:
-
-- [ ] **Conditional row visibility** (a row filter predicate).
-- [ ] **Per-row height** (currently uniform).
-- [ ] **Conditional row selectability.**
-
-### Acceptance
-
-- [ ] An annotated model generates a grid whose column kinds, headers, widths, order and per-row
-      styling match the annotations, asserted headlessly.
+- [ ] An annotated model generates a grid whose column kinds, headers, widths, order, images and
+      per-row styling match the annotations, asserted headlessly.
 - [ ] Editing a generated cell writes through to the model instance.
-- [ ] A misspelled `…PropertyName`/`…MethodName`, a non-`bool` condition, and a click method with the
-      wrong signature each fail the **build** with a generator diagnostic.
+- [ ] A misspelled `…PropertyName`/`…MethodName`, a non-`bool` condition, and a handler with the wrong
+      signature each fail the **build** with a generator diagnostic.
+- [ ] Every one of the 15 column kinds is reachable from attributes.
 - [ ] The same model still generates a working `PropertyGrid`.
 - [ ] `dotnet publish -p:PublishAot=true` on a consumer stays clean.
 - [ ] [`datagridview.md`](controls/datagridview.md) and [`propertygrid.md`](controls/propertygrid.md)
