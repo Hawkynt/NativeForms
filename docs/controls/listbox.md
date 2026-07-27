@@ -40,18 +40,18 @@ Inherits the common members of [`Control`](control.md).
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Items` | `ObservableList<object?>` | empty | The items shown. Mutating the collection repaints the control. |
+| `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
 | `DisplaySelector` | `Func<object?, string>` | `ToString()` | Produces the display text for an item. Setting `null` restores the default. |
+| `FocusedIndex` | `int` (get) | `-1` | The caret row keyboard navigation operates on — independent of the selection in the multi modes. |
 | `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional selector producing a leading icon per item; `null` result means none. |
 | `ItemHeight` | `int` | theme row height | Pixel height of a row. |
-| `SelectionMode` | `SelectionMode` | `One` | How the user selects: `None`, `One`, `MultiSimple` or `MultiExtended`. Changing the mode clears the selection. |
+| `Items` | `ObservableList<object?>` | empty | The items shown. Mutating the collection repaints the control. |
 | `SelectedIndex` | `int` | `-1` | The first selected index, `-1` for none. Setting replaces the whole selection with the one item (in `None` mode it only moves the caret); out-of-range values coerce to `-1`. |
 | `SelectedIndices` | `IReadOnlyList<int>` (get) | empty | The selected indices, always sorted ascending regardless of click order. |
-| `SelectedItems` | `IReadOnlyList<object?>` (get) | empty | The selected items in index order — a live view over `SelectedIndices`. |
 | `SelectedItem` | `object?` | `null` | The first selected item; setting selects by `IndexOf`. |
-| `FocusedIndex` | `int` (get) | `-1` | The caret row keyboard navigation operates on — independent of the selection in the multi modes. |
+| `SelectedItems` | `IReadOnlyList<object?>` (get) | empty | The selected items in index order — a live view over `SelectedIndices`. |
+| `SelectionMode` | `SelectionMode` | `One` | How the user selects: `None`, `One`, `MultiSimple` or `MultiExtended`. Changing the mode clears the selection. |
 | `TopIndex` | `int` (get) | `0` | Index of the first visible row (scroll position). |
-| `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
 
 ### Events
 
@@ -63,11 +63,11 @@ Inherits the common members of [`Control`](control.md).
 
 | Method | Description |
 |---|---|
+| `ClearSelected()` | Deselects every row. |
 | `EnsureVisible(int index)` | Scrolls so the given index is inside the visible row range. |
 | `GetSelected(int index)` | Whether the row at the given index is selected. |
-| `SetSelected(int index, bool value)` | Adds the row to or removes it from the selection; throws `ArgumentException` while `SelectionMode` is `None`. |
-| `ClearSelected()` | Deselects every row. |
 | `IndexFromPoint(int x, int y)` | The row index at the given client coordinates, or `-1` for none. |
+| `SetSelected(int index, bool value)` | Adds the row to or removes it from the selection; throws `ArgumentException` while `SelectionMode` is `None`. |
 
 ## Notes
 

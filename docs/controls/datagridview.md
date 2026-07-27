@@ -48,40 +48,40 @@ Inherits the common members of [`Control`](control.md).
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Columns` | `IList<DataGridViewColumn>` | empty | The columns shown. Mutate, then call `Invalidate()` to repaint. |
-| `Items` | `ObservableList<object?>` | empty | The row items. Mutating the collection repaints the control. |
-| `RowHeight` | `int` | theme row height | Pixel height of a data row. |
-| `ColumnHeaderHeight` | `int` | `RowHeight` | Pixel height of the column-header row. |
-| `ShowColumnHeaders` | `bool` | `true` | Whether the header row is painted. |
-| `ShowRowHeaders` | `bool` | `false` | Whether a header column is painted at the left edge, with a marker triangle on the selected row. |
-| `RowHeaderWidth` | `int` | `24` | Pixel width of the row-header column. |
-| `ShowGridLines` | `bool` | `true` | Whether horizontal and vertical grid lines are painted. |
-| `AlternatingRows` | `bool` | `false` | Whether every other data row (in display order) is tinted with `AlternatingRowColor`. |
-| `AlternatingRowColor` | `Color` | `#F6F6F6` | Background tint of alternating rows. |
-| `AllowUserToResizeColumns` | `bool` | `true` | Whether dragging a column divider in the header resizes that column (±3 px grab zone). |
 | `AllowUserToOrderColumns` | `bool` | `false` | Whether dragging a header past a neighbor reorders the display by rewriting `DisplayIndex` — `Columns` keeps its model order. |
+| `AllowUserToResizeColumns` | `bool` | `true` | Whether dragging a column divider in the header resizes that column (±3 px grab zone). |
+| `AlternatingRowColor` | `Color` | `#F6F6F6` | Background tint of alternating rows. |
+| `AlternatingRows` | `bool` | `false` | Whether every other data row (in display order) is tinted with `AlternatingRowColor`. |
+| `ColumnHeaderHeight` | `int` | `RowHeight` | Pixel height of the column-header row. |
+| `Columns` | `IList<DataGridViewColumn>` | empty | The columns shown. Mutate, then call `Invalidate()` to repaint. |
+| `CurrentColumnIndex` | `int` | `0` | The column keyboard activation (Space/Enter) and F2 target; follows the last clicked cell. |
+| `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
+| `EditingControl` | `Control?` (get) | `null` | The hosted editor while a `Text`/`MaskedText`/`NumericUpDown`/`TimePicker`/`DomainUpDown` cell edits; popup and dialog kinds host no child control. |
+| `EditMode` | `DataGridViewEditMode` | `EditOnKeystrokeOrF2` | How cells enter edit mode: keystroke/F2/double-click (default), `EditOnEnter` (a cell edits as soon as it becomes current), or `EditProgrammatically` (only `BeginEdit`). |
+| `FullRowTextSelector` | `Func<object?, string?>?` | `null` | Merges a row into one full-width cell: a non-`null` result paints that text across every column (a group/separator row), skipped by selection, navigation and editing. |
+| `HorizontalOffset` | `int` | `0` | Horizontal scroll in pixels, clamped so the non-frozen columns never scroll past their width; frozen columns stay put. |
+| `IsCurrentCellDirty` | `bool` (get) | `false` | Whether the hosted editor's content changed since the edit began; cleared when the edit ends. Popup kinds commit through their pick gesture and never report dirty. |
+| `IsEditing` | `bool` (get) | `false` | Whether a cell is currently in edit mode. |
+| `IsVerticalScrollBarVisible` / `IsHorizontalScrollBarVisible` | `bool` (get) | `false` | Whether the interactive scrollbar strips are currently shown (rows/columns overflow the viewport). |
+| `Items` | `ObservableList<object?>` | empty | The row items. Mutating the collection repaints the control. |
 | `MultiSelect` | `bool` | `false` | Whether Ctrl (toggle) and Shift (display-order range) clicks and Shift+arrows select several rows at once. |
 | `ReadOnly` | `bool` | `false` | Whether every cell in the grid refuses edits and check toggling (see `IsCellReadOnly`). |
-| `FullRowTextSelector` | `Func<object?, string?>?` | `null` | Merges a row into one full-width cell: a non-`null` result paints that text across every column (a group/separator row), skipped by selection, navigation and editing. |
 | `RowBackColorSelector` | `Func<object?, Color?>?` | `null` | Per-row background color; `null` result keeps the default. |
+| `RowHeaderWidth` | `int` | `24` | Pixel width of the row-header column. |
+| `RowHeight` | `int` | theme row height | Pixel height of a data row. |
 | `RowHeightSelector` | `Func<object?, int?>?` | `null` | Per-row pixel height; `null` result uses `RowHeight`. |
 | `RowHiddenSelector` | `Func<object?, bool>?` | `null` | Hides rows; hidden rows are skipped by painting, hit-testing and navigation. |
 | `RowSelectableSelector` | `Func<object?, bool>?` | `null` | Whether a row can be selected via mouse or keyboard; `null` means all. |
-| `HorizontalOffset` | `int` | `0` | Horizontal scroll in pixels, clamped so the non-frozen columns never scroll past their width; frozen columns stay put. |
-| `SelectedRowIndex` | `int` | `-1` | The selected row's `Items` index (`-1` for none) — the current row while `MultiSelect` holds a wider set. Stable under sorting; assigning collapses a multi-selection to the one row. |
 | `SelectedItem` | `object?` | `null` | The selected row item; setting selects by `IndexOf`. |
 | `SelectedItems` | `IEnumerable<object?>` (get) | empty | The selected items in model order: the whole Ctrl/Shift set under `MultiSelect`, otherwise the single row. |
-| `CurrentColumnIndex` | `int` | `0` | The column keyboard activation (Space/Enter) and F2 target; follows the last clicked cell. |
-| `TopRow` | `int` | `0` | Display index of the first visible data row (vertical scroll position). Settable — the value clamps into the scroll range; the vertical scrollbar thumb reads and writes it. |
-| `EditMode` | `DataGridViewEditMode` | `EditOnKeystrokeOrF2` | How cells enter edit mode: keystroke/F2/double-click (default), `EditOnEnter` (a cell edits as soon as it becomes current), or `EditProgrammatically` (only `BeginEdit`). |
+| `SelectedRowIndex` | `int` | `-1` | The selected row's `Items` index (`-1` for none) — the current row while `MultiSelect` holds a wider set. Stable under sorting; assigning collapses a multi-selection to the one row. |
 | `ShowCellToolTips` | `bool` | `true` | Whether resting the pointer on a cell whose column has a `TooltipSelector` pops that text up near the cursor. |
-| `IsCurrentCellDirty` | `bool` (get) | `false` | Whether the hosted editor's content changed since the edit began; cleared when the edit ends. Popup kinds commit through their pick gesture and never report dirty. |
-| `IsVerticalScrollBarVisible` / `IsHorizontalScrollBarVisible` | `bool` (get) | `false` | Whether the interactive scrollbar strips are currently shown (rows/columns overflow the viewport). |
+| `ShowColumnHeaders` | `bool` | `true` | Whether the header row is painted. |
+| `ShowGridLines` | `bool` | `true` | Whether horizontal and vertical grid lines are painted. |
+| `ShowRowHeaders` | `bool` | `false` | Whether a header column is painted at the left edge, with a marker triangle on the selected row. |
 | `SortedColumn` | `DataGridViewColumn?` (get) | `null` | The column the grid is currently sorted by. |
 | `SortOrder` | `SortOrder` (get) | `None` | The active sort direction; `None` shows `Items` order. |
-| `IsEditing` | `bool` (get) | `false` | Whether a cell is currently in edit mode. |
-| `EditingControl` | `Control?` (get) | `null` | The hosted editor while a `Text`/`MaskedText`/`NumericUpDown`/`TimePicker`/`DomainUpDown` cell edits; popup and dialog kinds host no child control. |
-| `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
+| `TopRow` | `int` | `0` | Display index of the first visible data row (vertical scroll position). Settable — the value clamps into the scroll range; the vertical scrollbar thumb reads and writes it. |
 
 ### Events
 
@@ -90,34 +90,34 @@ handlers stay stable while the grid is sorted or the columns are reordered.
 
 | Event | Description |
 |---|---|
-| `SelectionChanged` | Raised when `SelectedRowIndex` (or the multi-selection set) changes. |
-| `CellClick` | Raised when a data cell is clicked, and on Space/Enter for the current cell. |
-| `CellDoubleClick` | Raised when a cell is clicked twice within 500 ms. |
-| `CellContentClick` | Raised when the content of a check, button, link or multi-image cell is clicked; for multi-image cells `ContentIndex` names the icon (`-1` otherwise). |
 | `CellBeginEdit` | Raised before a cell enters edit mode; set `Cancel` to keep it read. |
-| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, the chosen item, `DateTime`, or — for the set-valued kinds — the whole `IReadOnlyList<object?>` of picked items); set `Cancel` to veto the write and keep the cell in edit mode. |
-| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, `TimeSpan`, the chosen item, or `DateTime`); set `Cancel` to veto the write and keep the cell in edit mode. |
+| `CellClick` | Raised when a data cell is clicked, and on Space/Enter for the current cell. |
+| `CellContentClick` | Raised when the content of a check, button, link or multi-image cell is clicked; for multi-image cells `ContentIndex` names the icon (`-1` otherwise). |
+| `CellDoubleClick` | Raised when a cell is clicked twice within 500 ms. |
 | `CellEndEdit` | Raised after a cell leaves edit mode, whether the edit committed or was cancelled. |
 | `CellItemCheck` | Raised before an item's tick flips inside a `CheckedListBox` cell's popup — the grid-side sibling of `CheckedListBox.ItemCheck`, with the same veto shape (reset `NewValue` to `CurrentValue`). `Index` indexes the popup's item list; the cell is the one `SelectedRowIndex`/`CurrentColumnIndex` report while the popup is open. |
+| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, the chosen item, `DateTime`, or — for the set-valued kinds — the whole `IReadOnlyList<object?>` of picked items); set `Cancel` to veto the write and keep the cell in edit mode. |
+| `CellValidating` | Raised before an edit commits, carrying `ProposedValue` (typed by the column's kind: `string`, `decimal`, `TimeSpan`, the chosen item, or `DateTime`); set `Cancel` to veto the write and keep the cell in edit mode. |
 | `CurrentCellDirtyStateChanged` | Raised when `IsCurrentCellDirty` flips — on the first editor change after the edit begins, and again when the edit ends. |
-| `RowValidating` | Raised before the current row is left for another one, carrying the row being left; set `Cancel` to keep the selection where it is. |
-| `RowValidated` | Raised after the current row was left without a `RowValidating` veto. |
 | `PasteCompleted` | Raised after `Paste` processed clipboard text — every attempted cell already ran its own `CellValidating`. |
+| `RowValidated` | Raised after the current row was left without a `RowValidating` veto. |
+| `RowValidating` | Raised before the current row is left for another one, carrying the row being left; set `Cancel` to keep the selection where it is. |
+| `SelectionChanged` | Raised when `SelectedRowIndex` (or the multi-selection set) changes. |
 
 ### Methods
 
 | Method | Description |
 |---|---|
-| `Sort(column, order)` | Sorts the presentation by the column and direction; `null`/`SortOrder.None` clears the sort. `Items` is never mutated. |
-| `EnsureVisible(int rowIndex)` | Scrolls so the given data row (an `Items` index) is visible. |
-| `IsCellReadOnly(rowItem, column)` | Whether the cell refuses edits and check toggling: read-only at any level (grid, column, or the column's per-cell predicate) wins, WinForms semantics. |
-| `GetCellTooltip(rowIndex, columnIndex)` | The text the column's `TooltipSelector` yields for the cell, or `null` (also for out-of-range indices). |
 | `BeginEdit(rowIndex, columnIndex)` | Puts the cell into edit mode; returns whether it did (see *Cell editing*). |
-| `CommitEdit()` | Validates and writes the active edit; `false` means a `CellValidating` veto kept the cell editing. A no-op returning `true` while nothing edits. |
 | `CancelEdit()` | Leaves edit mode without writing, still raising `CellEndEdit`. |
+| `CommitEdit()` | Validates and writes the active edit; `false` means a `CellValidating` veto kept the cell editing. A no-op returning `true` while nothing edits. |
+| `EnsureVisible(int rowIndex)` | Scrolls so the given data row (an `Items` index) is visible. |
 | `GetCellBounds(rowIndex, columnIndex)` | The client-space rectangle of a cell, honoring scroll, per-row heights, hidden rows, sorting and display order; `Rectangle.Empty` outside the visible window. |
+| `GetCellTooltip(rowIndex, columnIndex)` | The text the column's `TooltipSelector` yields for the cell, or `null` (also for out-of-range indices). |
 | `GetClipboardContent()` | The selection as tab-separated text (see *Clipboard*). |
+| `IsCellReadOnly(rowItem, column)` | Whether the cell refuses edits and check toggling: read-only at any level (grid, column, or the column's per-cell predicate) wins, WinForms semantics. |
 | `Paste(string text)` | Pastes tab-separated text starting at the current cell (see *Clipboard*); Ctrl+V feeds this from the system clipboard. |
+| `Sort(column, order)` | Sorts the presentation by the column and direction; `null`/`SortOrder.None` clears the sort. `Items` is never mutated. |
 
 ### DataGridViewColumn
 
@@ -127,50 +127,50 @@ Core members:
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `HeaderText` | `string` | ctor | Text painted in the column header. |
-| `Kind` | `DataGridViewColumnKind` | `Text` | How the column renders and reacts to clicks (see *Column kinds*). |
-| `Width` | `int` | `100` | Column width in pixels. |
-| `MinimumWidth` | `int` | `8` | The narrowest width the column accepts (floored at 2 px): the lower bound of a divider drag and of a `Fill` column's share. |
-| `FillWeight` | `float` | `100` | The column's share of the leftover viewport width under `AutoSizeMode.Fill`, relative to the other fill columns' weights. |
-| `Resizable` | `DataGridViewTriState` | `NotSet` | Whether the user may drag this column's divider: `True`/`False` override the grid's `AllowUserToResizeColumns`; `NotSet` inherits it — WinForms semantics. |
 | `Alignment` | `ContentAlignment` | `MiddleLeft` | Alignment of header and cell content. |
-| `ValueSelector` | `Func<object?, object?>` | ctor | Maps a row item to the cell value, rendered via `ToString()`. |
-| `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional per-cell icon before the text (text kinds); `null` result means none. |
-| `FormatSelector` | `Func<object?, string>?` | `null` | Formats the `ValueSelector` result into display text — the reflection-free `CellFormatting` seam. Shapes the displayed text only (editors still seed from the raw value); the result is cached per cell until the row changes. |
-| `DisplayTextSelector` | `Func<object?, string?>?` | `null` | Overrides the displayed cell text wholesale; `null` result falls back to `FormatSelector`/`ValueSelector`. |
+| `AutoSizeMode` | `DataGridViewAutoSizeColumnMode` | `None` | `AllCells` fits the widest cell text in the visible row window, remeasured each paint; `Fill` shares the leftover viewport width with the other fill columns by `FillWeight`, floored at `MinimumWidth`. |
 | `CellStyleSelector` | `Func<object?, DataGridViewCellStyle>?` | `null` | Per-cell style overrides — a value type with optional `ForeColor`, `BackColor` and `Alignment`; unset members keep the column/theme default. |
-| `TooltipSelector` | `Func<object?, string?>?` | `null` | Per-cell tooltip text, surfaced through `GetCellTooltip`. |
+| `DisplayIndex` | `int` | `-1` | The column's position in the display order (negative = its `Columns` position). Drag-reorder rewrites it on every column; `Columns` itself is never reordered. |
+| `DisplayTextSelector` | `Func<object?, string?>?` | `null` | Overrides the displayed cell text wholesale; `null` result falls back to `FormatSelector`/`ValueSelector`. |
+| `FillWeight` | `float` | `100` | The column's share of the leftover viewport width under `AutoSizeMode.Fill`, relative to the other fill columns' weights. |
+| `FormatSelector` | `Func<object?, string>?` | `null` | Formats the `ValueSelector` result into display text — the reflection-free `CellFormatting` seam. Shapes the displayed text only (editors still seed from the raw value); the result is cached per cell until the row changes. |
+| `Frozen` | `bool` | `false` | Pins the column at the left edge: frozen columns form the leading display run and stay put while `HorizontalOffset` scrolls the rest underneath. |
+| `HeaderText` | `string` | ctor | Text painted in the column header. |
+| `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional per-cell icon before the text (text kinds); `null` result means none. |
+| `Kind` | `DataGridViewColumnKind` | `Text` | How the column renders and reacts to clicks (see *Column kinds*). |
+| `MinimumWidth` | `int` | `8` | The narrowest width the column accepts (floored at 2 px): the lower bound of a divider drag and of a `Fill` column's share. |
 | `ReadOnly` | `bool` | `false` | Whether every cell in the column refuses edits and check toggling. |
 | `ReadOnlyCellSelector` | `Func<object?, bool>?` | `null` | Per-cell read-only predicate over the row item. |
-| `SortMode` | `DataGridViewColumnSortMode` | `NotSortable` | `Automatic` makes a header click toggle ascending/descending. |
+| `Resizable` | `DataGridViewTriState` | `NotSet` | Whether the user may drag this column's divider: `True`/`False` override the grid's `AllowUserToResizeColumns`; `NotSet` inherits it — WinForms semantics. |
 | `SortComparison` | `Comparison<object?>?` | `null` | Row-item comparison used when this column sorts; `null` compares the `ValueSelector` values. |
-| `AutoSizeMode` | `DataGridViewAutoSizeColumnMode` | `None` | `AllCells` fits the widest cell text in the visible row window, remeasured each paint; `Fill` shares the leftover viewport width with the other fill columns by `FillWeight`, floored at `MinimumWidth`. |
-| `Frozen` | `bool` | `false` | Pins the column at the left edge: frozen columns form the leading display run and stay put while `HorizontalOffset` scrolls the rest underneath. |
-| `DisplayIndex` | `int` | `-1` | The column's position in the display order (negative = its `Columns` position). Drag-reorder rewrites it on every column; `Columns` itself is never reordered. |
+| `SortMode` | `DataGridViewColumnSortMode` | `NotSortable` | `Automatic` makes a header click toggle ascending/descending. |
+| `TooltipSelector` | `Func<object?, string?>?` | `null` | Per-cell tooltip text, surfaced through `GetCellTooltip`. |
+| `ValueSelector` | `Func<object?, object?>` | ctor | Maps a row item to the cell value, rendered via `ToString()`. |
+| `Width` | `int` | `100` | Column width in pixels. |
 
 Kind-specific content and editing members:
 
 | Member | Type | Used by | Description |
 |---|---|---|---|
-| `CheckedSelector` | `Func<object?, bool>?` | `Check` | The cell's check state; unset renders unchecked. |
-| `CheckedSetter` | `Action<object?, bool>?` | `Check` | Writes the toggled state back on click unless the cell is read-only; `null` makes the glyph display-only. |
-| `EnabledSelector` | `Func<object?, bool>?` | `Button` | Whether the button is enabled; `null` means always. Disabled buttons grey their text and raise no `CellContentClick`. |
-| `ImagesSelector` | `Func<object?, IReadOnlyList<IImage>>?` | `MultiImage` | The icons painted side by side. Return a cached list — the selector runs on the paint path. |
-| `ProgressSelector` | `Func<object?, int>?` | `Progress` | The 0..100 fill; out-of-range values clamp. |
-| `TextSetter` | `Action<object?, string>?` | `Text` | Writes a committed edit back; `null` (the default) keeps the cell display-only. |
-| `ItemsSelector` | `Func<object?, IReadOnlyList<object?>>?` | `ComboBox`, `DomainUpDown`, `ListBox`, `CheckedListBox` | The choices the popup (or spinner) offers. Return a cached list; required to enter edit mode. |
-| `ItemDisplaySelector` | `Func<object?, string>?` | `ComboBox`, `DomainUpDown`, `ListBox`, `CheckedListBox` | A choice's display text in the popup. `null` falls back to `ToString()`. For the two list kinds it also shapes the closed cell's text, so writing it drops the cached display text. |
-| `ValueSetter` | `Action<object?, object?>?` | `ComboBox`, `DomainUpDown`, single-select `ListBox` | Writes the picked choice back to the row item. |
-| `SelectionMode` | `SelectionMode` | `ListBox` | `One` (default) makes the cell single-valued; `MultiSimple`/`MultiExtended` make it set-valued; `None` makes it display-only. Ignored by every other kind. |
 | `CheckedItemsSelector` | `Func<object?, IReadOnlyList<object?>>?` | `CheckedListBox`, multi-select `ListBox` | The items currently in the cell's set. Their display texts, joined with `", "`, are the closed cell's text — cached per row, so this never runs on the paint path. |
 | `CheckedItemsSetter` | `Action<object?, IReadOnlyList<object?>>?` | `CheckedListBox`, multi-select `ListBox` | Writes the whole picked set back. The grid hands over a freshly allocated array in `ItemsSelector` order and keeps no reference to it. |
-| `NumberSelector` / `NumberSetter` | `Func<object?, decimal>?` / `Action<object?, decimal>?` | `NumericUpDown` | Seed and write-back of the hosted numeric editor; the written value is already clamped into [`Minimum`, `Maximum`]. |
-| `Minimum` / `Maximum` / `Increment` / `DecimalPlaces` | `decimal` ×3, `int` | `NumericUpDown` | Editor range (0..100), spinner/arrow step (1) and displayed digits (0). |
-| `DateSelector` / `DateSetter` | `Func<object?, DateTime>?` / `Action<object?, DateTime>?` | `DateTime` | Seed and write-back of the popup calendar; the picked day keeps the seed's time of day. |
-| `TimeSelector` / `TimeSetter` | `Func<object?, TimeSpan>?` / `Action<object?, TimeSpan>?` | `TimePicker` | Seed and write-back of the hosted time editor; the written value is already inside [`MinTime`, `MaxTime`]. |
-| `MinTime` / `MaxTime` / `ShowSeconds` / `Use24HourClock` | `TimeSpan` ×2, `bool` ×2 | `TimePicker` | Editor window (`00:00:00`..`23:59:59`) and layout (seconds shown, 24-hour clock). |
-| `Mask` | `string` | `MaskedText` | The input mask the hosted [`MaskedTextBox`](maskedtextbox.md) editor forces; empty hosts a plain masked box. Commits through `TextSetter`. |
+| `CheckedSelector` | `Func<object?, bool>?` | `Check` | The cell's check state; unset renders unchecked. |
+| `CheckedSetter` | `Action<object?, bool>?` | `Check` | Writes the toggled state back on click unless the cell is read-only; `null` makes the glyph display-only. |
 | `ColorSelector` / `ColorSetter` | `Func<object?, Color>?` / `Action<object?, Color>?` | `Color` | The swatch color and the write-back of the picked color; both are required for the cell to edit. |
+| `DateSelector` / `DateSetter` | `Func<object?, DateTime>?` / `Action<object?, DateTime>?` | `DateTime` | Seed and write-back of the popup calendar; the picked day keeps the seed's time of day. |
+| `EnabledSelector` | `Func<object?, bool>?` | `Button` | Whether the button is enabled; `null` means always. Disabled buttons grey their text and raise no `CellContentClick`. |
+| `ImagesSelector` | `Func<object?, IReadOnlyList<IImage>>?` | `MultiImage` | The icons painted side by side. Return a cached list — the selector runs on the paint path. |
+| `ItemDisplaySelector` | `Func<object?, string>?` | `ComboBox`, `DomainUpDown`, `ListBox`, `CheckedListBox` | A choice's display text in the popup. `null` falls back to `ToString()`. For the two list kinds it also shapes the closed cell's text, so writing it drops the cached display text. |
+| `ItemsSelector` | `Func<object?, IReadOnlyList<object?>>?` | `ComboBox`, `DomainUpDown`, `ListBox`, `CheckedListBox` | The choices the popup (or spinner) offers. Return a cached list; required to enter edit mode. |
+| `Mask` | `string` | `MaskedText` | The input mask the hosted [`MaskedTextBox`](maskedtextbox.md) editor forces; empty hosts a plain masked box. Commits through `TextSetter`. |
+| `Minimum` / `Maximum` / `Increment` / `DecimalPlaces` | `decimal` ×3, `int` | `NumericUpDown` | Editor range (0..100), spinner/arrow step (1) and displayed digits (0). |
+| `MinTime` / `MaxTime` / `ShowSeconds` / `Use24HourClock` | `TimeSpan` ×2, `bool` ×2 | `TimePicker` | Editor window (`00:00:00`..`23:59:59`) and layout (seconds shown, 24-hour clock). |
+| `NumberSelector` / `NumberSetter` | `Func<object?, decimal>?` / `Action<object?, decimal>?` | `NumericUpDown` | Seed and write-back of the hosted numeric editor; the written value is already clamped into [`Minimum`, `Maximum`]. |
+| `ProgressSelector` | `Func<object?, int>?` | `Progress` | The 0..100 fill; out-of-range values clamp. |
+| `SelectionMode` | `SelectionMode` | `ListBox` | `One` (default) makes the cell single-valued; `MultiSimple`/`MultiExtended` make it set-valued; `None` makes it display-only. Ignored by every other kind. |
+| `TextSetter` | `Action<object?, string>?` | `Text` | Writes a committed edit back; `null` (the default) keeps the cell display-only. |
+| `TimeSelector` / `TimeSetter` | `Func<object?, TimeSpan>?` / `Action<object?, TimeSpan>?` | `TimePicker` | Seed and write-back of the hosted time editor; the written value is already inside [`MinTime`, `MaxTime`]. |
+| `ValueSetter` | `Action<object?, object?>?` | `ComboBox`, `DomainUpDown`, single-select `ListBox` | Writes the picked choice back to the row item. |
 
 ### Column kinds
 

@@ -23,12 +23,12 @@ icon.Dispose();                              // removes the icon, releases the p
 
 | Member | Type | Default | Description |
 |---|---|---|---|
+| `Click` | event | | Raised when the user clicks the icon with the primary button. |
+| `Dispose()` | method | | Removes the icon from the tray and releases the native peer. |
+| `DoubleClick` | event | | Raised when the user double-clicks the icon with the primary button. |
+| `SetIcon(int width, int height, ReadOnlySpan<int> argb)` | method | | Replaces the icon from 32-bit ARGB pixels (row-major, length = width × height). Throws `ArgumentOutOfRangeException` for non-positive dimensions, `ArgumentException` when the pixel count does not match. |
 | `Text` | `string` | `""` | The hover text the shell shows next to the icon. |
 | `Visible` | `bool` | `false` | Whether the icon sits in the tray. The first show creates the native peer and flushes the buffered icon and text into it. |
-| `SetIcon(int width, int height, ReadOnlySpan<int> argb)` | method | | Replaces the icon from 32-bit ARGB pixels (row-major, length = width × height). Throws `ArgumentOutOfRangeException` for non-positive dimensions, `ArgumentException` when the pixel count does not match. |
-| `Click` | event | | Raised when the user clicks the icon with the primary button. |
-| `DoubleClick` | event | | Raised when the user double-clicks the icon with the primary button. |
-| `Dispose()` | method | | Removes the icon from the tray and releases the native peer. |
 
 `NotifyIcon` is a component (`IDisposable`), not a control — it has no bounds, no parent and no
 window.

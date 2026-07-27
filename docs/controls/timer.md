@@ -20,16 +20,16 @@ timer.Start(); // == Enabled = true
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Interval` | `int` | `100` | The tick period in milliseconds. Throws `ArgumentOutOfRangeException` below 1. Setting it while the timer runs restarts the period at the new value. |
 | `Enabled` | `bool` | `false` | Whether the timer is ticking. Setting the same value again is a no-op (no peer restart). |
+| `Interval` | `int` | `100` | The tick period in milliseconds. Throws `ArgumentOutOfRangeException` below 1. Setting it while the timer runs restarts the period at the new value. |
 
 ### Methods
 
 | Name | Description |
 |---|---|
+| `Dispose()` | Stops the timer and releases the native timer source. |
 | `Start()` | Identical to `Enabled = true`. |
 | `Stop()` | Identical to `Enabled = false`. |
-| `Dispose()` | Stops the timer and releases the native timer source. |
 
 ### Events
 

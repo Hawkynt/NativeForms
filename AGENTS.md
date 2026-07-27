@@ -6,14 +6,18 @@ working in this repository. These rules are not optional. The full house spec li
 
 ## What this is
 
-A cross-platform **C# (.NET 10) UI toolkit** with a Windows Forms-shaped API that renders through
-platform-native widgets (Win32, GTK, Cocoa) via `[LibraryImport]` P/Invoke, and owner-draws the
-controls no platform offers natively — in that platform's own theme. It must stay **fast**, **tiny**
-(bytes, not megabytes) and **trim/NativeAOT compatible**.
+A cross-platform **C# (.NET 10) UI toolkit** with a Windows Forms-shaped API. The window and the
+text-bearing primitives (`Form`, `Button`, `Label`, `TextBox`, `RichTextBox`) are real platform
+widgets driven via `[LibraryImport]` P/Invoke; every other control is owner-drawn in that platform's
+own theme. **Shipping platforms are Windows (Win32) and Linux (GTK 3); macOS is a stub, not a
+feature.** It must stay **fast**, **tiny** (bytes, not megabytes) and **trim/NativeAOT compatible**.
 
 Solution layout — project folders at the repo root:
 - `NativeForms.Core` — platform-agnostic controls, layout, events, data-binding (`Hawkynt.NativeForms`).
-- `NativeForms.Backends.Windows` / `.Gtk` / `.MacOS` — one native backend each (macOS is a placeholder).
+- `NativeForms.Backends.Windows` / `.Gtk` — the two implemented native backends.
+- `NativeForms.Backends.MacOS` — a stub; every member throws `PlatformNotSupportedException`.
+- `NativeForms.Generators` — Roslyn source generator (`[GridEditable]` → `PopulateGrid`), packed as an
+  analyzer asset inside the Core NuGet package.
 - `NativeForms.Demo` — a runnable sample (`WinExe`) and the AOT publish target.
 - `NativeForms.Tests` — NUnit 4 tests; a headless backend makes control logic testable without a display.
 

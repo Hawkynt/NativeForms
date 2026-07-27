@@ -43,8 +43,8 @@ Unfilled slots render as `PromptChar`.
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `Mask` | `string` | `""` | The input mask. Setting it re-maps the current content into the new mask; content that no longer fits is discarded (all-prompts rendering). An empty mask turns the box back into a plain `TextBox`. |
-| `PromptChar` | `char` | `'_'` | The character rendered in unfilled slots. Changing it re-renders the content; slots holding the old prompt adopt the new one. |
 | `MaskCompleted` | `bool` (get) | `true` | Whether every required slot is filled. Always `true` without a mask. |
+| `PromptChar` | `char` | `'_'` | The character rendered in unfilled slots. Changing it re-renders the content; slots holding the old prompt adopt the new one. |
 
 ### Events
 

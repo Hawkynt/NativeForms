@@ -28,11 +28,11 @@ table.RangeSelected += (_, e) => InsertTable(e.Rows, e.Columns);
 
 | Property | Type | Default | Description |
 |---|---|---|---|
+| `Columns` | `int` (get) | `0` | The hovered column count, or `0` while nothing is hovered. |
 | `MaxColumns` | `int` | `10` | The greatest number of columns the grid offers; at least one. |
 | `MaxRows` | `int` | `8` | The greatest number of rows the grid offers; at least one. |
-| `Columns` | `int` (get) | `0` | The hovered column count, or `0` while nothing is hovered. |
-| `Rows` | `int` (get) | `0` | The hovered row count, or `0` while nothing is hovered. |
 | `PreferredSize` | `Size` (get) | — | The natural pixel size of the grid plus its caption strip, under the current theme. |
+| `Rows` | `int` (get) | `0` | The hovered row count, or `0` while nothing is hovered. |
 
 | Method | Description |
 |---|---|
@@ -40,8 +40,8 @@ table.RangeSelected += (_, e) => InsertTable(e.Rows, e.Columns);
 
 | Event | Description |
 |---|---|
-| `RangeSelected` | `EventHandler<GridRangeEventArgs>` — raised when a valid block is committed by click or Enter. `GridRangeEventArgs` carries `Rows` and `Columns`. |
 | `Canceled` | Raised when the pick is cancelled with Escape. |
+| `RangeSelected` | `EventHandler<GridRangeEventArgs>` — raised when a valid block is committed by click or Enter. `GridRangeEventArgs` carries `Rows` and `Columns`. |
 
 ## Notes
 

@@ -26,9 +26,9 @@ progress.Value = 50; // repaints the embedded gauge
 
 | Member | Type | Default | Description |
 |---|---|---|---|
+| `GetItemWidth(int index)` | method | | The pixel width panel `index` currently occupies — fixed panels their measured width, springs their equal share of the leftover. |
 | `Items` | `ToolStripItemCollection` | empty | The panels. Mutating the collection (or any item in it) repaints the bar. |
 | `SizingGrip` | `bool` | `true` | Whether the diagonal-dot resize grip is painted in the bottom-right corner. Its 14 px square is reserved from the spring budget; hiding it returns the width to the springs. |
-| `GetItemWidth(int index)` | method | | The pixel width panel `index` currently occupies — fixed panels their measured width, springs their equal share of the leftover. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of
 `OwnerDrawnControl` (`Invalidate`, `Focus`). Panels share the `ToolStripItem` model documented on
@@ -48,10 +48,10 @@ left-aligned caption.
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `Width` | `int` | `100` | The fixed pixel width the gauge occupies in the strip; clamped to at least 1. |
-| `Minimum` | `int` | `0` | The lowest value the gauge can represent. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
 | `Maximum` | `int` | `100` | The highest value the gauge can represent. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
+| `Minimum` | `int` | `0` | The lowest value the gauge can represent. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
 | `Value` | `int` | `0` | The current progress, clamped to [`Minimum`, `Maximum`] on assignment. |
+| `Width` | `int` | `100` | The fixed pixel width the gauge occupies in the strip; clamped to at least 1. |
 
 The gauge paints through the same renderer as the standalone
 [`ProgressBar`](progressbar.md) control, so the fill math and theming are identical — only the

@@ -172,25 +172,25 @@ Input goes in through `RaiseMouseDown/Up/Move/Wheel` (with optional button and m
 
 | Member | Kind | Description |
 |---|---|---|
-| `Theme` | `protected ITheme` | The theme to paint with; `DefaultTheme.Instance` until realized, then the backend's native theme |
+| `Focus()` | method | Move keyboard focus to this control |
 | `Focusable` | `protected virtual bool` (default `false`) | Override to `true` so the surface takes keyboard focus |
 | `Invalidate()` / `Invalidate(Rectangle)` | method | Request a repaint of the whole surface or a sub-region; safe no-ops before realization |
-| `Focus()` | method | Move keyboard focus to this control |
-| `OnPaint(PaintEventArgs)` | `protected virtual` | Draw through `e.Graphics`, clipped to `e.ClipRectangle` |
-| `OnMouseDown/Up/Move/Wheel(MouseEventArgs)`, `OnMouseLeave(EventArgs)` | `protected virtual` | Pointer input in client coordinates; `MouseEventArgs` carries the modifier keys |
-| `OnKeyDown/Up(KeyEventArgs)`, `OnKeyPress(KeyPressEventArgs)` | `protected virtual` | Keyboard input while focused; set `Handled` to consume |
 | `OnGotFocus/OnLostFocus(EventArgs)` | `protected virtual` | Focus transitions |
+| `OnKeyDown/Up(KeyEventArgs)`, `OnKeyPress(KeyPressEventArgs)` | `protected virtual` | Keyboard input while focused; set `Handled` to consume |
+| `OnMouseDown/Up/Move/Wheel(MouseEventArgs)`, `OnMouseLeave(EventArgs)` | `protected virtual` | Pointer input in client coordinates; `MouseEventArgs` carries the modifier keys |
+| `OnPaint(PaintEventArgs)` | `protected virtual` | Draw through `e.Graphics`, clipped to `e.ClipRectangle` |
+| `Theme` | `protected ITheme` | The theme to paint with; `DefaultTheme.Instance` until realized, then the backend's native theme |
 
 `IGraphics` — the immediate-mode surface passed to `OnPaint` (GDI on Win32, Cairo/Pango on GTK):
 
 | Method | Description |
 |---|---|
-| `FillRectangle(Color, Rectangle)` / `DrawRectangle(Color, Rectangle, int)` | Solid fill / outline |
-| `FillEllipse(Color, Rectangle)` / `DrawEllipse(Color, Rectangle, int)` | Ellipse inscribed in bounds |
+| `DrawImage(IImage, Rectangle)` | Image scaled into bounds |
 | `DrawLine(Color, int, int, int, int, int)` | Straight line with thickness |
 | `DrawText(string, Font, Color, Rectangle, ContentAlignment)` | Aligned text in the native font |
+| `FillEllipse(Color, Rectangle)` / `DrawEllipse(Color, Rectangle, int)` | Ellipse inscribed in bounds |
+| `FillRectangle(Color, Rectangle)` / `DrawRectangle(Color, Rectangle, int)` | Solid fill / outline |
 | `MeasureText(string, Font)` | Pixel size of a string (also on `IPlatformBackend` for measuring between paints) |
-| `DrawImage(IImage, Rectangle)` | Image scaled into bounds |
 | `PushClip(Rectangle)` / `PopClip()` | Clip-region stack |
 
 `ITheme` — colors: `WindowBackground`, `ControlBackground`, `ControlText`, `DisabledText`, `FieldBackground`, `Accent`, `SelectionBackground`, `SelectionText`, `Border`, `GridLine`, `HeaderBackground`, `HeaderText`; plus `DefaultFont` (`Font` struct), `RowHeight`, `ScrollBarSize`.

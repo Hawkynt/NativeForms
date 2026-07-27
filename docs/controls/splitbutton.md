@@ -31,12 +31,12 @@ form.Controls.Add(open);
 
 | Member | Type | Description |
 |---|---|---|
+| `CloseDropDown()` | method | Closes the drop-down cascade, if open. |
 | `DropDownItems` | `ToolStripItemCollection` | The items shown when the drop-down opens, sharing the strip/menu item model of [`MenuStrip`](menustrip.md). Lazily created. |
 | `HasDropDownItems` | `bool` (get) | Whether a drop-down would show anything, without materializing an empty collection. |
-| `IsDropDownOpen` | `bool` (get) | Whether the drop-down cascade is currently open. |
 | `Image` | `IImage?` | Optional icon rendered before the caption through the shared content layout. |
+| `IsDropDownOpen` | `bool` (get) | Whether the drop-down cascade is currently open. |
 | `ShowDropDown()` | method | Opens the drop-down below the control, left-aligned with it. A no-op before realization or while `DropDownItems` is empty. |
-| `CloseDropDown()` | method | Closes the drop-down cascade, if open. |
 
 Both controls inherit the common members of [`Control`](control.md), plus the owner-drawn surface
 of `OwnerDrawnControl` (`Invalidate`, `Focus`), and are focusable. Down (plain or with Alt) opens

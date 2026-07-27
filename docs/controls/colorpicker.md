@@ -20,13 +20,13 @@ Because it is an ordinary control, it drops straight into a `RibbonHostItem` or 
 
 | Member | Description |
 |---|---|
-| `SelectedColor` | `Color` — the chosen colour; setting it repaints and raises `SelectedColorChanged`. |
-| `AlphaEnabled` | `bool` — when set, the mixer shows an alpha bar and the face draws a transparency checkerboard behind a translucent colour. Defaults to `false`. |
-| `Palette` | `static IReadOnlyList<Color>` — the 40 standard swatches the mixer offers. |
-| `CustomColors` | `IReadOnlyList<Color>` (get) — the user-saved custom swatches (up to sixteen, oldest dropped first). |
 | `AddCustomColor(Color)` | Adds a colour to the custom palette. |
+| `AlphaEnabled` | `bool` — when set, the mixer shows an alpha bar and the face draws a transparency checkerboard behind a translucent colour. Defaults to `false`. |
+| `CustomColors` | `IReadOnlyList<Color>` (get) — the user-saved custom swatches (up to sixteen, oldest dropped first). |
 | `DroppedDown` | `bool` (get) — whether the mixer is currently open. |
 | `OpenDropDown()` / `CloseDropDown()` | Open/close the mixer drop-down. |
+| `Palette` | `static IReadOnlyList<Color>` — the 40 standard swatches the mixer offers. |
+| `SelectedColor` | `Color` — the chosen colour; setting it repaints and raises `SelectedColorChanged`. |
 | `SelectedColorChanged` | Raised when `SelectedColor` changes (live, on every mixer edit). |
 
 ## The mixer

@@ -41,13 +41,13 @@ form.Controls.Add(calendar);
 
 | Member | Type | Description |
 |---|---|---|
-| `Subject` | `string` | The one-line title shown on the chip. |
-| `Start` / `End` | `DateTime` | The span; `End` is treated as at or after `Start`. |
 | `AllDay` | `bool` | When set, the item paints in the all-day band / as a month chip rather than on the time grid. |
-| `Location` | `string` | An optional secondary line, shown when the chip is tall enough. |
 | `Color` | `Color` | The category colour; `Color.Empty` (the default) paints in the theme accent. Stored internally as a packed ARGB int, so the struct stays ~48 B. |
-| `Tag` | `object?` | Whatever the caller carries back through the events — the source model row. |
+| `Location` | `string` | An optional secondary line, shown when the chip is tall enough. |
 | `Movable` | `bool` | Whether the user may drag this appointment to a new time. `true` by default (so "move all" is the default); set it `false` on the locked entries (a company holiday, a fixed booking). A non-movable appointment does not drag and paints a small padlock instead of a move affordance. |
+| `Start` / `End` | `DateTime` | The span; `End` is treated as at or after `Start`. |
+| `Subject` | `string` | The one-line title shown on the chip. |
+| `Tag` | `object?` | Whatever the caller carries back through the events — the source model row. |
 
 ## Binding
 
@@ -59,38 +59,38 @@ The control does **not** own the caller's storage. `SetAppointments<T>(IEnumerab
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `ViewMode` | `CalendarViewMode` | `Week` | `Day`, `WorkWeek` (Mon–Fri), `Week` (7 days from `FirstDayOfWeek`) or `Month`. |
-| `SelectedDate` | `DateTime` | today | The date the view is centred on; assigning navigates there. |
-| `TimeScale` | `int` | `30` | Minutes per time-grid slot (clamped 5–120). Hour lines are always drawn every 60 min. |
-| `WorkDayStart` / `WorkDayEnd` | `TimeSpan` | 08:00 / 17:00 | The shaded work-day band on the time grid. |
+| `AppointmentCount` | `int` | `0` | The number of bound appointments. |
 | `FirstDayOfWeek` | `DayOfWeek` | `Monday` | The leftmost column of the week and month views. |
+| `FirstVisibleDate` | `DateTime` | — | The first date the current view shows. |
 | `Now` | `DateTime` | `DateTime.Now` | The instant the "now" line and today highlight read; settable, like `MonthCalendar.TodayDate`, so long-running views and tests stay deterministic. |
 | `NowLineColor` | `Color` | alert red | The colour of the "now" line. |
-| `VisibleDayCount` | `int` | — | The number of day columns the current view spans (1 / 5 / 7 / 7). |
-| `FirstVisibleDate` | `DateTime` | — | The first date the current view shows. |
-| `AppointmentCount` | `int` | `0` | The number of bound appointments. |
 | `SelectedAppointment` | `Appointment?` | `null` | The selected appointment, or `null`. |
 | `SelectedAppointmentIndex` | `int` | `-1` | Its index into the start-sorted snapshot. |
+| `SelectedDate` | `DateTime` | today | The date the view is centred on; assigning navigates there. |
+| `TimeScale` | `int` | `30` | Minutes per time-grid slot (clamped 5–120). Hour lines are always drawn every 60 min. |
+| `ViewMode` | `CalendarViewMode` | `Week` | `Day`, `WorkWeek` (Mon–Fri), `Week` (7 days from `FirstDayOfWeek`) or `Month`. |
+| `VisibleDayCount` | `int` | — | The number of day columns the current view spans (1 / 5 / 7 / 7). |
+| `WorkDayStart` / `WorkDayEnd` | `TimeSpan` | 08:00 / 17:00 | The shaded work-day band on the time grid. |
 
 ### Methods
 
 | Name | Description |
 |---|---|
-| `SetAppointments<T>(IEnumerable<T>, Func<T, Appointment>)` | Binds by projecting each source item through the selector. |
-| `SetAppointments(IEnumerable<Appointment>)` | Binds ready appointments. |
-| `Next()` / `Previous()` | Page by the view's own unit — a day, a week, a month. |
 | `GoToToday()` | Jump to `Now.Date`. |
+| `Next()` / `Previous()` | Page by the view's own unit — a day, a week, a month. |
+| `SetAppointments(IEnumerable<Appointment>)` | Binds ready appointments. |
+| `SetAppointments<T>(IEnumerable<T>, Func<T, Appointment>)` | Binds by projecting each source item through the selector. |
 | `TryGetAppointmentBounds(int index, out Rectangle)` | The client rectangle of a laid-out appointment (already translated for scroll) — the hook the demo and autopilot aim clicks at. |
 
 ### Events
 
 | Name | Description |
 |---|---|
-| `SelectionChanged` | Raised when `SelectedAppointment` changes, by click or navigation. |
 | `AppointmentActivate` | Raised on a double-click or Enter on a selected appointment — the open-for-edit hook; carries `AppointmentEventArgs.Appointment`. The control hosts no editor, it only reports the model. |
-| `TimeRangeSelected` | Raised when the user click-drags across empty time (or empty month days), carrying the span as a `DateRangeEventArgs` (`Start`, `End`) — the "new appointment here" hook. |
-| `AppointmentMoving` | Raised while a drag proposes moving or resizing a `Movable` appointment, before it is applied — **cancelable**. Carries the appointment, its `OriginalStart`/`OriginalEnd` and the snapped proposed `Start`/`End` (`AppointmentMoveEventArgs`). Set `Cancel = true` to veto; the snapshot then stays put. |
 | `AppointmentMoved` | Raised after `AppointmentMoving` was not cancelled — the reschedule stands. Apply the proposed `Start`/`End` to your model item and re-bind through `SetAppointments`. |
+| `AppointmentMoving` | Raised while a drag proposes moving or resizing a `Movable` appointment, before it is applied — **cancelable**. Carries the appointment, its `OriginalStart`/`OriginalEnd` and the snapped proposed `Start`/`End` (`AppointmentMoveEventArgs`). Set `Cancel = true` to veto; the snapshot then stays put. |
+| `SelectionChanged` | Raised when `SelectedAppointment` changes, by click or navigation. |
+| `TimeRangeSelected` | Raised when the user click-drags across empty time (or empty month days), carrying the span as a `DateRangeEventArgs` (`Start`, `End`) — the "new appointment here" hook. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 

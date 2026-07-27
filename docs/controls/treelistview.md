@@ -40,12 +40,12 @@ Inherits the common members of [`Control`](control.md). The node model — `Tree
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Nodes` | `TreeNodeCollection` | empty | The root nodes. Mutating any level of the hierarchy re-flattens and repaints. |
-| `Columns` | `ObservableList<TreeListViewColumn>` | empty | The columns. Index 0 is the tree column; the rest render their `TextSelector` text. Mutating the collection — or any column's caption, width or alignment — repaints. |
-| `SelectedNode` | `TreeNode?` | `null` | The selected node. Setting it scrolls into view and raises `AfterSelect`; a foreign node throws `ArgumentException`. |
 | `CheckBoxes` | `bool` | `false` | Whether every node shows a themed check box in the tree column. |
+| `Columns` | `ObservableList<TreeListViewColumn>` | empty | The columns. Index 0 is the tree column; the rest render their `TextSelector` text. Mutating the collection — or any column's caption, width or alignment — repaints. |
 | `ImageList` | `ImageList?` | `null` | The icon store for `TreeNode.ImageIndex`; `null` for no icons. |
 | `ItemHeight` | `int` | theme row height | Pixel height of a row, the header and the indent per level. |
+| `Nodes` | `TreeNodeCollection` | empty | The root nodes. Mutating any level of the hierarchy re-flattens and repaints. |
+| `SelectedNode` | `TreeNode?` | `null` | The selected node. Setting it scrolls into view and raises `AfterSelect`; a foreign node throws `ArgumentException`. |
 | `ShowColumnHeaders` | `bool` | `true` | Whether the column header row is shown. |
 | `TopIndex` | `int` (get) | `0` | Index of the first visible row in the flattened tree (scroll position). |
 | `VisibleNodeCount` | `int` (get) | `0` | The number of rows the expanded part of the tree currently occupies. |

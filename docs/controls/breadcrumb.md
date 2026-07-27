@@ -24,19 +24,19 @@ Clicking a segment trims the path to it (the navigate-up gesture) and raises `It
 
 | Member | Description |
 |---|---|
-| `Items` | `BreadcrumbItemCollection` — the path segments, left to right (`Add`, `Add(string)`, `AddRange(params string[])`, `Remove`, `TrimAfter(index)`, `Clear`). |
-| `ImageList` | `ImageList?` — the icons segments' `ImageIndex`/`ImageKey` point into. |
-| `TrimOnClick` | `bool` (default `true`) — whether clicking a segment trims the path to it before `ItemClicked` fires. |
-| `PathSeparator` | `string` (default `"/"`) — the delimiter that joins/splits a path; a plain text convention, so any virtual namespace picks its own. |
-| `SubItemsProvider` | `Func<BreadcrumbItem?, IReadOnlyList<BreadcrumbItem>>?` — the folder-walk hook: given a segment (or `null` for the level before the first), returns its children. A click on the following chevron lists them; choosing one navigates in. Nothing touches the filesystem, so it serves a real directory, an archive or any virtual tree. |
-| `ItemClicked` | Raised when a segment is clicked (after any trim), carrying the `BreadcrumbItem` and its `Index`. |
-| `SubItemSelected` | Raised when a child chosen from a chevron drop-down is navigated into. |
+| `AutoCompleteSource` | `Func<string, IReadOnlyList<string>>?` — path completions for the field: the first candidate that extends the typed text is appended and selected (type on to replace, Enter to accept). |
 | `Editable` | `bool` (default `false`) — whether clicking the bar's empty space turns it into an editable path field. |
 | `FullPath` | `string` (get) — the segment captions joined by `PathSeparator`; the text the edit field starts from. |
+| `ImageList` | `ImageList?` — the icons segments' `ImageIndex`/`ImageKey` point into. |
 | `IsEditing` | `bool` (get) — whether the edit field is currently shown. |
-| `PathParser` | `Func<string, IReadOnlyList<BreadcrumbItem>>?` — turns committed edit text into segments (default splits on `PathSeparator`); a caller resolving a real or virtual path supplies its own, labelling and tagging each node. |
-| `AutoCompleteSource` | `Func<string, IReadOnlyList<string>>?` — path completions for the field: the first candidate that extends the typed text is appended and selected (type on to replace, Enter to accept). |
+| `ItemClicked` | Raised when a segment is clicked (after any trim), carrying the `BreadcrumbItem` and its `Index`. |
+| `Items` | `BreadcrumbItemCollection` — the path segments, left to right (`Add`, `Add(string)`, `AddRange(params string[])`, `Remove`, `TrimAfter(index)`, `Clear`). |
 | `PathEntered` | Raised when the field commits a path (Enter), carrying the entered text. |
+| `PathParser` | `Func<string, IReadOnlyList<BreadcrumbItem>>?` — turns committed edit text into segments (default splits on `PathSeparator`); a caller resolving a real or virtual path supplies its own, labelling and tagging each node. |
+| `PathSeparator` | `string` (default `"/"`) — the delimiter that joins/splits a path; a plain text convention, so any virtual namespace picks its own. |
+| `SubItemSelected` | Raised when a child chosen from a chevron drop-down is navigated into. |
+| `SubItemsProvider` | `Func<BreadcrumbItem?, IReadOnlyList<BreadcrumbItem>>?` — the folder-walk hook: given a segment (or `null` for the level before the first), returns its children. A click on the following chevron lists them; choosing one navigates in. Nothing touches the filesystem, so it serves a real directory, an archive or any virtual tree. |
+| `TrimOnClick` | `bool` (default `true`) — whether clicking a segment trims the path to it before `ItemClicked` fires. |
 
 Methods: `BeginEdit()`, `EndEdit(bool commit)`.
 
@@ -44,9 +44,9 @@ Methods: `BeginEdit()`, `EndEdit(bool commit)`.
 
 | Member | Description |
 |---|---|
-| `Text` | The segment caption. |
-| `Tag` | Arbitrary caller data — a folder path, a node, an id. |
 | `ImageIndex` / `ImageKey` | The segment's icon in the breadcrumb's `ImageList` (index wins, key falls back). |
+| `Tag` | Arbitrary caller data — a folder path, a node, an id. |
+| `Text` | The segment caption. |
 
 ## Notes
 

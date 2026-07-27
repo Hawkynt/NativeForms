@@ -62,32 +62,32 @@ ribbon.PreferredHeightChanged += (_, _) => LayoutContentBelow(ribbon.Bottom);
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Tabs` | `RibbonTabCollection` | empty | The tabs, left to right. The first tab added becomes the selected one. |
-| `QuickAccessItems` | `RibbonQuickAccessCollection` | empty | Icon-only `RibbonButton` commands painted at the right of the tab strip, reachable from any tab. Each button's `Click`/`Command`, `Enabled` and icon behave as anywhere else; the tabs are clipped so they never run under the toolbar. |
 | `ContextualTabGroups` | `RibbonContextualTabGroupCollection` | empty | Colour-coded tab families (`RibbonContextualTabGroup(text, color)`) shown only while `Visible` is set. Their tabs live in `Tabs` but are filtered out of the strip, hit-test and keyboard navigation while hidden, and wear the group colour while shown; hiding the group holding the selection hands it to the nearest shown tab. |
+| `GroupAreaHeight` | `int` (get) | remaining height | Pixel height of the group area; `0` while minimized. |
 | `ImageList` | `ImageList?` | `null` | The icons the groups' and items' image indices point into. |
+| `Minimized` | `bool` | `false` | Collapses the ribbon onto its tab strip — the control shrinks its own `Height` to `TabStripHeight` (remembering the expanded height to restore) so a plain container re-flows the content below. Hosted controls go with it; the tabs stay clickable and open a flyout. |
+| `PreferredHeight` | `int` (get) | `Height` | The height the ribbon wants: `TabStripHeight` while minimized, else the strip plus a full group area. Minimizing already shrinks the control to it. |
+| `QuickAccessItems` | `RibbonQuickAccessCollection` | empty | Icon-only `RibbonButton` commands painted at the right of the tab strip, reachable from any tab. Each button's `Click`/`Command`, `Enabled` and icon behave as anywhere else; the tabs are clipped so they never run under the toolbar. |
 | `SelectedIndex` | `int` | `-1` | Index of the selected tab, `-1` while there are no tabs. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `RibbonTab?` | `null` | The selected tab; setting selects by `IndexOf`. |
-| `Minimized` | `bool` | `false` | Collapses the ribbon onto its tab strip — the control shrinks its own `Height` to `TabStripHeight` (remembering the expanded height to restore) so a plain container re-flows the content below. Hosted controls go with it; the tabs stay clickable and open a flyout. |
+| `Tabs` | `RibbonTabCollection` | empty | The tabs, left to right. The first tab added becomes the selected one. |
 | `TabStripHeight` | `int` (get) | theme row height + 4 | Pixel height of the tab strip. |
-| `GroupAreaHeight` | `int` (get) | remaining height | Pixel height of the group area; `0` while minimized. |
-| `PreferredHeight` | `int` (get) | `Height` | The height the ribbon wants: `TabStripHeight` while minimized, else the strip plus a full group area. Minimizing already shrinks the control to it. |
 
 ### Ribbon events
 
 | Event | Description |
 |---|---|
-| `SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
 | `MinimizedChanged` | Raised after `Minimized` changes. |
 | `PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, so a host can re-flow the content below it. |
+| `SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
 
 ### RibbonTab
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Text` | `string` | `""` | The caption in the tab strip. |
 | `Groups` | `RibbonGroupCollection` | empty | The groups shown while this tab is selected, left to right. |
 | `Tag` | `object?` | `null` | Caller-owned data; the toolkit never reads it. |
+| `Text` | `string` | `""` | The caption in the tab strip. |
 
 Constructors: `RibbonTab()` and `RibbonTab(string text)`.
 
@@ -95,13 +95,13 @@ Constructors: `RibbonTab()` and `RibbonTab(string text)`.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Text` | `string` | `""` | The caption painted along the group's bottom edge. |
-| `Items` | `ToolStripItemCollection` | empty | The items, laid out left to right in columns. |
+| `Bounds` | `Rectangle` (get) | empty | The group's laid-out rectangle, as of the last layout pass — empty while minimized or on an unselected tab. |
 | `ImageIndex` | `int` | `-1` | Index of the icon the collapsed drop-down button shows. |
 | `ImageKey` | `string?` | `null` | The keyed alternative to `ImageIndex` (index wins when both are set). |
 | `IsCollapsed` | `bool` (get) | `false` | Whether the group is currently folded into its drop-down button. Recomputed on every layout pass. |
-| `Bounds` | `Rectangle` (get) | empty | The group's laid-out rectangle, as of the last layout pass — empty while minimized or on an unselected tab. |
+| `Items` | `ToolStripItemCollection` | empty | The items, laid out left to right in columns. |
 | `Tag` | `object?` | `null` | Caller-owned data. |
+| `Text` | `string` | `""` | The caption painted along the group's bottom edge. |
 
 Constructors: `RibbonGroup()` and `RibbonGroup(string text)`.
 

@@ -22,11 +22,11 @@ label.Text = "Updated"; // forwarded to the native widget, raises TextChanged, r
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `AutoSize` | `bool` | `false` | Sizes the label to fit its text in the theme's default font, via the backend's text measurement — on realization and on every `Text` change. Buffered before realization. |
-| `TextAlign` | `ContentAlignment` | `TopLeft` | Where the text sits within the bounds. Win32 static controls honor the horizontal component plus a coarse vertical centering only; GTK honors all nine anchors. |
 | `BorderStyle` | `BorderStyle` | `None` | `None` or `FixedSingle`. Rendered natively on Win32 (`WS_BORDER`); GTK has no native label frame, so the value is not rendered there. |
-| `UseMnemonic` | `bool` | `true` | Whether `&` in `Text` marks the following character as a mnemonic and renders it underlined (`&&` escapes a literal ampersand). Rendering only for now. |
 | `Image` | `IImage?` | `null` | The image shown by the label. Rendered natively only while `Text` is empty (Win32 `SS_BITMAP` static, GTK swaps in a `GtkImage`) — no toolkit renders image and text in one static widget, so a captioned label keeps its text and the image stays pending. |
 | `ImageAlign` | `ContentAlignment` | `MiddleCenter` | Where the image anchors within the bounds. Advisory for now: the native image-only renderings ignore it (Win32 pins the bitmap top-left, GTK centers it). |
+| `TextAlign` | `ContentAlignment` | `TopLeft` | Where the text sits within the bounds. Win32 static controls honor the horizontal component plus a coarse vertical centering only; GTK honors all nine anchors. |
+| `UseMnemonic` | `bool` | `true` | Whether `&` in `Text` marks the following character as a mnemonic and renders it underlined (`&&` escapes a literal ampersand). Rendering only for now. |
 
 The displayed text is the inherited `Text` property; changes raise `TextChanged`. Inherits the common members of [`Control`](control.md).
 

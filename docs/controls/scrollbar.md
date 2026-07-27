@@ -23,10 +23,10 @@ form.Controls.Add(bar);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Minimum` | `int` | `0` | The value at the start of the track. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
-| `Maximum` | `int` | `100` | The value at the end of the track. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
-| `SmallChange` | `int` | `1` | The step an arrow click (and each autorepeat tick) scrolls by. Coerced to at least 1. |
 | `LargeChange` | `int` | `10` | The page a channel click scrolls by; also the thumb's share of the range. Coerced to at least 1; changing it re-clamps `Value`. |
+| `Maximum` | `int` | `100` | The value at the end of the track. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
+| `Minimum` | `int` | `0` | The value at the start of the track. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
+| `SmallChange` | `int` | `1` | The step an arrow click (and each autorepeat tick) scrolls by. Coerced to at least 1. |
 | `Value` | `int` | `0` | The current scroll position, clamped to [`Minimum`, `Maximum − LargeChange + 1`]. |
 
 ### Events

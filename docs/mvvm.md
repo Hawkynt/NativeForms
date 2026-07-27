@@ -62,14 +62,14 @@ public sealed class CounterViewModel : ObservableObject
 
 | Member | Description |
 |---|---|
+| `event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged` | Raised when a property's validation error is set or cleared. |
 | `event PropertyChangedEventHandler? PropertyChanged` | Raised after a property changes. |
 | `event PropertyChangingEventHandler? PropertyChanging` | Raised before a property changes. |
-| `protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)` | Raises `PropertyChanging` for the calling property. |
-| `protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)` | Raises `PropertyChanged` for the calling property. |
 | `protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)` | Assigns if different, raising changing/changed around the write; returns whether a change occurred. |
-| `event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged` | Raised when a property's validation error is set or cleared. |
-| `string? GetError(string propertyName)` | The property's current validation error, or `null` while valid. |
+| `protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)` | Raises `PropertyChanged` for the calling property. |
+| `protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)` | Raises `PropertyChanging` for the calling property. |
 | `protected void SetError(string propertyName, string? error)` | Sets (or, with null/empty, clears) the property's single validation error — the `INotifyDataErrorInfo`-style hook, zero storage while everything is valid. |
+| `string? GetError(string propertyName)` | The property's current validation error, or `null` while valid. |
 
 ## RelayCommand and RelayCommand&lt;T&gt;
 
@@ -154,8 +154,8 @@ All four `BindingMode` values exist:
 
 | Member | Description |
 |---|---|
-| `PropertyBinding(source, sourcePropertyName, getSource, setTarget, mode, setSource, getTarget, subscribeTargetChanged, unsubscribeTargetChanged)` | Creates and immediately activates the binding (full signature above). |
 | `BindingMode Mode { get; }` | The flow direction chosen at construction. |
+| `PropertyBinding(source, sourcePropertyName, getSource, setTarget, mode, setSource, getTarget, subscribeTargetChanged, unsubscribeTargetChanged)` | Creates and immediately activates the binding (full signature above). |
 | `void Dispose()` | Detaches the binding from both endpoints. |
 
 ### Bind sugar, converters, fallbacks, validation

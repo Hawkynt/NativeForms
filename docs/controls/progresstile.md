@@ -30,16 +30,16 @@ form.Controls.Add(drive);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Image` | `IImage?` | `null` | The icon at the leading edge, or `null` for a text-only tile. |
-| `SecondaryText` | `string` | `""` | The line under the caption. Empty hides the line. |
-| `Maximum` | `int` | `100` | The highest value the bar can represent. |
-| `Value` | `int` | `0` | The amount used, clamped to `[0, Maximum]`. |
-| `WarningThreshold` | `int` | `0` | The value at which the bar switches to `WarningColor`, in `Value`'s units. `0` leaves the warning off. |
-| `WarningColor` | `Color` | `#E81123` | The fill used past the threshold — the alert red Explorer paints a nearly-full drive in. |
-| `IsWarning` | `bool` | `false` | Whether the bar is currently past the threshold. |
 | `Clickable` | `bool` | `false` | Whether the tile behaves as a button: focusable, hover-highlighted, raising `Click`. |
-| `Selected` | `bool` | `false` | Whether the tile paints as the selected one of a set. |
 | `Compact` | `bool` | `false` | Short one-row layout: the icon on the left with the caption stacked directly over the usage bar to its right, the two sized to the icon's height. The `SecondaryText` line is not shown in this mode. |
+| `Image` | `IImage?` | `null` | The icon at the leading edge, or `null` for a text-only tile. |
+| `IsWarning` | `bool` | `false` | Whether the bar is currently past the threshold. |
+| `Maximum` | `int` | `100` | The highest value the bar can represent. |
+| `SecondaryText` | `string` | `""` | The line under the caption. Empty hides the line. |
+| `Selected` | `bool` | `false` | Whether the tile paints as the selected one of a set. |
+| `Value` | `int` | `0` | The amount used, clamped to `[0, Maximum]`. |
+| `WarningColor` | `Color` | `#E81123` | The fill used past the threshold — the alert red Explorer paints a nearly-full drive in. |
+| `WarningThreshold` | `int` | `0` | The value at which the bar switches to `WarningColor`, in `Value`'s units. `0` leaves the warning off. |
 
 The inherited `Text` is the primary caption. Also honours the ambient `Font` and `ForeColor`.
 
@@ -47,8 +47,8 @@ The inherited `Text` is the primary caption. Also honours the ambient `Font` and
 
 | Name | Description |
 |---|---|
-| `ValueChanged` | Raised when `Value` changes — a real move only, not a re-assignment of the same number. |
 | `Click` | Raised on a click or Space, while `Clickable`. |
+| `ValueChanged` | Raised when `Value` changes — a real move only, not a re-assignment of the same number. |
 
 Inherits the common members of [`Control`](control.md) plus the owner-drawn surface of `OwnerDrawnControl`.
 

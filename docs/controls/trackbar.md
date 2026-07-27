@@ -20,13 +20,13 @@ form.Controls.Add(bar);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Minimum` | `int` | `0` | The value at the start of the track. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
-| `Maximum` | `int` | `10` | The value at the end of the track. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
-| `Value` | `int` | `0` | The current position, clamped to [`Minimum`, `Maximum`] on assignment. |
-| `SmallChange` | `int` | `1` | The step an arrow key changes the value by. Coerced to at least 1. |
 | `LargeChange` | `int` | `5` | The step a track click or PageUp/PageDown changes the value by. Coerced to at least 1. |
-| `TickFrequency` | `int` | `1` | The value spacing between painted tick marks. Coerced to at least 1. |
+| `Maximum` | `int` | `10` | The value at the end of the track. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
+| `Minimum` | `int` | `0` | The value at the start of the track. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
 | `Orientation` | `Orientation` | `Horizontal` | The axis the track runs along. |
+| `SmallChange` | `int` | `1` | The step an arrow key changes the value by. Coerced to at least 1. |
+| `TickFrequency` | `int` | `1` | The value spacing between painted tick marks. Coerced to at least 1. |
+| `Value` | `int` | `0` | The current position, clamped to [`Minimum`, `Maximum`] on assignment. |
 
 ### Events
 

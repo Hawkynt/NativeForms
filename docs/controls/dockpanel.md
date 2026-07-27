@@ -103,27 +103,27 @@ may hold any character.
 
 | Member | Description |
 |---|---|
+| `ActiveContent` / `ActiveContentChanged` | The pane with the active caption. |
 | `Add(content, state = Document, edge = Left)` | Adds a pane in the given state. |
 | `AddDocument(content)` | Adds a pane to the central document well. |
-| `DockToEdge(content, edge)` | Docks a pane to an edge, joining any existing group there. |
 | `Contents` | `IReadOnlyList<DockContent>` — every owned pane. |
-| `ActiveContent` / `ActiveContentChanged` | The pane with the active caption. |
-| `ImageList` | The icons `DockContent.ImageIndex` (or `ImageKey`) index into. |
+| `DockToEdge(content, edge)` | Docks a pane to an edge, joining any existing group there. |
 | `DocumentTabStripEdge` | `TabAlignment` (default `Bottom`) — which edge each tab group's tab strip sits on. `Top`/`Bottom` lay the tabs in a horizontal row; `Left`/`Right` stack them in a vertical strip sized to the widest caption. |
+| `ImageList` | The icons `DockContent.ImageIndex` (or `ImageKey`) index into. |
 | `SaveLayout()` / `LoadLayout(string, Func<string,DockContent?>)` | Reflection-free layout round-trip. |
 
 ### `DockContent`
 
 | Member | Description |
 |---|---|
-| `Title` | Caption text (an alias for `Text`). |
-| `ImageIndex` | Icon index into `DockPanel.ImageList`, or `-1`. |
-| `DockState` / `DockEdge` | Where the pane lives; assigning moves it. |
-| `PersistId` | Stable key for save/load (defaults to `Name`). |
 | `AllowClose` / `AllowFloat` / `AllowAutoHide` | Which caption buttons the pane shows. |
 | `Close()` / `Float()` / `ToggleAutoHide()` / `Activate()` | State transitions (routed through the manager). |
-| `DockStateChanged` | Raised after the state changes. |
 | `CloseRequested` | Vetoable (`CancelEventArgs`) close pipeline. |
+| `DockState` / `DockEdge` | Where the pane lives; assigning moves it. |
+| `DockStateChanged` | Raised after the state changes. |
+| `ImageIndex` | Icon index into `DockPanel.ImageList`, or `-1`. |
+| `PersistId` | Stable key for save/load (defaults to `Name`). |
+| `Title` | Caption text (an alias for `Text`). |
 
 ## Differences from WinForms
 

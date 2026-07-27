@@ -20,32 +20,32 @@ form.Controls.Add(picker);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Value` | `DateTime` | `DateTime.Now` | The picked date and time, clamped into [`MinDate`, `MaxDate`] on assignment. |
-| `MinDate` | `DateTime` | `1753-01-01` | The earliest pickable date; assignments and steps clamp to it. Throws `ArgumentOutOfRangeException` when set later than `MaxDate`. |
-| `MaxDate` | `DateTime` | `9998-12-31` | The latest pickable date; assignments and steps clamp to it. Throws `ArgumentOutOfRangeException` when set earlier than `MinDate`. |
-| `DayBackgroundProvider` | `Func<DateTime, Color?>?` | `null` | Per-day background shading (holidays) for the drop-down calendar. |
-| `DateSelectable` | `Func<DateTime, bool>?` | `null` | A predicate blocking individual days in the drop-down from being picked, on top of `MinDate`/`MaxDate`. |
-| `DayTooltipProvider` | `Func<DateTime, string?>?` | `null` | Per-day tooltip text passed to the drop-down calendar. |
-| `Format` | `DateTimePickerFormat` | `Long` | How the closed field renders `Value` — always in the invariant culture: `Long` = `dddd, dd MMMM yyyy`, `Short` = `MM/dd/yyyy`, `Time` = `HH:mm:ss`, `Custom` = `CustomFormat`. |
-| `CustomFormat` | `string` | `""` | The invariant pattern used while `Format` is `Custom`; empty renders an empty field. |
-| `ShowCheckBox` | `bool` | `false` | Whether the field carries a check box in front of the text. |
 | `Checked` | `bool` | `true` | Whether the value applies. While `ShowCheckBox` is on and this is off, the text greys and every value-changing gesture is suppressed. |
+| `CustomFormat` | `string` | `""` | The invariant pattern used while `Format` is `Custom`; empty renders an empty field. |
+| `DateSelectable` | `Func<DateTime, bool>?` | `null` | A predicate blocking individual days in the drop-down from being picked, on top of `MinDate`/`MaxDate`. |
+| `DayBackgroundProvider` | `Func<DateTime, Color?>?` | `null` | Per-day background shading (holidays) for the drop-down calendar. |
+| `DayTooltipProvider` | `Func<DateTime, string?>?` | `null` | Per-day tooltip text passed to the drop-down calendar. |
 | `DroppedDown` | `bool` (read-only) | `false` | Whether the calendar popup is currently open. |
+| `Format` | `DateTimePickerFormat` | `Long` | How the closed field renders `Value` — always in the invariant culture: `Long` = `dddd, dd MMMM yyyy`, `Short` = `MM/dd/yyyy`, `Time` = `HH:mm:ss`, `Custom` = `CustomFormat`. |
+| `MaxDate` | `DateTime` | `9998-12-31` | The latest pickable date; assignments and steps clamp to it. Throws `ArgumentOutOfRangeException` when set earlier than `MinDate`. |
+| `MinDate` | `DateTime` | `1753-01-01` | The earliest pickable date; assignments and steps clamp to it. Throws `ArgumentOutOfRangeException` when set later than `MaxDate`. |
+| `ShowCheckBox` | `bool` | `false` | Whether the field carries a check box in front of the text. |
+| `Value` | `DateTime` | `DateTime.Now` | The picked date and time, clamped into [`MinDate`, `MaxDate`] on assignment. |
 
 ### Methods
 
 | Name | Description |
 |---|---|
-| `OpenDropDown()` | Opens the calendar popup below the field, its page centered on `Value`. A no-op while already open or before realization. |
 | `CloseDropDown()` | Closes the popup without committing. A no-op while closed. |
+| `OpenDropDown()` | Opens the calendar popup below the field, its page centered on `Value`. A no-op while already open or before realization. |
 
 ### Events
 
 | Name | Description |
 |---|---|
-| `ValueChanged` | Raised when `Value` changes, by user gesture or assignment (after clamping). |
-| `DropDown` | Raised when the calendar popup opens. |
 | `CloseUp` | Raised when the calendar popup closes — commit, cancel and light-dismiss alike. |
+| `DropDown` | Raised when the calendar popup opens. |
+| `ValueChanged` | Raised when `Value` changes, by user gesture or assignment (after clamping). |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 

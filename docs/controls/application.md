@@ -33,18 +33,18 @@ Tests bypass the registry and pass a backend directly — `Application.Run(form,
 
 | Method | Description |
 |---|---|
+| `Exit()` | Requests the running message loop to exit (forwards to the backend's `Quit`) |
 | `Run(Form mainForm)` | Resolves a backend via `BackendRegistry.Resolve()`, realizes and shows `mainForm` (applying its `StartPosition` against the backend's screen size), and blocks in the message loop until it closes |
 | `Run(Form mainForm, IPlatformBackend backend)` | Same, on an explicit backend — the seam tests use for the headless backend |
-| `Exit()` | Requests the running message loop to exit (forwards to the backend's `Quit`) |
 
 `BackendRegistry` (`Hawkynt.NativeForms.Backends`):
 
 | Member | Description |
 |---|---|
+| `Clear()` | Removes every backend. Intended for tests |
 | `Register(IPlatformBackend)` | Adds a backend. Idempotent per concrete type — registering the same type twice keeps the first |
 | `Registered` | All registered backends, in registration order |
 | `Resolve()` | The first registered backend whose `IsSupported` is true; throws `PlatformNotSupportedException` when nothing is registered or nothing matches the OS |
-| `Clear()` | Removes every backend. Intended for tests |
 
 ## Notes
 

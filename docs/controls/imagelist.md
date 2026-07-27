@@ -29,17 +29,17 @@ listView.SmallImageList = icons;          // controls materialize entries on fir
 
 | Name | Type | Description |
 |---|---|---|
-| `ImageSize` | `Size` (read-only) | The fixed pixel size every image in this list has — exactly like the WinForms namesake. |
 | `Count` | `int` (read-only) | The number of images stored. |
+| `ImageSize` | `Size` (read-only) | The fixed pixel size every image in this list has — exactly like the WinForms namesake. |
 
 ### Methods
 
 | Name | Description |
 |---|---|
 | `Add(ReadOnlySpan<int> argb)` | Adds an image from row-major 32-bit ARGB pixels and returns its index. Throws `ArgumentException` when the pixel count is not `ImageSize.Width * ImageSize.Height`. |
-| `AddPng(ReadOnlySpan<byte> png)` | Decodes a PNG (the core decoder's 8-bit non-interlaced subset) and adds it, returning its index; a size other than `ImageSize` is nearest-neighbor-resampled to fit. Throws `FormatException` outside the subset. |
-| `AddIco(ReadOnlySpan<byte> ico)` | Decodes the ICO entry closest to `ImageSize` and adds it, resampled the same way, returning its index. |
 | `AddBadged(int baseIndex, ReadOnlySpan<int> badgeArgb, int badgeWidth, int badgeHeight, ContentAlignment corner = BottomRight)` | Adds a **copy** of the base image with a badge composed onto it (status overlays like "modified" or "locked") and returns the new entry's index; the base entry stays untouched. Throws `ArgumentOutOfRangeException` for a bad index or a badge that is empty or larger than `ImageSize`, `ArgumentException` for a pixel-count mismatch. |
+| `AddIco(ReadOnlySpan<byte> ico)` | Decodes the ICO entry closest to `ImageSize` and adds it, resampled the same way, returning its index. |
+| `AddPng(ReadOnlySpan<byte> png)` | Decodes a PNG (the core decoder's 8-bit non-interlaced subset) and adds it, returning its index; a size other than `ImageSize` is nearest-neighbor-resampled to fit. Throws `FormatException` outside the subset. |
 | `Clear()` | Removes all images and disposes any realized native bitmaps. |
 | `Dispose()` | Disposes all realized native bitmaps; the pixel data stays usable, so the list can re-materialize later. |
 

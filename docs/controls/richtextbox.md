@@ -28,14 +28,14 @@ var rtf = editor.Rtf;                        // the whole document as RTF
 
 | Name | Type | Default | Description |
 |---|---|---|---|
+| `DetectUrls` | `bool` | `true` | Whether URLs in the text are detected, rendered as links and raise `LinkClicked`. |
+| `Rtf` | `string` | — | The whole document as RTF (the NativeForms subset). Buffered before realization; afterwards both directions go straight through the native widget. |
+| `SelectionAlignment` | `ContentAlignment` | `TopLeft` | Alignment of the paragraphs the selection touches. Only the horizontal component (left/center/right) is meaningful. |
 | `SelectionBold` / `SelectionItalic` / `SelectionUnderline` / `SelectionStrikeout` | `bool` | `false` | Whether the current selection carries the style. Writing formats the selection. |
+| `SelectionBullet` | `bool` | `false` | Whether the paragraphs the selection touches are bulleted list items. |
 | `SelectionColor` | `Color` | `Color.Empty` | Text color of the current selection; `Color.Empty` restores the default. |
 | `SelectionFontSize` | `float` | `0` | Font size of the current selection, in points; 0 means the default. |
-| `SelectionAlignment` | `ContentAlignment` | `TopLeft` | Alignment of the paragraphs the selection touches. Only the horizontal component (left/center/right) is meaningful. |
-| `SelectionBullet` | `bool` | `false` | Whether the paragraphs the selection touches are bulleted list items. |
-| `DetectUrls` | `bool` | `true` | Whether URLs in the text are detected, rendered as links and raise `LinkClicked`. |
 | `ZoomFactor` | `float` | `1.0` | Display scale of the text — a pure view setting, not part of the document. Buffered before realization. |
-| `Rtf` | `string` | — | The whole document as RTF (the NativeForms subset). Buffered before realization; afterwards both directions go straight through the native widget. |
 
 ### Events
 

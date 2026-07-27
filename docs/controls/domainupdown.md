@@ -24,9 +24,9 @@ spinner.DownButton();   // walks forward to "Gamma"
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `Items` | `ObservableList<string>` | empty | The items the spinner walks through. Mutations keep the selection on the same item (shifted by inserts/removes before it, cleared when it vanishes). |
-| `Wrap` | `bool` | `false` | Whether stepping past either end wraps around to the other. |
 | `SelectedIndex` | `int` | `-1` | Selected item index, `-1` for none. Setting it mirrors the item into the editor. Out-of-range values coerce to `-1`. |
 | `SelectedItem` | `string?` | `null` | The selected item; setting selects by `IndexOf`. |
+| `Wrap` | `bool` | `false` | Whether stepping past either end wraps around to the other. |
 
 ### Events
 
@@ -38,8 +38,8 @@ spinner.DownButton();   // walks forward to "Gamma"
 
 | Method | Description |
 |---|---|
-| `UpButton()` | Steps to the *previous* item (classic WinForms semantics: up walks backward through the list), committing a pending typed edit first. |
 | `DownButton()` | Steps to the *next* item. From no selection, either direction lands on the first item. Without `Wrap` the ends clamp. |
+| `UpButton()` | Steps to the *previous* item (classic WinForms semantics: up walks backward through the list), committing a pending typed edit first. |
 
 The inherited `Text` property is the hosted editor's content; assigning it counts as a pending user edit. Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 

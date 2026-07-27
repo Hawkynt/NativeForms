@@ -23,19 +23,19 @@ form.Controls.Add(expander);
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Expanded` | `bool` | `true` | Whether the content area is shown. Collapsing remembers the current height and shrinks to `HeaderHeight`; expanding restores it. |
-| `ShowCheckBox` | `bool` | `false` | Replaces the header's expand triangle with a check box — the checkable-group-box idiom, where ticking the box opens the content and clearing it collapses it. |
 | `Checked` | `bool` | tracks `Expanded` | The header check box's state, an alias for `Expanded` (checked = open) so it can be two-way bound. Setting it expands or collapses regardless of `ShowCheckBox`. |
+| `Expanded` | `bool` | `true` | Whether the content area is shown. Collapsing remembers the current height and shrinks to `HeaderHeight`; expanding restores it. |
 | `HeaderHeight` | `int` (get) | theme row height | Pixel height of the header row — the whole control while collapsed. |
 | `Image` | `IImage?` | `null` | An optional icon painted in the header beside the caption (after the expand glyph); `TextImageRelation` places it before or after the text. |
+| `ShowCheckBox` | `bool` | `false` | Replaces the header's expand triangle with a check box — the checkable-group-box idiom, where ticking the box opens the content and clearing it collapses it. |
 | `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | Where the `Image` sits relative to the caption; `TextBeforeImage` puts the icon after the text. |
 
 ### Events
 
 | Event | Description |
 |---|---|
-| `ExpandedChanged` | Raised after `Expanded` changes, whether by property, header click or Space. |
 | `CheckedChanged` | Raised after `Checked` (i.e. `Expanded`) changes — the binding hook for the header check-box state. |
+| `ExpandedChanged` | Raised after `Expanded` changes, whether by property, header click or Space. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of
 `OwnerDrawnControl` (`Invalidate`, `Focus`).

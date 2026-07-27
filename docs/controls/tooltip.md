@@ -23,13 +23,13 @@ toolTip.Dispose();               // detach everything, release popup and timer
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `InitialDelay` | `int` | `500` | Milliseconds the pointer must rest on a control before its tip appears; clamped to at least 1. |
-| `AutoPopDelay` | `int` | `5000` | Milliseconds a visible tip stays up before hiding on its own; clamped to at least 1. |
 | `Active` | `bool` (get) | `false` | Whether the tip popup is currently visible. |
-| `SetToolTip(Control control, string? text)` | method | | Registers the hover text for a control, or removes the registration for a null/empty text. Backend-free — it may happen long before the control is realized. |
+| `AutoPopDelay` | `int` | `5000` | Milliseconds a visible tip stays up before hiding on its own; clamped to at least 1. |
+| `Dispose()` | method | | Hides the tip, detaches every observed control and releases the native popup and timer. |
 | `GetToolTip(Control control)` | method | | The registered hover text, or an empty string. |
 | `Hide()` | method | | Hides the tip and stops any pending delay. |
-| `Dispose()` | method | | Hides the tip, detaches every observed control and releases the native popup and timer. |
+| `InitialDelay` | `int` | `500` | Milliseconds the pointer must rest on a control before its tip appears; clamped to at least 1. |
+| `SetToolTip(Control control, string? text)` | method | | Registers the hover text for a control, or removes the registration for a null/empty text. Backend-free — it may happen long before the control is realized. |
 
 `ToolTip` is a component (`IDisposable`), not a control: one instance serves any number of
 controls through a per-control text map, a single shared popup and a single delay timer.

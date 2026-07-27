@@ -85,37 +85,37 @@ Properties:
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `StartPosition` | `FormStartPosition` | `Manual` | Placement policy applied once, at show time, by rewriting `Bounds` in the core |
-| `FormBorderStyle` | `FormBorderStyle` | `Sizable` | The frame the native window wears; live-toggled after realization |
-| `WindowState` | `FormWindowState` | `Normal` | Normal/minimized/maximized, synced two-way with the native window |
-| `MinimizeBox` / `MaximizeBox` | `bool` | `true` | Caption buttons; advisory on GTK (the window manager owns the caption) |
-| `MinimumSize` / `MaximumSize` | `Size` | `Size.Empty` | Resize limits; a zero component leaves that axis unconstrained; assigning clamps the current size |
-| `TopMost` | `bool` | `false` | Keeps the window above all normal windows |
-| `Opacity` | `double` | `1.0` | Overall opacity, clamped to 0…1; compositor-dependent on Linux |
+| `AcceptButton` | `Button?` | `null` | The button Enter clicks through the dialog-key chain (see above) |
+| `ActiveControl` | `Control?` | `null` | The child holding keyboard focus, tracked from peer focus events. Assigning focuses the control; assigned before the form is shown, it becomes the initial focus instead of the first tab stop — the WinForms contract |
+| `CancelButton` | `Button?` | `null` | The button Escape clicks; assigning gives it `DialogResult.Cancel` when it has none |
 | `ClientSize` | `Size` | — | The size of the form. **Caveat:** WinForms subtracts the non-client frame here; no peer reports its non-client metrics yet, so for now `ClientSize` equals `Size` on every platform — a documented platform gap, not a contract |
 | `DialogResult` | `DialogResult` | `None` | The verdict `ShowDialog` reports; setting a non-`None` value on a modally shown form closes it |
-| `AcceptButton` | `Button?` | `null` | The button Enter clicks through the dialog-key chain (see above) |
-| `CancelButton` | `Button?` | `null` | The button Escape clicks; assigning gives it `DialogResult.Cancel` when it has none |
-| `ActiveControl` | `Control?` | `null` | The child holding keyboard focus, tracked from peer focus events. Assigning focuses the control; assigned before the form is shown, it becomes the initial focus instead of the first tab stop — the WinForms contract |
+| `FormBorderStyle` | `FormBorderStyle` | `Sizable` | The frame the native window wears; live-toggled after realization |
+| `MinimizeBox` / `MaximizeBox` | `bool` | `true` | Caption buttons; advisory on GTK (the window manager owns the caption) |
+| `MinimumSize` / `MaximumSize` | `Size` | `Size.Empty` | Resize limits; a zero component leaves that axis unconstrained; assigning clamps the current size |
+| `Opacity` | `double` | `1.0` | Overall opacity, clamped to 0…1; compositor-dependent on Linux |
+| `StartPosition` | `FormStartPosition` | `Manual` | Placement policy applied once, at show time, by rewriting `Bounds` in the core |
+| `TopMost` | `bool` | `false` | Keeps the window above all normal windows |
+| `WindowState` | `FormWindowState` | `Normal` | Normal/minimized/maximized, synced two-way with the native window |
 
 Events:
 
 | Event | Description |
 |---|---|
-| `Load` | Raised after realization, before first show — on *every* show, since the form unrealizes between them |
-| `FormClosing` | Raised before the form closes, with `CloseReason`; settable `Cancel` vetoes |
 | `FormClosed` | Raised after the window closed |
+| `FormClosing` | Raised before the form closes, with `CloseReason`; settable `Cancel` vetoes |
+| `Load` | Raised after realization, before first show — on *every* show, since the form unrealizes between them |
 | `Resize` / `SizeChanged` | Raised (in that order) whenever the form's size changes — programmatically, by a native resize, or on minimize/maximize/restore |
 
 Methods:
 
 | Method | Description |
 |---|---|
+| `Close()` | Closes the form as the native close button would, running the `FormClosing` veto first; no-op before realization |
+| `OnLoad` / `OnFormClosing` / `OnFormClosed` / `OnResize` / `OnSizeChanged` | `protected virtual` raisers for subclasses |
+| `SetIcon(int, int, ReadOnlySpan<int>)` | Replaces the caption/taskbar icon from 32-bit ARGB pixels |
 | `Show()` | Shows the form modelessly and returns immediately. Throws without a running message loop |
 | `ShowDialog(Form? owner = null)` | Shows the form modally, blocks until it closes, returns `DialogResult` (`Cancel` when closed without a verdict). Throws without a running message loop |
-| `Close()` | Closes the form as the native close button would, running the `FormClosing` veto first; no-op before realization |
-| `SetIcon(int, int, ReadOnlySpan<int>)` | Replaces the caption/taskbar icon from 32-bit ARGB pixels |
-| `OnLoad` / `OnFormClosing` / `OnFormClosed` / `OnResize` / `OnSizeChanged` | `protected virtual` raisers for subclasses |
 
 ## Differences from System.Windows.Forms.Form
 

@@ -29,12 +29,12 @@ spinner.UpButton();   // 0.00 -> 0.25
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Minimum` | `decimal` | `0` | Lowest accepted value. Raising it above `Maximum` drags the maximum along; the current value re-clamps. |
-| `Maximum` | `decimal` | `100` | Highest accepted value. Lowering it below `Minimum` drags the minimum along. |
-| `Value` | `decimal` | `0` | The current value, clamped into the range. Reading it commits a pending typed edit first, so callers always see what the user entered. |
-| `Increment` | `decimal` | `1` | The step a spinner button or Up/Down key changes the value by. Negative values throw `ArgumentOutOfRangeException`. |
 | `DecimalPlaces` | `int` | `0` | Decimal digits the editor displays (0–28); out-of-range values throw. |
+| `Increment` | `decimal` | `1` | The step a spinner button or Up/Down key changes the value by. Negative values throw `ArgumentOutOfRangeException`. |
+| `Maximum` | `decimal` | `100` | Highest accepted value. Lowering it below `Minimum` drags the minimum along. |
+| `Minimum` | `decimal` | `0` | Lowest accepted value. Raising it above `Maximum` drags the maximum along; the current value re-clamps. |
 | `ThousandsSeparator` | `bool` | `false` | Whether the editor displays group separators (`"N"` instead of `"F"` formatting); typed input parses with separators either way. |
+| `Value` | `decimal` | `0` | The current value, clamped into the range. Reading it commits a pending typed edit first, so callers always see what the user entered. |
 
 ### Events
 

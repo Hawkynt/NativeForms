@@ -32,17 +32,17 @@ var save = new FilePicker { Mode = FilePickerMode.Save, Filter = "CSV|*.csv" };
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `SelectedPath` | `string` | `""` | The committed path. Assigning rewrites the editor, re-evaluates `PathExists` and raises `PathChanged`. |
-| `SelectedPaths` | `string[]` | `[]` | Every path the current selection covers — the whole set after a multi-pick, one element after any other commit. Never `null`. |
-| `Mode` | `FilePickerMode` | `Open` | Which dialog the browse button opens: `Open` or `Save`. |
 | `Filter` | `string` | `""` | Type filter in WinForms syntax (`"Text files\|*.txt\|All files\|*.*"`). Validated on assignment. |
 | `FilterIndex` | `int` | `1` | 1-based index of the initially selected filter entry. |
-| `Multiselect` | `bool` | `false` | Whether the dialog lets the user pick several files (`Open` mode only). |
 | `InitialDirectory` | `string` | `""` | Where the dialog starts; empty starts at the committed path's own folder. |
-| `Title` | `string` | `""` | The dialog's caption; empty picks the platform default. |
-| `ReadOnlyText` | `bool` | `false` | Makes the field display-only — still selectable and copyable, but only the browse button changes it. |
+| `Mode` | `FilePickerMode` | `Open` | Which dialog the browse button opens: `Open` or `Save`. |
+| `Multiselect` | `bool` | `false` | Whether the dialog lets the user pick several files (`Open` mode only). |
 | `PathExists` | `bool` | `false` | Whether the committed path was real when last evaluated. See Notes. |
 | `PlaceholderText` | `string` | `""` | Greyed hint shown while the field is empty. |
+| `ReadOnlyText` | `bool` | `false` | Makes the field display-only — still selectable and copyable, but only the browse button changes it. |
+| `SelectedPath` | `string` | `""` | The committed path. Assigning rewrites the editor, re-evaluates `PathExists` and raises `PathChanged`. |
+| `SelectedPaths` | `string[]` | `[]` | Every path the current selection covers — the whole set after a multi-pick, one element after any other commit. Never `null`. |
+| `Title` | `string` | `""` | The dialog's caption; empty picks the platform default. |
 
 The inherited `Text` is the hosted editor's *live* content, including an edit not committed yet.
 

@@ -21,9 +21,9 @@ form.Controls.Add(panel);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `BorderStyle` | `BorderStyle` | `BorderStyle.None` | The border drawn around the panel; changing it invalidates the control. |
 | `AutoScroll` | `bool` | `false` | Whether the panel scrolls children that overflow its client area. Turning it off snaps the scroll offset back to zero. |
 | `AutoScrollPosition` | `Point` | `(0, 0)` | The scroll offset, negated exactly like its Windows Forms namesake: a panel scrolled 10 px down reports `(0, -10)`. Assigning accepts either sign and scrolls to the absolute offset, clamped to the content extent. |
+| `BorderStyle` | `BorderStyle` | `BorderStyle.None` | The border drawn around the panel; changing it invalidates the control. |
 
 `BorderStyle` (enum, defined alongside `Panel`): `None` (no border), `FixedSingle` (a single flat line), `Fixed3D` (a sunken 3-D edge).
 

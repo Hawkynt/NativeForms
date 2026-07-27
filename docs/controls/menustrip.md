@@ -36,10 +36,10 @@ form.Controls.Add(strip);
 
 | Member | Type | Description |
 |---|---|---|
-| `Items` | `ToolStripItemCollection` | The top-level items. Mutating the collection (or any item in it) repaints the bar. |
-| `OpenIndex` | `int` (get) | Index of the top-level item whose drop-down is open, `-1` for none. |
-| `OpenDropDown(int index)` | method | Opens the drop-down of the item at `index` below the bar. A no-op for out-of-range indexes, disabled items, items without children, or before realization. |
 | `CloseDropDown()` | method | Closes the open drop-down cascade, if any. |
+| `Items` | `ToolStripItemCollection` | The top-level items. Mutating the collection (or any item in it) repaints the bar. |
+| `OpenDropDown(int index)` | method | Opens the drop-down of the item at `index` below the bar. A no-op for out-of-range indexes, disabled items, items without children, or before realization. |
+| `OpenIndex` | `int` (get) | Index of the top-level item whose drop-down is open, `-1` for none. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of
 `OwnerDrawnControl` (`Invalidate`, `Focus`). The bar is focusable.
@@ -53,16 +53,16 @@ the owning collection into a repaint.
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `Text` | `string` | `""` | The caption. `&` marks the following character as the mnemonic; `&&` escapes a literal ampersand. |
-| `Image` | `IImage?` | `null` | Direct icon; wins over `ImageList` + `ImageIndex`. |
-| `ImageList` | `ImageList?` | `null` | Icon store that `ImageIndex` indexes into. |
-| `ImageIndex` | `int` | `-1` | Index of the icon within `ImageList`; negative for none. |
-| `Enabled` | `bool` | `true` | Whether the item reacts to the user. With a `Command` attached, its `CanExecute` gates the effective value on top of the assigned one. |
-| `Visible` | `bool` | `true` | Whether the item occupies space and paints. |
-| `Command` | `ICommand?` | `null` | MVVM command: `PerformClick` executes it, `CanExecuteChanged` re-evaluates `Enabled` and repaints the hosting strip. |
-| `Tag` | `object?` | `null` | Arbitrary caller data. |
 | `Click` | event | | Raised when the item is activated (click, Enter, shortcut). |
+| `Command` | `ICommand?` | `null` | MVVM command: `PerformClick` executes it, `CanExecuteChanged` re-evaluates `Enabled` and repaints the hosting strip. |
+| `Enabled` | `bool` | `true` | Whether the item reacts to the user. With a `Command` attached, its `CanExecute` gates the effective value on top of the assigned one. |
+| `Image` | `IImage?` | `null` | Direct icon; wins over `ImageList` + `ImageIndex`. |
+| `ImageIndex` | `int` | `-1` | Index of the icon within `ImageList`; negative for none. |
+| `ImageList` | `ImageList?` | `null` | Icon store that `ImageIndex` indexes into. |
 | `PerformClick()` | method | | Activates as a user click would: raises `Click`, then executes `Command` when it can. A no-op while not `Enabled`. |
+| `Tag` | `object?` | `null` | Arbitrary caller data. |
+| `Text` | `string` | `""` | The caption. `&` marks the following character as the mnemonic; `&&` escapes a literal ampersand. |
+| `Visible` | `bool` | `true` | Whether the item occupies space and paints. |
 
 ### ToolStripMenuItem
 
@@ -71,11 +71,11 @@ Adds the menu-specific surface on top of `ToolStripDropDownItem` (below):
 | Member | Type | Default | Description |
 |---|---|---|---|
 | `Checked` | `bool` | `false` | Whether the check (or radio) mark shows. Checking a `CheckedGroup` member unchecks its sibling group members. |
-| `CheckOnClick` | `bool` | `false` | Whether clicking toggles `Checked` automatically. In a `CheckedGroup`, clicking always checks (radio semantics — the checked member stays checked). |
-| `CheckedGroup` | `string?` | `null` | The radio group among siblings, or `null` for an ordinary check item. Group members are mutually exclusive and paint a bullet instead of a check mark. |
-| `ShortcutKeys` | `Keys` | `None` | The chord that activates the item, e.g. `Keys.Control \| Keys.S`. Dispatched by the owning `MenuStrip`. |
-| `ShortcutKeyDisplayString` | `string?` | `null` | Overrides the shortcut text shown right-aligned in the drop-down; `null` renders the formatted chord (`"Ctrl+Shift+S"`, digits without the `D` prefix). |
 | `CheckedChanged` | event | | Raised after `Checked` changes — including a group sibling being turned off. |
+| `CheckedGroup` | `string?` | `null` | The radio group among siblings, or `null` for an ordinary check item. Group members are mutually exclusive and paint a bullet instead of a check mark. |
+| `CheckOnClick` | `bool` | `false` | Whether clicking toggles `Checked` automatically. In a `CheckedGroup`, clicking always checks (radio semantics — the checked member stays checked). |
+| `ShortcutKeyDisplayString` | `string?` | `null` | Overrides the shortcut text shown right-aligned in the drop-down; `null` renders the formatted chord (`"Ctrl+Shift+S"`, digits without the `D` prefix). |
+| `ShortcutKeys` | `Keys` | `None` | The chord that activates the item, e.g. `Keys.Control \| Keys.S`. Dispatched by the owning `MenuStrip`. |
 
 Constructors: `ToolStripMenuItem()`, `ToolStripMenuItem(string text)`.
 

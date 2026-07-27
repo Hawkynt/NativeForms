@@ -38,17 +38,17 @@ Inherits the common members of [`Control`](control.md).
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Nodes` | `TreeNodeCollection` | empty | The root nodes. Mutating any level of the hierarchy re-flattens and repaints. |
-| `SelectedNode` | `TreeNode?` | `null` | The selected node. Setting it runs the vetoable `BeforeSelect`, scrolls the node into view and raises `AfterSelect`; setting `null` clears silently (no events); a node attached to a different tree throws `ArgumentException`. |
+| `AllowReorder` | `bool` | `false` | Whether nodes can be dragged within the tree to reorder or reparent them, with a live insertion marker. Intra-tree movement, distinct from the cross-control `Control.AllowDrop` data drag. |
+| `AutoExpandDelay` | `int` | `700` | Milliseconds the pointer must dwell on a collapsed node while dragging before it auto-expands; `0` disables hover-expansion. |
 | `CheckBoxes` | `bool` | `false` | Whether every node shows a themed check box. |
 | `ImageList` | `ImageList?` | `null` | The icon store for `TreeNode.ImageIndex`; `null` for no icons. |
 | `ItemHeight` | `int` | theme row height | Pixel height of a row — also the indent per level. |
+| `Nodes` | `TreeNodeCollection` | empty | The root nodes. Mutating any level of the hierarchy re-flattens and repaints. |
+| `SelectedNode` | `TreeNode?` | `null` | The selected node. Setting it runs the vetoable `BeforeSelect`, scrolls the node into view and raises `AfterSelect`; setting `null` clears silently (no events); a node attached to a different tree throws `ArgumentException`. |
+| `ShowDragImage` | `bool` | `true` | Whether a drag carries a translucent image of the dragged node (icon + label) under the pointer; `false` gives a marker-only drag. |
 | `ShowLines` | `bool` | `true` | Whether connector lines are drawn between nodes. |
 | `ShowPlusMinus` | `bool` | `true` | Whether expand/collapse glyphs are drawn for parent nodes. |
 | `ShowRootLines` | `bool` | `true` | Whether root nodes get their own glyph/line cell. When `false`, everything shifts one indent level left and roots lose their glyphs. |
-| `AllowReorder` | `bool` | `false` | Whether nodes can be dragged within the tree to reorder or reparent them, with a live insertion marker. Intra-tree movement, distinct from the cross-control `Control.AllowDrop` data drag. |
-| `AutoExpandDelay` | `int` | `700` | Milliseconds the pointer must dwell on a collapsed node while dragging before it auto-expands; `0` disables hover-expansion. |
-| `ShowDragImage` | `bool` | `true` | Whether a drag carries a translucent image of the dragged node (icon + label) under the pointer; `false` gives a marker-only drag. |
 | `TopIndex` | `int` (get) | `0` | Index of the first visible row in the flattened tree (scroll position). |
 | `VisibleNodeCount` | `int` (get) | `0` | The number of rows the expanded part of the tree currently occupies. |
 
@@ -56,14 +56,14 @@ Inherits the common members of [`Control`](control.md).
 
 | Event | Description |
 |---|---|
-| `BeforeSelect` | Raised before the selection moves to a node; set `TreeViewCancelEventArgs.Cancel` to veto. |
-| `AfterSelect` | Raised after `SelectedNode` changes to a node. |
-| `BeforeExpand` | Raised before a node expands; set `Cancel` to veto. |
-| `AfterExpand` | Raised after a node expanded. |
-| `BeforeCollapse` | Raised before a node collapses; set `Cancel` to veto. |
-| `AfterCollapse` | Raised after a node collapsed. |
-| `BeforeCheck` | Raised before a node's `Checked` state flips; set `Cancel` to veto. |
 | `AfterCheck` | Raised after a node's `Checked` state changed. |
+| `AfterCollapse` | Raised after a node collapsed. |
+| `AfterExpand` | Raised after a node expanded. |
+| `AfterSelect` | Raised after `SelectedNode` changes to a node. |
+| `BeforeCheck` | Raised before a node's `Checked` state flips; set `Cancel` to veto. |
+| `BeforeCollapse` | Raised before a node collapses; set `Cancel` to veto. |
+| `BeforeExpand` | Raised before a node expands; set `Cancel` to veto. |
+| `BeforeSelect` | Raised before the selection moves to a node; set `TreeViewCancelEventArgs.Cancel` to veto. |
 | `ItemDrag` | Raised when a node starts being dragged (the pointer crossed the drag threshold). Carries the node in `Node`. |
 | `NodeDragOver` | Raised continuously as the drop target changes during a drag; set `TreeNodeDragEventArgs.Cancel` to reject the current target (no marker, no drop). |
 | `NodeDrop` | Raised when a dragged node is released over a valid target; set `Cancel` to abort the move. |
@@ -76,8 +76,8 @@ The Before/After/expand/collapse/check args carry the affected node in `Node`. T
 
 | Method | Description |
 |---|---|
-| `ExpandAll()` | Expands every node in the tree. |
 | `CollapseAll()` | Collapses every node in the tree. |
+| `ExpandAll()` | Expands every node in the tree. |
 
 ### TreeNode
 
@@ -85,27 +85,27 @@ Constructors: `TreeNode()`, `TreeNode(string text)`.
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `Text` | `string` | `""` | The node's label. |
-| `Tag` | `object?` | `null` | Arbitrary caller data. |
+| `Checked` | `bool` | `false` | The check state. Changing it raises `AfterCheck` on an attached control. |
 | `ImageIndex` | `int` | `-1` | The image-list index of the node's icon, or `-1` for none. |
 | `ImageKey` | `string?` | `null` | The image-list key of the node's icon — the string alternative to `ImageIndex` (index wins when both are set). |
-| `SelectedImageIndex` | `int` | `-1` | The icon used while the node is selected, or `-1` to reuse `ImageIndex`. |
-| `SelectedImageKey` | `string?` | `null` | The keyed alternative to `SelectedImageIndex`. |
-| `Checked` | `bool` | `false` | The check state. Changing it raises `AfterCheck` on an attached control. |
 | `IsExpanded` | `bool` (get) | `false` | Whether the node's children are currently shown. |
+| `Level` | `int` (get) | `0` | Zero-based depth: 0 for roots, parent level + 1 below. |
 | `Nodes` | `TreeNodeCollection` (get) | empty | The child nodes, created on first access. |
 | `Parent` | `TreeNode?` (get) | `null` | The parent node; `null` for roots. |
+| `SelectedImageIndex` | `int` | `-1` | The icon used while the node is selected, or `-1` to reuse `ImageIndex`. |
+| `SelectedImageKey` | `string?` | `null` | The keyed alternative to `SelectedImageIndex`. |
+| `Tag` | `object?` | `null` | Arbitrary caller data. |
+| `Text` | `string` | `""` | The node's label. |
 | `TreeView` | `TreeView?` (get) | `null` | The tree this node is attached to; `null` while detached. |
-| `Level` | `int` (get) | `0` | Zero-based depth: 0 for roots, parent level + 1 below. |
 
 | Method | Description |
 |---|---|
+| `Collapse()` | Hides the children (same pipeline). When the selected node vanishes under the collapsing one, the selection moves up to this node. |
+| `EnsureVisible()` | Expands every ancestor and scrolls the attached control until this node is on screen. |
 | `Expand()` | Shows the children. On an attached control this runs the cancelable Before/After pipeline; detached nodes just flip the state. |
 | `ExpandAll()` | Expands the node and every descendant. |
-| `Collapse()` | Hides the children (same pipeline). When the selected node vanishes under the collapsing one, the selection moves up to this node. |
-| `Toggle()` | Expands a collapsed node, collapses an expanded one. |
-| `EnsureVisible()` | Expands every ancestor and scrolls the attached control until this node is on screen. |
 | `SetChildLoader(Func<TreeNode, IEnumerable<TreeNode>>?)` | Registers a delegate that supplies the node's children the first time it is expanded — lazy population for large or **virtual** trees (folders, archive entries, remote listings). The node paints as expandable immediately; the loader runs once. `null` clears it. |
+| `Toggle()` | Expands a collapsed node, collapses an expanded one. |
 
 ### TreeNodeCollection
 

@@ -35,9 +35,9 @@ Inherits everything from [`ListBox`](listbox.md) — items, selectors, selection
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `CheckOnClick` | `bool` | `false` | Whether a single click toggles the check. Otherwise the first click on a row only selects it and a further click toggles. |
 | `CheckedIndices` | `IReadOnlyList<int>` (get) | empty | The checked indices, sorted ascending — a live view over the check states. |
 | `CheckedItems` | `IReadOnlyList<object?>` (get) | empty | The checked items in index order — a live view over the check states. |
+| `CheckOnClick` | `bool` | `false` | Whether a single click toggles the check. Otherwise the first click on a row only selects it and a further click toggles. |
 
 ### Events
 

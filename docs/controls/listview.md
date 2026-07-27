@@ -47,52 +47,52 @@ Inherits the common members of [`Control`](control.md).
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Columns` | `ObservableList<ColumnHeader>` | empty | The columns for Details view. Mutating the collection repaints the control. |
-| `Items` | `ObservableList<ListViewItem>` | empty | The items shown. Mutating the collection repaints; selection, caret and a pending label edit shift and prune with it. |
-| `Groups` | `ObservableList<ListViewGroup>` | empty | The groups items can join via `ListViewItem.Group`, rendered in this order. |
-| `View` | `ListViewView` | `Details` | Item arrangement. Changing it commits a pending label edit. |
-| `ShowColumnHeaders` | `bool` | `true` | Whether the header row is shown (Details view only). |
-| `ShowGroups` | `bool` | `true` | Whether items render under their group's header section — in every view except `List`, like the classic control. No effect while `Groups` is empty. |
-| `FullRowSelect` | `bool` | `true` | Whether the selection highlight spans the full Details row; when `false` it covers only the first column. |
-| `MultiSelect` | `bool` | `true` | Whether Ctrl/Shift gestures can select more than one item. Turning it off collapses the selection to its first index. |
 | `CheckBoxes` | `bool` | `false` | Whether every item shows a themed check box; see `ListViewItem.Checked`. |
 | `CheckedIndices` | `IReadOnlyList<int>` | (live) | The indices of the currently checked items — a live view backed by the item states. |
 | `CheckedItems` | `IReadOnlyList<ListViewItem>` | (live) | The currently checked items — a live view over [`CheckedIndices`](listview.md). |
+| `Columns` | `ObservableList<ColumnHeader>` | empty | The columns for Details view. Mutating the collection repaints the control. |
+| `FocusedIndex` | `int` (get) | `-1` | The caret item keyboard navigation operates on, `-1` before any interaction. |
+| `FullRowSelect` | `bool` | `true` | Whether the selection highlight spans the full Details row; when `false` it covers only the first column. |
+| `Groups` | `ObservableList<ListViewGroup>` | empty | The groups items can join via `ListViewItem.Group`, rendered in this order. |
+| `IsEditing` | `bool` (get) | `false` | Whether a label edit is currently in progress. |
+| `ItemHeight` | `int` | theme row height | Pixel height of a row and of the header. |
+| `Items` | `ObservableList<ListViewItem>` | empty | The items shown. Mutating the collection repaints; selection, caret and a pending label edit shift and prune with it. |
+| `ItemSorter` | `Comparison<ListViewItem>?` | `null` | A custom item ordering — the delegate-shaped stand-in for the classic `ListViewItemSorter`. Wins over `Sorting`; assigning a non-null comparison sorts immediately. |
 | `LabelEdit` | `bool` | `false` | Whether the user can edit item labels; see `BeginEdit`. |
 | `LargeImageList` | `ImageList?` | `null` | The icon store for `LargeIcon` and `Tile` (via `ListViewItem.ImageIndex`); its image size drives those views' cell size. |
-| `SmallImageList` | `ImageList?` | `null` | The icon store for the remaining views; its image size drives the `SmallIcon` cell size. |
-| `Sorting` | `SortOrder` | `None` | The automatic sort direction over the item text (or the last clicked column's text). Assigning `Ascending`/`Descending` sorts immediately; `None` stops sorting without restoring the old order. |
-| `ItemSorter` | `Comparison<ListViewItem>?` | `null` | A custom item ordering — the delegate-shaped stand-in for the classic `ListViewItemSorter`. Wins over `Sorting`; assigning a non-null comparison sorts immediately. |
-| `ItemHeight` | `int` | theme row height | Pixel height of a row and of the header. |
+| `MultiSelect` | `bool` | `true` | Whether Ctrl/Shift gestures can select more than one item. Turning it off collapses the selection to its first index. |
 | `SelectedIndex` | `int` | `-1` | The first selected index, `-1` for none. Setting it replaces the whole selection and scrolls the item into view; out-of-range values coerce to `-1`. |
 | `SelectedIndices` | `IReadOnlyList<int>` (get) | empty | The selected indices, always sorted ascending. |
-| `SelectedItems` | `IReadOnlyList<ListViewItem>` (get) | empty | The selected items in index order — a live, allocation-free view over `SelectedIndices`. |
 | `SelectedItem` | `ListViewItem?` | `null` | The first selected item; setting selects it alone (by `IndexOf`). |
-| `FocusedIndex` | `int` (get) | `-1` | The caret item keyboard navigation operates on, `-1` before any interaction. |
+| `SelectedItems` | `IReadOnlyList<ListViewItem>` (get) | empty | The selected items in index order — a live, allocation-free view over `SelectedIndices`. |
+| `ShowColumnHeaders` | `bool` | `true` | Whether the header row is shown (Details view only). |
+| `ShowGroups` | `bool` | `true` | Whether items render under their group's header section — in every view except `List`, like the classic control. No effect while `Groups` is empty. |
+| `SmallImageList` | `ImageList?` | `null` | The icon store for the remaining views; its image size drives the `SmallIcon` cell size. |
+| `Sorting` | `SortOrder` | `None` | The automatic sort direction over the item text (or the last clicked column's text). Assigning `Ascending`/`Descending` sorts immediately; `None` stops sorting without restoring the old order. |
 | `TopIndex` | `int` (get) | `0` | Index of the first visible flattened row (scroll position). Group header rows count as rows; in the icon views a row spans a whole rank of cells. |
-| `IsEditing` | `bool` (get) | `false` | Whether a label edit is currently in progress. |
+| `View` | `ListViewView` | `Details` | Item arrangement. Changing it commits a pending label edit. |
 
 ### Events
 
 | Event | Description |
 |---|---|
-| `SelectedIndexChanged` | Raised once per gesture when the set of selected indices changes — a Shift range over ten rows is one event. |
+| `AfterLabelEdit` | Raised after a label edit finished. `LabelEditEventArgs` carries the `Item` index and the entered `Label` (`null` when the edit was cancelled); setting `CancelEdit` discards the text and keeps the item's current label. |
+| `BeforeLabelEdit` | Raised before a label edit opens; setting `CancelEdit` keeps the editor closed. |
 | `ColumnClick` | Raised when a Details column header is clicked, before any automatic sort; `ColumnClickEventArgs.Column` is the index into `Columns`. |
+| `ItemActivate` | Raised when an item is activated — double-click or Enter on the caret item. |
 | `ItemCheck` | Raised before an item's check state flips. `ItemCheckEventArgs` (the same type [`CheckedListBox`](checkedlistbox.md) uses) carries `Index`, `CurrentValue` and a writable `NewValue`; a handler vetoes the flip by resetting `NewValue` to `CurrentValue`. |
 | `ItemChecked` | Raised after an item's check state flipped; `ItemCheckedEventArgs.Item` is the item. Vetoed flips raise nothing. |
-| `ItemActivate` | Raised when an item is activated — double-click or Enter on the caret item. |
-| `BeforeLabelEdit` | Raised before a label edit opens; setting `CancelEdit` keeps the editor closed. |
-| `AfterLabelEdit` | Raised after a label edit finished. `LabelEditEventArgs` carries the `Item` index and the entered `Label` (`null` when the edit was cancelled); setting `CancelEdit` discards the text and keeps the item's current label. |
+| `SelectedIndexChanged` | Raised once per gesture when the set of selected indices changes — a Shift range over ten rows is one event. |
 
 ### Methods
 
 | Method | Description |
 |---|---|
+| `BeginEdit(int index)` | Starts editing the given item's label: a hosted native text box appears over it, pre-filled and fully selected. Throws `InvalidOperationException` while `LabelEdit` is off. |
+| `EndEdit(bool cancel)` | Ends a pending label edit, committing the editor's text (or discarding it when `cancel` is set), then raises `AfterLabelEdit` — whose handler may still veto the commit. A no-op with no edit in progress. |
 | `EnsureVisible(int index)` | Scrolls so the given item is inside the visible row window. |
 | `GetItemBounds(int index)` | The item's cell rectangle in client coordinates for the current scroll position (possibly outside the visible area). Details and List cells span the full control width. Throws for out-of-range indices. |
 | `Sort()` | Sorts `Items` in place — stably — by `ItemSorter` when set, else by the active column's text in the `Sorting` direction; a no-op while neither is active. Selected items stay selected and the caret follows its item. |
-| `BeginEdit(int index)` | Starts editing the given item's label: a hosted native text box appears over it, pre-filled and fully selected. Throws `InvalidOperationException` while `LabelEdit` is off. |
-| `EndEdit(bool cancel)` | Ends a pending label edit, committing the editor's text (or discarding it when `cancel` is set), then raises `AfterLabelEdit` — whose handler may still veto the commit. A no-op with no edit in progress. |
 
 ### ListViewItem
 
@@ -101,14 +101,14 @@ Constructors: `ListViewItem()`, `ListViewItem(string text)`,
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `Text` | `string` | `""` | Primary label — first column in Details, the whole cell in every other view. Setting it repaints an attached control. |
-| `SubItems` | `List<string>` (get) | empty | Texts for the remaining Details columns, in column order; the Tile view shows the first as its greyed second line. |
+| `Checked` | `bool` | `false` | The check state. Writes on an attached item run through the vetoable `ItemCheck` pipeline; detached items flip silently. |
+| `Group` | `ListViewGroup?` | `null` | The group the item renders under, `null` for the default section. Changing it re-flattens the presentation. |
 | `Image` | `IImage?` | `null` | The explicit icon; `null` falls back to `ImageIndex`. |
 | `ImageIndex` | `int` | `-1` | Index into the owner's image list (large or small, per view), `-1` for none. |
-| `Group` | `ListViewGroup?` | `null` | The group the item renders under, `null` for the default section. Changing it re-flattens the presentation. |
-| `Tag` | `object?` | `null` | Arbitrary caller data. |
 | `Selected` | `bool` | `false` | Whether the item is selected. Writes on an attached item change the owner's selection (respecting `MultiSelect`) and raise its event; detached items just store the flag. |
-| `Checked` | `bool` | `false` | The check state. Writes on an attached item run through the vetoable `ItemCheck` pipeline; detached items flip silently. |
+| `SubItems` | `List<string>` (get) | empty | Texts for the remaining Details columns, in column order; the Tile view shows the first as its greyed second line. |
+| `Tag` | `object?` | `null` | Arbitrary caller data. |
+| `Text` | `string` | `""` | Primary label — first column in Details, the whole cell in every other view. Setting it repaints an attached control. |
 
 | Method | Description |
 |---|---|
@@ -130,8 +130,8 @@ Constructors: `ColumnHeader()`, `ColumnHeader(string text)`, `ColumnHeader(strin
 | Member | Type | Default | Description |
 |---|---|---|---|
 | `Text` | `string` | `""` | Header caption. |
-| `Width` | `int` | `120` | Column width in pixels. |
 | `TextAlign` | `ContentAlignment` | `MiddleLeft` | Alignment of header and cell text. |
+| `Width` | `int` | `120` | Column width in pixels. |
 
 ### ListViewView
 

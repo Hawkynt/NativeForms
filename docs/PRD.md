@@ -1,8 +1,9 @@
 # NativeForms — Product Requirements & Implementation Checklist
 
-> A fast, tiny, trim/AOT-compatible UI toolkit with a Windows Forms-shaped API that renders through
-> platform-native widgets (Win32, GTK, Cocoa) via P/Invoke — and paints the controls no platform
-> offers natively in that platform's own visual style.
+> A fast, tiny, trim/AOT-compatible UI toolkit with a Windows Forms-shaped API. Windows, buttons,
+> labels and text boxes are real platform widgets (Win32, GTK) driven via P/Invoke; every other
+> control is owner-drawn in the host platform's own visual style. Shipping platforms are Windows and
+> Linux — macOS is a stated future direction (§10 M9), not a shipped feature.
 
 This document is the **authoritative, living checklist**. Every control and feature is tracked here
 with `[ ]` / `[x]` boxes. When code and this document disagree, this document wins unless it is being
@@ -21,10 +22,13 @@ widget · `owner` = we draw it ourselves in the native theme.
 1. **Source-level WinForms familiarity.** Public API mirrors `System.Windows.Forms` in a distinct
    namespace (`Hawkynt.NativeForms`) — porting is largely a namespace swap. We match names, members
    and semantics where they make sense; we do **not** aim for 100% binary compatibility.
-2. **Native first, owner-drawn to match.** If the platform has the widget, we wrap it (it looks and
-   behaves exactly like the user's desktop). If it doesn't (DataGridView, rich ListView, icon
-   ComboBox drop-downs, …), we draw it ourselves using the platform's **theme colors, metrics and
-   fonts** so it still looks native.
+2. **Native where it pays, owner-drawn to match.** *Today* the native-peer set is deliberately
+   narrow — the window plus the text-bearing primitives (`Form`, `Button`, `Label`, `TextBox`,
+   `RichTextBox`), where the OS owns caret, IME, selection and accessibility. Everything else is
+   drawn by Core against the platform's **theme colors, metrics and fonts**, which is what lets one
+   implementation of a `DataGridView` or `CalendarView` behave identically on every backend. Widening
+   that native set for controls that have a faithful platform counterpart is a tracked goal, not a
+   claim — see §12.
 3. **Trim & NativeAOT compatible.** No reflection-based serialization, no `TypeDescriptor`
    data-binding, no runtime code-gen. `IsAotCompatible=true` on every library; the analyzers must
    stay green.
@@ -50,9 +54,10 @@ Hawkynt.NativeForms                (Core: controls, layout, events, App)   [plat
  ├─ .ComponentModel                (ObservableObject, RelayCommand, bindings)
  ├─ .Drawing                       (owner-draw abstraction: IGraphics, ITheme, geometry)
  └─ .Backends                      (IPlatformBackend + peer interfaces)
-Hawkynt.NativeForms.Backends.Windows   (Win32/user32/comctl32/uxtheme via [LibraryImport])
-Hawkynt.NativeForms.Backends.Gtk       (GTK 3 via [LibraryImport])
-Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend — placeholder)
+Hawkynt.NativeForms.Backends.Windows   (Win32/user32/comctl32/uxtheme via [LibraryImport])  SHIPPING
+Hawkynt.NativeForms.Backends.Gtk       (GTK 3 via [LibraryImport])                          SHIPPING
+Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend)                      STUB — throws
+Hawkynt.NativeForms.Generators         (Roslyn generator, packed as an analyzer in Core)     SHIPPING
 ```
 
 - **Core** never calls a native API. It creates **peers** through `IPlatformBackend` and drives the

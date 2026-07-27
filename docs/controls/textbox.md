@@ -29,27 +29,27 @@ box.SelectedText = "Jane";    // replace them, caret lands after the insertion
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Multiline` | `bool` | `false` | Multiline editor with vertical scrolling instead of a single-line entry. May recreate the native widget (see Notes). |
-| `PlaceholderText` | `string` | `""` | Greyed hint shown while the box is empty. Single-line only on most platforms. |
-| `PasswordChar` | `char` | `'\0'` | Masks the displayed text with this character; `'\0'` turns masking off. |
-| `UseSystemPasswordChar` | `bool` | `false` | Masks with the platform's standard glyph (`●`), overriding `PasswordChar`. |
-| `ReadOnly` | `bool` | `false` | Text can be selected and copied but not edited. |
-| `MaxLength` | `int` | `0` | Maximum characters the user can type; 0 means unlimited. Negative values coerce to 0. |
-| `CharacterCasing` | `CharacterCasing` | `Normal` | Forces `Upper`/`Lower` casing. Changing it re-cases the current `Text`; while active, programmatic writes and user input are normalized alike. |
 | `AcceptsReturn` | `bool` | `false` | Whether a multiline box keeps Enter (a newline) instead of activating the form's `AcceptButton`. Wired through the peer key seam. |
 | `AcceptsTab` | `bool` | `false` | Whether the box keeps an unmodified Tab (a tab character) instead of moving focus. Wired through the peer key seam. |
-| `SelectionStart` | `int` | `0` | Index of the first selected character (the caret position when nothing is selected). Buffered before realization, read live from the widget afterwards. |
-| `SelectionLength` | `int` | `0` | Number of selected characters. Buffered/live like `SelectionStart`. |
+| `CharacterCasing` | `CharacterCasing` | `Normal` | Forces `Upper`/`Lower` casing. Changing it re-cases the current `Text`; while active, programmatic writes and user input are normalized alike. |
+| `MaxLength` | `int` | `0` | Maximum characters the user can type; 0 means unlimited. Negative values coerce to 0. |
+| `Multiline` | `bool` | `false` | Multiline editor with vertical scrolling instead of a single-line entry. May recreate the native widget (see Notes). |
+| `PasswordChar` | `char` | `'\0'` | Masks the displayed text with this character; `'\0'` turns masking off. |
+| `PlaceholderText` | `string` | `""` | Greyed hint shown while the box is empty. Single-line only on most platforms. |
+| `ReadOnly` | `bool` | `false` | Text can be selected and copied but not edited. |
 | `SelectedText` | `string` | `""` | The selected run of `Text`; assigning replaces the selection and places the caret after the inserted text. |
+| `SelectionLength` | `int` | `0` | Number of selected characters. Buffered/live like `SelectionStart`. |
+| `SelectionStart` | `int` | `0` | Index of the first selected character (the caret position when nothing is selected). Buffered before realization, read live from the widget afterwards. |
+| `UseSystemPasswordChar` | `bool` | `false` | Masks with the platform's standard glyph (`●`), overriding `PasswordChar`. |
 
 ### Methods
 
 | Name | Description |
 |---|---|
+| `AppendText(string text)` | Appends to the content and parks the caret at the end — the classic log-window helper. |
+| `Clear()` | Empties the box, raising `TextChanged` when it held text. |
 | `Select(int start, int length)` | Selects the given run (negative values clamp to zero); buffered until realization like the `Selection*` setters. |
 | `SelectAll()` | Selects the whole content. |
-| `Clear()` | Empties the box, raising `TextChanged` when it held text. |
-| `AppendText(string text)` | Appends to the content and parks the caret at the end — the classic log-window helper. |
 
 The inherited `Text` property is overridden: assigned text is normalized by `CharacterCasing` and pushed to the widget; user edits flow back from the peer and raise `TextChanged` exactly once — the peer's echo of a programmatic write never raises a second event.
 

@@ -30,21 +30,21 @@ form.Controls.Add(table);
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `ColumnCount` | `int` | `1` | The number of columns; coerced to at least one. |
-| `RowCount` | `int` | `1` | The number of rows; coerced to at least one. |
-| `ColumnStyles` | `TableLayoutStyleCollection<ColumnStyle>` | empty | The sizing rules per column, in track order. |
-| `RowStyles` | `TableLayoutStyleCollection<RowStyle>` | empty | The sizing rules per row, in track order. |
 | `CellBorderStyle` | `TableLayoutPanelCellBorderStyle` | `None` | The grid lines painted between cells; `Single` insets every cell by one pixel per line. |
+| `ColumnCount` | `int` | `1` | The number of columns; coerced to at least one. |
+| `ColumnStyles` | `TableLayoutStyleCollection<ColumnStyle>` | empty | The sizing rules per column, in track order. |
+| `RowCount` | `int` | `1` | The number of rows; coerced to at least one. |
+| `RowStyles` | `TableLayoutStyleCollection<RowStyle>` | empty | The sizing rules per row, in track order. |
 
 ### Methods
 
 | Method | Description |
 |---|---|
-| `SetCellPosition(control, column, row)` | Pins a control to the given cell; auto-placement flows the other children around it. |
 | `GetCellPosition(control)` | The `TableLayoutPanelCellPosition` a control was pinned to, or `(-1, -1)` while it auto-places. |
+| `PerformLayout()` | Recomputes the grid and repositions every child. Runs automatically on every structural change — an explicit call is rarely needed. |
+| `SetCellPosition(control, column, row)` | Pins a control to the given cell; auto-placement flows the other children around it. |
 | `SetColumnSpan(control, value)` / `GetColumnSpan(control)` | Stretches a control across neighboring columns; 1 by default. |
 | `SetRowSpan(control, value)` / `GetRowSpan(control)` | Stretches a control across neighboring rows; 1 by default. |
-| `PerformLayout()` | Recomputes the grid and repositions every child. Runs automatically on every structural change — an explicit call is rarely needed. |
 
 Inherits [`Panel`](panel.md) (`BorderStyle`, `AutoScroll`, `AutoScrollPosition`) and through it the
 common members of [`Control`](control.md).

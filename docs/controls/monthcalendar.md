@@ -22,15 +22,15 @@ calendar.SetSelectionRange(new(2026, 7, 10), new(2026, 7, 12));
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `SelectionStart` | `DateTime` | today | The first selected day. Setting it keeps the end when still valid, collapsing or capping the range onto the new start otherwise; the displayed month follows. |
-| `SelectionEnd` | `DateTime` | today | The last selected day. Setting it keeps the start when still valid, collapsing or capping the range onto the new end otherwise. |
-| `MaxSelectionCount` | `int` | `7` | The largest number of days a selection may span. Coerced to at least 1; shrinking it trims the current range. |
-| `FirstDayOfWeek` | `DayOfWeek` | `Monday` | The day of week shown in the leftmost column. |
-| `MinDate` | `DateTime` | `1753-01-01` | The earliest selectable day; earlier cells paint disabled and reject clicks. Throws `ArgumentOutOfRangeException` when set later than `MaxDate`. |
-| `MaxDate` | `DateTime` | `9998-12-31` | The latest selectable day; later cells paint disabled and reject clicks. Throws `ArgumentOutOfRangeException` when set earlier than `MinDate`. |
-| `DayBackgroundProvider` | `Func<DateTime, Color?>?` | `null` | Per-day background shading (holidays, deadlines) for in-month days; the selection still paints over it. |
 | `DateSelectable` | `Func<DateTime, bool>?` | `null` | A predicate that blocks individual days from being picked (weekends, booked days) on top of `MinDate`/`MaxDate`; a rejected day paints disabled. |
+| `DayBackgroundProvider` | `Func<DateTime, Color?>?` | `null` | Per-day background shading (holidays, deadlines) for in-month days; the selection still paints over it. |
 | `DayTooltipProvider` | `Func<DateTime, string?>?` | `null` | Per-day tooltip text, shown on hover. |
+| `FirstDayOfWeek` | `DayOfWeek` | `Monday` | The day of week shown in the leftmost column. |
+| `MaxDate` | `DateTime` | `9998-12-31` | The latest selectable day; later cells paint disabled and reject clicks. Throws `ArgumentOutOfRangeException` when set earlier than `MinDate`. |
+| `MaxSelectionCount` | `int` | `7` | The largest number of days a selection may span. Coerced to at least 1; shrinking it trims the current range. |
+| `MinDate` | `DateTime` | `1753-01-01` | The earliest selectable day; earlier cells paint disabled and reject clicks. Throws `ArgumentOutOfRangeException` when set later than `MaxDate`. |
+| `SelectionEnd` | `DateTime` | today | The last selected day. Setting it keeps the start when still valid, collapsing or capping the range onto the new end otherwise. |
+| `SelectionStart` | `DateTime` | today | The first selected day. Setting it keeps the end when still valid, collapsing or capping the range onto the new start otherwise; the displayed month follows. |
 | `TodayDate` | `DateTime` | today | The day wearing the accent circle. Settable, like its WinForms namesake, so long-running views and tests stay deterministic. |
 
 ### Methods

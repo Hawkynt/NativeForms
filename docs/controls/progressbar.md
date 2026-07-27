@@ -22,13 +22,13 @@ bar.Style = ProgressBarStyle.Marquee;   // indeterminate sweep, timer-driven
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Minimum` | `int` | `0` | The lowest value the bar can represent. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
-| `Maximum` | `int` | `100` | The highest value the bar can represent. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
-| `Value` | `int` | `0` | The current progress, clamped to [`Minimum`, `Maximum`] on assignment. |
-| `Style` | `ProgressBarStyle` | `Blocks` | How the bar presents progress. Switching to `Marquee` starts the animation timer; switching away stops it. |
 | `MarqueeAnimationSpeed` | `int` | `100` | The marquee tick period in milliseconds (the WinForms default); 0 pauses the animation. Throws `ArgumentOutOfRangeException` when negative. |
-| `Step` | `int` | `10` | The amount `PerformStep` advances `Value` by. |
+| `Maximum` | `int` | `100` | The highest value the bar can represent. Lowering it below `Minimum` pulls `Minimum` down; `Value` is re-clamped. |
+| `Minimum` | `int` | `0` | The lowest value the bar can represent. Raising it above `Maximum` pulls `Maximum` up; `Value` is re-clamped. |
 | `Orientation` | `Orientation` | `Horizontal` | The axis the bar fills along. Horizontal bars fill left to right, vertical ones bottom to top. |
+| `Step` | `int` | `10` | The amount `PerformStep` advances `Value` by. |
+| `Style` | `ProgressBarStyle` | `Blocks` | How the bar presents progress. Switching to `Marquee` starts the animation timer; switching away stops it. |
+| `Value` | `int` | `0` | The current progress, clamped to [`Minimum`, `Maximum`] on assignment. |
 
 ### Methods
 

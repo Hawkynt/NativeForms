@@ -31,8 +31,8 @@ form.Controls.Add(strip);
 
 | Member | Type | Description |
 |---|---|---|
-| `Items` | `ToolStripItemCollection` | The toolbar items. Mutating the collection (or any item in it) repaints the bar. |
 | `HasOverflow` | `bool` (get) | Whether the bar currently needs the overflow chevron. |
+| `Items` | `ToolStripItemCollection` | The toolbar items. Mutating the collection (or any item in it) repaints the bar. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of
 `OwnerDrawnControl` (`Invalidate`, `Focus`). Items share the `ToolStripItem` model documented on
@@ -44,8 +44,8 @@ the [`MenuStrip`](menustrip.md) page: `Text` (with mnemonics), `Image`/`ImageLis
 | Member | Type | Default | Description |
 |---|---|---|---|
 | `Checked` | `bool` | `false` | Whether the button is latched down (toggle state); painted as a themed fill with an accent frame. |
-| `CheckOnClick` | `bool` | `false` | Whether clicking toggles `Checked` automatically. |
 | `CheckedChanged` | event | | Raised after `Checked` changes. |
+| `CheckOnClick` | `bool` | `false` | Whether clicking toggles `Checked` automatically. |
 
 Constructors: `ToolStripButton()`, `ToolStripButton(string text)`.
 

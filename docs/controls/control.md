@@ -37,26 +37,26 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Text` | `string` | `""` | Caption text: button label, form title, label text. `null` is normalized to `""` |
 | `Bounds` | `Rectangle` | `(0, 0, 0, 0)` | Position and size relative to the parent's client area, in pixels |
-| `Location` / `Size` / `Left` / `Top` / `Width` / `Height` | — | zero | Views over the single `Bounds` field |
-| `Tag` | `object?` | `null` | Arbitrary caller-owned data; the toolkit never reads it |
-| `Name` | `string` | `""` | Programmatic name — designer-style lookup data, never rendered. `null` resets to `""` |
-| `Visible` | `bool` | `true` | **Effective**, like WinForms: the getter reports `false` inside a hidden ancestor even while this control's own flag is set; the setter writes only the local flag |
-| `Enabled` | `bool` | `true` | **Effective** the same way: `false` inside a disabled ancestor; the setter writes only the local flag |
-| `Parent` | `Control?` | `null` | The containing control; `null` for a top-level form. Set by `Controls.Add`/`Remove` |
-| `Controls` | `ControlCollection` | empty | The child controls hosted by this control (allocated on first access) |
 | `ContextMenuStrip` | `ContextMenuStrip?` | `null` | The context menu a right-click opens at the cursor. Wired through the owner-drawn mouse pipeline; native-widget controls need right-click peer events first (tracked in [../PRD.md](../PRD.md)) |
+| `Controls` | `ControlCollection` | empty | The child controls hosted by this control (allocated on first access) |
+| `Enabled` | `bool` | `true` | **Effective** the same way: `false` inside a disabled ancestor; the setter writes only the local flag |
+| `Location` / `Size` / `Left` / `Top` / `Width` / `Height` | — | zero | Views over the single `Bounds` field |
+| `Name` | `string` | `""` | Programmatic name — designer-style lookup data, never rendered. `null` resets to `""` |
+| `Parent` | `Control?` | `null` | The containing control; `null` for a top-level form. Set by `Controls.Add`/`Remove` |
+| `Tag` | `object?` | `null` | Arbitrary caller-owned data; the toolkit never reads it |
+| `Text` | `string` | `""` | Caption text: button label, form title, label text. `null` is normalized to `""` |
+| `Visible` | `bool` | `true` | **Effective**, like WinForms: the getter reports `false` inside a hidden ancestor even while this control's own flag is set; the setter writes only the local flag |
 
 ### Layout
 
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `Anchor` | `AnchorStyles` | `Top \| Left` | Container edges the control is bound to: anchored edges keep their distance to the parent's `DisplayRectangle`, opposing anchors stretch, `None` drifts by half the delta. Assigning resets `Dock` to `None` — last one assigned wins, like WinForms |
+| `DisplayRectangle` | `Rectangle` | — | The client rectangle available to content: the client area deflated by `Padding` (containers with chrome, like `GroupBox`, deflate further) |
 | `Dock` | `DockStyle` | `None` | The parent edge the control glues itself to; assigning resets `Anchor` to its default. Docked siblings claim edges in **reverse `Controls` order** — the last-added child docks first, so designer-style `Add(fill); Add(toolbar); Add(menu)` stacks the menu topmost, exactly like WinForms — and `Fill` takes the remainder |
 | `Margin` | `Padding` | all zero | Spacing layout containers (`FlowLayoutPanel`, `TableLayoutPanel`) keep around this control; plain containers position by `Bounds` alone and ignore it |
 | `Padding` | `Padding` | all zero | Interior spacing between the control's edges and its content; honored through `DisplayRectangle`. Not ambient — each control owns its padding |
-| `DisplayRectangle` | `Rectangle` | — | The client rectangle available to content: the client area deflated by `Padding` (containers with chrome, like `GroupBox`, deflate further) |
 | `RightToLeft` | `RightToLeft` | `Inherit` | Text direction, resolved up the parent chain (default `No`). Owner-drawn controls mirror their glyph/text painting; containers do not mirror child layout yet ([../PRD.md](../PRD.md) §8) |
 
 `SuspendLayout()`/`ResumeLayout()`/`ResumeLayout(bool)` coalesce bulk changes into one pass (calls nest); `PerformLayout()` runs the container's layout pass immediately.
@@ -65,11 +65,11 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 
 | Member | Type | Default | Description |
 |---|---|---|---|
-| `TabIndex` | `int` | `0` | Position in the container's tab order: siblings ascend by `TabIndex` (ties keep insertion order), depth-first through nested containers — the WinForms traversal |
-| `TabStop` | `bool` | per kind | Whether Tab stops here. Until assigned it follows the kind's default: focusable controls are stops; labels, panels, group boxes, picture boxes, progress bars, scroll bars and strips are not; the menu bar opts out (Alt reaches it), matching WinForms |
-| `Focused` | `bool` | `false` | Whether the peer currently holds keyboard focus |
 | `CanFocus` | `bool` | — | Whether `Focus()` would succeed now: focusable kind, visible, enabled, realized |
 | `Focus()` | method | — | Moves keyboard focus via the peer; a no-op while `CanFocus` is `false` |
+| `Focused` | `bool` | `false` | Whether the peer currently holds keyboard focus |
+| `TabIndex` | `int` | `0` | Position in the container's tab order: siblings ascend by `TabIndex` (ties keep insertion order), depth-first through nested containers — the WinForms traversal |
+| `TabStop` | `bool` | per kind | Whether Tab stops here. Until assigned it follows the kind's default: focusable controls are stops; labels, panels, group boxes, picture boxes, progress bars, scroll bars and strips are not; the menu bar opts out (Alt reaches it), matching WinForms |
 
 ### Appearance (ambient)
 
@@ -87,38 +87,38 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 | Member | Description |
 |---|---|
 | `AllowDrop` (`bool`, default `false`) | Opts the control in as a drop target; only opted-in controls are hit-tested and raise the drag events |
-| `DragEnter` / `DragOver` / `DragLeave` / `DragDrop` | The target-side events, carrying `DragEventArgs` (`Data`, `AllowedEffect`, settable `Effect`, `X`/`Y`) |
 | `DoDragDrop(object data, DragDropEffects allowedEffects)` | Starts an in-process drag with this control as the source. **Returns `void` and returns immediately** — unlike WinForms there is no nested message loop and no final-effect return value; the drag rides the source's captured mouse stream. The source must be a realized owner-drawn control; OS-level (cross-process) drag-and-drop is tracked in [../PRD.md](../PRD.md) §8 |
+| `DragEnter` / `DragOver` / `DragLeave` / `DragDrop` | The target-side events, carrying `DragEventArgs` (`Data`, `AllowedEffect`, settable `Effect`, `X`/`Y`) |
 
 ### Threading
 
 | Member | Description |
 |---|---|
-| `InvokeRequired` | `true` only while a message loop runs on another thread; `false` outside `Application.Run`, matching the WinForms convention for a handle-less control |
-| `Invoke(Action)` | Runs the action on the UI thread and blocks; inline when already there (or no loop). Exceptions propagate to the caller |
 | `BeginInvoke(Action)` | Queues the action onto the UI thread and returns immediately; throws `InvalidOperationException` when no loop is running and the control is unrealized |
+| `Invoke(Action)` | Runs the action on the UI thread and blocks; inline when already there (or no loop). Exceptions propagate to the caller |
+| `InvokeRequired` | `true` only while a message loop runs on another thread; `false` outside `Application.Run`, matching the WinForms convention for a handle-less control |
 
 ### Other members
 
 | Member | Description |
 |---|---|
-| `PerformClick()` | Raises `Click` programmatically — a **no-op while the control is not effectively `Enabled` and `Visible`**, the WinForms contract a disabled dialog button relies on |
 | `FindForm()` | The form this control sits on (itself for a form), or `null` while unparented |
-| `PointToScreen(Point)` | Maps a client-space point to screen coordinates; throws `InvalidOperationException` before realization |
 | `LogicalToDevice(int)` / `LogicalToDevice(Size)` | Scales logical (96-DPI) pixels by the backend's DPI scale; identity before realization |
+| `PerformClick()` | Raises `Click` programmatically — a **no-op while the control is not effectively `Enabled` and `Visible`**, the WinForms contract a disabled dialog button relies on |
+| `PointToScreen(Point)` | Maps a client-space point to screen coordinates; throws `InvalidOperationException` before realization |
 
 ### Events
 
 | Event | Description |
 |---|---|
 | `Click` | Raised when the control is activated by the user (native click, checkbox toggle, `PerformClick`) |
-| `MouseMove` / `MouseEnter` / `MouseLeave` | Raised as the pointer moves over, enters and leaves the control — for every control, native or owner-drawn |
-| `MouseDown` / `MouseUp` / `MouseWheel` | Raised on button presses, releases and wheel turns over an **owner-drawn** control; native widgets consume these themselves |
-| `MouseDoubleClick` / `DoubleClick` | Raised on a double-click over an owner-drawn control (detected from press timing and slop) |
-| `TextChanged` | Raised after `Text` changes to a different value (realized or not) |
+| `DragEnter` / `DragOver` / `DragLeave` / `DragDrop` | See drag and drop above |
 | `Enter` / `GotFocus` | Raised when focus arrives, in that order (the WinForms order). Containers along the way raise `Enter` when focus enters their subtree from outside, outermost first |
 | `LostFocus` / `Leave` | Raised when focus departs — **`LostFocus` first, then `Leave`**, mirroring the WinForms firing order on the departing control. Containers raise `Leave` when focus leaves their subtree entirely, innermost first |
-| `DragEnter` / `DragOver` / `DragLeave` / `DragDrop` | See drag and drop above |
+| `MouseDoubleClick` / `DoubleClick` | Raised on a double-click over an owner-drawn control (detected from press timing and slop) |
+| `MouseDown` / `MouseUp` / `MouseWheel` | Raised on button presses, releases and wheel turns over an **owner-drawn** control; native widgets consume these themselves |
+| `MouseMove` / `MouseEnter` / `MouseLeave` | Raised as the pointer moves over, enters and leaves the control — for every control, native or owner-drawn |
+| `TextChanged` | Raised after `Text` changes to a different value (realized or not) |
 
 `OnClick`/`OnTextChanged`/`OnGotFocus`/`OnLostFocus`/`OnEnter`/`OnLeave`/`OnDrag…` are the `protected virtual` raisers for subclasses.
 
@@ -128,21 +128,21 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 
 | Member | Description |
 |---|---|
-| `Padding(int left, int top, int right, int bottom)` / `Padding(int all)` | Per-side or uniform spacing in pixels |
-| `Left` / `Top` / `Right` / `Bottom` | The four sides |
 | `All` | The uniform value when all sides agree, otherwise `-1` |
 | `Horizontal` / `Vertical` | `Left + Right` / `Top + Bottom` |
+| `Left` / `Top` / `Right` / `Bottom` | The four sides |
+| `Padding(int left, int top, int right, int bottom)` / `Padding(int all)` | Per-side or uniform spacing in pixels |
 
 `ControlCollection` (implements `IReadOnlyList<Control>`):
 
 | Member | Description |
 |---|---|
-| `Count` / `this[int]` | Number of children / child at index |
 | `Add(Control)` | Appends and sets the child's `Parent` to the owner; realizes the child's subtree immediately when the owner is already live |
 | `AddRange(params Control[])` | Adds several controls in order |
-| `Remove(Control)` | Removes, clears `Parent` and disposes the child's peer tree; returns whether it was present |
-| `Contains(Control)` | Whether the control is a direct child |
 | `Clear()` | Removes every child, clearing parents and disposing their peer trees |
+| `Contains(Control)` | Whether the control is a direct child |
+| `Count` / `this[int]` | Number of children / child at index |
+| `Remove(Control)` | Removes, clears `Parent` and disposes the child's peer tree; returns whether it was present |
 
 Input and event-argument types (used chiefly by [owner-drawn controls](../custom-controls.md)):
 

@@ -22,6 +22,7 @@ headless autopilot. Each page below is one tab of the demo:
 | [![Basics](screenshots/01-basics.png)](screenshots/01-basics.png)<br>Basics | [![Input](screenshots/02-input.png)](screenshots/02-input.png)<br>Input | [![Lists](screenshots/03-lists.png)](screenshots/03-lists.png)<br>Lists & trees |
 | [![Grid](screenshots/04-grid.png)](screenshots/04-grid.png)<br>DataGridView | [![Layout](screenshots/05-layout.png)](screenshots/05-layout.png)<br>Layout | [![Docking](screenshots/06-docking.png)](screenshots/06-docking.png)<br>Docking |
 | [![Pickers](screenshots/07-pickers.png)](screenshots/07-pickers.png)<br>Pickers | [![Ribbon](screenshots/08-ribbon.png)](screenshots/08-ribbon.png)<br>Ribbon | [![Calendar](screenshots/09-calendar.png)](screenshots/09-calendar.png)<br>Calendar |
+| [![Widgets](screenshots/28-widgets.png)](screenshots/28-widgets.png)<br>Widgets (app shell) | [![Editors](screenshots/29-editors.png)](screenshots/29-editors.png)<br>Editors | [![Menus](screenshots/19-menus.png)](screenshots/19-menus.png)<br>Menus |
 
 Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 [the month scheduler](screenshots/calendar-month.png), [a modal MessageBox](screenshots/messagebox.png),
@@ -49,6 +50,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `CheckBox` | owner-drawn | [checkbox.md](controls/checkbox.md) |
 | `CheckedListBox` | owner-drawn | [checkedlistbox.md](controls/checkedlistbox.md) |
 | `ClockFace` | owner-drawn + popup dial | [clockface.md](controls/clockface.md) |
+| `CodeTextBox` | owner-drawn + completion popup | [codetextbox.md](controls/codetextbox.md) |
 | `ColorPicker` | owner-drawn | [colorpicker.md](controls/colorpicker.md) |
 | `ComboBox` | owner-drawn + popup | [combobox.md](controls/combobox.md) |
 | `ContextMenuStrip` | owner-drawn (popup engine) | [contextmenustrip.md](controls/contextmenustrip.md) |
@@ -67,6 +69,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `HScrollBar` / `VScrollBar` | owner-drawn | [scrollbar.md](controls/scrollbar.md) |
 | `IconLabel` | owner-drawn | [iconlabel.md](controls/iconlabel.md) |
 | `ImageList` | — | [imagelist.md](controls/imagelist.md) |
+| `InfoBar` / `Toast` | owner-drawn | [infobar.md](controls/infobar.md) |
 | `Label` | native | [label.md](controls/label.md) |
 | `LinkLabel` | owner-drawn | [linklabel.md](controls/linklabel.md) |
 | `ListBox` | owner-drawn | [listbox.md](controls/listbox.md) |
@@ -75,16 +78,20 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `MenuStrip` + menu items | owner-drawn (popup engine) | [menustrip.md](controls/menustrip.md) |
 | `MessageBox` + common dialogs | native | [dialogs.md](controls/dialogs.md) |
 | `MonthCalendar` | owner-drawn | [monthcalendar.md](controls/monthcalendar.md) |
+| `NavigationView` | owner-drawn | [navigationview.md](controls/navigationview.md) |
 | `NotifyIcon` | native (Windows) | [notifyicon.md](controls/notifyicon.md) |
 | `NumericUpDown` | owner-drawn + hosted editor | [numericupdown.md](controls/numericupdown.md) |
 | `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
 | `PictureBox` | owner-drawn | [picturebox.md](controls/picturebox.md) |
 | `ProgressBar` | owner-drawn | [progressbar.md](controls/progressbar.md) |
 | `ProgressTile` | owner-drawn | [progresstile.md](controls/progresstile.md) |
+| `PropertyGrid` | owner-drawn + hosted editors/pickers | [propertygrid.md](controls/propertygrid.md) |
 | `RadioButton` | owner-drawn | [radiobutton.md](controls/radiobutton.md) |
+| `RangeSlider` | owner-drawn | [rangeslider.md](controls/rangeslider.md) |
 | `Ribbon` (tabs, groups, items) | owner-drawn + popup | [ribbon.md](controls/ribbon.md) |
 | `RichTextBox` | native | [richtextbox.md](controls/richtextbox.md) |
 | `SearchBox` | owner-drawn + hosted editor | [searchbox.md](controls/searchbox.md) |
+| `SegmentedControl` | owner-drawn | [segmentedcontrol.md](controls/segmentedcontrol.md) |
 | `SplitButton` / `DropDownButton` | owner-drawn | [splitbutton.md](controls/splitbutton.md) |
 | `SplitContainer` | owner-drawn | [splitcontainer.md](controls/splitcontainer.md) |
 | `StatusStrip` | owner-drawn | [statusstrip.md](controls/statusstrip.md) |
@@ -94,11 +101,13 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `TimePicker` | owner-drawn + popup clock | [timepicker.md](controls/timepicker.md) |
 | `Timer` | — | [timer.md](controls/timer.md) |
 | `ToggleSwitch` | owner-drawn | [toggleswitch.md](controls/toggleswitch.md) |
+| `TokenBox` | owner-drawn + hosted editor | [tokenbox.md](controls/tokenbox.md) |
 | `ToolStrip` | owner-drawn | [toolstrip.md](controls/toolstrip.md) |
 | `ToolTip` | owner-drawn (popup) | [tooltip.md](controls/tooltip.md) |
 | `TrackBar` | owner-drawn | [trackbar.md](controls/trackbar.md) |
 | `TreeListView` | owner-drawn | [treelistview.md](controls/treelistview.md) |
 | `TreeView` | owner-drawn | [treeview.md](controls/treeview.md) |
+| `ZoomPanel` | owner-drawn | [zoompanel.md](controls/zoompanel.md) |
 
 Controls not listed here are not shipped yet — the full planned inventory, with per-control
 acceptance criteria and milestones, lives in the [PRD](PRD.md) (§7 and §10). A page is added here

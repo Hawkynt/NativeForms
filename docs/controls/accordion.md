@@ -44,12 +44,12 @@ accordion.ExpandMode = AccordionExpandMode.Multiple;
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Panes` | `AccordionPaneCollection` | empty | The panes, top to bottom. Adding parents the pane into `Controls`; the first pane added opens by itself. |
 | `ExpandMode` | `AccordionExpandMode` | `Single` | Whether opening a pane closes the others. Switching back to `Single` folds down to the selected pane. |
+| `HeaderHeight` | `int` (get) | theme row height | Pixel height of one header row. |
 | `ImageList` | `ImageList?` | `null` | The icons referenced by each pane's `ImageIndex` (or its `ImageKey` string; index wins). |
+| `Panes` | `AccordionPaneCollection` | empty | The panes, top to bottom. Adding parents the pane into `Controls`; the first pane added opens by itself. |
 | `SelectedIndex` | `int` | `-1` | The open pane under `Single`, the most recently opened one otherwise; `-1` while none is open. Assigning expands that pane through the ordinary path, so `PaneExpanding` can still veto it. |
 | `SelectedPane` | `AccordionPane?` | `null` | The current pane; setting expands it. |
-| `HeaderHeight` | `int` (get) | theme row height | Pixel height of one header row. |
 
 ### Methods
 
@@ -61,10 +61,10 @@ accordion.ExpandMode = AccordionExpandMode.Multiple;
 
 | Event | Description |
 |---|---|
-| `SelectedIndexChanged` | Raised after `SelectedIndex` changes. |
-| `PaneExpanding` | Raised **before** a pane opens. Setting `Cancel` leaves the whole stack untouched — no sibling is collapsed on the cancelled pane's behalf. |
-| `PaneExpanded` | Raised after a pane has opened and the stack has been laid out again. |
 | `PaneCollapsed` | Raised after a pane has closed, including the pane `Single` mode closed to make room. |
+| `PaneExpanded` | Raised after a pane has opened and the stack has been laid out again. |
+| `PaneExpanding` | Raised **before** a pane opens. Setting `Cancel` leaves the whole stack untouched — no sibling is collapsed on the cancelled pane's behalf. |
+| `SelectedIndexChanged` | Raised after `SelectedIndex` changes. |
 
 `AccordionPaneCollection` is an `IReadOnlyList<AccordionPane>` with `Add`, `AddRange`, `Remove`,
 `Clear` and `IndexOf`. Inherits the common members of [`Control`](control.md), plus the owner-drawn

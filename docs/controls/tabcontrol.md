@@ -35,21 +35,21 @@ tabs.ImageList = icons;
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `TabPages` | `TabPageCollection` | empty | The pages, in tab order. Adding parents the page into `Controls`; the first page added becomes the selected one. |
+| `Alignment` | `TabAlignment` | `Top` | Which edge the header strip runs along — `Top`, `Bottom`, `Left` or `Right`. |
+| `HeaderHeight` | `int` (get) | theme row height + 6 | Pixel height of a horizontal header strip (and the height of each stacked side tab). |
 | `ImageList` | `ImageList?` | `null` | The icons referenced by each page's `ImageIndex` (or its `ImageKey` string; index wins). |
 | `SelectedIndex` | `int` | `-1` | Index of the visible page, `-1` while there are no pages. Out-of-range values coerce to `-1`. |
 | `SelectedTab` | `TabPage?` | `null` | The visible page; setting selects by `IndexOf`. |
-| `Alignment` | `TabAlignment` | `Top` | Which edge the header strip runs along — `Top`, `Bottom`, `Left` or `Right`. |
 | `ShowCloseButtons` | `bool` | `false` | Whether each tab paints an × close button that the caption makes room for. |
-| `HeaderHeight` | `int` (get) | theme row height + 6 | Pixel height of a horizontal header strip (and the height of each stacked side tab). |
+| `TabPages` | `TabPageCollection` | empty | The pages, in tab order. Adding parents the page into `Controls`; the first page added becomes the selected one. |
 
 ### Events
 
 | Event | Description |
 |---|---|
 | `SelectedIndexChanged` | Raised when `SelectedIndex` changes — including when removing the selected page hands the selection to a neighbor. Not raised when re-assigning the current index. |
-| `TabClosing` | Raised when a tab's close button is pressed, before the page is removed; a handler can veto by setting `Cancel`. |
 | `TabClosed` | Raised after a close button removed its page. |
+| `TabClosing` | Raised when a tab's close button is pressed, before the page is removed; a handler can veto by setting `Cancel`. |
 
 `TabPageCollection` is an `IReadOnlyList<TabPage>` with `Add`, `AddRange`, `Remove`, `Clear` and
 `IndexOf`. Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of

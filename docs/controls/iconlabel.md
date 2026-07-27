@@ -37,11 +37,11 @@ var tile = new IconLabel
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Image` | `IImage?` | `null` | The image shown beside the caption, or `null` for text only. |
-| `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | How the image sits relative to the text. |
-| `TextAlign` | `ContentAlignment` | `MiddleLeft` | Where the whole image+text block anchors within the bounds. |
-| `ImageAlign` | `ContentAlignment` | `MiddleCenter` | Where the image anchors when it is the *only* content. |
 | `AutoSize` | `bool` | `false` | Sizes the label to fit image, gap and text in the ambient font. |
+| `Image` | `IImage?` | `null` | The image shown beside the caption, or `null` for text only. |
+| `ImageAlign` | `ContentAlignment` | `MiddleCenter` | Where the image anchors when it is the *only* content. |
+| `TextAlign` | `ContentAlignment` | `MiddleLeft` | Where the whole image+text block anchors within the bounds. |
+| `TextImageRelation` | `TextImageRelation` | `ImageBeforeText` | How the image sits relative to the text. |
 
 The inherited `Text` is the caption. Also honours the ambient `Font`, `ForeColor` and `BackColor`.
 

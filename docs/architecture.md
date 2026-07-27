@@ -76,19 +76,19 @@ Every backend type compiles on every OS; `IsSupported` gates it at run time, so 
 
 | Member | Description |
 |---|---|
-| `Name` | Short diagnostic identifier (`"Win32"`, `"Gtk"`, `"Cocoa"`) |
-| `IsSupported` | Whether this backend can run on the current OS |
-| `Theme` | The native `ITheme` owner-drawn controls paint with |
-| `CreateWindow()` / `CreateButton()` / `CreateLabel()` / `CreateTextBox()` / `CreateRichTextBox()` | Create an unrealized peer of that native-widget kind |
 | `CreateCanvas()` / `CreatePopup()` | Create an owner-draw surface / a light-dismiss popup surface |
-| `CreateTimer()` / `CreateNotifyIcon()` | Create a stopped UI-thread timer / a hidden tray icon (throws `NotSupportedException` where the platform has no tray) |
 | `CreateImage(int, int, ReadOnlySpan<int>)` | A native bitmap from 32-bit ARGB pixels, decoder-free |
+| `CreateTimer()` / `CreateNotifyIcon()` | Create a stopped UI-thread timer / a hidden tray icon (throws `NotSupportedException` where the platform has no tray) |
+| `CreateWindow()` / `CreateButton()` / `CreateLabel()` / `CreateTextBox()` / `CreateRichTextBox()` | Create an unrealized peer of that native-widget kind |
 | `GetScreenSize()` | Pixel size of the primary screen (used for `Form.StartPosition` centering) |
+| `IsSupported` | Whether this backend can run on the current OS |
 | `MeasureText(string, Font)` | Text measurement without a paint surface, same engine as `IGraphics.MeasureText` |
-| `ShowMessageBox(…)` / `ShowFileDialog(…)` / `ShowColorDialog(…)` / `ShowFontDialog(…)` | The platform's native common dialogs, application-modal |
-| `SetClipboardText(string)` | Places plain text on the system clipboard (write-only seam) |
-| `Run(IWindowPeer)` | Enter the message loop; blocks until close or `Quit` |
+| `Name` | Short diagnostic identifier (`"Win32"`, `"Gtk"`, `"Cocoa"`) |
 | `Quit()` | Request the running loop to exit |
+| `Run(IWindowPeer)` | Enter the message loop; blocks until close or `Quit` |
+| `SetClipboardText(string)` | Places plain text on the system clipboard (write-only seam) |
+| `ShowMessageBox(…)` / `ShowFileDialog(…)` / `ShowColorDialog(…)` / `ShowFontDialog(…)` | The platform's native common dialogs, application-modal |
+| `Theme` | The native `ITheme` owner-drawn controls paint with |
 
 Peer contracts (`IControlPeer` is `SetBounds`/`SetText`/`SetVisible`/`SetEnabled`/`PointToScreen`/`Dispose`; `IContainerPeer` adds `AddChild`):
 

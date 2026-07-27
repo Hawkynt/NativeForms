@@ -24,16 +24,16 @@ form.Controls.Add(split);
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Panel1` | `Panel` (get) | — | The left (or top) panel; parented by the constructor. |
-| `Panel2` | `Panel` (get) | — | The right (or bottom) panel; parented by the constructor. |
+| `FixedPanel` | `FixedPanel` | `None` | Which panel keeps its size when the container resizes: `Panel1`, `Panel2`, or `None` (both scale proportionally). |
 | `Orientation` | `Orientation` | `Vertical` | The direction of the splitter bar: `Vertical` puts the panels side by side, `Horizontal` stacks them. |
+| `Panel1` | `Panel` (get) | — | The left (or top) panel; parented by the constructor. |
+| `Panel1Collapsed` | `bool` | `false` | Hides `Panel1` and gives the whole area to `Panel2`; mutually exclusive with `Panel2Collapsed`. |
+| `Panel1MinSize` | `int` | `25` | The smallest size `Panel1` may be squeezed to. |
+| `Panel2` | `Panel` (get) | — | The right (or bottom) panel; parented by the constructor. |
+| `Panel2Collapsed` | `bool` | `false` | Hides `Panel2` and gives the whole area to `Panel1`. |
+| `Panel2MinSize` | `int` | `25` | The smallest size `Panel2` may be squeezed to. |
 | `SplitterDistance` | `int` | `50` | Pixel size of `Panel1` along the split axis. Assignments clamp to the minimum sizes against the current control size. |
 | `SplitterWidth` | `int` | `4` | Thickness of the splitter bar; at least 1. |
-| `FixedPanel` | `FixedPanel` | `None` | Which panel keeps its size when the container resizes: `Panel1`, `Panel2`, or `None` (both scale proportionally). |
-| `Panel1Collapsed` | `bool` | `false` | Hides `Panel1` and gives the whole area to `Panel2`; mutually exclusive with `Panel2Collapsed`. |
-| `Panel2Collapsed` | `bool` | `false` | Hides `Panel2` and gives the whole area to `Panel1`. |
-| `Panel1MinSize` | `int` | `25` | The smallest size `Panel1` may be squeezed to. |
-| `Panel2MinSize` | `int` | `25` | The smallest size `Panel2` may be squeezed to. |
 
 ### Events
 

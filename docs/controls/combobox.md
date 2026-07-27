@@ -33,19 +33,19 @@ Plain values work without any selector: the default `DisplaySelector` calls `ToS
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Items` | `ObservableList<object?>` | empty | The items offered by the drop-down. Mutating the collection repaints the control and keeps the selection on the same item across inserts/removes. |
-| `DropDownStyle` | `ComboBoxStyle` | `DropDownList` | Closed and owner-painted (`DropDownList`) or editable through a hosted native `TextBox` (`DropDown`). `Simple` throws `NotSupportedException`. |
+| `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
 | `DisplaySelector` | `Func<object?, string>` | `ToString()` | Produces the display text for an item. Setting `null` restores the default. |
-| `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional selector producing an icon per item; wins over `ImageList` + `ImageIndexSelector` when both are set. |
+| `DropDownStyle` | `ComboBoxStyle` | `DropDownList` | Closed and owner-painted (`DropDownList`) or editable through a hosted native `TextBox` (`DropDown`). `Simple` throws `NotSupportedException`. |
+| `DroppedDown` | `bool` | `false` | Whether the drop-down is currently open. Settable, like its WinForms namesake. |
 | `ImageList` / `ImageIndexSelector` | `ImageList?` / `Func<object?, int>?` | `null` | Icon store plus an index selector (negative index means no icon); images materialize lazily. |
-| `ValueSelector` | `Func<object?, object?>?` | `null` | Maps an item to its binding value — the reflection-free stand-in for `ValueMember`; `null` makes the item its own value. |
-| `PlaceholderText` | `string` | `""` | Greyed hint shown while nothing is selected (closed style) or the hosted editor is empty. |
+| `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional selector producing an icon per item; wins over `ImageList` + `ImageIndexSelector` when both are set. |
+| `Items` | `ObservableList<object?>` | empty | The items offered by the drop-down. Mutating the collection repaints the control and keeps the selection on the same item across inserts/removes. |
 | `MaxDropDownItems` | `int` | `8` | Maximum rows the drop-down shows before it scrolls. |
+| `PlaceholderText` | `string` | `""` | Greyed hint shown while nothing is selected (closed style) or the hosted editor is empty. |
 | `SelectedIndex` | `int` | `-1` | Selected item index, `-1` for none. Out-of-range values coerce to `-1`. |
 | `SelectedItem` | `object?` | `null` | The selected item; setting selects by `IndexOf`. |
 | `SelectedValue` | `object?` | `null` | `ValueSelector` applied to `SelectedItem` (or the item itself). Assigning selects the first item whose value `Equals` the given one; no match clears the selection. |
-| `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
-| `DroppedDown` | `bool` | `false` | Whether the drop-down is currently open. Settable, like its WinForms namesake. |
+| `ValueSelector` | `Func<object?, object?>?` | `null` | Maps an item to its binding value — the reflection-free stand-in for `ValueMember`; `null` makes the item its own value. |
 
 The inherited `Text` property is overridden: in the editable style it mirrors the hosted editor; in the closed style it is the selected item's display text, and assigning selects the item with that text.
 
@@ -53,16 +53,16 @@ The inherited `Text` property is overridden: in the editable style it mirrors th
 
 | Name | Description |
 |---|---|
-| `SelectedIndexChanged` | Raised when `SelectedIndex` changes — by popup commit, keyboard, assignment, or the selected item being removed. |
 | `DropDown` | Raised when the popup opens. |
 | `DropDownClosed` | Raised when the popup closes — commit, cancel and light-dismiss alike. |
+| `SelectedIndexChanged` | Raised when `SelectedIndex` changes — by popup commit, keyboard, assignment, or the selected item being removed. |
 
 ### Methods
 
 | Method | Description |
 |---|---|
-| `OpenDropDown()` | Opens the popup below the field: field width, one row per item up to `MaxDropDownItems`, hover starting on the selected item. A no-op while open or before realization. |
 | `CloseDropDown()` | Closes the popup without changing the selection. |
+| `OpenDropDown()` | Opens the popup below the field: field width, one row per item up to `MaxDropDownItems`, hover starting on the selected item. A no-op while open or before realization. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 

@@ -28,12 +28,12 @@ menu.Show(panel, new(5, 6));
 
 | Member | Type | Description |
 |---|---|---|
-| `Items` | `ToolStripItemCollection` | The menu items, sharing the [`MenuStrip`](menustrip.md) item model — icons, check/radio marks, shortcut text, nested submenus, `ICommand` wiring. |
-| `IsOpen` | `bool` (get) | Whether the menu is currently open. |
-| `Show(Control control, Point clientLocation)` | method | Opens the menu at a position given in `control`'s client space. The control must be realized — only a live widget knows its screen position; before that the call is a no-op. |
 | `Close()` | method | Closes the menu, if open. |
-| `Opening` | event | Raised before the menu opens, with a settable `CancelEventArgs.Cancel` — veto to keep it closed, or populate `Items` for the context on the fly. |
 | `Closed` | event | Raised after the menu (and its whole cascade) has closed, whatever caused it — commit, `Close()` or light dismissal. |
+| `IsOpen` | `bool` (get) | Whether the menu is currently open. |
+| `Items` | `ToolStripItemCollection` | The menu items, sharing the [`MenuStrip`](menustrip.md) item model — icons, check/radio marks, shortcut text, nested submenus, `ICommand` wiring. |
+| `Opening` | event | Raised before the menu opens, with a settable `CancelEventArgs.Cancel` — veto to keep it closed, or populate `Items` for the context on the fly. |
+| `Show(Control control, Point clientLocation)` | method | Opens the menu at a position given in `control`'s client space. The control must be realized — only a live widget knows its screen position; before that the call is a no-op. |
 
 `ContextMenuStrip` is a component, not a control: it does not derive from `Control`, owns no peer
 until it opens, and can serve any number of controls at once.

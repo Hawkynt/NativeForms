@@ -25,11 +25,11 @@ form.Controls.Add(picker);
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `SelectedPath` | `string` | `""` | The committed directory. Assigning rewrites the editor, re-evaluates `PathExists` and raises `PathChanged`. It also seeds the dialog's start location. |
-| `Title` | `string` | `""` | The dialog's caption; empty picks the platform default. |
-| `ReadOnlyText` | `bool` | `false` | Makes the field display-only — still selectable and copyable, but only the browse button changes it. |
 | `PathExists` | `bool` | `false` | Whether the committed directory was real when last evaluated. See Notes. |
 | `PlaceholderText` | `string` | `""` | Greyed hint shown while the field is empty. |
+| `ReadOnlyText` | `bool` | `false` | Makes the field display-only — still selectable and copyable, but only the browse button changes it. |
+| `SelectedPath` | `string` | `""` | The committed directory. Assigning rewrites the editor, re-evaluates `PathExists` and raises `PathChanged`. It also seeds the dialog's start location. |
+| `Title` | `string` | `""` | The dialog's caption; empty picks the platform default. |
 
 The inherited `Text` is the hosted editor's *live* content, including an edit not committed yet.
 

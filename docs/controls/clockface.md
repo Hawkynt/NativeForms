@@ -32,31 +32,31 @@ Hosting the same engine in a popup is exactly what `TimePicker` does — wire `P
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Value` | `TimeSpan` | the current time of day | The selected time — whole seconds, kept inside a single day. Setting it repaints and raises `ValueChanged` on a real change. |
+| `FinalStage` | `ClockFaceStage` | — | The last stage of the current layout — the deepest hand `Precision` offers. |
 | `OriginalValue` | `TimeSpan` | `00:00:00` | The value the dial opened on; a host reverts to it on cancel. Assigning it does not raise `ValueChanged`. |
-| `Use24HourClock` | `bool` | `true` | Whether the hour ring is the two-ring 00–23 dial rather than a single 01–12 ring with an AM/PM toggle. |
 | `Precision` | `ClockFacePrecision` | `Minutes` | How far the dial drills: `Hours` (the hour is the only step), `Minutes`, or `Seconds`. Lowering it falls a deeper active stage back to the deepest one still shown. |
 | `ShowSeconds` | `bool` | `false` | `Precision == Seconds` in boolean form; setting it toggles between `Seconds` and `Minutes`. |
 | `Stage` | `ClockFaceStage` | `Hour` | The hand the dial is editing — `Hour`, `Minute` or `Second`. Assigning a stage past `Precision` falls back to the deepest hand shown. |
-| `FinalStage` | `ClockFaceStage` | — | The last stage of the current layout — the deepest hand `Precision` offers. |
+| `Use24HourClock` | `bool` | `true` | Whether the hour ring is the two-ring 00–23 dial rather than a single 01–12 ring with an AM/PM toggle. |
+| `Value` | `TimeSpan` | the current time of day | The selected time — whole seconds, kept inside a single day. Setting it repaints and raises `ValueChanged` on a real change. |
 
 ### Methods
 
 | Method | Description |
 |---|---|
-| `Paint(IGraphics, ITheme, Size)` | Paints the whole dial into the given size — the engine hook a popup host calls. |
-| `HandleMouseDown` / `HandleMouseMove` / `HandleMouseUp` / `HandleMouseWheel` / `HandleKeyDown` | Surface-agnostic input, taking the theme and size a host lays the dial out in. |
 | `ClockFace.PreferredSize(ITheme)` | *(static)* The natural popup size for a dial painted with the theme: a square dial framed by the readout/AM-PM header and the OK footer. |
+| `HandleMouseDown` / `HandleMouseMove` / `HandleMouseUp` / `HandleMouseWheel` / `HandleKeyDown` | Surface-agnostic input, taking the theme and size a host lays the dial out in. |
+| `Paint(IGraphics, ITheme, Size)` | Paints the whole dial into the given size — the engine hook a popup host calls. |
 
 ### Events & callbacks
 
 | Name | Kind | Description |
 |---|---|---|
-| `ValueChanged` | `event` | Raised when `Value` changes, by gesture or assignment. |
-| `StageChanged` | `event` | Raised when `Stage` changes. |
-| `Invalidated` | `Action?` | Repaint request for a host surface; left `null` for a stand-alone control that repaints through its own canvas. |
-| `Committed` | `Action?` | The user finalized — the OK affordance, or Enter on the final stage. |
 | `Cancelled` | `Action?` | The user pressed Escape. |
+| `Committed` | `Action?` | The user finalized — the OK affordance, or Enter on the final stage. |
+| `Invalidated` | `Action?` | Repaint request for a host surface; left `null` for a stand-alone control that repaints through its own canvas. |
+| `StageChanged` | `event` | Raised when `Stage` changes. |
+| `ValueChanged` | `event` | Raised when `Value` changes, by gesture or assignment. |
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
