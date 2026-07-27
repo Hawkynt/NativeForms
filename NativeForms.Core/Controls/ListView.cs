@@ -179,6 +179,43 @@ public class ListView : OwnerDrawnControl
         }
     }
 
+    /// <summary>The item for a display row, or <see langword="false"/> when the row turned out not to exist —
+    /// which the unknown-size virtual mode only learns by asking, so a row already scheduled for painting can
+    /// disappear underneath the paint loop.</summary>
+    private bool TryGetRowItem(int index, out ListViewItem item)
+    {
+        if (!this.VirtualMode)
+        {
+            if (index < 0 || index >= this.Items.Count)
+            {
+                item = _virtualPlaceholder ??= new ListViewItem(string.Empty);
+                return false;
+            }
+
+            item = this.Items[index];
+            return true;
+        }
+
+        var probe = new RetrieveVirtualItemEventArgs(index);
+        this.RetrieveVirtualItem?.Invoke(this, probe);
+        if (this.UnknownVirtualSize)
+        {
+            if (probe.EndOfList || probe.Item is null)
+            {
+                _countFinal = true;
+                _discoveredCount = index; // rows [0, index) exist; this one does not
+                item = _virtualPlaceholder ??= new ListViewItem(string.Empty);
+                return false;
+            }
+
+            if (index + 1 > _discoveredCount)
+                _discoveredCount = index + 1;
+        }
+
+        item = probe.Item ?? (_virtualPlaceholder ??= new ListViewItem(string.Empty));
+        return probe.Item is not null;
+    }
+
     /// <summary>The item for a display row: fetched from <see cref="RetrieveVirtualItem"/> while virtual
     /// (falling back to a shared blank placeholder), otherwise the model item.</summary>
     private ListViewItem GetRowItem(int index)
@@ -712,7 +749,10 @@ public class ListView : OwnerDrawnControl
 
         var itemsPerRow = this.ItemsPerRow;
         var start = rowIndex * itemsPerRow;
-        return new(-1, start, Math.Min(itemsPerRow, this.RowSourceCount - start));
+
+        // Clamped at zero: a negative Count is the group-header sentinel, and the unknown-size virtual mode
+        // can shrink RowSourceCount underneath a row the paint loop already scheduled.
+        return new(-1, start, Math.Max(0, Math.Min(itemsPerRow, this.RowSourceCount - start)));
     }
 
     /// <summary>The pixel height of a flat row: headers at <see cref="ItemHeight"/>, item rows at the cell height.</summary>
@@ -1577,18 +1617,30 @@ public class ListView : OwnerDrawnControl
         var rowCount = this.FlatRowCount;
         var cell = this.CellSize;
         var y = headerHeight;
+
+        // Rows span the full width, so clip them off the scroll bar's gutter instead of letting a long label
+        // run underneath the thumb.
+        var gutter = this.ScrollBarVisible ? _ScrollBarWidth : 0;
+        if (gutter > 0)
+            g.PushClip(new Rectangle(0, 0, Math.Max(0, width - gutter), height));
+
         for (var r = _topIndex; r < rowCount && y < height; ++r)
         {
             var row = this.GetFlatRow(r);
             var rowHeight = this.RowHeightOf(row);
             if (row.Count < 0)
                 this.PaintGroupHeader(g, theme, row.GroupIndex, y, rowHeight);
+            else if (row.Count == 0)
+                break; // the row source ran out (unknown-size virtual mode discovers the end as it paints)
             else
                 for (var k = 0; k < row.Count; ++k)
                     this.PaintItem(g, theme, this.DisplayItem(row.Start + k), k * cell.Width, y, cell.Width, rowHeight);
 
             y += rowHeight;
         }
+
+        if (gutter > 0)
+            g.PopClip();
 
         this.PaintScrollBar(g, theme);
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
@@ -1636,7 +1688,9 @@ public class ListView : OwnerDrawnControl
     /// <summary>Draws one item cell in the current view.</summary>
     private void PaintItem(IGraphics g, ITheme theme, int index, int cellX, int y, int cellWidth, int rowHeight)
     {
-        var item = this.GetRowItem(index);
+        if (!this.TryGetRowItem(index, out var item))
+            return; // the row does not exist after all — draw nothing rather than a blank placeholder
+
         var selected = this.IsSelected(index);
         switch (this.View)
         {

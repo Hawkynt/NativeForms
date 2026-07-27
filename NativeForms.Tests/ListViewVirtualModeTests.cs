@@ -167,6 +167,58 @@ internal sealed class ListViewVirtualModeTests
     }
 
     [Test]
+    public void Discovering_the_end_mid_paint_draws_no_phantom_rows()
+    {
+        // The unknown-size mode only learns the end by asking, so a row the paint loop already scheduled can
+        // vanish underneath it. That must draw nothing — not a blank placeholder, and not a group header
+        // (whose sentinel is a negative row count, which the shrinking source used to produce).
+        var list = new ListView { Bounds = new(0, 0, 300, 220), View = ListViewView.List };
+        list.VirtualMode = true;
+        list.VirtualListSize = -1;
+        list.RetrieveVirtualItem += (_, e) =>
+        {
+            if (e.ItemIndex >= 5)
+                e.EndOfList = true;
+            else
+                e.Item = new ListViewItem("R" + e.ItemIndex);
+        };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(list);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        var g = canvas.RaisePaint();
+        var texts = g.Operations.FindAll(o => o.StartsWith("text"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(texts, Has.Count.EqualTo(5), "exactly the five real rows are drawn");
+            Assert.That(texts.Exists(o => o.Contains("\"\"")), Is.False, "no blank placeholder row");
+            Assert.That(texts.Exists(o => o.Contains("Default")), Is.False, "no phantom group header");
+        });
+    }
+
+    [Test]
+    public void Rows_are_clipped_off_the_scroll_bar_gutter()
+    {
+        var list = new ListView { Bounds = new(0, 0, 200, 100), View = ListViewView.List };
+        for (var i = 0; i < 50; ++i)
+            list.Items.Add(new ListViewItem("a very long label that would run under the thumb"));
+
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(list);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o == "clip 0,0,186,100"), Is.True,
+            "the row loop is clipped to the client area minus the 14-px scroll bar");
+    }
+
+    [Test]
     public void Leaving_virtual_mode_clears_the_selection()
     {
         var list = new ListView { Bounds = new(0, 0, 300, 220), View = ListViewView.List };
