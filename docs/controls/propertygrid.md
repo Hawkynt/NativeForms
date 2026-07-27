@@ -158,4 +158,4 @@ Nothing else to add, and no runtime cost — the emitted `PopulateGrid` is ordin
 
 See [docs/PRD.md](../PRD.md) §7.10: multiline-string editing (Alt+Enter drop-out to a multi-line editor), nested/expandable object rows, and per-row validation feedback.
 
-**Driving a `DataGridView` from the same attributes** is planned but not built — see [PRD §13](../PRD.md#13-whats-next--candidate-workstreams) item 2. The intent is that one `[GridEditable]` model emits both a `PopulateGrid(PropertyGrid)` and a `PopulateColumns(DataGridView)`, so the same annotations give you an inspector and a grid. Today the attributes drive the `PropertyGrid` only; grid columns are added by hand.
+**Driving a [`DataGridView`](datagridview.md) from the same attributes** is planned but not built — specified in [PRD §14](../PRD.md#14-attribute-driven-grids--extend-the-generator-from-inspector-rows-to-grid-columns). The intent is that one `[GridEditable]` model emits both a `PopulateGrid(PropertyGrid)` and a `PopulateColumns(DataGridView)`, so the same annotations give you an inspector and a grid. Today the attributes drive the `PropertyGrid` only; grid columns are added by hand.

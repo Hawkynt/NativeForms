@@ -807,6 +807,8 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
 - **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `DataGridView`/`TreeView`. `[ ]`
+- **M13 — Attribute-driven grids (§14).** Extend the `[GridEditable]` source generator so one annotated
+  model emits both the `PropertyGrid` rows and the `DataGridView` columns. `[ ]`
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -981,13 +983,9 @@ next change starts from a considered list instead of an inbox.
    `OwnerDrawnControl` (UIA on Windows, AT-SPI on Linux), or lean on §12 promotion for the controls
    that can become real widgets. Realistically both. Without this the toolkit is unusable for anyone
    who needs assistive tech, which also blocks public-sector adoption.
-2. **Attribute-driven `DataGridView` columns.** The `[GridEditable]` generator already turns a model's
-   attributes into `PropertyGrid` rows without reflection. The same symbol walk should emit
-   `DataGridView` **columns** — `[GridDisplayName]` → header text, the property type → column kind
-   (the grid already has 15), `[GridRange]` → cell validation, `[GridIgnore]` → skip — so binding a
-   grid to a list of models is one generated `PopulateColumns(grid)` call. This is the
-   `WindowsFormsExtensions`-style ergonomic, reached without `TypeDescriptor`. Emit both populators
-   from one `[GridEditable]` marker so a model can drive an inspector and a grid interchangeably.
+2. **Attribute-driven `DataGridView` columns.** Extend the Roslyn generator so one `[GridEditable]`
+   model emits both `PopulateGrid(PropertyGrid)` and `PopulateColumns(DataGridView)` — the
+   `WindowsFormsExtensions`-style ergonomic without `TypeDescriptor`. Specified in **§14**.
 3. **`DataGridView` virtual mode.** `ListView` gained `VirtualMode` + unknown-size probing; the grid
    is the control that most needs it (a million-row query is its native use case) and the row-source
    indirection is already designed.
@@ -1013,3 +1011,74 @@ next change starts from a considered list instead of an inbox.
 11. **Localization beyond `Strings`.** Day/month names come from the OS, but the toolkit's own
     literals live in one static class with no per-culture resource path and no RTL mirroring of
     owner-drawn layout.
+
+---
+
+## 14. Attribute-driven grids — extend the generator from inspector rows to grid columns
+
+**Where we are.** `[GridEditable]` makes the Roslyn generator emit `PopulateGrid(PropertyGrid)`: one row
+per public settable property, editor inferred from the property type, category/description/range read
+from the `Grid*` attributes at compile time. One marker, one populator, zero reflection.
+
+**The goal.** The *same* marker should also emit `PopulateColumns(DataGridView)`, so a `List<T>` of
+annotated models becomes a fully configured grid in one call — the ergonomic
+`Hawkynt.WindowsFormsExtensions` gives WinForms, but reached through a source generator instead of
+`TypeDescriptor`/`DataSource`, which §1.3 forbids.
+
+**Why the generator is the right mechanism here.** `DataGridViewColumn` is already
+*delegate*-configured — `ValueSelector`, `ValueSetter`, `CheckedSelector`/`CheckedSetter`,
+`ProgressSelector`, `ImageSelector`, `TooltipSelector`, `CellStyleSelector`, `SortComparison`. Those
+delegates are exactly what a generator can synthesize as strongly-typed lambdas
+(`row => ((T)row!).Total`), which is why this fits without inventing new runtime machinery: the
+generator writes the selector boilerplate a developer writes by hand today.
+
+### Design rules
+
+- [ ] **One marker, two populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)` *and*
+      `PopulateColumns(DataGridView)`, so a model drives an inspector and a grid interchangeably.
+      Emitting the grid populator only when the type is actually used with a grid is a nice-to-have,
+      not a requirement — dead generated methods are trimmed.
+- [ ] **Column kind inferred from the property type**, mapped onto the 15 kinds the grid already has:
+      `bool` → `Check`, numeric → `NumericUpDown` (or `Progress` when a `[GridRange]` bounds it and the
+      model opts in), `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`, `Color` → `Color`,
+      `enum` → `ComboBox` (items from `Enum.GetNames<T>()`), `[Flags]` enum → `CheckedListBox`,
+      anything else → `Text`. An explicit attribute overrides the inference.
+- [ ] **Shared vocabulary where the meaning is shared.** `[GridDisplayName]` → `HeaderText`,
+      `[GridIgnore]` → skip the column, `[GridDescription]` → `TooltipSelector`, `[GridRange]` → cell
+      validation and the `Progress` bounds. Grid-only concerns (width, display order, frozen,
+      auto-size, sort mode, alignment, read-only) get their own attributes rather than overloading the
+      inspector ones.
+- [ ] **Read/write without reflection or boxing surprises.** The generator emits both a `ValueSelector`
+      and, for settable properties, a `ValueSetter`, so grid editing writes straight back into the
+      model.
+- [ ] **Virtual-mode friendly.** The generated populator configures *columns only*; it never
+      materializes rows, so it composes with §13's `DataGridView` virtual mode rather than fighting it.
+- [ ] **Degrades exactly like the inspector path.** Without the analyzer the attributes still compile
+      and hand-built columns still work; only the generated method is absent.
+
+### Open decisions (settle before implementing)
+
+- [ ] **Attribute names.** Mirror `WindowsFormsExtensions`' vocabulary where it maps cleanly so porting
+      is muscle memory, rather than inventing a parallel set. Resolve against that library's actual
+      surface — this PRD deliberately does not guess the names.
+- [ ] **Conditional row/cell styling.** Attributes cannot carry delegates, and per-row colouring is the
+      feature that makes the reference library worth copying. Candidate encodings: name a static method
+      (`[GridCellStyle(nameof(StyleRow))]`) that the generator wires into `CellStyleSelector`; or have
+      the generator declare a `partial` hook the model implements. Pick one — a string-named method
+      that silently mismatches is the failure mode to avoid, so whichever is chosen must produce a
+      compile-time diagnostic (`NFG0xx`) when it does not resolve.
+- [ ] **Column ordering.** Declaration order, or an explicit index attribute, or both with the explicit
+      one winning.
+
+### Acceptance
+
+- [ ] A `[GridEditable]` model with mixed property types generates a `DataGridView` whose column kinds,
+      headers and order match the annotations, asserted headlessly.
+- [ ] Editing a generated cell writes through to the model instance.
+- [ ] The same model still generates a working `PropertyGrid` — the two populators do not interfere.
+- [ ] A misresolved styling hook fails the build with a generator diagnostic, not at run time.
+- [ ] `dotnet publish -p:PublishAot=true` on a consumer stays clean (the generated code is plain
+      delegates; nothing reflective is introduced).
+- [ ] [`docs/controls/datagridview.md`](controls/datagridview.md) and
+      [`docs/controls/propertygrid.md`](controls/propertygrid.md) both document the shared attribute
+      vocabulary.
