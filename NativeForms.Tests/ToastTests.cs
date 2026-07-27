@@ -29,6 +29,21 @@ internal sealed class ToastTests
     }
 
     [Test]
+    public void The_stack_never_climbs_out_of_the_form()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 600, 400) };
+        Application.Run(form, backend);
+
+        for (var i = 0; i < 12; ++i) // far more than the 400-px column can hold
+            Toast.Show(form, "T" + i, "m", InfoBarSeverity.Info, 3000);
+
+        foreach (var bar in form.Controls.OfType<InfoBar>())
+            Assert.That(bar.Bounds.Y, Is.GreaterThanOrEqualTo(0),
+                $"toast {bar.Title} sits above the client area at Y={bar.Bounds.Y}");
+    }
+
+    [Test]
     public void Multiple_toasts_stack_upward_without_overlapping()
     {
         var backend = new HeadlessBackend();

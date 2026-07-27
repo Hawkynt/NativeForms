@@ -70,6 +70,13 @@ public static class Toast
 
         public void Add(string title, string message, InfoBarSeverity severity, int durationMs)
         {
+            // Retire the oldest toasts as soon as the column would not fit the form: an uncapped stack walks
+            // off the top edge (and a child above the client area is not visible anyway).
+            var capacity = Math.Max(1, (this.Form.ClientSize.Height - (2 * _Margin)) / (_BarHeight + _Gap));
+            for (var i = 0; i < _entries.Count && this.LiveCount() >= capacity; ++i)
+                if (!_entries[i].Leaving)
+                    _entries[i].Leaving = true;
+
             var width = Math.Min(360, Math.Max(160, this.Form.ClientSize.Width - (2 * _Margin)));
             var bar = new InfoBar
             {
@@ -89,6 +96,17 @@ public static class Toast
             _timer.Start();
         }
 
+        /// <summary>The toasts still counted for stacking (the leaving ones are already collapsing away).</summary>
+        private int LiveCount()
+        {
+            var live = 0;
+            foreach (var entry in _entries)
+                if (!entry.Leaving)
+                    ++live;
+
+            return live;
+        }
+
         // Newest toast sits at the bottom; older ones stack above it. Sets each entry's resting Y target and
         // snaps non-leaving toasts to it, so the column is correctly stacked even before the first animation
         // frame; the timer then only drives the fade and the leaving slide-down.
@@ -98,14 +116,13 @@ public static class Toast
             for (var i = _entries.Count - 1; i >= 0; --i)
             {
                 var entry = _entries[i];
-                y -= _BarHeight;
-                entry.TargetY = y;
-                if (!entry.Leaving)
-                {
-                    var b = entry.Bar.Bounds;
-                    entry.Bar.Bounds = new Rectangle(b.X, y, b.Width, b.Height);
-                }
+                if (entry.Leaving)
+                    continue; // collapsing in place; it no longer holds a slot in the column
 
+                y -= _BarHeight;
+                entry.TargetY = Math.Max(_Margin, y);
+                var b = entry.Bar.Bounds;
+                entry.Bar.Bounds = new Rectangle(b.X, entry.TargetY, b.Width, b.Height);
                 y -= _Gap;
             }
         }
