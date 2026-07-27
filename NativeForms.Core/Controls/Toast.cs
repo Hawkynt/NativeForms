@@ -120,7 +120,10 @@ public static class Toast
                     continue; // collapsing in place; it no longer holds a slot in the column
 
                 y -= _BarHeight;
-                entry.TargetY = Math.Max(_Margin, y);
+
+                // Never place a bar outside the client area in either direction: a child past an edge is
+                // invisible at best and re-grows the form's layout at worst.
+                entry.TargetY = Math.Max(0, Math.Min(y, this.Form.ClientSize.Height - _BarHeight));
                 var b = entry.Bar.Bounds;
                 entry.Bar.Bounds = new Rectangle(b.X, entry.TargetY, b.Width, b.Height);
                 y -= _Gap;

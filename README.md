@@ -24,11 +24,12 @@ NativeForms lets you write desktop UI with the ergonomics of `System.Windows.For
 
 - **Real native widgets** for the window and the text-bearing primitives: [`Form`](docs/controls/form.md),
   [`Button`](docs/controls/button.md), [`Label`](docs/controls/label.md),
-  [`TextBox`](docs/controls/textbox.md), [`MaskedTextBox`](docs/controls/maskedtextbox.md),
-  [`RichTextBox`](docs/controls/richtextbox.md), plus the platform's own
-  [`MessageBox` and common dialogs](docs/controls/dialogs.md),
-  [`NotifyIcon`](docs/controls/notifyicon.md) and [`Timer`](docs/controls/timer.md). These are genuine
-  `HWND`s / `GtkWidget*`s, so caret, IME, selection and accessibility come from the OS.
+  [`TextBox`](docs/controls/textbox.md), [`MaskedTextBox`](docs/controls/maskedtextbox.md) and
+  [`RichTextBox`](docs/controls/richtextbox.md). These are genuine `HWND`s / `GtkWidget*`s, so caret,
+  IME, selection and accessibility come from the OS. The platform's own
+  [`MessageBox` and common dialogs](docs/controls/dialogs.md) are used directly too, and
+  [`Timer`](docs/controls/timer.md) (a native timer source) and
+  [`NotifyIcon`](docs/controls/notifyicon.md) (Windows tray only) are non-visual native resources.
 - **Owner-drawn, native-themed** for everything else — the lists, grids, trees, containers, menus and
   the modern extras. They render through `IGraphics` using an `ITheme` populated from live OS colors,
   fonts and metrics, so they match the desktop without being OS widgets.

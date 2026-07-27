@@ -67,14 +67,14 @@ All six live in `Hawkynt.NativeForms` (declared in Core, so they compile with or
 
 | Attribute | Target | Argument | Effect on the generated row |
 |---|---|---|---|
-| `[GridCategory]` | property, field | `string category` | The category header the row groups under. Rows without one land in `Misc`. |
-| `[GridDescription]` | property, field | `string description` | Text shown in the grid's description strip while the row is selected. |
-| `[GridDisplayName]` | property, field | `string name` | Overrides the row's displayed name (the property name is used otherwise). |
+| `[GridCategory]` | property | `string category` | The category header the row groups under. Rows without one land in `Misc`. |
+| `[GridDescription]` | property | `string description` | Text shown in the grid's description strip while the row is selected. |
+| `[GridDisplayName]` | property | `string name` | Overrides the row's displayed name (the property name is used otherwise). |
 | `[GridEditable]` | class | — | Marks the model. The class must be **`partial`** and **non-nested**, or the generator reports `NFG001` and emits nothing. |
-| `[GridIgnore]` | property, field | — | Excludes the member from the generated grid. |
-| `[GridRange]` | property, field | `double minimum, double maximum` | Clamps a numeric row's committed value to the inclusive bounds. |
+| `[GridIgnore]` | property | — | Excludes the member from the generated grid. |
+| `[GridRange]` | property | `double minimum, double maximum` | Clamps a numeric row's committed value to the inclusive bounds. |
 
-Only **public, settable, non-static, non-indexer** properties become rows; anything else is skipped whether or not it carries an attribute.
+Only **public, settable, non-static, non-indexer properties** become rows. The member attributes also *compile* on fields (their `AttributeUsage` permits it), but **the generator only walks properties** — a field carrying `[GridCategory]` is silently skipped. Expose it as a property, or add the row by hand.
 
 ### Getting the generator
 

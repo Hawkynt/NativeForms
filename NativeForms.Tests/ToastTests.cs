@@ -44,6 +44,24 @@ internal sealed class ToastTests
     }
 
     [Test]
+    public void A_form_too_short_for_a_toast_still_keeps_it_inside()
+    {
+        var backend = new HeadlessBackend();
+        var form = new Form { Bounds = new(0, 0, 300, 40) }; // shorter than one 36-px bar plus margins
+        Application.Run(form, backend);
+
+        Toast.Show(form, "Squeezed", "m", InfoBarSeverity.Info, 3000);
+
+        var bar = form.Controls.OfType<InfoBar>().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.Bounds.Y, Is.GreaterThanOrEqualTo(0));
+            Assert.That(bar.Bounds.Bottom, Is.LessThanOrEqualTo(form.ClientSize.Height),
+                "a toast must never hang past the bottom edge — that is what re-grew the form");
+        });
+    }
+
+    [Test]
     public void Multiple_toasts_stack_upward_without_overlapping()
     {
         var backend = new HeadlessBackend();

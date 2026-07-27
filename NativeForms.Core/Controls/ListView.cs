@@ -220,24 +220,8 @@ public class ListView : OwnerDrawnControl
     /// (falling back to a shared blank placeholder), otherwise the model item.</summary>
     private ListViewItem GetRowItem(int index)
     {
-        if (!this.VirtualMode)
-            return this.Items[index];
-
-        var args = new RetrieveVirtualItemEventArgs(index);
-        this.RetrieveVirtualItem?.Invoke(this, args);
-
-        if (this.UnknownVirtualSize)
-        {
-            if (args.EndOfList || args.Item is null)
-            {
-                _countFinal = true;
-                _discoveredCount = index; // rows [0, index) exist; this one does not
-            }
-            else if (index + 1 > _discoveredCount)
-                _discoveredCount = index + 1;
-        }
-
-        return args.Item ?? (_virtualPlaceholder ??= new ListViewItem(string.Empty));
+        this.TryGetRowItem(index, out var item);
+        return item; // the blank placeholder when the row turned out not to exist
     }
 
     /// <summary>How items are arranged. Defaults to <see cref="ListViewView.Details"/>. Changing the
