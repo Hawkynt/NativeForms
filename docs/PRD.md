@@ -627,7 +627,7 @@ strategy (may differ per platform; note exceptions inline).
       delegate drops down a suggestion list that filters as you type (arrow/Enter/click to pick,
       Tab to complete-and-stay, a second Tab to leave the field)
 
-### 7.10 App-shell & advanced controls (planned — the pieces a file explorer / image editor / media player / coding IDE / browser shell / settings app still need)
+### 7.10 App-shell & advanced controls (shipped — the pieces a file explorer / image editor / media player / coding IDE / browser shell / settings app needed)
 - [x] `PropertyGrid` (owner) — two-column name/value editor grouped by category, with per-row typed
       inline editors (text, checkbox/bool, numeric, dropdown/enum, colour, browse); reflection-free
       (delegate/selector-driven rows), expandable categories, a description strip, `SelectedObject` via
@@ -981,28 +981,35 @@ next change starts from a considered list instead of an inbox.
    `OwnerDrawnControl` (UIA on Windows, AT-SPI on Linux), or lean on §12 promotion for the controls
    that can become real widgets. Realistically both. Without this the toolkit is unusable for anyone
    who needs assistive tech, which also blocks public-sector adoption.
-2. **`DataGridView` virtual mode.** `ListView` gained `VirtualMode` + unknown-size probing; the grid
+2. **Attribute-driven `DataGridView` columns.** The `[GridEditable]` generator already turns a model's
+   attributes into `PropertyGrid` rows without reflection. The same symbol walk should emit
+   `DataGridView` **columns** — `[GridDisplayName]` → header text, the property type → column kind
+   (the grid already has 15), `[GridRange]` → cell validation, `[GridIgnore]` → skip — so binding a
+   grid to a list of models is one generated `PopulateColumns(grid)` call. This is the
+   `WindowsFormsExtensions`-style ergonomic, reached without `TypeDescriptor`. Emit both populators
+   from one `[GridEditable]` marker so a model can drive an inspector and a grid interchangeably.
+3. **`DataGridView` virtual mode.** `ListView` gained `VirtualMode` + unknown-size probing; the grid
    is the control that most needs it (a million-row query is its native use case) and the row-source
    indirection is already designed.
-3. **An undo/redo service.** `CodeTextBox`, `PropertyGrid`, `DataGridView` and `CalendarView` each
+4. **An undo/redo service.** `CodeTextBox`, `PropertyGrid`, `DataGridView` and `CalendarView` each
    want it and none has it. One `IUndoContext` with a command stack, opted into per control, beats
    four bespoke implementations.
-4. **Live theming: dark mode and high contrast without a restart.** `ITheme` is queried once;
+5. **Live theming: dark mode and high contrast without a restart.** `ITheme` is queried once;
    `ThemeChanged` exists but nothing re-derives cached brushes/bitmaps from it. The colour-mixer
    bitmaps and every cached gradient need an invalidation path.
-5. **Per-monitor DPI.** Geometry is integer device pixels throughout. Moving a window between a 100%
+6. **Per-monitor DPI.** Geometry is integer device pixels throughout. Moving a window between a 100%
    and a 175% monitor currently does the wrong thing. This is a deep change (scale factor in the
    layout pass, bitmap re-rasterization) and should be planned before more pixel geometry accretes.
-6. **A dogfooding sample app.** The §7.10 controls were built for "a file explorer / image editor /
+7. **A dogfooding sample app.** The §7.10 controls were built for "a file explorer / image editor /
    IDE". Actually shipping a small file explorer (Breadcrumb + NavigationView + virtual ListView +
    TreeView + PropertyGrid) would surface integration bugs the per-control demo cannot, and doubles
    as the honest answer to "can you really build an app with this?".
-7. **Keyboard command routing.** Shortcuts are per-control today; there is no application-level
+8. **Keyboard command routing.** Shortcuts are per-control today; there is no application-level
    accelerator table, no chord support, and no single place to ask "what is bound to Ctrl+S?".
-8. **`CodeTextBox` depth.** Find & replace, bracket matching, code folding, word wrap, multi-caret —
+9. **`CodeTextBox` depth.** Find & replace, bracket matching, code folding, word wrap, multi-caret —
    in that order. Each is self-contained and independently testable.
-9. **Drag & drop between controls.** `AllowDrop` exists on `Control` and `TreeView` has intra-tree
+10. **Drag & drop between controls.** `AllowDrop` exists on `Control` and `TreeView` has intra-tree
    reordering, but there is no cross-control or cross-application data transfer.
-10. **Localization beyond `Strings`.** Day/month names come from the OS, but the toolkit's own
+11. **Localization beyond `Strings`.** Day/month names come from the OS, but the toolkit's own
     literals live in one static class with no per-culture resource path and no RTL mirroring of
     owner-drawn layout.
