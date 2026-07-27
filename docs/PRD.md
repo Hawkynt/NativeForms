@@ -1081,7 +1081,7 @@ that needs new grid capability rather than new plumbing:
 | Several images per cell | `DataGridViewMultiImageColumnAttribute` (+ max size, padding, margin, per-image click and tooltip provider) | `ImagesSelector` + `MaxImageSize`/`ImageGap`/`ImagePadding`/`ImageTooltipSelector`; per-icon click reports its index via `CellContentClick` (shipped) |
 | Image *and* text in one cell, with relation | `textImageRelation` (`ImageBeforeText`, …) | `ImageSelector` + `TextImageRelation` (shipped) |
 | Fixed image box + aspect ratio | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio` | `ImageSize` + `KeepImageAspectRatio` (shipped) |
-| Conditional image overlay, stackable | `SupportsConditionalImageAttribute` (`AllowMultiple`) | **missing** |
+| Conditional image overlay, stackable | `SupportsConditionalImageAttribute` (`AllowMultiple`) | `OverlayImagesSelector` (shipped) |
 | Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side) | **missing** |
 
 - [x] Add `TextImageRelation` to `DataGridViewColumn` (we already have the enum, used by
@@ -1092,7 +1092,9 @@ that needs new grid capability rather than new plumbing:
 - [x] Add per-image metadata to `MultiImage` (`MaxImageSize`, `ImageGap`, `ImagePadding`) plus
       `ImageTooltipSelector`; painting and per-icon hit-testing share one metrics helper so they cannot
       drift apart.
-- [ ] Add a conditional image overlay list, so several conditional badges can stack on one cell.
+- [x] Add a conditional image overlay list, so several conditional badges can stack on one cell
+      (`OverlayImagesSelector` + `OverlaySize`; the selector returns only the badges that currently
+      apply, so several conditions compose).
 
 ### 14.3 The rest of the parity map
 

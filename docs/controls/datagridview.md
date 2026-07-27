@@ -65,6 +65,8 @@ Inherits the common members of [`Control`](control.md).
 | `IsVerticalScrollBarVisible` / `IsHorizontalScrollBarVisible` | `bool` (get) | `false` | Whether the interactive scrollbar strips are currently shown (rows/columns overflow the viewport). |
 | `Items` | `ObservableList<object?>` | empty | The row items. Mutating the collection repaints the control. |
 | `MultiSelect` | `bool` | `false` | Whether Ctrl (toggle) and Shift (display-order range) clicks and Shift+arrows select several rows at once. |
+| `OverlayImagesSelector` | `Func<object?, IReadOnlyList<IImage>>?` | `null` | Badge icons drawn over the cell icon (shortcut/shared/offline style); return only the badges that currently apply. |
+| `OverlaySize` | `int` | `0` | Edge of one overlay badge; `0` uses half the host icon. |
 | `ReadOnly` | `bool` | `false` | Whether every cell in the grid refuses edits and check toggling (see `IsCellReadOnly`). |
 | `RowBackColorSelector` | `Func<object?, Color?>?` | `null` | Per-row background color; `null` result keeps the default. |
 | `RowHeaderWidth` | `int` | `24` | Pixel width of the row-header column. |

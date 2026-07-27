@@ -110,6 +110,18 @@ public sealed class DataGridViewColumn
     /// <see cref="TooltipSelector"/>.</summary>
     public Func<object?, int, string?>? ImageTooltipSelector { get; set; }
 
+    /// <summary>
+    /// Optional badge icons drawn over the cell's <see cref="ImageSelector"/> icon — the "shortcut
+    /// arrow / shared / offline" overlays a file list stacks on one item. The selector returns only the
+    /// badges that currently apply, so several conditions compose; they are drawn at the icon's bottom
+    /// right, most recent last, each shifted left by one badge width.
+    /// </summary>
+    public Func<object?, IReadOnlyList<IImage>>? OverlayImagesSelector { get; set; }
+
+    /// <summary>The edge, in pixels, of one <see cref="OverlayImagesSelector"/> badge, or <c>0</c> (the
+    /// default) for half the host icon.</summary>
+    public int OverlaySize { get; set; }
+
     /// <summary>Whether every cell in this column refuses edits and check toggling. Combined with the
     /// grid and per-cell levels by <see cref="DataGridView.IsCellReadOnly"/>.</summary>
     public bool ReadOnly { get; set; }

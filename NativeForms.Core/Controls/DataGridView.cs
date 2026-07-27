@@ -2102,7 +2102,10 @@ public class DataGridView : OwnerDrawnControl
                     out var textRect);
 
                 if (!imageRect.IsEmpty)
+                {
                     g.DrawImage(icon, imageRect);
+                    PaintOverlays(g, column, item, imageRect);
+                }
 
                 if (text.Length > 0)
                 {
@@ -2148,6 +2151,21 @@ public class DataGridView : OwnerDrawnControl
         // Letterbox: the largest rectangle with the icon's ratio that fits the requested box.
         var scale = Math.Min((double)explicitBox.Width / icon.Width, (double)explicitBox.Height / icon.Height);
         return new Size(Math.Max(1, (int)Math.Round(icon.Width * scale)), Math.Max(1, (int)Math.Round(icon.Height * scale)));
+    }
+
+    /// <summary>Draws the column's conditional badge overlays over a cell icon: bottom-right anchored,
+    /// each shifted one badge width left, so several conditions stack on one icon.</summary>
+    private static void PaintOverlays(IGraphics g, DataGridViewColumn column, object? item, Rectangle host)
+    {
+        var overlays = column.OverlayImagesSelector?.Invoke(item);
+        if (overlays is null || overlays.Count == 0)
+            return;
+
+        var badge = column.OverlaySize > 0 ? column.OverlaySize : Math.Max(1, host.Height / 2);
+        var x = host.Right - badge;
+        var y = host.Bottom - badge;
+        for (var i = 0; i < overlays.Count && x + badge > host.Left; ++i, x -= badge)
+            g.DrawImage(overlays[i], new Rectangle(x, y, badge, badge));
     }
 
     /// <summary>The icon edge and stride of a <see cref="DataGridViewColumnKind.MultiImage"/> cell, shared

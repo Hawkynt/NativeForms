@@ -693,4 +693,41 @@ internal sealed class DataGridViewColumnTypesTests
             Assert.That(grid.GetCellTooltip(0, 0), Is.EqualTo("whole cell"), "the cell-wide overload is unchanged");
         });
     }
+
+    [Test]
+    public void Conditional_overlays_stack_on_the_cell_icon()
+    {
+        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
+        {
+            ImageSelector = static _ => new HeadlessImage(16, 16),
+            OverlayImagesSelector = static _ => new IImage[] { new HeadlessImage(4, 4), new HeadlessImage(5, 5) },
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        // 18px host icon at (4,24) -> 9px badges at its bottom-right, the second shifted one badge left.
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 4x4 @13,33,9,9")), Is.True, "first badge bottom-right");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("image 5x5 @4,33,9,9")), Is.True, "second badge stacks left");
+        });
+    }
+
+    [Test]
+    public void An_empty_overlay_list_draws_nothing_extra()
+    {
+        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
+        {
+            ImageSelector = static _ => new HeadlessImage(16, 16),
+            OverlayImagesSelector = static _ => System.Array.Empty<IImage>(),
+        });
+        grid.Items.Add(new Row { Name = "Alice" });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.FindAll(o => o.StartsWith("image")), Has.Count.EqualTo(1), "only the host icon");
+    }
 }
