@@ -52,7 +52,7 @@ Inherits the common members of [`Control`](control.md).
 | `AllowUserToResizeColumns` | `bool` | `true` | Whether dragging a column divider in the header resizes that column (±3 px grab zone). |
 | `AlternatingRowColor` | `Color` | `#F6F6F6` | Background tint of alternating rows. |
 | `AlternatingRows` | `bool` | `false` | Whether every other data row (in display order) is tinted with `AlternatingRowColor`. |
-| `ColumnHeaderHeight` | `int` | `RowHeight` | Pixel height of the column-header row. |
+| `ColumnHeaderHeight` | `int` | `RetrieveVirtualRow` | `event EventHandler<RetrieveVirtualRowEventArgs>` | — | Fetches the row item at an index while `VirtualMode` is on. Called once per visible row per paint. |
 | `Columns` | `IList<DataGridViewColumn>` | empty | The columns shown. Mutate, then call `Invalidate()` to repaint. |
 | `CurrentColumnIndex` | `int` | `0` | The column keyboard activation (Space/Enter) and F2 target; follows the last clicked cell. |
 | `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
@@ -70,6 +70,7 @@ Inherits the common members of [`Control`](control.md).
 | `ReadOnly` | `bool` | `false` | Whether every cell in the grid refuses edits and check toggling (see `IsCellReadOnly`). |
 | `RowBackColorSelector` | `Func<object?, Color?>?` | `null` | Per-row background color; `null` result keeps the default. |
 | `RowHeaderWidth` | `int` | `24` | Pixel width of the row-header column. |
+| `RowHeight` | Pixel height of the column-header row. |
 | `RowHeight` | `int` | theme row height | Pixel height of a data row. |
 | `RowHeightSelector` | `Func<object?, int?>?` | `null` | Per-row pixel height; `null` result uses `RowHeight`. |
 | `RowHiddenSelector` | `Func<object?, bool>?` | `null` | Hides rows; hidden rows are skipped by painting, hit-testing and navigation. |
@@ -84,6 +85,8 @@ Inherits the common members of [`Control`](control.md).
 | `SortedColumn` | `DataGridViewColumn?` (get) | `null` | The column the grid is currently sorted by. |
 | `SortOrder` | `SortOrder` (get) | `None` | The active sort direction; `None` shows `Items` order. |
 | `TopRow` | `int` | `0` | Display index of the first visible data row (vertical scroll position). Settable — the value clamps into the scroll range; the vertical scrollbar thumb reads and writes it. |
+| `VirtualMode` | `bool` | `false` | Whether rows are served on demand instead of from `Items`. Sorting is left to the source while on. |
+| `VirtualRowCount` | `int` | `0` | The row count while `VirtualMode` is on, or `-1` to probe for an unknown size until `RetrieveVirtualRowEventArgs.EndOfRows`. |
 
 ### Events
 

@@ -286,7 +286,7 @@ public class DataGridView : OwnerDrawnControl
         get => _selectedRowIndex;
         set
         {
-            var clamped = value < -1 || value >= this.Items.Count ? -1 : value;
+            var clamped = value < -1 || value >= this.RowSourceCount ? -1 : value;
             if (clamped != _selectedRowIndex && !this.ValidateRowChange())
                 return;
 
@@ -313,7 +313,7 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>The selected row item, or <see langword="null"/>.</summary>
     public object? SelectedItem
     {
-        get => _selectedRowIndex >= 0 && _selectedRowIndex < this.Items.Count ? this.Items[_selectedRowIndex] : null;
+        get => _selectedRowIndex >= 0 && _selectedRowIndex < this.RowSourceCount ? this.GetRowItem(_selectedRowIndex) : null;
         set => this.SelectedRowIndex = value is null ? -1 : this.Items.IndexOf(value);
     }
 
@@ -326,14 +326,14 @@ public class DataGridView : OwnerDrawnControl
             if (this.MultiSelect && _multiSelection is { } multi)
             {
                 for (var i = 0; i < multi.Count; ++i)
-                    if (multi[i] < this.Items.Count)
-                        yield return this.Items[multi[i]];
+                    if (multi[i] < this.RowSourceCount)
+                        yield return this.GetRowItem(multi[i]);
 
                 yield break;
             }
 
-            if (_selectedRowIndex >= 0 && _selectedRowIndex < this.Items.Count)
-                yield return this.Items[_selectedRowIndex];
+            if (_selectedRowIndex >= 0 && _selectedRowIndex < this.RowSourceCount)
+                yield return this.GetRowItem(_selectedRowIndex);
         }
     }
 
@@ -625,11 +625,11 @@ public class DataGridView : OwnerDrawnControl
     /// cell-wide <see cref="DataGridViewColumn.TooltipSelector"/>. Indices are model indices.</summary>
     public string? GetCellTooltip(int rowIndex, int columnIndex, int imageIndex)
     {
-        if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
+        if (rowIndex < 0 || rowIndex >= this.RowSourceCount || columnIndex < 0 || columnIndex >= _columns.Count)
             return null;
 
         var column = _columns[columnIndex];
-        var item = this.Items[rowIndex];
+        var item = this.GetRowItem(rowIndex);
         if (imageIndex >= 0 && column.ImageTooltipSelector is { } perImage && perImage(item, imageIndex) is { } text)
             return text;
 
@@ -640,14 +640,14 @@ public class DataGridView : OwnerDrawnControl
     /// cell, or <c>-1</c>. Mirrors the per-icon hit-test used for clicks.</summary>
     private int HitTestCellImage(int rowIndex, int columnIndex, int cellX, int rowHeight)
     {
-        if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
+        if (rowIndex < 0 || rowIndex >= this.RowSourceCount || columnIndex < 0 || columnIndex >= _columns.Count)
             return -1;
 
         var column = _columns[columnIndex];
         if (column.Kind != DataGridViewColumnKind.MultiImage)
             return -1;
 
-        var images = column.ImagesSelector?.Invoke(this.Items[rowIndex]);
+        var images = column.ImagesSelector?.Invoke(this.GetRowItem(rowIndex));
         var (iconSize, slot, _) = MultiImageMetrics(column, rowHeight);
         if (images is null || iconSize <= 0)
             return -1;
@@ -706,17 +706,17 @@ public class DataGridView : OwnerDrawnControl
 
     private void OnItemsChanged(object? sender, ListChangedEventArgs e)
     {
-        if (_selectedRowIndex >= this.Items.Count)
-            _selectedRowIndex = this.Items.Count - 1;
+        if (_selectedRowIndex >= this.RowSourceCount)
+            _selectedRowIndex = this.RowSourceCount - 1;
 
         if (_multiSelection is { } multi)
-            while (multi.Count > 0 && multi[^1] >= this.Items.Count)
+            while (multi.Count > 0 && multi[^1] >= this.RowSourceCount)
                 multi.RemoveAt(multi.Count - 1);
 
-        if (_anchorRowIndex >= this.Items.Count)
-            _anchorRowIndex = this.Items.Count - 1;
+        if (_anchorRowIndex >= this.RowSourceCount)
+            _anchorRowIndex = this.RowSourceCount - 1;
 
-        if (this.IsEditing && _editRowIndex >= this.Items.Count)
+        if (this.IsEditing && _editRowIndex >= this.RowSourceCount)
             this.CancelEdit();
 
         _sortDirty = true;
@@ -728,7 +728,7 @@ public class DataGridView : OwnerDrawnControl
 
     private void ClampScroll()
     {
-        var maxTop = Math.Max(0, this.Items.Count - this.VisibleRowCount);
+        var maxTop = Math.Max(0, this.RowSourceCount - this.VisibleRowCount);
         _topRow = Math.Clamp(_topRow, 0, maxTop);
     }
 
@@ -739,13 +739,16 @@ public class DataGridView : OwnerDrawnControl
     private void EnsureSortMap()
     {
         var column = _sortedColumn;
-        if (column is null || _sortOrder == SortOrder.None)
+
+        // Virtual mode sorts at the source: building a map here would have to fetch every row to compare
+        // them, which is exactly what the mode exists to avoid.
+        if (column is null || _sortOrder == SortOrder.None || this.VirtualMode)
         {
             _sortMap = null;
             return;
         }
 
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var map = _sortMap;
         if (!_sortDirty && map is not null && map.Length == count)
             return;
@@ -792,6 +795,130 @@ public class DataGridView : OwnerDrawnControl
             return comparable.CompareTo(right);
 
         return string.CompareOrdinal(left.ToString(), right.ToString());
+    }
+
+    // --- Virtual mode ----------------------------------------------------------------------------
+
+    private int _virtualDiscovered;
+    private bool _virtualCountFinal;
+
+    /// <summary>
+    /// Whether rows are served on demand by <see cref="RetrieveVirtualRow"/> over a
+    /// <see cref="VirtualRowCount"/> instead of from <see cref="Items"/>, so a million-row query never
+    /// materialises. Sorting is left to the data source while virtual (the grid cannot compare rows it
+    /// has not fetched), and <see cref="Items"/> is ignored. Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool VirtualMode
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            _virtualDiscovered = 0;
+            _virtualCountFinal = false;
+            _selectedRowIndex = -1;
+            _sortMap = null;   // the grid cannot compare rows it has not fetched
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>The row count exposed while <see cref="VirtualMode"/> is on, or <c>-1</c> for an unknown
+    /// size: the grid then probes past what it has confirmed, growing as you scroll until
+    /// <see cref="RetrieveVirtualRow"/> reports the end.</summary>
+    public int VirtualRowCount
+    {
+        get => field;
+        set
+        {
+            value = value < 0 ? -1 : value;
+            if (field == value)
+                return;
+
+            field = value;
+            _virtualDiscovered = 0;
+            _virtualCountFinal = false;
+            if (this.VirtualMode)
+            {
+                _sortMap = null;
+                this.Invalidate();
+            }
+        }
+    }
+
+    /// <summary>Raised while <see cref="VirtualMode"/> is on to fetch the row item at an index. Called
+    /// once per visible row per paint — keep it cheap.</summary>
+    public event EventHandler<RetrieveVirtualRowEventArgs>? RetrieveVirtualRow;
+
+    /// <summary>Whether the grid is in the unknown-size virtual mode.</summary>
+    private bool UnknownVirtualSize => this.VirtualMode && this.VirtualRowCount < 0;
+
+    /// <summary>The number of rows the presentation draws from: <see cref="Items"/> normally, the fixed
+    /// <see cref="VirtualRowCount"/> in known virtual mode, or a probe window past the confirmed rows.</summary>
+    private int RowSourceCount
+    {
+        get
+        {
+            if (!this.VirtualMode)
+                return this.Items.Count;
+
+            if (!this.UnknownVirtualSize)
+                return this.VirtualRowCount;
+
+            if (_virtualCountFinal)
+                return _virtualDiscovered;
+
+            // Deliberately NOT VisibleRowCount: that settles the scroll bars, which read this count back
+            // and would recurse. A plain row estimate is enough to size the probe window.
+            var rows = Math.Max(1, (this.Height - this.HeaderHeight) / this.RowHeight);
+            return Math.Max(_virtualDiscovered, _topRow + (2 * rows));
+        }
+    }
+
+    /// <summary>The row item at a model index: fetched from <see cref="RetrieveVirtualRow"/> while
+    /// virtual, otherwise the model item. Returns <see langword="false"/> when the row turns out not to
+    /// exist, which the unknown-size mode only learns by asking.</summary>
+    private bool TryGetRowItem(int modelIndex, out object? item)
+    {
+        item = null;
+        if (!this.VirtualMode)
+        {
+            if (modelIndex < 0 || modelIndex >= this.Items.Count)
+                return false;
+
+            item = this.Items[modelIndex];
+            return true;
+        }
+
+        if (modelIndex < 0)
+            return false;
+
+        var probe = new RetrieveVirtualRowEventArgs(modelIndex);
+        this.RetrieveVirtualRow?.Invoke(this, probe);
+        if (this.UnknownVirtualSize)
+        {
+            if (probe.EndOfRows || probe.Item is null)
+            {
+                _virtualCountFinal = true;
+                _virtualDiscovered = modelIndex;
+                return false;
+            }
+
+            if (modelIndex + 1 > _virtualDiscovered)
+                _virtualDiscovered = modelIndex + 1;
+        }
+
+        item = probe.Item;
+        return probe.Item is not null || !this.UnknownVirtualSize;
+    }
+
+    /// <summary>The row item at a model index, or <see langword="null"/> when it does not exist.</summary>
+    private object? GetRowItem(int modelIndex)
+    {
+        this.TryGetRowItem(modelIndex, out var item);
+        return item;
     }
 
     private int ToModelIndex(int displayIndex)
@@ -865,7 +992,7 @@ public class DataGridView : OwnerDrawnControl
 
     private bool IsRowNavigable(int modelIndex)
     {
-        var item = this.Items[modelIndex];
+        var item = this.GetRowItem(modelIndex);
         return !this.IsRowHidden(item) && this.IsRowSelectable(item) && this.MergedTextOf(item) is null;
     }
 
@@ -962,7 +1089,7 @@ public class DataGridView : OwnerDrawnControl
     /// scroll over already-shown rows) allocates nothing.</summary>
     private string GetDisplayText(DataGridViewColumn column, object? item, int modelIndex)
     {
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var cache = column.DisplayTextCache;
         if (cache is null || cache.Length != count)
             column.DisplayTextCache = cache = count > 0 ? new string?[count] : [];
@@ -1056,14 +1183,14 @@ public class DataGridView : OwnerDrawnControl
         rowTop = 0;
         rowHeight = 0;
 
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var height = this.Height;
         var currentY = this.HeaderHeight;
         var display = Math.Max(0, _topRow);
         while (currentY < height && display < count)
         {
             var modelIndex = this.ToModelIndex(display);
-            var item = this.Items[modelIndex];
+            var item = this.GetRowItem(modelIndex);
             ++display;
             if (this.IsRowHidden(item))
                 continue;
@@ -1162,7 +1289,7 @@ public class DataGridView : OwnerDrawnControl
         var viewportWidth = this.Width - this.ContentLeft;
         var viewportHeight = this.Height - this.HeaderHeight;
         var contentWidth = this.TotalColumnWidth;
-        var contentHeight = this.Items.Count * this.RowHeight;
+        var contentHeight = this.RowSourceCount * this.RowHeight;
         var vertical = contentHeight > viewportHeight;
         var horizontal = contentWidth > viewportWidth - (vertical ? size : 0);
         if (horizontal)
@@ -1200,7 +1327,7 @@ public class DataGridView : OwnerDrawnControl
     /// visible page as the thumb's share.</summary>
     private void GetVerticalScrollRange(out int maximum, out int largeChange)
     {
-        maximum = Math.Max(0, this.Items.Count - 1);
+        maximum = Math.Max(0, this.RowSourceCount - 1);
         largeChange = this.VisibleRowCount;
     }
 
@@ -1339,12 +1466,12 @@ public class DataGridView : OwnerDrawnControl
         if (direction == 0)
             return from;
 
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var display = from;
         while (steps-- > 0)
         {
             var next = display + direction;
-            while (next >= 0 && next < count && this.IsRowHidden(this.Items[this.ToModelIndex(next)]))
+            while (next >= 0 && next < count && this.IsRowHidden(this.GetRowItem(this.ToModelIndex(next))))
                 next += direction;
 
             if (next < 0 || next >= count)
@@ -1363,7 +1490,7 @@ public class DataGridView : OwnerDrawnControl
     private void MoveSelection(int steps, bool extend = false)
     {
         this.EnsureSortMap();
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         if (count == 0 || steps == 0)
             return;
 
@@ -1411,7 +1538,7 @@ public class DataGridView : OwnerDrawnControl
     private void SelectEdge(bool first)
     {
         this.EnsureSortMap();
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var direction = first ? 1 : -1;
         var display = first ? 0 : count - 1;
         while (display >= 0 && display < count && !this.IsRowNavigable(this.ToModelIndex(display)))
@@ -1451,7 +1578,7 @@ public class DataGridView : OwnerDrawnControl
         if (rowIndex < 0)
             return;
 
-        var item = this.Items[rowIndex];
+        var item = this.GetRowItem(rowIndex);
         if (this.MergedTextOf(item) is not null)
             return; // merged rows have no cells and take no selection
 
@@ -1685,7 +1812,7 @@ public class DataGridView : OwnerDrawnControl
         {
             case Keys.Down: this.MoveSelection(1, e.Shift); break;
             case Keys.Up: this.MoveSelection(-1, e.Shift); break;
-            case Keys.Home when this.Items.Count > 0: this.SelectEdge(first: true); break;
+            case Keys.Home when this.RowSourceCount > 0: this.SelectEdge(first: true); break;
             case Keys.End: this.SelectEdge(first: false); break;
             case Keys.PageDown: this.MoveSelection(this.VisibleRowCount, e.Shift); break;
             case Keys.PageUp: this.MoveSelection(-this.VisibleRowCount, e.Shift); break;
@@ -1761,7 +1888,7 @@ public class DataGridView : OwnerDrawnControl
         var frozenWidth = this.FrozenWidth;
         var scrollEdge = contentLeft + frozenWidth;
         var showGridLines = this.ShowGridLines;
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
 
         g.PushClip(new Rectangle(contentLeft, 0, Math.Max(0, width - contentLeft), height));
 
@@ -1788,7 +1915,10 @@ public class DataGridView : OwnerDrawnControl
         while (y < height && display < count)
         {
             var modelIndex = this.ToModelIndex(display);
-            var item = this.Items[modelIndex];
+            // The unknown-size virtual source only reveals the end when asked, so a row the loop
+            // already scheduled can turn out not to exist.
+            if (!this.TryGetRowItem(modelIndex, out var item))
+                break;
             var displayIndex = display;
             ++display;
             if (this.IsRowHidden(item))
@@ -1902,7 +2032,10 @@ public class DataGridView : OwnerDrawnControl
         while (y < height && display < count)
         {
             var modelIndex = this.ToModelIndex(display);
-            var item = this.Items[modelIndex];
+            // The unknown-size virtual source only reveals the end when asked, so a row the loop
+            // already scheduled can turn out not to exist.
+            if (!this.TryGetRowItem(modelIndex, out var item))
+                break;
             ++display;
             if (this.IsRowHidden(item))
                 continue;
@@ -1951,7 +2084,10 @@ public class DataGridView : OwnerDrawnControl
         while (y < height && display < count)
         {
             var modelIndex = this.ToModelIndex(display);
-            var item = this.Items[modelIndex];
+            // The unknown-size virtual source only reveals the end when asked, so a row the loop
+            // already scheduled can turn out not to exist.
+            if (!this.TryGetRowItem(modelIndex, out var item))
+                break;
             ++display;
             if (this.IsRowHidden(item))
                 continue;
@@ -2192,7 +2328,10 @@ public class DataGridView : OwnerDrawnControl
         while (y < height && display < count)
         {
             var modelIndex = this.ToModelIndex(display);
-            var item = this.Items[modelIndex];
+            // The unknown-size virtual source only reveals the end when asked, so a row the loop
+            // already scheduled can turn out not to exist.
+            if (!this.TryGetRowItem(modelIndex, out var item))
+                break;
             ++display;
             if (this.IsRowHidden(item))
                 continue;
@@ -2224,14 +2363,17 @@ public class DataGridView : OwnerDrawnControl
 
             var font = this.Theme.DefaultFont;
             var widest = 0;
-            var count = this.Items.Count;
+            var count = this.RowSourceCount;
             var height = this.Height;
             var y = this.HeaderHeight;
             var display = Math.Max(0, _topRow);
             while (y < height && display < count)
             {
                 var modelIndex = this.ToModelIndex(display);
-                var item = this.Items[modelIndex];
+                // The unknown-size virtual source only reveals the end when asked, so a row the loop
+                // already scheduled can turn out not to exist.
+                if (!this.TryGetRowItem(modelIndex, out var item))
+                    break;
                 ++display;
                 if (this.IsRowHidden(item))
                     continue;
@@ -2280,7 +2422,7 @@ public class DataGridView : OwnerDrawnControl
         if (!hasFill)
             return;
 
-        var verticalOverflow = this.Items.Count * this.RowHeight > this.Height - this.HeaderHeight;
+        var verticalOverflow = this.RowSourceCount * this.RowHeight > this.Height - this.HeaderHeight;
         var available = Math.Max(0, this.Width - this.ContentLeft - (verticalOverflow ? this.Theme.ScrollBarSize : 0) - fixedWidth);
         var assigned = 0;
         var weightUsed = 0f;
@@ -2314,7 +2456,7 @@ public class DataGridView : OwnerDrawnControl
     /// </summary>
     public bool BeginEdit(int rowIndex, int columnIndex)
     {
-        if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
+        if (rowIndex < 0 || rowIndex >= this.RowSourceCount || columnIndex < 0 || columnIndex >= _columns.Count)
             return false;
 
         if (_editRowIndex == rowIndex && _editColumnIndex == columnIndex)
@@ -2324,7 +2466,7 @@ public class DataGridView : OwnerDrawnControl
             return false;
 
         var column = _columns[columnIndex];
-        var item = this.Items[rowIndex];
+        var item = this.GetRowItem(rowIndex);
         if (this.IsCellReadOnly(item, column) || !IsCellEditable(column))
             return false;
 
@@ -2469,7 +2611,7 @@ public class DataGridView : OwnerDrawnControl
         var rowIndex = _editRowIndex;
         var columnIndex = _editColumnIndex;
         var column = _columns[columnIndex];
-        var item = this.Items[rowIndex];
+        var item = this.GetRowItem(rowIndex);
         switch (column.Kind)
         {
             case DataGridViewColumnKind.Text or DataGridViewColumnKind.MaskedText:
@@ -2876,7 +3018,7 @@ public class DataGridView : OwnerDrawnControl
         this.EnsureSortMap();
         this.EnsureDisplayMap();
         var map = _displayMap!;
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var display = this.ToDisplayIndex(rowIndex);
         if (display < 0)
             return false;
@@ -2887,7 +3029,7 @@ public class DataGridView : OwnerDrawnControl
             var modelRow = this.ToModelIndex(display);
             if (this.IsRowNavigable(modelRow))
             {
-                var item = this.Items[modelRow];
+                var item = this.GetRowItem(modelRow);
                 while (d >= 0 && d < map.Length)
                 {
                     var column = _columns[map[d]];
@@ -2969,14 +3111,14 @@ public class DataGridView : OwnerDrawnControl
     /// </summary>
     public Rectangle GetCellBounds(int rowIndex, int columnIndex)
     {
-        if (rowIndex < 0 || rowIndex >= this.Items.Count || columnIndex < 0 || columnIndex >= _columns.Count)
+        if (rowIndex < 0 || rowIndex >= this.RowSourceCount || columnIndex < 0 || columnIndex >= _columns.Count)
             return Rectangle.Empty;
 
         this.ApplyFillWidths();
         this.EnsureSortMap();
         this.EnsureDisplayMap();
 
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var height = this.Height;
         var y = this.HeaderHeight;
         var display = Math.Max(0, _topRow);
@@ -2985,7 +3127,10 @@ public class DataGridView : OwnerDrawnControl
         while (y < height && display < count)
         {
             var modelIndex = this.ToModelIndex(display);
-            var item = this.Items[modelIndex];
+            // The unknown-size virtual source only reveals the end when asked, so a row the loop
+            // already scheduled can turn out not to exist.
+            if (!this.TryGetRowItem(modelIndex, out var item))
+                break;
             ++display;
             if (this.IsRowHidden(item))
                 continue;
@@ -3385,7 +3530,7 @@ public class DataGridView : OwnerDrawnControl
         if (!this.ValidateCell(rowIndex, columnIndex, choice))
             return;
 
-        _columns[columnIndex].ValueSetter!(this.Items[rowIndex], choice);
+        _columns[columnIndex].ValueSetter!(this.GetRowItem(rowIndex), choice);
         this.InvalidateDisplayText(rowIndex);
         this.EndEdit(rowIndex, columnIndex);
     }
@@ -3401,7 +3546,7 @@ public class DataGridView : OwnerDrawnControl
         var rowIndex = _editRowIndex;
         var columnIndex = _editColumnIndex;
         var column = _columns[columnIndex];
-        var item = this.Items[rowIndex];
+        var item = this.GetRowItem(rowIndex);
         var proposed = _editCalendar!.SelectionStart.Date + column.DateSelector!(item).TimeOfDay;
         if (!this.ValidateCell(rowIndex, columnIndex, proposed))
             return;
@@ -3561,7 +3706,7 @@ public class DataGridView : OwnerDrawnControl
 
         var builder = new StringBuilder();
         var map = _displayMap!;
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var first = true;
         for (var display = 0; display < count; ++display)
         {
@@ -3573,7 +3718,7 @@ public class DataGridView : OwnerDrawnControl
                 builder.Append("\r\n");
             first = false;
 
-            var item = this.Items[modelIndex];
+            var item = this.GetRowItem(modelIndex);
             if (this.MergedTextOf(item) is { } mergedText)
             {
                 builder.Append(mergedText);
@@ -3618,7 +3763,7 @@ public class DataGridView : OwnerDrawnControl
         if (startColumn < 0 || display < 0)
             return;
 
-        var count = this.Items.Count;
+        var count = this.RowSourceCount;
         var lines = text.Split('\n');
         var lineCount = lines.Length;
         if (lineCount > 0 && lines[lineCount - 1].Length == 0)
@@ -3653,7 +3798,7 @@ public class DataGridView : OwnerDrawnControl
     private bool TryPasteCell(int rowIndex, int columnIndex, string text)
     {
         var column = _columns[columnIndex];
-        var item = this.Items[rowIndex];
+        var item = this.GetRowItem(rowIndex);
         if (this.IsCellReadOnly(item, column))
             return false;
 

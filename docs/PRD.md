@@ -806,7 +806,7 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   faithful counterpart, keeping the owner-drawn path as the fallback. `[ ]`
 - **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
-  `DataGridView`/`TreeView`. `[ ]`
+  `TreeView`. `[~]` (`DataGridView` virtual mode shipped)
 - **M13 — Attribute-driven grids & lists (§14).** Extend the `[GridEditable]` source generator so one
   annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns —
   column kind, width, sort, images, tooltips, per-cell/row styling and click handlers — with every
@@ -894,6 +894,7 @@ same commit. `—` = not applicable.
 | `CodeTextBox` (gutter, tokenizer, completion) | ✔ | ✔ | [controls/codetextbox.md](controls/codetextbox.md) |
 | `TreeView` inline label editing (F2) | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
 | `[GridEditable]` source generator (packed as an analyzer in Core) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#attributes) |
+| `DataGridView` virtual mode (known + unknown size) | ✔ | — | [controls/datagridview.md](controls/datagridview.md) |
 | MVVM primitives + binding + `ICommand` wiring | ✔ | ✔ | [mvvm.md](mvvm.md) |
 | Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
 
@@ -991,9 +992,9 @@ next change starts from a considered list instead of an inbox.
    `PopulateColumns(DataGridView)` (and later `ListView`) alongside the shipped
    `PopulateGrid(PropertyGrid)` — the `C--FrameworkExtensions` ergonomic, with every member reference
    resolved at compile time instead of by reflection. Specified in **§14**.
-3. **`DataGridView` virtual mode.** `ListView` gained `VirtualMode` + unknown-size probing; the grid
-   is the control that most needs it (a million-row query is its native use case) and the row-source
-   indirection is already designed.
+3. ~~**`DataGridView` virtual mode.**~~ **Shipped** — `VirtualMode` + `VirtualRowCount` (`-1` probes for
+   an unknown size) + `RetrieveVirtualRow`, mirroring `ListView`. Sorting is left to the source while
+   virtual, since the grid cannot compare rows it never fetched.
 4. **An undo/redo service.** `CodeTextBox`, `PropertyGrid`, `DataGridView` and `CalendarView` each
    want it and none has it. One `IUndoContext` with a command stack, opted into per control, beats
    four bespoke implementations.
