@@ -38,7 +38,7 @@ is what makes a `DataGridView` or a `CalendarView` possible at all. It is also w
 a drop-in for platform accessibility on the drawn controls yet. Promoting the controls that *do* have
 a faithful native counterpart (check boxes, combo boxes, progress bars, …) onto real peers when their
 properties stay inside what the platform widget supports is a tracked workstream — see
-[PRD §12](docs/PRD.md#12-native-peer-promotion-opt-in-real-widgets-where-the-platform-has-one).
+[PRD §12](docs/PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
 
 It is built to be **small and quick**: reflection-free, `IsAotCompatible`, buffered peer state,
 value-type geometry, and no per-frame allocation — kilobytes of managed overhead, not megabytes.

@@ -769,8 +769,8 @@ strategy (may differ per platform; note exceptions inline).
 ## 10. Milestones (the completion roadmap)
 
 Every §7 box belongs to a milestone below, except items marked "later / optional" inline
-(WebBrowser/WebView, PropertyGrid, printing, MDI) — those are decided when their milestone
-neighborhood ships.
+(WebBrowser/WebView, printing, MDI) — those are decided when their milestone neighborhood ships.
+`PropertyGrid` was on that list and has since shipped (§7.10, M10).
 
 - **M0 — Foundation.** Core control model, backend abstraction, native Win32 + GTK
   Button/Label/Form, macOS placeholder, MVVM primitives + binding, demo, tests, CI. `[~]`
@@ -798,6 +798,15 @@ neighborhood ships.
   ToggleSwitch/SearchBox extras. `[ ]`
 - **M9 — Platform polish.** Accessibility, per-monitor DPI, live dark-mode/high-contrast, RTL,
   drag & drop/clipboard, threading (`Control.Invoke`), macOS (Cocoa) backend. `[ ]`
+- **M10 — App shell & advanced controls (§7.10).** SegmentedControl, RangeSlider, InfoBar + Toast,
+  NavigationView, TreeView label editing, TokenBox, ZoomPanel, ListView virtual mode, PropertyGrid
+  (+ the `[GridEditable]` source generator), CodeTextBox. `[x]` — all ten shipped, tested,
+  demoed and documented.
+- **M11 — Native-peer promotion (§12).** Opt into real platform widgets for the controls that have a
+  faithful counterpart, keeping the owner-drawn path as the fallback. `[ ]`
+- **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
+  find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
+  `DataGridView`/`TreeView`. `[ ]`
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -842,7 +851,7 @@ same commit. `—` = not applicable.
 | `CalendarView` (Day/WorkWeek/Week/Month scheduler) | ✔ | ✔ | [controls/calendarview.md](controls/calendarview.md) |
 | `TimePicker` (double-click analog clock) | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
 | `ClockFace` (analog dial, stand-alone or popup) | ✔ | ✔ | [controls/clockface.md](controls/clockface.md) |
-| `ColorPicker` (swatch + 40-colour palette drop-down) | ✔ | ✔ | [controls/colorpicker.md](controls/colorpicker.md) |
+| `ColorPicker` (SV/wheel mixer, RGB·HSL·HSV·CMYK tabs, alpha, eyedropper) | ✔ | ✔ | [controls/colorpicker.md](controls/colorpicker.md) |
 | `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
 | `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
 | `GroupBox` (caption image, nesting) | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |
@@ -858,7 +867,7 @@ same commit. `—` = not applicable.
 | `ListBox` (selection modes, icons) | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |
 | `CheckedListBox` | ✔ | ✔ | [controls/checkedlistbox.md](controls/checkedlistbox.md) |
 | `ComboBox` | ✔ | ✔ | [controls/combobox.md](controls/combobox.md) |
-| `ListView` (5 views, groups, checks, sort, label edit) | ✔ | ✔ | [controls/listview.md](controls/listview.md) |
+| `ListView` (5 views, groups, checks, sort, label edit, virtual mode, scroll bar) | ✔ | ✔ | [controls/listview.md](controls/listview.md) |
 | `TreeView` | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
 | `TreeListView` | ✔ | ✔ | [controls/treelistview.md](controls/treelistview.md) |
 | `DataGridView` (kinds, editing, frozen, reorder, clipboard) | ✔ | ✔ | [controls/datagridview.md](controls/datagridview.md) |
@@ -869,6 +878,16 @@ same commit. `—` = not applicable.
 | `ToolTip` | ✔ | ✔ | [controls/tooltip.md](controls/tooltip.md) |
 | `NotifyIcon` | ✔ | — | [controls/notifyicon.md](controls/notifyicon.md) |
 | Modal forms + `MessageBox` + common dialogs | ✔ | ✔ | [controls/dialogs.md](controls/dialogs.md) |
+| `SegmentedControl` | ✔ | ✔ | [controls/segmentedcontrol.md](controls/segmentedcontrol.md) |
+| `RangeSlider` (two-thumb) | ✔ | ✔ | [controls/rangeslider.md](controls/rangeslider.md) |
+| `InfoBar` + `Toast` (stacked, fading) | ✔ | ✔ | [controls/infobar.md](controls/infobar.md) |
+| `NavigationView` (collapsible rail) | ✔ | ✔ | [controls/navigationview.md](controls/navigationview.md) |
+| `TokenBox` (chips, autocomplete, per-chip style) | ✔ | ✔ | [controls/tokenbox.md](controls/tokenbox.md) |
+| `ZoomPanel` (wheel-zoom, pan, rulers, grid, zoom slider) | ✔ | ✔ | [controls/zoompanel.md](controls/zoompanel.md) |
+| `PropertyGrid` (typed rows, pickers, attribute generator) | ✔ | ✔ | [controls/propertygrid.md](controls/propertygrid.md) |
+| `CodeTextBox` (gutter, tokenizer, completion) | ✔ | ✔ | [controls/codetextbox.md](controls/codetextbox.md) |
+| `TreeView` inline label editing (F2) | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
+| `[GridEditable]` source generator (packed as an analyzer in Core) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#attributes) |
 | MVVM primitives + binding + `ICommand` wiring | ✔ | ✔ | [mvvm.md](mvvm.md) |
 | Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
 
@@ -879,3 +898,111 @@ the autopilot drives it — posting the click rather than awaiting it, then dism
 exactly as the `MessageBox` check does. That check runs **last**, with the modal one: a native
 chooser is a toplevel that takes the keyboard focus with it and does not reliably hand it back, so
 placed mid-script it strands every later typing check.
+
+---
+
+## 12. Native-peer promotion (opt into real widgets where the platform has one)
+
+**Where we are.** The native-peer set is deliberately narrow: `IPlatformBackend` creates a window,
+button, label, text box, rich text box, canvas, popup, timer and tray icon. Everything else — 48
+classes, including `CheckBox`, `RadioButton`, `ComboBox`, `ListBox`, `ProgressBar`, `TrackBar`,
+`ScrollBar`, `GroupBox`, `TabControl` — is owner-drawn on a canvas peer, even though every desktop
+ships a perfectly good version of most of them.
+
+**Why that was right, and why it is now limiting.** Drawing them ourselves is what makes one
+implementation behave identically on every backend, and it is the only way to get a `DataGridView`
+or `CalendarView` at all. But it costs the things only a real widget has: **screen-reader
+accessibility**, IME and text-service integration, the OS's own hover/press animation, high-contrast
+and per-widget theme overrides, and the last 5% of "feels like this desktop".
+
+**The goal.** For each control with a faithful platform counterpart, realize a *native* peer when the
+control's configured properties stay inside what that widget supports, and fall back to the existing
+owner-drawn path otherwise. Owner-draw remains the universal path — it is still what runs on a
+backend without the widget, and what runs the moment an app asks for something the widget cannot do.
+
+### Design rules (decide these before the first control moves)
+
+- [ ] **Capability gate per control.** Each promotable control declares the property subset that keeps
+      it native (e.g. a `ComboBox` with no per-item image, no custom `ItemHeight`, no `ForeColor`
+      override). Inside the gate → native peer; outside → canvas. The gate is evaluated **at
+      realization**, so the decision is made once, before a peer exists.
+- [ ] **Escaping the gate after realization.** Setting a property that leaves the gate must either
+      re-realize the control onto a canvas peer or be documented as ignored. Pick one rule and apply
+      it everywhere; silent divergence between backends is the failure mode to avoid.
+- [ ] **No behavioral fork in the public API.** `Checked`, `CheckedChanged`, `Items`, … behave
+      identically either way. Tests assert the *same* observable behavior against both paths.
+- [ ] **Opt-in switch.** A global (`Application.PreferNativeWidgets`) plus a per-control override, so
+      an app that wants pixel-identical cross-platform rendering can keep everything owner-drawn.
+- [ ] **Backends may decline.** A backend without the widget returns `null` from the factory and Core
+      falls back silently. macOS gets this for free — it declines everything until §10 M9 lands.
+
+### Promotion candidates, in payoff order
+
+| Control | Win32 | GTK 3 | Gate — stays native while… |
+|---|---|---|---|
+| [ ] `CheckBox` | `BUTTON` (`BS_AUTOCHECKBOX`) | `GtkCheckButton` | no `Image`, no colour override |
+| [ ] `RadioButton` | `BUTTON` (`BS_AUTORADIOBUTTON`) | `GtkRadioButton` | as above |
+| [ ] `ProgressBar` | `msctls_progress32` | `GtkProgressBar` | always (incl. marquee) |
+| [ ] `TrackBar` | `msctls_trackbar32` | `GtkScale` | no custom tick painting |
+| [ ] `HScrollBar` / `VScrollBar` | `SCROLLBAR` | `GtkScrollbar` | always |
+| [ ] `GroupBox` | `BUTTON` (`BS_GROUPBOX`) | `GtkFrame` | no caption image |
+| [ ] `ComboBox` | `COMBOBOX` | `GtkComboBoxText` | no per-item image, no owner-draw, no placeholder |
+| [ ] `ListBox` | `LISTBOX` | `GtkListBox` | plain string items, single/extended selection only |
+| [ ] `LinkLabel` | `SysLink` | `GtkLinkButton` | single link spanning the whole text |
+| [ ] `NumericUpDown` | `EDIT` + `msctls_updown32` | `GtkSpinButton` | no custom formatting delegate |
+| [ ] `ToolTip` | `tooltips_class32` | `GtkTooltip` | text-only tips |
+
+Asymmetric candidates (one platform only, so the other keeps owner-draw): `ToggleSwitch` →
+`GtkSwitch`; `Expander` → `GtkExpander`; `SplitContainer` → `GtkPaned`.
+
+**Deliberately staying owner-drawn:** `DataGridView`, `ListView`, `TreeView`, `TreeListView`,
+`CalendarView`, `Ribbon`, `DockPanel`, `MenuStrip`/`ToolStrip`/`StatusStrip`, and everything in
+§7.9/§7.10. Their native counterparts either do not exist, differ too much between platforms, or
+would not survive the feature set we already ship (15 column kinds, merged rows, virtual mode…).
+
+### Acceptance
+
+- [ ] A control with a native peer and its owner-drawn twin pass the **same** behavior test suite.
+- [ ] The allocation budgets of §4 hold on both paths.
+- [ ] A screen reader announces a promoted `CheckBox` on Windows and on Linux (the point of the
+      exercise — verified manually, once, per control family).
+- [ ] `docs/README.md`'s strategy column and each control page's header say which path a control
+      takes and what the gate is.
+
+---
+
+## 13. What's next — candidate workstreams
+
+Ranked by how much they unblock, not by effort. Nothing here is committed; this section exists so the
+next change starts from a considered list instead of an inbox.
+
+1. **Accessibility (the biggest real gap).** 48 owner-drawn controls are invisible to a screen
+   reader — they are one canvas with no accessible tree. Options: expose an accessibility bridge from
+   `OwnerDrawnControl` (UIA on Windows, AT-SPI on Linux), or lean on §12 promotion for the controls
+   that can become real widgets. Realistically both. Without this the toolkit is unusable for anyone
+   who needs assistive tech, which also blocks public-sector adoption.
+2. **`DataGridView` virtual mode.** `ListView` gained `VirtualMode` + unknown-size probing; the grid
+   is the control that most needs it (a million-row query is its native use case) and the row-source
+   indirection is already designed.
+3. **An undo/redo service.** `CodeTextBox`, `PropertyGrid`, `DataGridView` and `CalendarView` each
+   want it and none has it. One `IUndoContext` with a command stack, opted into per control, beats
+   four bespoke implementations.
+4. **Live theming: dark mode and high contrast without a restart.** `ITheme` is queried once;
+   `ThemeChanged` exists but nothing re-derives cached brushes/bitmaps from it. The colour-mixer
+   bitmaps and every cached gradient need an invalidation path.
+5. **Per-monitor DPI.** Geometry is integer device pixels throughout. Moving a window between a 100%
+   and a 175% monitor currently does the wrong thing. This is a deep change (scale factor in the
+   layout pass, bitmap re-rasterization) and should be planned before more pixel geometry accretes.
+6. **A dogfooding sample app.** The §7.10 controls were built for "a file explorer / image editor /
+   IDE". Actually shipping a small file explorer (Breadcrumb + NavigationView + virtual ListView +
+   TreeView + PropertyGrid) would surface integration bugs the per-control demo cannot, and doubles
+   as the honest answer to "can you really build an app with this?".
+7. **Keyboard command routing.** Shortcuts are per-control today; there is no application-level
+   accelerator table, no chord support, and no single place to ask "what is bound to Ctrl+S?".
+8. **`CodeTextBox` depth.** Find & replace, bracket matching, code folding, word wrap, multi-caret —
+   in that order. Each is self-contained and independently testable.
+9. **Drag & drop between controls.** `AllowDrop` exists on `Control` and `TreeView` has intra-tree
+   reordering, but there is no cross-control or cross-application data transfer.
+10. **Localization beyond `Strings`.** Day/month names come from the OS, but the toolkit's own
+    literals live in one static class with no per-culture resource path and no RTL mirroring of
+    owner-drawn layout.
