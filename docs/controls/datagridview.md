@@ -204,6 +204,62 @@ Kind-specific content and editing members:
 | `ListBox` | The picked value — or, when `SelectionMode` admits several, the comma-joined summary of the picked set — plus a drop arrow | Edits in a taller, scrollable popup list. A single-select cell commits the clicked row through `ValueSetter` at once; a multi-select one gathers the picks and commits them as a whole set through `CheckedItemsSetter`. |
 | `CheckedListBox` | The comma-joined summary of `CheckedItemsSelector`'s items, plus a drop arrow | Edits in a popup checked list; every tick runs the vetoable `CellItemCheck`, and the whole set commits through `CheckedItemsSetter`. |
 
+## Building columns from a model's attributes
+
+A `[GridEditable]` model emits `PopulateColumns(DataGridView)` at compile time, so the columns come from
+the annotations rather than from hand-written code:
+
+```csharp
+[GridEditable]
+internal partial class Task
+{
+    [GridIgnore] public IImage? Icon { get; set; }
+    [GridIgnore] public bool IsArchived { get; set; }
+
+    [GridColumnImage(nameof(Icon))]
+    [GridColumnWidth(180)]
+    public string Title { get; set; } = "";
+
+    [GridColumnReadOnlyWhen(nameof(IsArchived))]
+    public int Estimate { get; set; }
+
+    [GridColumnKind(DataGridViewColumnKind.Progress)]
+    public int Done { get; set; }
+}
+
+var grid = new DataGridView();
+Task.PopulateColumns(grid);          // kinds, headers, widths, images, per-row rules
+grid.SetDataSource(tasks);
+```
+
+Every one of this control's column kinds is reachable: the kind is inferred from the property's type
+where the type implies one, and `[GridColumnKind]` pins it otherwise. The full vocabulary — column kinds,
+widths, sort modes, images and per-row rules — is tabulated on the
+[`PropertyGrid` page](propertygrid.md#grid-column-attributes), because the same annotations drive the
+inspector, this grid and a [`ListView`](listview.md).
+
+**Porting from `Hawkynt.WindowsFormsExtensions`.** The reference library resolves these names by
+reflection at run time; here they are resolved by the generator at compile time, so a typo is a build
+error (`NFG002`) rather than a silent no-op.
+
+| There | Here |
+|---|---|
+| `DataGridViewCheckboxColumnAttribute` | inferred from `bool`, or `[GridColumnKind(Check)]` |
+| `DataGridViewComboboxColumnAttribute` | inferred from an `enum`, or `[GridColumnKind(ComboBox)]` |
+| `DataGridViewProgressBarColumnAttribute` | `[GridColumnKind(Progress)]` |
+| `DataGridViewButtonColumnAttribute` | `[GridColumnKind(Button)]` |
+| `DataGridViewImageColumnAttribute` | `[GridColumnImage]` |
+| `DataGridViewMultiImageColumnAttribute` | `[GridColumnKind(MultiImage)]` + `[GridColumnImages]` |
+| `SupportsConditionalImageAttribute` | `[GridColumnOverlayImages]` (one selector returns the badges that apply, so conditions compose) |
+| `DataGridViewImageAndTextColumnAttribute` | `[GridColumnImage]` + `[GridColumnTextImageRelation]` |
+| `DataGridViewColumnWidthAttribute` | `[GridColumnWidth]` |
+| `DataGridViewColumnSortModeAttribute` | `[GridColumnSortMode]` |
+| `DataGridViewReadOnlyAttribute` | `[GridColumnReadOnlyWhen]`, or a get-only property |
+| `DataGridViewRowHeightAttribute` | `[GridRowHeightFrom]` |
+| `DataGridViewRowSelectableAttribute` | `[GridRowSelectableWhen]` |
+| `DataGridViewRowVisibleAttribute` | `[GridRowHiddenWhen]` |
+| `ListViewRepeatedImageAttribute` | not modelled — use `[GridColumnImages]` with a list of the right length |
+
 ## Notes
 
 ### Virtualization

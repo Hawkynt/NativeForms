@@ -282,7 +282,7 @@ strategy (may differ per platform; note exceptions inline).
   - [x] Icon (raw-ARGB `SetIcon`, decoder-free), `TopMost`, `Opacity` (compositor-dependent on Linux)
 - [x] `Panel` (owner) — background, `BorderStyle` (None/FixedSingle/Fixed3D), real nested
       children, `AutoScroll` (see the dedicated box below)
-- [~] `GroupBox` (owner) — themed frame + caption, caption image (icon before the text in the
+- [~] `GroupBox` (native frame, or owner-drawn — §12) — themed frame + caption, caption image (icon before the text in the
       frame gap), real nested children done; child inset/layout convenience pending
 - [~] `TabControl` / `TabPage` (owner, themed header strip; pages host real nested children)
   - [x] Tab headers with **icon + text** (`ImageList` + per-page `ImageIndex`), accent underline
@@ -323,9 +323,9 @@ strategy (may differ per platform; note exceptions inline).
   - [~] Image (`Image`/`ImageAlign`/`TextImageRelation` peer surface): GTK full image+text
         (`gtk_button_set_image` + position); Win32 `BM_SETIMAGE`/`BS_BITMAP` image-only (classic
         BUTTON cannot render both — documented); owner-drawn image+text fallback pending
-- [~] `CheckBox` (owner) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
+- [~] `CheckBox` (native, or owner-drawn — §12) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
       image + text via `ContentLayout` done; tri-state `CheckState` pending
-- [~] `RadioButton` (owner) — themed ring + accent dot, grouping by container, click/Space,
+- [~] `RadioButton` (native, or owner-drawn — §12) — themed ring + accent dot, grouping by container, click/Space,
       `CheckedChanged`, image + text via `ContentLayout` done
 - [~] `Label` (native) — polish done, images pending
   - [x] Text
@@ -335,7 +335,7 @@ strategy (may differ per platform; note exceptions inline).
   - [x] Mnemonic activation focuses the next control in tab order
   - [~] `Image` + `ImageAlign`: peer surface done — Win32 `SS_BITMAP` and GTK widget-swap render
         image-only when the caption is empty (image+text is platform-limited, documented)
-- [~] `LinkLabel` (owner) — whole-text link: accent color + underline, hover + `Visited` states,
+- [~] `LinkLabel` (native `SysLink`/`GtkLinkButton`, or owner-drawn — §12) — whole-text link: accent color + underline, hover + `Visited` states,
       click/Space → `LinkClicked`; per-character `LinkArea` ranges pending
 - [~] `TextBox` (native: Win32 EDIT / GTK GtkEntry + GtkTextView-in-ScrolledWindow)
   - [x] Single-line editing, `TextChanged` (echo-guarded two-way sync, once per user edit)
@@ -366,13 +366,13 @@ strategy (may differ per platform; note exceptions inline).
       pending (GTK: literal-text bullets and code-point offsets documented)
 
 ### 7.4 Lists & selection
-- [x] `ListBox` (owner) — items, per-item icons, wheel/keyboard scroll, `DataSource` binding,
+- [x] `ListBox` (native, or owner-drawn — §12) — items, per-item icons, wheel/keyboard scroll, `DataSource` binding,
       `SelectionMode` (None/One/MultiSimple/MultiExtended: Ctrl/Shift click + keyboard, sorted
       `SelectedIndices`, anchor ranges, caret via `FocusedIndex`)
 - [x] `CheckedListBox` (owner) — per-item check state over the ListBox engine (`ItemCheck`
       veto-able before the flip, `CheckOnClick`, Space toggles selection, shared `CheckGlyph`
       with CheckBox, check states survive item mutation)
-- [~] `ComboBox` (owner field + popup drop-down in native theme) — `DropDownList` and `DropDown`
+- [~] `ComboBox` (native drop-down list, or owner field + popup in native theme — §12) — `DropDownList` and `DropDown`
       (hosted native TextBox editor), **items with icons** (shared ListBox row painter, pixel-
       identical rows), `PlaceholderText`, full keyboard model (Alt+Down/F4, closed-arrow
       selection, prefix cycling open and closed), light-dismiss popup sized by
@@ -447,13 +447,13 @@ strategy (may differ per platform; note exceptions inline).
         `TopRow`/`HorizontalOffset`), auto-shown on overflow
 
 ### 7.5 Range & date
-- [x] `TrackBar` (owner) — Min/Max/Value, `TickFrequency` ticks, horizontal/vertical, themed
+- [x] `TrackBar` (native, or owner-drawn — §12) — Min/Max/Value, `TickFrequency` ticks, horizontal/vertical, themed
       groove + accent fill + thumb, track paging + thumb scrub, Win32 key directions
 - [x] `NumericUpDown` / `DomainUpDown` (owner spinner + hosted native TextBox editor) — decimal
       clamping/`Increment`/`DecimalPlaces`, domain matching + `Wrap`, themed spin buttons with
       timer-driven autorepeat (shared `AutoRepeat` engine); commit points documented (no focus
       model yet)
-- [x] `HScrollBar`/`VScrollBar` (owner) — proportional thumb, channel paging, arrow autorepeat,
+- [x] `HScrollBar`/`VScrollBar` (native, or owner-drawn — §12) — proportional thumb, channel paging, arrow autorepeat,
       Win32 `Maximum − LargeChange + 1` semantics, `Scroll` vs `ValueChanged` split
   - [ ] Unify the two internal scrollbar renderers (`Drawing.ScrollBarRenderer` used by
         `Panel.AutoScroll` vs the `ScrollBar` control's own) into one implementation
@@ -503,7 +503,7 @@ strategy (may differ per platform; note exceptions inline).
       to a single unit, `Precision` (Hours/Minutes/Seconds) with picking the final part committing,
       click/drag/keyboard, stage machine with `Committed`/`Cancelled` callbacks,
       allocation-free repaint at every stage (cached strings, shared trig table, cached hand endpoint)
-- [x] `ProgressBar` (owner) — determinate (Min/Max/Value, accent fill), `Style.Marquee`
+- [x] `ProgressBar` (native when horizontal, or owner-drawn — §12) — determinate (Min/Max/Value, accent fill), `Style.Marquee`
       (timer-driven sweep, allocation-free per tick), `Step`/`PerformStep`, vertical orientation
 
 ### 7.6 Menus, toolbars, status
@@ -538,7 +538,8 @@ strategy (may differ per platform; note exceptions inline).
 - [~] `NotifyIcon` (tray) — Win32 `Shell_NotifyIconW` with message-only callback window done;
       GTK throws (GtkStatusIcon deprecated; StatusNotifier/D-Bus is the tracked follow-up)
 - [ ] `WebBrowser/WebView` (native host) — likely later / optional
-- [ ] `PropertyGrid` (owner) — later
+- [x] `PropertyGrid` (owner) — category grouping, per-type editors reusing the real pickers, and the
+      source-generated `PopulateGrid` of §15; see [controls/propertygrid.md](controls/propertygrid.md)
 
 ### 7.8 Dialogs (native common dialogs)
 - [x] `MessageBox.Show` (buttons/icons mapped; `MessageBoxW` / `GtkMessageDialog`)
@@ -1268,7 +1269,7 @@ that needs new grid capability rather than new plumbing:
 | Image *and* text in one cell, with relation     | `textImageRelation` (`ImageBeforeText`, …)                                                                  | `ImageSelector` + `TextImageRelation` (shipped)                                                                                                       |
 | Fixed image box + aspect ratio                  | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio`                                                    | `ImageSize` + `KeepImageAspectRatio` (shipped)                                                                                                        |
 | Conditional image overlay, stackable            | `SupportsConditionalImageAttribute` (`AllowMultiple`)                                                       | `OverlayImagesSelector` (shipped)                                                                                                                     |
-| Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side)                                                                | **missing**                                                                                                                                           |
+| Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side)                                                                | expressible — `[GridColumnImages]` over a list of the right length                                                                                    |
 
 - [x] Add `TextImageRelation` to `DataGridViewColumn` (we already have the enum, used by
       [`IconLabel`](controls/iconlabel.md) and [`Button`](controls/button.md)) — placed through the shared
@@ -1281,6 +1282,11 @@ that needs new grid capability rather than new plumbing:
 - [x] Add a conditional image overlay list, so several conditional badges can stack on one cell
       (`OverlayImagesSelector` + `OverlaySize`; the selector returns only the badges that currently
       apply, so several conditions compose).
+- [x] Reach all of it from the model: `[GridColumnImage]`, `[GridColumnImages]`,
+      `[GridColumnOverlayImages]`, `[GridColumnImageSize]` and `[GridColumnTextImageRelation]` name a
+      member the same way the conditional attributes do, and the generator resolves it at compile time —
+      an image property that does not exist, or is not an `IImage`, is `NFG002`/`NFG003` rather than a
+      column that silently shows nothing.
 
 ### 15.3 The rest of the parity map
 

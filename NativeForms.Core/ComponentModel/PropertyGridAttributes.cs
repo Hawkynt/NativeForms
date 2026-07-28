@@ -1,3 +1,5 @@
+using Hawkynt.NativeForms.Drawing;
+
 namespace Hawkynt.NativeForms;
 
 /// <summary>
@@ -70,6 +72,77 @@ public sealed class GridColumnKindAttribute(DataGridViewColumnKind kind) : Attri
 {
     /// <summary>The column kind to use.</summary>
     public DataGridViewColumnKind Kind { get; } = kind;
+}
+
+/// <summary>
+/// Draws the image the named property yields in this column's cells, beside the text.
+/// </summary>
+/// <remarks>
+/// The property must be a readable public one returning an <see cref="Drawing.IImage"/>; returning
+/// <see langword="null"/> for a row simply leaves that cell without an icon. Pair it with
+/// <see cref="GridColumnTextImageRelationAttribute"/> to choose which side the icon sits on, and with
+/// <see cref="GridColumnImageSizeAttribute"/> to fix the box it is drawn into.
+/// </remarks>
+/// <param name="propertyName">The name of the property producing the image.</param>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnImageAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the property producing the image.</summary>
+    public string PropertyName { get; } = propertyName;
+}
+
+/// <summary>
+/// Draws the several images the named property yields side by side in this column's cells — the strip
+/// form, for badges or a rating.
+/// </summary>
+/// <remarks>The property must return a readable list of <see cref="Drawing.IImage"/>.</remarks>
+/// <param name="propertyName">The name of the property producing the images.</param>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnImagesAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the property producing the images.</summary>
+    public string PropertyName { get; } = propertyName;
+}
+
+/// <summary>
+/// Stacks the images the named property yields over this column's cells as badges.
+/// </summary>
+/// <remarks>
+/// The property returns only the badges that currently apply, so several conditions compose without the
+/// attribute needing to be stackable itself.
+/// </remarks>
+/// <param name="propertyName">The name of the property producing the overlays.</param>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnOverlayImagesAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the property producing the overlay badges.</summary>
+    public string PropertyName { get; } = propertyName;
+}
+
+/// <summary>Fixes the box a generated column draws its image into.</summary>
+/// <param name="width">The box width in pixels.</param>
+/// <param name="height">The box height in pixels.</param>
+/// <param name="keepAspectRatio">Whether to letterbox the image rather than stretch it.</param>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnImageSizeAttribute(int width, int height, bool keepAspectRatio = true) : Attribute
+{
+    /// <summary>The box width in pixels.</summary>
+    public int Width { get; } = width;
+
+    /// <summary>The box height in pixels.</summary>
+    public int Height { get; } = height;
+
+    /// <summary>Whether the image is letterboxed into the box rather than stretched to it.</summary>
+    public bool KeepAspectRatio { get; } = keepAspectRatio;
+}
+
+/// <summary>Places a generated column's image relative to its text.</summary>
+/// <param name="relation">Where the image sits.</param>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnTextImageRelationAttribute(TextImageRelation relation) : Attribute
+{
+    /// <summary>Where the image sits relative to the text.</summary>
+    public TextImageRelation Relation { get; } = relation;
 }
 
 /// <summary>Makes a generated column's cells read-only while the named <see cref="bool"/> property on

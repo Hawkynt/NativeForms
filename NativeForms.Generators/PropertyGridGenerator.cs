@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -178,6 +179,8 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
                 && ResolveBool(spc, type, prop, "[GridColumnReadOnlyWhen]", readOnlyWhen))
                 sb.Append("                ReadOnlyCellSelector = r => ").Append(row).Append('.').Append(readOnlyWhen).AppendLine(",");
 
+            EmitImages(sb, spc, type, prop, row);
+
             sb.AppendLine("            });");
         }
 
@@ -267,6 +270,100 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
     }
 
     /// <summary>The column kind for a property type, unless <c>[GridColumnKind]</c> forces one.</summary>
+    /// <summary>
+    /// Wires a column's image members from the attributes on the property: one icon beside the text, a
+    /// strip of them, or a stack of overlay badges, plus the box they are drawn into and which side of the
+    /// text the icon sits on. Each named member is resolved at compile time, so a typo is a build error
+    /// rather than a column that silently shows nothing.
+    /// </summary>
+    private static void EmitImages(
+        StringBuilder sb,
+        SourceProductionContext spc,
+        INamedTypeSymbol type,
+        IPropertySymbol prop,
+        string row)
+    {
+        if (GetStringArgument(prop, "GridColumnImageAttribute") is { } image
+            && ResolveImage(spc, type, prop, "[GridColumnImage]", image, list: false))
+            sb.Append("                ImageSelector = r => ").Append(row).Append('.').Append(image).AppendLine(",");
+
+        if (GetStringArgument(prop, "GridColumnImagesAttribute") is { } images
+            && ResolveImage(spc, type, prop, "[GridColumnImages]", images, list: true))
+            sb.Append("                ImagesSelector = r => ").Append(row).Append('.').Append(images).AppendLine(",");
+
+        if (GetStringArgument(prop, "GridColumnOverlayImagesAttribute") is { } overlays
+            && ResolveImage(spc, type, prop, "[GridColumnOverlayImages]", overlays, list: true))
+            sb.Append("                OverlayImagesSelector = r => ").Append(row).Append('.').Append(overlays).AppendLine(",");
+
+        if (GetEnumArgument(prop, "GridColumnTextImageRelationAttribute") is { } relation)
+            sb.Append("                TextImageRelation = global::Hawkynt.NativeForms.Drawing.TextImageRelation.")
+              .Append(relation).AppendLine(",");
+
+        if (GetAttribute(prop, "GridColumnImageSizeAttribute") is not { } size || size.ConstructorArguments.Length < 2)
+            return;
+
+        var width = size.ConstructorArguments[0].Value as int? ?? 0;
+        var height = size.ConstructorArguments[1].Value as int? ?? 0;
+        sb.Append("                ImageSize = new global::System.Drawing.Size(")
+          .Append(width.ToString(CultureInfo.InvariantCulture)).Append(", ")
+          .Append(height.ToString(CultureInfo.InvariantCulture)).AppendLine("),");
+
+        if (size.ConstructorArguments.Length > 2 && size.ConstructorArguments[2].Value is bool keep)
+            sb.Append("                KeepImageAspectRatio = ").Append(keep ? "true" : "false").AppendLine(",");
+    }
+
+    /// <summary>
+    /// Resolves a named member to a readable public property producing an image, or a list of them,
+    /// reporting the same diagnostics a mistyped condition gets.
+    /// </summary>
+    private static bool ResolveImage(
+        SourceProductionContext spc,
+        INamedTypeSymbol type,
+        ISymbol site,
+        string attribute,
+        string name,
+        bool list)
+    {
+        var location = site.Locations.Length > 0 ? site.Locations[0] : Location.None;
+        var expected = list
+            ? "System.Collections.Generic.IReadOnlyList<Hawkynt.NativeForms.Drawing.IImage>"
+            : "Hawkynt.NativeForms.Drawing.IImage";
+
+        foreach (var member in type.GetMembers(name))
+        {
+            if (member is not IPropertySymbol candidate
+                || candidate.GetMethod is null
+                || candidate.DeclaredAccessibility != Accessibility.Public)
+                continue;
+
+            if (IsImageShaped(candidate.Type, list))
+                return true;
+
+            spc.ReportDiagnostic(Diagnostic.Create(
+                _WrongMemberType, location, attribute, name, expected, candidate.Type.ToDisplayString()));
+            return false;
+        }
+
+        spc.ReportDiagnostic(Diagnostic.Create(_UnresolvedMember, location, attribute, name, type.Name));
+        return false;
+    }
+
+    /// <summary>Whether a type is our image, or a list of them — matched by name, since the generator
+    /// cannot reference the runtime assembly it is generating against.</summary>
+    private static bool IsImageShaped(ITypeSymbol type, bool list)
+    {
+        const string ImageName = "Hawkynt.NativeForms.Drawing.IImage";
+        if (!list)
+            return type.ToDisplayString().TrimEnd('?') == ImageName
+                || type.AllInterfaces.Any(i => i.ToDisplayString() == ImageName);
+
+        if (type is not INamedTypeSymbol { IsGenericType: true } named)
+            return false;
+
+        return named.TypeArguments.Length == 1
+            && named.TypeArguments[0].ToDisplayString().TrimEnd('?') == ImageName;
+    }
+
     private static string ColumnKindFor(IPropertySymbol prop)
     {
         if (GetEnumArgument(prop, "GridColumnKindAttribute") is { } forced)
@@ -329,6 +426,16 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
 
         spc.ReportDiagnostic(Diagnostic.Create(_UnresolvedMember, location, attribute, name, type.Name));
         return false;
+    }
+
+    /// <summary>The attribute of the given name applied to a symbol, or <see langword="null"/>.</summary>
+    private static AttributeData? GetAttribute(ISymbol symbol, string attributeName)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+            if (attribute.AttributeClass?.Name == attributeName)
+                return attribute;
+
+        return null;
     }
 
     private static int? GetIntArgument(ISymbol symbol, string attributeName)

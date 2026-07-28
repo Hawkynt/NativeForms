@@ -88,9 +88,19 @@ typo is a build error (`NFG002`) and a wrong-typed member is `NFG003`, not a sil
 | `[GridColumnReadOnlyWhen]` | property | `string propertyName` | Cells are read-only while the named `bool` property is true (`ReadOnlyCellSelector`). |
 | `[GridColumnSortMode]` | property | `DataGridViewColumnSortMode mode` | The column's sort mode; `Automatic` makes the header clickable. |
 | `[GridColumnWidth]` | property | `int width` | The column's starting pixel width. |
+| `[GridColumnImage]` | property | `string propertyName` | Draws the `IImage` the named property yields beside the text (`ImageSelector`). |
+| `[GridColumnImages]` | property | `string propertyName` | Draws the list of `IImage` the named property yields as a strip (`ImagesSelector`). |
+| `[GridColumnImageSize]` | property | `int width, int height, bool keepAspectRatio = true` | Fixes the box the image is drawn into. |
+| `[GridColumnOverlayImages]` | property | `string propertyName` | Stacks the list of `IImage` the named property yields as badges (`OverlayImagesSelector`). |
+| `[GridColumnTextImageRelation]` | property | `TextImageRelation relation` | Which side of the text the image sits on. |
 | `[GridRowHeightFrom]` | class | `string propertyName` | Row height from the named `int` property (`RowHeightSelector`). |
 | `[GridRowHiddenWhen]` | class | `string propertyName` | Hides the row while the named `bool` property is true (`RowHiddenSelector`). |
 | `[GridRowSelectableWhen]` | class | `string propertyName` | Row is selectable only while the named `bool` property is true (`RowSelectableSelector`). |
+
+The image attributes name a property the same way the conditional ones do, and are resolved the same
+way: the member must be a readable public property returning an `IImage` (or an `IReadOnlyList<IImage>`
+for the list forms), or the build fails with `NFG002`/`NFG003`. The property producing the image is
+usually itself `[GridIgnore]`d, since it feeds a column rather than being one.
 
 Column kinds are inferred from the property type: `bool` → `Check`, any numeric → `NumericUpDown`,
 `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`, `Color` → `Color`, an `enum` → `ComboBox`,
