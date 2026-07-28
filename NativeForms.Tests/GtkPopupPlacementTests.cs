@@ -77,7 +77,10 @@ public sealed partial class GtkPopupPlacementTests
         var observed = new Observations();
 
         var form = new Form { Text = _FormTitle, Width = 520, Height = 420 };
-        var combo = new ComboBox { Bounds = new Rectangle(20, 200, 180, 26) };
+        // These assertions are about our own popup engine, so the combo is pinned to the owner-drawn
+        // path: promoted, it would show the platform's list instead and there would be no surface of
+        // ours to observe (PRD §12).
+        var combo = new ComboBox { Bounds = new Rectangle(20, 200, 180, 26), UseNativeWidget = false };
         combo.Items.Add("Mercury");
         combo.Items.Add("Venus");
         combo.Items.Add("Earth");

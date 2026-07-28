@@ -141,6 +141,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITrackBarPeer? CreateTrackBar(bool vertical)
         => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
 
+    /// <summary>Whether this backend accepts the drop-down-list promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeComboBox { get; set; }
+
+    /// <summary>The last combo peer handed out, so a test can drive it like the real widget.</summary>
+    public HeadlessComboBoxPeer? LastComboBox { get; private set; }
+
+    public IComboBoxPeer? CreateComboBox()
+        => !this.OfferNativeComboBox ? null : this.LastComboBox = this.Track(new HeadlessComboBoxPeer());
+
     /// <summary>Whether this backend accepts the scroll-bar promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeScrollBar { get; set; }
 
@@ -1287,6 +1296,55 @@ internal sealed class HeadlessRadioButtonPeer : HeadlessPeer, IRadioButtonPeer
     {
         _checked = true;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+
+/// <summary>A stand-in for a real platform drop-down list, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessComboBoxPeer : HeadlessPeer, IComboBoxPeer
+{
+    private int _selectedIndex = -1;
+
+    public event EventHandler? SelectionChanged;
+
+    public event EventHandler? DropDownOpened;
+
+    public event EventHandler? DropDownClosed;
+
+    /// <summary>The item texts the core last handed over.</summary>
+    public string[] Items { get; private set; } = [];
+
+    /// <summary>Whether the widget's own list is open.</summary>
+    public bool DroppedDown { get; private set; }
+
+    public void SetItems(ReadOnlySpan<string> items, int selectedIndex)
+    {
+        this.Items = items.ToArray();
+        _selectedIndex = selectedIndex;
+    }
+
+    public void SetSelectedIndex(int index) => _selectedIndex = index;
+
+    public int GetSelectedIndex() => _selectedIndex;
+
+    /// <summary>Models a real widget, which reports the edge it just went through.</summary>
+    public void SetDroppedDown(bool droppedDown)
+    {
+        if (this.DroppedDown == droppedDown)
+            return;
+
+        this.DroppedDown = droppedDown;
+        if (droppedDown)
+            DropDownOpened?.Invoke(this, EventArgs.Empty);
+        else
+            DropDownClosed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Simulates the user picking a row.</summary>
+    public void RaiseUserSelect(int index)
+    {
+        _selectedIndex = index;
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 }
 

@@ -1373,6 +1373,46 @@ internal sealed partial class Autopilot
             this.Expect("the status line", this.Read(() => status.Text), "Toolbar: New clicked.");
         });
 
+        this.Check("Native promotion: every eligible control on screen realized onto a real widget", () =>
+        {
+            // The peers under this are pure interop, so nothing but a live desktop proves they were built
+            // at all. Each entry is a control whose properties clear its gate (PRD §12).
+            this.ExpectTrue("CheckBox stayed owner-drawn", this.Read(() => _form.Part<CheckBox>("basics.check").IsNativeWidget));
+            this.ExpectTrue("LinkLabel stayed owner-drawn", this.Read(() => _form.Part<LinkLabel>("basics.link").IsNativeWidget));
+            this.ExpectTrue("ProgressBar stayed owner-drawn", this.Read(() => _form.Part<ProgressBar>("basics.progressHalf").IsNativeWidget));
+            this.ExpectTrue("TrackBar stayed owner-drawn", this.Read(() => _form.Part<TrackBar>("input.track").IsNativeWidget));
+            this.ExpectTrue("HScrollBar stayed owner-drawn", this.Read(() => _form.Part<HScrollBar>("input.hscroll").IsNativeWidget));
+            this.ExpectTrue("VScrollBar stayed owner-drawn", this.Read(() => _form.Part<VScrollBar>("input.vscroll").IsNativeWidget));
+            this.ExpectTrue("ComboBox stayed owner-drawn", this.Read(() => _form.Part<ComboBox>("ribbon.styleCombo").IsNativeWidget));
+            this.ExpectTrue("RadioButton stayed owner-drawn", this.Read(() => _form.Part<RadioButton>("ribbon.calendarDay").IsNativeWidget));
+
+            // And the ones whose state rules them out must have stayed behind.
+            this.ExpectTrue(
+                "the icon RadioButton was promoted, but no platform radio draws an image beside its caption",
+                !this.Read(() => _form.Part<RadioButton>("basics.radioSmall").IsNativeWidget));
+            this.ExpectTrue(
+                "the icon ComboBox was promoted, but a stock combo shows no per-item icons",
+                !this.Read(() => _form.Part<ComboBox>("lists.comboList").IsNativeWidget));
+            this.ExpectTrue(
+                "the editable ComboBox was promoted, but its editor is a hosted TextBox",
+                !this.Read(() => _form.Part<ComboBox>("lists.comboEdit").IsNativeWidget));
+        });
+
+        this.Check("Native promotion: a promoted ComboBox drives its selection through the platform list", () =>
+        {
+            var combo = _form.Part<ComboBox>("ribbon.styleCombo");
+            if (!this.Read(() => combo.IsNativeWidget))
+            {
+                this.Fail("the ribbon style combo was not promoted, so there is nothing native to drive");
+                return;
+            }
+
+            this.Do(() => combo.SelectedIndex = 2);
+            this.Settle();
+            this.Expect("SelectedIndex after assigning it", this.Read(() => combo.SelectedIndex), 2);
+            this.Expect("the text the widget reports back", this.Read(() => combo.Text), "Heading 2");
+        });
+
         this.Check("ToolTip: hovering an owner-drawn control raises the tip after its initial delay", () =>
         {
             this.SelectTab(0);

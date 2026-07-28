@@ -537,6 +537,12 @@ public interface IComboBoxPeer : IControlPeer
     /// <summary>Raised when the user picks an item. Programmatic changes must not raise it.</summary>
     event EventHandler? SelectionChanged;
 
+    /// <summary>Raised when the widget's own list opens.</summary>
+    event EventHandler? DropDownOpened;
+
+    /// <summary>Raised when the widget's own list closes.</summary>
+    event EventHandler? DropDownClosed;
+
     /// <summary>Replaces the whole item list, then restores the selection the core asks for.</summary>
     void SetItems(ReadOnlySpan<string> items, int selectedIndex);
 
@@ -545,6 +551,12 @@ public interface IComboBoxPeer : IControlPeer
 
     /// <summary>The widget's current selection, read when it reports a change.</summary>
     int GetSelectedIndex();
+
+    /// <summary>
+    /// Opens or closes the widget's own list, so <see cref="ComboBox.OpenDropDown"/> still works when the
+    /// control has no popup of its own to show.
+    /// </summary>
+    void SetDroppedDown(bool droppedDown);
 }
 
 

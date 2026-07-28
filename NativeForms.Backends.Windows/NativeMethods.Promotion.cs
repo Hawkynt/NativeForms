@@ -139,6 +139,65 @@ internal static partial class NativeMethods
         internal fixed char szUrl[2084];
     }
 
+    // --- COMBOBOX / LISTBOX ------------------------------------------------------------------------
+
+    /// <summary>Combo box: a drop-down list with no editable field.</summary>
+    internal const uint CBS_DROPDOWNLIST = 0x0003;
+
+    /// <summary>Combo box: keep the list sorted by the control rather than by insertion order.</summary>
+    internal const uint CBS_HASSTRINGS = 0x0200;
+
+    /// <summary>Combo box: appends a string.</summary>
+    internal const uint CB_ADDSTRING = 0x0143;
+
+    /// <summary>Combo box: empties the list.</summary>
+    internal const uint CB_RESETCONTENT = 0x014B;
+
+    /// <summary>Combo box: sets the selected index (-1 clears).</summary>
+    internal const uint CB_SETCURSEL = 0x014E;
+
+    /// <summary>Combo box: reads the selected index (-1 for none).</summary>
+    internal const uint CB_GETCURSEL = 0x0147;
+
+    /// <summary>Combo box: opens or closes the list.</summary>
+    internal const uint CB_SHOWDROPDOWN = 0x014F;
+
+    /// <summary>Combo box: the selection changed.</summary>
+    internal const int CBN_SELCHANGE = 1;
+
+    /// <summary>Combo box: the list is about to be shown.</summary>
+    internal const int CBN_DROPDOWN = 7;
+
+    /// <summary>Combo box: the list has been closed.</summary>
+    internal const int CBN_CLOSEUP = 8;
+
+    /// <summary>List box: notify the owner of selections.</summary>
+    internal const uint LBS_NOTIFY = 0x0001;
+
+    /// <summary>List box: always show the vertical scroll bar's space.</summary>
+    internal const uint LBS_DISABLENOSCROLL = 0x1000;
+
+    /// <summary>List box: appends a string.</summary>
+    internal const uint LB_ADDSTRING = 0x0180;
+
+    /// <summary>List box: empties the list.</summary>
+    internal const uint LB_RESETCONTENT = 0x0184;
+
+    /// <summary>List box: sets the selected index (-1 clears).</summary>
+    internal const uint LB_SETCURSEL = 0x0186;
+
+    /// <summary>List box: reads the selected index (-1 for none).</summary>
+    internal const uint LB_GETCURSEL = 0x0188;
+
+    /// <summary>List box: scrolls an index into view without selecting it.</summary>
+    internal const uint LB_SETTOPINDEX = 0x0197;
+
+    /// <summary>List box: the selection changed.</summary>
+    internal const int LBN_SELCHANGE = 1;
+
+    /// <summary>List box: an item was double-clicked.</summary>
+    internal const int LBN_DBLCLK = 2;
+
     // --- Stand-alone scroll bars -------------------------------------------------------------------
 
     /// <summary>Scroll bar: runs horizontally.</summary>

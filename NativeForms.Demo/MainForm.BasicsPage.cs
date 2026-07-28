@@ -248,6 +248,7 @@ internal sealed partial class MainForm
         this.Publish("basics.dialogResult", dialogResultLabel);
         this.Publish("basics.link", link);
         this.Publish("basics.check", plainCheck);
+        this.Publish("basics.progressHalf", half);
         this.Publish("basics.checkDisabled", disabledCheck);
         this.Publish("basics.toggle", toggle);
         this.Publish("basics.radioSmall", small);

@@ -325,6 +325,34 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
 
+    /// <summary>Creates a <c>GtkComboBoxText</c> — a drop-down list of plain strings.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_combo_box_text_new();
+
+    /// <summary>Appends a string to a <c>GtkComboBoxText</c>.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_combo_box_text_append_text(nint comboBox, string text);
+
+    /// <summary>Empties a <c>GtkComboBoxText</c>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_combo_box_text_remove_all(nint comboBox);
+
+    /// <summary>Selects the row at the given index, or clears the selection with -1.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_combo_box_set_active(nint comboBox, int index);
+
+    /// <summary>The selected row's index, or -1 for none.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_combo_box_get_active(nint comboBox);
+
+    /// <summary>Opens the combo's own list.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_combo_box_popup(nint comboBox);
+
+    /// <summary>Closes the combo's own list.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_combo_box_popdown(nint comboBox);
+
     /// <summary>Creates a <c>GtkScrollbar</c> along the given orientation over an adjustment (0 makes one).</summary>
     [LibraryImport(Gtk)]
     internal static partial nint gtk_scrollbar_new(int orientation, nint adjustment);
@@ -699,6 +727,20 @@ internal static partial class NativeMethods
     /// </summary>
     [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial void g_object_get_int(nint @object, string firstPropertyName, out int value, nint terminator);
+
+    /// <summary>
+    /// Reads a single <c>gboolean</c> object property through the same fixed-signature variadic mapping
+    /// as the other readers; GObject writes exactly <c>sizeof(gboolean)</c> bytes into the out slot.
+    /// </summary>
+    [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
+    private static partial void g_object_get_gboolean(nint @object, string firstPropertyName, out int value, nint terminator);
+
+    /// <summary>Reads a boolean object property.</summary>
+    internal static bool g_object_get_bool(nint @object, string propertyName)
+    {
+        g_object_get_gboolean(@object, propertyName, out var value, 0);
+        return value != 0;
+    }
 
     /// <summary>
     /// Writes a single <c>gint</c> object property (used to pin <c>gtk-xft-dpi</c>) through the same

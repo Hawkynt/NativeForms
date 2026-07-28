@@ -54,7 +54,19 @@ public class ComboBox : OwnerDrawnControl
     } = static item => item?.ToString() ?? string.Empty;
 
     /// <summary>Optional selector producing an icon for an item; <see langword="null"/> for none.</summary>
-    public Func<object?, IImage?>? ImageSelector { get; set; }
+    public Func<object?, IImage?>? ImageSelector
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.ReconsiderPromotion(); // per-item icons are what a stock combo cannot show
+            this.Invalidate();
+        }
+    }
 
     /// <summary>The icon store <see cref="ImageIndexSelector"/> indexes into, or <see langword="null"/> for none.</summary>
     public ImageList? ImageList
@@ -67,13 +79,26 @@ public class ComboBox : OwnerDrawnControl
 
             this.BindImageListAnimation(field, value);
             field = value;
+            this.ReconsiderPromotion();
             this.Invalidate();
         }
     }
 
     /// <summary>Optional selector mapping an item to its <see cref="ImageList"/> index; a negative
     /// index means no icon. <see cref="ImageSelector"/> wins when both are set.</summary>
-    public Func<object?, int>? ImageIndexSelector { get; set; }
+    public Func<object?, int>? ImageIndexSelector
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.ReconsiderPromotion();
+            this.Invalidate();
+        }
+    }
 
     /// <summary>Optional selector producing the binding value of an item, the reflection-free stand-in
     /// for <c>ValueMember</c>; <see langword="null"/> makes the item its own value.</summary>
@@ -102,6 +127,7 @@ public class ComboBox : OwnerDrawnControl
             else
                 this.RemoveEditor();
 
+            this.ReconsiderPromotion();
             this.Invalidate();
         }
     } = ComboBoxStyle.DropDownList;
@@ -120,6 +146,7 @@ public class ComboBox : OwnerDrawnControl
             if (_editor is not null)
                 _editor.PlaceholderText = value;
 
+            this.ReconsiderPromotion();
             this.Invalidate();
         }
     } = string.Empty;
@@ -143,6 +170,7 @@ public class ComboBox : OwnerDrawnControl
                 return;
 
             _selectedIndex = clamped;
+            _native?.SetSelectedIndex(clamped);
             this.PushSelectionIntoEditor();
             this.Invalidate();
             this.OnSelectedIndexChanged(EventArgs.Empty);
@@ -239,6 +267,102 @@ public class ComboBox : OwnerDrawnControl
         }
     }
 
+    private IComboBoxPeer? _native;
+    private bool? _nativeOffered;
+
+    /// <summary>
+    /// Forces this combo onto the native widget (<see langword="true"/>) or the owner-drawn painter
+    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
+    /// <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether this combo is currently rendered by a real platform widget.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform drop-down list. A stock
+    /// combo shows a flat list of strings and nothing else, so per-item images and a placeholder rule it
+    /// out — and the editable style hosts a real <see cref="TextBox"/> child, which a native combo has
+    /// nowhere to put.
+    /// </summary>
+    private bool IsNativeEligible
+        => this.DropDownStyle == ComboBoxStyle.DropDownList
+        && this.PlaceholderText.Length == 0
+        && this.ImageSelector is null
+        && this.ImageIndexSelector is null
+        && this.ImageList is null;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
+        {
+            var offered = backend.CreateComboBox();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                this.PushNativeItems(peer);
+                peer.SelectionChanged += this.OnNativeSelectionChanged;
+                peer.DropDownOpened += this.OnNativeDropDownOpened;
+                peer.DropDownClosed += this.OnNativeDropDownClosed;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <summary>Re-realizes the control when a property change crossed the eligibility line.</summary>
+    private void ReconsiderPromotion()
+    {
+        if (this.IsNativeWidget != this.WouldBeNative)
+            this.RerealizePeer();
+    }
+
+    /// <summary>Renders every item through <see cref="DisplaySelector"/> and hands the list over whole.</summary>
+    private void PushNativeItems(IComboBoxPeer peer)
+    {
+        var count = this.Items.Count;
+        var texts = count == 0 ? [] : new string[count];
+        for (var i = 0; i < count; ++i)
+            texts[i] = this.DisplaySelector(this.Items[i]) ?? string.Empty;
+
+        peer.SetItems(texts, _selectedIndex);
+    }
+
+    /// <summary>The widget's selection moved; mirror it, which raises the public event exactly once.</summary>
+    private void OnNativeSelectionChanged(object? sender, EventArgs e)
+    {
+        if (_native is { } peer)
+            this.SelectedIndex = peer.GetSelectedIndex();
+    }
+
+    /// <summary>The widget opened its own list; flip the flag and raise the event the popup path raises.</summary>
+    private void OnNativeDropDownOpened(object? sender, EventArgs e)
+    {
+        if (_droppedDown)
+            return;
+
+        _droppedDown = true;
+        this.OnDropDown(EventArgs.Empty);
+    }
+
+    /// <summary>The widget closed its own list.</summary>
+    private void OnNativeDropDownClosed(object? sender, EventArgs e)
+    {
+        if (!_droppedDown)
+            return;
+
+        _droppedDown = false;
+        this.OnDropDownClosed(EventArgs.Empty);
+    }
+
     /// <summary>Raised when <see cref="SelectedIndex"/> changes, by user gesture or assignment.</summary>
     public event EventHandler? SelectedIndexChanged;
 
@@ -276,6 +400,14 @@ public class ComboBox : OwnerDrawnControl
 
     private protected override void OnUnrealized()
     {
+        if (_native is { } peer)
+        {
+            peer.SelectionChanged -= this.OnNativeSelectionChanged;
+            peer.DropDownOpened -= this.OnNativeDropDownOpened;
+            peer.DropDownClosed -= this.OnNativeDropDownClosed;
+            _native = null;
+        }
+
         base.OnUnrealized();
         _droppedDown = false;
         _popup?.Dispose();
@@ -441,6 +573,14 @@ public class ComboBox : OwnerDrawnControl
         if (_droppedDown)
             return;
 
+        // A promoted combo has no popup of its own: the widget owns the list, and reports back through
+        // DropDownOpened, which is what flips the flag and raises the event.
+        if (_native is { } native)
+        {
+            native.SetDroppedDown(true);
+            return;
+        }
+
         var backend = this.Backend;
         if (backend is null)
             return;
@@ -463,6 +603,12 @@ public class ComboBox : OwnerDrawnControl
     {
         if (!_droppedDown)
             return;
+
+        if (_native is { } native)
+        {
+            native.SetDroppedDown(false);
+            return;
+        }
 
         _droppedDown = false;
         this.OwnsOpenPopup = false;
@@ -653,6 +799,11 @@ public class ComboBox : OwnerDrawnControl
             _popupTopIndex = Math.Clamp(_popupTopIndex, 0, Math.Max(0, this.Items.Count - _popupVisibleRows));
             _popup?.InvalidateAll();
         }
+
+        // The widget holds its own copy of the list, so any structural change re-sends it whole; the item
+        // counts are small and this keeps one code path instead of an incremental mirror.
+        if (_native is { } peer)
+            this.PushNativeItems(peer);
 
         this.Invalidate();
         if (changed)

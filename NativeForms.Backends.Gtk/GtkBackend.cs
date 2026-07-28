@@ -180,6 +180,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real drop-down list, so this backend accepts the promotion (PRD §12).</remarks>
+    public IComboBoxPeer? CreateComboBox()
+    {
+        EnsureInitialized();
+        return new GtkComboBoxPeer();
+    }
+
+    /// <inheritdoc />
     /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
     public IProgressBarPeer? CreateProgressBar()
     {

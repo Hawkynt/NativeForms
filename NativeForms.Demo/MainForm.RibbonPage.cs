@@ -162,7 +162,8 @@ internal sealed partial class MainForm
 
         var calendar = new AccordionPane("Calendar") { ImageIndex = _IconGreen };
         calendar.Controls.Add(new Label { Bounds = new(12, 10, 260, 18), Text = "Show" });
-        calendar.Controls.Add(new RadioButton { Bounds = new(12, 34, 264, 20), Text = "Day", Checked = true });
+        var calendarDay = new RadioButton { Bounds = new(12, 34, 264, 20), Text = "Day", Checked = true };
+        calendar.Controls.Add(calendarDay);
         calendar.Controls.Add(new RadioButton { Bounds = new(12, 58, 264, 20), Text = "Work week" });
         calendar.Controls.Add(new RadioButton { Bounds = new(12, 82, 264, 20), Text = "Month" });
         // Kept inside 124 px so the Calendar body is complete even when a second pane is open beside
@@ -270,6 +271,7 @@ internal sealed partial class MainForm
         this.Publish("ribbon.clipboard", clipboard);
         this.Publish("ribbon.styles", styles);
         this.Publish("ribbon.styleCombo", styleCombo);
+        this.Publish("ribbon.calendarDay", calendarDay);
         this.Publish("ribbon.minimize", minimize);
         this.Publish("ribbon.multiple", multiple);
         this.Publish("ribbon.narrow", narrow);

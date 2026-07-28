@@ -15,7 +15,7 @@ internal abstract class Win32ControlPeer : IControlPeer
     /// <summary>Buffered caption/content text, applied whenever a native handle exists.</summary>
     protected string _text = string.Empty;
 
-    private Rectangle _bounds;
+    private protected Rectangle _bounds;
     private bool _visible = true;
     private bool _enabled = true;
     private Font? _font;
@@ -30,7 +30,7 @@ internal abstract class Win32ControlPeer : IControlPeer
     internal nint Handle;
 
     /// <inheritdoc/>
-    public void SetBounds(Rectangle bounds)
+    public virtual void SetBounds(Rectangle bounds)
     {
         _bounds = bounds;
         if (Handle != 0)
