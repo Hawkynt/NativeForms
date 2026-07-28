@@ -455,8 +455,14 @@ strategy (may differ per platform; note exceptions inline).
       model yet)
 - [x] `HScrollBar`/`VScrollBar` (native, or owner-drawn — §12) — proportional thumb, channel paging, arrow autorepeat,
       Win32 `Maximum − LargeChange + 1` semantics, `Scroll` vs `ValueChanged` split
-  - [ ] Unify the two internal scrollbar renderers (`Drawing.ScrollBarRenderer` used by
-        `Panel.AutoScroll` vs the `ScrollBar` control's own) into one implementation
+  - [x] Unify the two internal scrollbar renderers (`Drawing.ScrollBarRenderer` used by
+        `Panel.AutoScroll` vs the `ScrollBar` control's own) into one implementation. They were the same
+        arithmetic under two names: a container's extent/viewport/offset triple converts exactly into the
+        Windows Forms quartet (`minimum = 0`, `maximum = extent - 1`, `largeChange = viewport`), so the
+        thumb length and the position-to-pixel mapping now live in one place and the container-shaped
+        calls convert and delegate. What legitimately differed — minimum thumb length, thumb inset,
+        whether there are stepper buttons — is a `ScrollBarMetrics` profile, so neither caller's rendering
+        changed: the pinned paint output is byte-identical.
 - [x] `MonthCalendar` (owner) — `CalendarCore` engine (title + nav arrows, `FirstDayOfWeek`
       header, 6×7 grid with leading/trailing greying, today accent, single + Shift/drag range
       selection capped by `MaxSelectionCount`, `Min`/`MaxDate` clamps, full keyboard set incl.

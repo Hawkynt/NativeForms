@@ -1,5 +1,6 @@
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
 

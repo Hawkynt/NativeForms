@@ -251,7 +251,7 @@ public class Panel : OwnerDrawnControl
             var verticalTrack = this.GetVerticalTrack(horizontalBar);
             if (verticalTrack.Contains(e.Location))
             {
-                var thumb = Drawing.ScrollBarRenderer.GetThumb(verticalTrack, vertical: true, extent.Height, viewport.Height, _scroll.Y);
+                var thumb = ScrollBarRenderer.GetThumb(verticalTrack, vertical: true, extent.Height, viewport.Height, _scroll.Y);
                 if (thumb.Contains(e.Location))
                 {
                     _thumbDrag = _VerticalThumbDrag;
@@ -272,7 +272,7 @@ public class Panel : OwnerDrawnControl
         if (!horizontalTrack.Contains(e.Location))
             return;
 
-        var horizontalThumb = Drawing.ScrollBarRenderer.GetThumb(horizontalTrack, vertical: false, extent.Width, viewport.Width, _scroll.X);
+        var horizontalThumb = ScrollBarRenderer.GetThumb(horizontalTrack, vertical: false, extent.Width, viewport.Width, _scroll.X);
         if (horizontalThumb.Contains(e.Location))
         {
             _thumbDrag = _HorizontalThumbDrag;
@@ -292,13 +292,13 @@ public class Panel : OwnerDrawnControl
         this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
         if (_thumbDrag == _VerticalThumbDrag)
         {
-            var position = Drawing.ScrollBarRenderer.PositionFromThumbDelta(
+            var position = ScrollBarRenderer.PositionFromThumbDelta(
                 this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _thumbDragOrigin, e.Y - _thumbDragPixel);
             this.ScrollTo(_scroll.X, position);
         }
         else
         {
-            var position = Drawing.ScrollBarRenderer.PositionFromThumbDelta(
+            var position = ScrollBarRenderer.PositionFromThumbDelta(
                 this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _thumbDragOrigin, e.X - _thumbDragPixel);
             this.ScrollTo(position, _scroll.Y);
         }
@@ -333,10 +333,10 @@ public class Panel : OwnerDrawnControl
 
         this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
         if (verticalBar)
-            Drawing.ScrollBarRenderer.Paint(g, this.Theme, this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _scroll.Y);
+            ScrollBarRenderer.Paint(g, this.Theme, this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _scroll.Y);
 
         if (horizontalBar)
-            Drawing.ScrollBarRenderer.Paint(g, this.Theme, this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _scroll.X);
+            ScrollBarRenderer.Paint(g, this.Theme, this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _scroll.X);
 
         if (verticalBar && horizontalBar)
             g.FillRectangle(this.Theme.ControlBackground, new Rectangle(viewport.Width, viewport.Height, this.Width - viewport.Width, this.Height - viewport.Height));
