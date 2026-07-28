@@ -66,12 +66,6 @@ public class RadioButton : OwnerDrawnControl
     private IRadioButtonPeer? _native;
     private bool? _nativeOffered;
 
-    /// <summary>
-    /// Forces this button onto the native widget (<see langword="true"/>) or the owner-drawn painter
-    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
-    /// <see cref="Application.PreferNativeWidgets"/>.
-    /// </summary>
-    public bool? UseNativeWidget { get; set; }
 
     /// <summary>Whether this button is currently rendered by a real platform widget.</summary>
     public bool IsNativeWidget => _native is not null;

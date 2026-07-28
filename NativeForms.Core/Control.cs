@@ -48,6 +48,12 @@ public abstract class Control
 
         /// <summary>A light-dismiss surface owned by this control is on screen holding the grab.</summary>
         PopupOpen = 1 << 13,
+
+        /// <summary><see cref="UseNativeWidget"/> was assigned and overrides the application default.</summary>
+        NativePreferenceAssigned = 1 << 14,
+
+        /// <summary>The explicitly assigned <see cref="UseNativeWidget"/> value.</summary>
+        NativePreference = 1 << 15,
     }
 
     /// <summary>The bit position of the packed <see cref="AnchorStyles"/> flags inside <see cref="_state"/>.</summary>
@@ -650,6 +656,48 @@ public abstract class Control
 
     /// <summary>The containing control, or <see langword="null"/> for a top-level form.</summary>
     public Control? Parent { get; internal set; }
+
+    /// <summary>
+    /// Forces this control onto a real platform widget (<see langword="true"/>) or onto the owner-drawn
+    /// painter (<see langword="false"/>); <see langword="null"/> — the default — follows
+    /// <see cref="Application.PreferNativeWidgets"/>. Controls that have no platform counterpart ignore
+    /// it entirely (PRD §12).
+    /// </summary>
+    /// <remarks>
+    /// <see langword="true"/> is a preference, never an override of the truth: a control is promoted only
+    /// while its properties stay inside what the platform widget can express, and a backend that has no
+    /// such widget declines regardless. Assigning this on a realized control does not swap its peer — a
+    /// form on screen should not change its rendering out from under the user; a property change that
+    /// crosses the eligibility line does, because there the alternative is drawing something wrong.
+    /// <para>
+    /// Setting it to <see langword="false"/> is the escape hatch for a host that imposes a size a
+    /// platform widget will not accept — <see cref="ToolStripControlHost"/> does exactly that, because a
+    /// toolbar row is shorter than several desktops will draw a combo box in.
+    /// </para>
+    /// </remarks>
+    /// <remarks>
+    /// Packed into the state flags rather than held in a field of its own: this is on every control in
+    /// the library, and the per-instance budgets of PRD §4 do not have room for two more bytes on all of
+    /// them.
+    /// </remarks>
+    public bool? UseNativeWidget
+    {
+        get => (_state & State.NativePreferenceAssigned) == 0 ? null : (_state & State.NativePreference) != 0;
+        set
+        {
+            if (value is not { } preferred)
+            {
+                _state &= ~(State.NativePreferenceAssigned | State.NativePreference);
+                return;
+            }
+
+            _state |= State.NativePreferenceAssigned;
+            if (preferred)
+                _state |= State.NativePreference;
+            else
+                _state &= ~State.NativePreference;
+        }
+    }
 
     /// <summary>
     /// The context menu a right-click on this control opens at the cursor, or <see langword="null"/>

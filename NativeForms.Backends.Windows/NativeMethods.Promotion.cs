@@ -25,6 +25,9 @@ internal static partial class NativeMethods
     /// <summary>A frame with a caption; the classic group box.</summary>
     internal const uint BS_GROUPBOX = 0x00000007;
 
+    /// <summary>Puts a window at the bottom of the z-order (a <c>SetWindowPos</c> insert-after handle).</summary>
+    internal const nint HWND_BOTTOM = 1;
+
     /// <summary>Starts a new tab/arrow-key group — what makes a run of radio buttons one group.</summary>
     internal const uint WS_GROUP = 0x00020000;
 

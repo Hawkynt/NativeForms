@@ -432,6 +432,13 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                         peer.OnNotifyMessage(lParam);
                     return 0;
 
+                case NativeMethods.WM_HSCROLL:
+                case NativeMethods.WM_VSCROLL:
+                    // A hosted slider or scroll bar identifies itself by HWND rather than control id.
+                    if (lParam != 0)
+                        peer.ChildFromHandle(lParam)?.OnScroll((int)(wParam & 0xFFFF));
+                    return 0;
+
                 case NativeMethods.WM_CTLCOLORSTATIC:
                 case NativeMethods.WM_CTLCOLOREDIT:
                 case NativeMethods.WM_CTLCOLORLISTBOX:

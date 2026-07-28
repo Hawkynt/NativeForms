@@ -16,11 +16,6 @@ public class TrackBar : OwnerDrawnControl
     private ITrackBarPeer? _native;
     private bool? _nativeOffered;
 
-    /// <summary>
-    /// Whether this slider realizes onto a real platform slider rather than the owner-drawn surface.
-    /// <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
-    /// </summary>
-    public bool? UseNativeWidget { get; set; }
 
     /// <summary>Whether the control is currently backed by a real platform slider.</summary>
     public bool IsNativeWidget => _native is not null;

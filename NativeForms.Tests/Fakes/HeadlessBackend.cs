@@ -141,6 +141,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITrackBarPeer? CreateTrackBar(bool vertical)
         => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
 
+    /// <summary>Whether this backend accepts the caption-frame promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeGroupBox { get; set; }
+
+    /// <summary>The last frame peer handed out, so a test can inspect what it was given.</summary>
+    public HeadlessGroupBoxPeer? LastGroupBox { get; private set; }
+
+    public IGroupBoxPeer? CreateGroupBox()
+        => !this.OfferNativeGroupBox ? null : this.LastGroupBox = this.Track(new HeadlessGroupBoxPeer());
+
     /// <summary>Whether this backend accepts the list promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeListBox { get; set; }
 
@@ -1306,6 +1315,18 @@ internal sealed class HeadlessRadioButtonPeer : HeadlessPeer, IRadioButtonPeer
         _checked = true;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
+}
+
+
+/// <summary>A stand-in for a real platform caption frame, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessGroupBoxPeer : HeadlessPeer, IGroupBoxPeer
+{
+    /// <summary>The child peers this frame is hosting, in the order they arrived.</summary>
+    public List<IControlPeer> Children { get; } = [];
+
+    public void AddChild(IControlPeer child) => this.Children.Add(child);
+
+    public void RemoveChild(IControlPeer child) => this.Children.Remove(child);
 }
 
 

@@ -78,6 +78,7 @@ public interface IPlatformBackend
     IScrollBarPeer? CreateScrollBar(bool vertical) => null;
 
     /// <summary>Creates a native caption-frame peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    /// <remarks>The peer hosts the control's children itself; see <see cref="IGroupBoxPeer"/> for why.</remarks>
     IGroupBoxPeer? CreateGroupBox() => null;
 
     /// <summary>Creates a native drop-down-list peer, or <see langword="null"/> to decline (PRD §12).</summary>

@@ -14,6 +14,12 @@ public class ToolStripControlHost : ToolStripItem
     public ToolStripControlHost(Control control)
     {
         ArgumentNullException.ThrowIfNull(control);
+
+        // A toolbar row is a fixed, deliberately short strip, and several desktops will not draw a combo
+        // box or a slider that small — the widget keeps its own minimum and is clipped. Hosted controls
+        // therefore stay on the owner-drawn painter, which honours whatever height the bar hands it
+        // (PRD §12). An application that wants the platform widget can opt back in per control.
+        control.UseNativeWidget ??= false;
         this.Control = control;
     }
 

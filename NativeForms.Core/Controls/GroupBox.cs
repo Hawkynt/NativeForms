@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
@@ -28,12 +29,56 @@ public class GroupBox : OwnerDrawnControl
 
             field = value;
             this.UpdateImageAnimation();
+            if (this.IsNativeWidget != this.WouldBeNative)
+                this.RerealizePeer();
+
             this.Invalidate();
         }
     }
 
     /// <inheritdoc/>
     private protected override IImage? AnimatedImageSlot => this.Image;
+
+    private IGroupBoxPeer? _native;
+    private bool? _nativeOffered;
+
+
+    /// <summary>Whether this frame is currently rendered by a real platform widget.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform frame. A stock frame's
+    /// caption is text, so an <see cref="Image"/> beside it keeps the painter.
+    /// </summary>
+    private bool IsNativeEligible => this.Image is null;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
+        {
+            var offered = backend.CreateGroupBox();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        _native = null;
+        base.OnUnrealized();
+    }
 
     /// <summary>
     /// Where the <see cref="Image"/> sits relative to the caption. Defaults to

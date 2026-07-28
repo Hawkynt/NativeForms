@@ -196,6 +196,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real frame, so this backend accepts the promotion (PRD §12).</remarks>
+    public IGroupBoxPeer? CreateGroupBox()
+    {
+        EnsureInitialized();
+        return new GtkGroupBoxPeer();
+    }
+
+    /// <inheritdoc />
     /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
     public IProgressBarPeer? CreateProgressBar()
     {

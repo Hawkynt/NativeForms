@@ -121,12 +121,6 @@ public abstract class ScrollBar : OwnerDrawnControl
     private IScrollBarPeer? _native;
     private bool? _nativeOffered;
 
-    /// <summary>
-    /// Forces this bar onto the native widget (<see langword="true"/>) or the owner-drawn painter
-    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
-    /// <see cref="Application.PreferNativeWidgets"/>.
-    /// </summary>
-    public bool? UseNativeWidget { get; set; }
 
     /// <summary>Whether this bar is currently rendered by a real platform widget.</summary>
     public bool IsNativeWidget => _native is not null;

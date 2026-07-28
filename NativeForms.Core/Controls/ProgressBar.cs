@@ -23,11 +23,6 @@ public class ProgressBar : OwnerDrawnControl
     /// we have. See <see cref="WouldBeNative"/>.</summary>
     private bool? _nativeOffered;
 
-    /// <summary>
-    /// Whether this bar realizes onto a real platform progress indicator rather than the owner-drawn
-    /// surface. <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
-    /// </summary>
-    public bool? UseNativeWidget { get; set; }
 
     /// <summary>Whether the control is currently backed by a real platform progress indicator.</summary>
     public bool IsNativeWidget => _native is not null;

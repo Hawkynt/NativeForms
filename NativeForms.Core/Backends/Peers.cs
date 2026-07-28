@@ -514,17 +514,14 @@ public interface IScrollBarPeer : IControlPeer
 /// when a <see cref="GroupBox"/> is promoted to a real widget — see PRD §12.
 /// </summary>
 /// <remarks>
-/// A group box owns children, so the peer is an <see cref="IContainerPeer"/>: the frame supplies the
-/// border and caption, and the children are parented into the area inside it.
+/// A group box owns children, so the peer is an <see cref="IContainerPeer"/>. Both platforms build it the
+/// same way: a plain container carrying the control's own coordinate system, with the real frame widget
+/// behind everything else, filling it. Parenting the children <em>into</em> the frame instead would shift
+/// them by whatever inset the platform reserves, so the same bounds would land in a different place on
+/// each rendering path — and on Windows it would also strand the children's <c>WM_COMMAND</c>
+/// notifications at a stock control that discards them.
 /// </remarks>
-public interface IGroupBoxPeer : IContainerPeer
-{
-    /// <summary>
-    /// The inset from the peer's own bounds to the area children occupy, so the core can lay out against
-    /// the same rectangle the platform reserves for content.
-    /// </summary>
-    Padding GetContentInset();
-}
+public interface IGroupBoxPeer : IContainerPeer;
 
 
 /// <summary>

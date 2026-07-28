@@ -442,6 +442,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_tree_view_scroll_to_cell(nint treeView, nint path, nint column, int useAlign, float rowAlign, float colAlign);
 
+    /// <summary>Creates a <c>GtkFrame</c> with the given caption (0 for none).</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint gtk_frame_new(string? label);
+
+    /// <summary>Replaces a frame's caption.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_frame_set_label(nint frame, string? label);
+
     /// <summary>Creates a <c>GtkComboBoxText</c> — a drop-down list of plain strings.</summary>
     [LibraryImport(Gtk)]
     internal static partial nint gtk_combo_box_text_new();

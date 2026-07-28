@@ -19,17 +19,6 @@ public class CheckBox : OwnerDrawnControl
     /// instead of rebuilding a canvas peer that was never going to be promoted anyway.</summary>
     private bool? _nativeOffered;
 
-    /// <summary>
-    /// Whether this box realizes onto a real platform check box rather than the owner-drawn surface.
-    /// <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
-    /// </summary>
-    /// <remarks>
-    /// Only honoured while the control stays inside what the platform widget can express — see
-    /// <see cref="IsNativeEligible"/>. Setting <see cref="Image"/> on a realized control re-runs that
-    /// decision and swaps the peer; assigning this property itself does not, because a control that is
-    /// already showing should not change its rendering out from under a running form.
-    /// </remarks>
-    public bool? UseNativeWidget { get; set; }
 
     /// <summary>Whether the control is currently backed by a real platform check box.</summary>
     public bool IsNativeWidget => _native is not null;
