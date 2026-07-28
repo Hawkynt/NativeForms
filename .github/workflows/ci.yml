@@ -62,12 +62,13 @@ jobs:
       # real control state asserted, and a layout audit per page. This is the tier the headless fakes
       # cannot reach — a control sized from a wrong system metric passes every unit test and fails
       # here on the first frame.
-      # Advisory, not a gate, until the focus flake below is fixed: Xvfb runs without a window manager,
-      # so nothing assigns the toplevel X focus and the text-entry checks fail about one run in four
-      # (measured: 1 of 4 locally, 9 checks each time, all of the form "a click focuses X and typing
-      # lands in it"). Blocking merges on that would train people to ignore it.
+      # A gate. This was advisory for a focus flake measured at about one run in four on a
+      # window-manager-less Xvfb — nothing assigns the toplevel X focus, so the text-entry checks lose
+      # their keystrokes. Re-measured on exactly this configuration after the focus work landed:
+      # 8 consecutive runs, 160 of 160 checks each. Against a 25% failure rate that outcome has a 10%
+      # chance, so the flake is gone rather than hiding. If it returns, the honest move is to fix the
+      # focus, not to make this advisory again.
       - name: Autopilot
-        continue-on-error: true
         run: >
           xvfb-run -a --server-args="-screen 0 1600x1000x24"
           dotnet run --project NativeForms.Demo --configuration Release --no-build -- --autopilot

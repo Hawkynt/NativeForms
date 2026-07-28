@@ -898,13 +898,15 @@ strategy (may differ per platform; note exceptions inline).
       `TimePickerTests` against the headless backend.
       *Method note:* this check has high run-to-run variance; take **≥5 runs** before concluding a change
       helped. Two single-run A/Bs during the investigation pointed at the wrong culprit.
-- [~] **The autopilot runs in CI on Linux** (`ubuntu-latest`, GTK plus Xvfb), uploading its captures —
-      advisory rather than blocking for now, because Xvfb has no window manager and nothing assigns the
-      toplevel X focus, so the text-entry checks fail about one run in four (measured 1 of 4 locally, 9
-      checks each time, all "a click focuses X and typing lands in it"). Fixing that — a lightweight WM in
-      the job, or focusing the toplevel explicitly rather than relying on one — is what turns it into the
-      gate it should be. Worth the effort: the 3840-pixel scroll bar above would have failed the layout
-      audit on the first frame, and it was found by eye instead.
+- [x] **The autopilot runs in CI on Linux** (`ubuntu-latest`, GTK plus Xvfb), uploading its captures, and
+      **gates the build**. It was advisory for a focus flake measured at about one run in four on a
+      window-manager-less Xvfb — nothing assigns the toplevel X focus, so the text-entry checks lost their
+      keystrokes. Re-measured on exactly that configuration after the focus work landed: **8 consecutive
+      runs, 160 of 160 checks each**, which against a 25% failure rate has a 10% chance of happening, so
+      the flake is gone rather than hiding. Following the method note above, which asks for ≥5 runs before
+      concluding anything about this suite. If it returns, fix the focus rather than making the job
+      advisory again — the 3840-pixel scroll bar above would have failed the layout audit on its first
+      frame, and was found by eye instead.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
