@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -72,6 +73,47 @@ public sealed partial class Win32Backend : IPlatformBackend
 
     /// <inheritdoc/>
     public IRichTextBoxPeer CreateRichTextBox() => new RichTextBoxPeer();
+
+    /// <inheritdoc/>
+    public ICheckBoxPeer CreateCheckBox() => new CheckBoxPeer();
+
+    /// <inheritdoc/>
+    public IProgressBarPeer CreateProgressBar()
+    {
+        EnsureCommonControls(NativeMethods.ICC_PROGRESS_CLASS);
+        return new ProgressBarPeer();
+    }
+
+    /// <inheritdoc/>
+    public ITrackBarPeer CreateTrackBar(bool vertical)
+    {
+        EnsureCommonControls(NativeMethods.ICC_BAR_CLASSES);
+        return new TrackBarPeer(vertical);
+    }
+
+    /// <summary>
+    /// Registers a block of common-control window classes once per process. Without this,
+    /// <c>CreateWindowEx</c> on <c>msctls_progress32</c> or <c>msctls_trackbar32</c> fails with an
+    /// unregistered class on hosts that carry no application manifest.
+    /// </summary>
+    /// <param name="classes">The <c>ICC_*</c> block to register.</param>
+    private static void EnsureCommonControls(uint classes)
+    {
+        if ((_registeredCommonControls & classes) == classes)
+            return;
+
+        var request = new NativeMethods.INITCOMMONCONTROLSEX
+        {
+            dwSize = (uint)Marshal.SizeOf<NativeMethods.INITCOMMONCONTROLSEX>(),
+            dwICC = classes,
+        };
+
+        if (NativeMethods.InitCommonControlsEx(ref request))
+            _registeredCommonControls |= classes;
+    }
+
+    /// <summary>The <c>ICC_*</c> blocks already registered by <see cref="EnsureCommonControls"/>.</summary>
+    private static uint _registeredCommonControls;
 
     /// <inheritdoc/>
     public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();

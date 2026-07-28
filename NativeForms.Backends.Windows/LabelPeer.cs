@@ -19,8 +19,6 @@ internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
     private BorderStyle _borderStyle;
     private bool _useMnemonic = true;
     private Win32Image? _image;
-    private nint _parent;
-    private int _controlId;
 
     /// <summary>Whether the static renders the bitmap instead of text.</summary>
     private bool IsImageOnly => _image is not null && _text.Length == 0;
@@ -61,8 +59,6 @@ internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
     /// <inheritdoc/>
     internal override void CreateChildHandle(nint parent, int controlId)
     {
-        _parent = parent;
-        _controlId = controlId;
         base.CreateChildHandle(parent, controlId);
 
         if (this.IsImageOnly && _image is { Handle: not 0 } image)
@@ -108,16 +104,5 @@ internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
 
         _image = native;
         this.RecreateHandle();
-    }
-
-    /// <summary>Rebuilds the HWND with the current style bits; buffered state is re-flushed by creation.</summary>
-    private void RecreateHandle()
-    {
-        if (Handle == 0)
-            return;
-
-        NativeMethods.DestroyWindow(Handle);
-        Handle = 0;
-        this.CreateChildHandle(_parent, _controlId);
     }
 }

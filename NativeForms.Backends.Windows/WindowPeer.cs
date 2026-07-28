@@ -383,7 +383,7 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     }
 
     /// <summary>The hosted child peer owning the given HWND, or <see langword="null"/>.</summary>
-    private Win32ChildPeer? ChildFromHandle(nint hwnd)
+    internal Win32ChildPeer? ChildFromHandle(nint hwnd)
     {
         foreach (var child in _children.Values)
             if (child.Handle == hwnd)
@@ -494,6 +494,15 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                     var notifyCode = (int)((wParam >> 16) & 0xFFFF);
                     commandWindow.OnCommand(controlId, notifyCode);
                 }
+
+                return 0;
+
+            case NativeMethods.WM_HSCROLL:
+            case NativeMethods.WM_VSCROLL:
+                // A slider or scroll bar reports through its parent, identifying itself by HWND in lParam
+                // rather than by control id. A zero lParam is the window's own scroll bar, not a child.
+                if (lParam != 0 && _windows.TryGetValue(hwnd, out var scrollWindow))
+                    scrollWindow.ChildFromHandle(lParam)?.OnScroll((int)(wParam & 0xFFFF));
 
                 return 0;
 

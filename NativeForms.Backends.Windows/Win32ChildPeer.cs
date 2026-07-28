@@ -14,6 +14,12 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
     /// <summary>The subclass identity — one per peer class is enough, the HWND disambiguates.</summary>
     private const nuint _PointerSubclassId = 1;
 
+    /// <summary>The parent window this peer was created under, for <see cref="RecreateHandle"/>.</summary>
+    private nint _parent;
+
+    /// <summary>The HMENU control id this peer was created with, for <see cref="RecreateHandle"/>.</summary>
+    private int _controlId;
+
     /// <summary>Pinning handle keeping this peer reachable from the subclass procedure.</summary>
     private GCHandle _subclassHandle;
 
@@ -33,6 +39,10 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
     /// </summary>
     internal virtual void CreateChildHandle(nint parent, int controlId)
     {
+        // Remembered so a creation-time style bit can be changed later by rebuilding the window.
+        _parent = parent;
+        _controlId = controlId;
+
         var style = NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE | ExtraStyle;
         Handle = NativeMethods.CreateWindowExW(
             0,
@@ -175,10 +185,32 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
     }
 
     /// <summary>
+    /// Rebuilds the HWND with the current style bits. Several stock controls read their style only at
+    /// creation (<c>BS_DEFPUSHBUTTON</c>, <c>PBS_MARQUEE</c>, <c>TBS_VERT</c>), so changing one means
+    /// making a new window; buffered state is re-flushed by creation.
+    /// </summary>
+    private protected void RecreateHandle()
+    {
+        if (Handle == 0)
+            return;
+
+        NativeMethods.DestroyWindow(Handle);
+        Handle = 0;
+        this.CreateChildHandle(_parent, _controlId);
+    }
+
+    /// <summary>
     /// Handles a <c>WM_COMMAND</c> notification addressed to this control. The base implementation does
     /// nothing; interactive controls (buttons) override it.
     /// </summary>
     internal virtual void OnCommand(int notifyCode) { }
+
+    /// <summary>
+    /// Handles a <c>WM_HSCROLL</c>/<c>WM_VSCROLL</c> notification this control sent to its parent. The
+    /// base implementation does nothing; sliders and scroll bars override it.
+    /// </summary>
+    /// <param name="scrollCode">The <c>SB_*</c> code in the low word of <c>wParam</c>.</param>
+    internal virtual void OnScroll(int scrollCode) { }
 
     /// <summary>
     /// Handles a <c>WM_NOTIFY</c> notification addressed to this control; <paramref name="lParam"/>
