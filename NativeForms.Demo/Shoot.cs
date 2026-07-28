@@ -6,7 +6,7 @@ namespace Hawkynt.NativeForms.Demo;
 /// Photographs a window with whichever in-process route the running backend offers — GTK/Cairo on
 /// Linux, GDI on Win32 — so <c>--shoot</c> means the same thing everywhere.
 /// </summary>
-internal static class Shoot
+internal static partial class Shoot
 {
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)

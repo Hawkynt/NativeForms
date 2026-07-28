@@ -41,6 +41,7 @@ if (measureStartup)
 // up) and reports the cold time to first window, then closes on the first tick — once the message
 // loop is actually running, so the shutdown is clean — without driving the gallery.
 var shooting = Array.IndexOf(args, "--shoot") >= 0;
+var shootFailures = 0;
 if (measureStartup && !shooting)
     form.Load += (_, _) =>
     {
@@ -118,6 +119,22 @@ if (shooting)
                 Note($"shot threw: {e}");
             }
 
+            // A shot proves the page renders; these prove it responds. On Windows nothing else can:
+            // the autopilot's input is gdk_test_simulate_*, so its whole walkthrough is GTK-only.
+            if (pages is not null)
+                try
+                {
+                    var failures = Shoot.Check(pages.TabPages[page], form.ClientSize, Note);
+                    shootFailures += failures;
+                    if (failures > 0)
+                        Note($"  {name}: {failures} check(s) failed");
+                }
+                catch (Exception e)
+                {
+                    Note($"  {name}: checks threw: {e.Message}");
+                    ++shootFailures;
+                }
+
             if (pages is not null && ++page < pages.TabPages.Count)
             {
                 pages.SelectedIndex = page;
@@ -125,6 +142,10 @@ if (shooting)
             }
 
             shutter.Stop();
+            Note(shootFailures == 0
+                ? $"shoot: {page} page(s), every check passed"
+                : $"shoot: {shootFailures} check(s) failed across {page} page(s)");
+
             form.Close();
         };
 
@@ -135,4 +156,4 @@ if (shooting)
 }
 
 Application.Run(form);
-return Autopilot.ExitCode;
+return shootFailures > 0 ? 1 : Autopilot.ExitCode;

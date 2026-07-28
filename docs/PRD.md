@@ -875,7 +875,12 @@ strategy (may differ per platform; note exceptions inline).
       The entry here previously called it a wine bug and told the next reader not to re-diagnose it. That
       was wrong, and it was wrong because nothing had ever run the path on Windows: the unit tests use
       headless fakes and never create an `HWND`. The `screenshots (windows)` job now does, on every push,
-      and is a gate rather than advisory.
+      and is a gate rather than advisory. It photographs **every page**, and runs a state round-trip and a
+      layout audit over every control on each — a shot proves a page renders, and nothing else on Windows
+      could prove it responds, because the autopilot drives `gdk_test_simulate_*` and is GTK-only by
+      construction. A narrower claim than the autopilot's (no pointer, no keyboard, no window manager),
+      but it is the claim that reaches Windows, and it covers what matters most for a peer-backed toolkit:
+      state written to a control surviving the trip into the native widget and back.
 - [ ] **Autopilot capture must not touch the widget tree.** A capture is an *observation*; anything that
       mutates GTK state from inside it corrupts the very walkthrough it is documenting. Measured: adding
       a per-layer background fill that read `BackendRegistry.Resolve().Theme` made the TimePicker
