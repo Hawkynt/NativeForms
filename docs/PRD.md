@@ -808,11 +808,10 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `TreeView`. `[~]` (`DataGridView` virtual mode shipped)
 - **M13 — Attribute-driven grids & lists (§14).** Extend the `[GridEditable]` source generator so one
-  annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns —
-  column kind, width, sort, images, tooltips, per-cell/row styling and click handlers — with every
-  member reference resolved (and diagnosed) at compile time. The grid capabilities it depends on now
-  all ship — row hooks (`RowHiddenSelector`, `RowHeightSelector`, `RowSelectableSelector`) and the image
-  surface of §14.2 — leaving the generator work itself. `[ ]`
+  annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns,
+  with every member reference resolved (and diagnosed) at compile time. `[~]` — columns, inferred kinds,
+  widths, sort modes and the per-row rules generate today, with `NFG002`/`NFG003` catching bad names;
+  the click/style/image attributes and the `ListView` populator remain.
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -895,6 +894,7 @@ same commit. `—` = not applicable.
 | `TreeView` inline label editing (F2) | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
 | `[GridEditable]` source generator (packed as an analyzer in Core) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#attributes) |
 | `DataGridView` virtual mode (known + unknown size) | ✔ | — | [controls/datagridview.md](controls/datagridview.md) |
+| Attribute-driven `DataGridView` columns (generator) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes) |
 | MVVM primitives + binding + `ICommand` wiring | ✔ | ✔ | [mvvm.md](mvvm.md) |
 | Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
 
@@ -1066,7 +1066,7 @@ this is mostly a mapping exercise — and we cover more kinds than the reference
 - [ ] Attributes must be able to select **every one of our 15 kinds**, not only the nine the reference
       covers — the extra seven get attributes of their own so the annotation route is never weaker than
       hand-built columns.
-- [ ] Kind is **inferred from the property type** and overridable by attribute: `bool` → `Check`,
+- [x] Kind is **inferred from the property type** and overridable by `[GridColumnKind]`: `bool` → `Check`,
       numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
       `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
 
@@ -1122,31 +1122,31 @@ populator.
 
 ### 14.4 Design rules
 
-- [ ] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)`,
-      `PopulateColumns(DataGridView)` and later `PopulateColumns(ListView)`, so one model drives an
-      inspector, a grid and a list interchangeably.
-- [ ] **Member references are `nameof`-friendly strings, resolved at compile time.** Adopt the
-      reference's `…PropertyName` / `…MethodName` convention, but the generator checks every one:
-      unresolved name, wrong type, or a bad handler signature is a diagnostic (`NFG002`…).
+- [x] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)` and
+      `PopulateColumns(DataGridView)`; the `ListView` populator is still to come.
+- [x] **Member references are `nameof`-friendly strings, resolved at compile time.** An unresolved name
+      is `NFG002` and a wrong-typed one is `NFG003` — both **build errors**. Handler-signature checking
+      arrives with the click attributes.
 - [ ] **Stackable attributes stay stackable.** Style, tooltip and conditional-image attributes are
       `AllowMultiple` in the reference and must remain so here — first matching condition wins, with
       the evaluation order documented.
 - [ ] **Reuse the inspector vocabulary where the meaning is identical** (`[GridIgnore]`,
       `[GridDisplayName]`, `[GridDescription]`, `[GridRange]`); grid-only concerns get grid-only
       attributes.
-- [ ] **Columns only.** The populator never materializes rows, so it composes with §13's virtual mode.
-- [ ] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
+- [x] **Columns only.** The populator never materializes rows, so it composes with §13's virtual mode.
+- [x] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
       hand-built columns still work; only the generated method is absent.
 
 ### 14.5 Acceptance
 
 - [ ] An annotated model generates a grid whose column kinds, headers, widths, order, images and
       per-row styling match the annotations, asserted headlessly.
-- [ ] Editing a generated cell writes through to the model instance.
-- [ ] A misspelled `…PropertyName`/`…MethodName`, a non-`bool` condition, and a handler with the wrong
-      signature each fail the **build** with a generator diagnostic.
+- [x] Editing a generated cell writes through to the model instance (`ValueSetter`; a get-only property
+      yields a read-only column).
+- [~] A misspelled `…PropertyName` (`NFG002`) and a wrong-typed condition (`NFG003`) fail the **build**;
+      handler-signature checking lands with the click attributes.
 - [ ] Every one of the 15 column kinds is reachable from attributes.
-- [ ] The same model still generates a working `PropertyGrid`.
-- [ ] `dotnet publish -p:PublishAot=true` on a consumer stays clean.
+- [x] The same model still generates a working `PropertyGrid`.
+- [x] `dotnet publish -p:PublishAot=true` on a consumer stays clean.
 - [ ] [`datagridview.md`](controls/datagridview.md) and [`propertygrid.md`](controls/propertygrid.md)
       document the shared vocabulary, with a porting table from the reference library's names.

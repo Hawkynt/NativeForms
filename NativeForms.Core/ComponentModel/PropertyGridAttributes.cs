@@ -48,3 +48,71 @@ public sealed class GridDisplayNameAttribute(string name) : Attribute
 /// <summary>Excludes a property from the generated grid.</summary>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public sealed class GridIgnoreAttribute : Attribute;
+
+// --- Grid-column attributes ----------------------------------------------------------------------
+//
+// These add the concerns a DataGridView has and a PropertyGrid does not (width, sort, per-row rules).
+// Following the WindowsFormsExtensions convention, a dynamic rule is expressed as the *name* of another
+// member on the model rather than a delegate — but the generator resolves those names at compile time,
+// so a typo is a build error instead of a silent no-op.
+
+/// <summary>The pixel width a generated <see cref="DataGridView"/> column starts at.</summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnWidthAttribute(int width) : Attribute
+{
+    /// <summary>The column width in pixels.</summary>
+    public int Width { get; } = width;
+}
+
+/// <summary>Overrides the column kind the generator would infer from the property type.</summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnKindAttribute(DataGridViewColumnKind kind) : Attribute
+{
+    /// <summary>The column kind to use.</summary>
+    public DataGridViewColumnKind Kind { get; } = kind;
+}
+
+/// <summary>Makes a generated column's cells read-only while the named <see cref="bool"/> property on
+/// the row model is <see langword="true"/>.</summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnReadOnlyWhenAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the <see cref="bool"/> property that gates the read-only state.</summary>
+    public string PropertyName { get; } = propertyName;
+}
+
+/// <summary>Sorts a generated column; <see cref="DataGridViewColumnSortMode.Automatic"/> makes its
+/// header clickable.</summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GridColumnSortModeAttribute(DataGridViewColumnSortMode sortMode) : Attribute
+{
+    /// <summary>The sort mode to apply.</summary>
+    public DataGridViewColumnSortMode SortMode { get; } = sortMode;
+}
+
+/// <summary>Hides a row while the named <see cref="bool"/> property on the row model is
+/// <see langword="true"/>. Wired to <see cref="DataGridView.RowHiddenSelector"/>.</summary>
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class GridRowHiddenWhenAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the gating <see cref="bool"/> property.</summary>
+    public string PropertyName { get; } = propertyName;
+}
+
+/// <summary>Allows a row to be selected only while the named <see cref="bool"/> property on the row
+/// model is <see langword="true"/>. Wired to <see cref="DataGridView.RowSelectableSelector"/>.</summary>
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class GridRowSelectableWhenAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the gating <see cref="bool"/> property.</summary>
+    public string PropertyName { get; } = propertyName;
+}
+
+/// <summary>Takes a row's pixel height from the named <see cref="int"/> property on the row model.
+/// Wired to <see cref="DataGridView.RowHeightSelector"/>.</summary>
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class GridRowHeightFromAttribute(string propertyName) : Attribute
+{
+    /// <summary>The name of the <see cref="int"/> property supplying the height.</summary>
+    public string PropertyName { get; } = propertyName;
+}

@@ -26,6 +26,24 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    /// <summary>The point of resolving member references at compile time: the reference library resolves
+    /// these names by reflection, where a typo is a silent no-op or a run-time throw.</summary>
+    private static readonly DiagnosticDescriptor _UnresolvedMember = new(
+        "NFG002",
+        "Grid attribute names a member that does not exist",
+        "'{0}' names '{1}', which is not a readable public property of '{2}'",
+        "NativeForms",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor _WrongMemberType = new(
+        "NFG003",
+        "Grid attribute names a member of the wrong type",
+        "'{0}' names '{1}', which must be of type '{2}' but is '{3}'",
+        "NativeForms",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     /// <inheritdoc/>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -100,11 +118,177 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
         }
 
         sb.AppendLine("        }");
+        sb.AppendLine();
+        EmitColumns(spc, type, sb);
         sb.AppendLine("    }");
         if (hasNamespace)
             sb.AppendLine("}");
 
         spc.AddSource(type.Name + ".PropertyGrid.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    /// <summary>
+    /// Emits <c>PopulateColumns(DataGridView)</c>: one column per editable property, its kind inferred
+    /// from the property type (or forced by <c>[GridColumnKind]</c>), plus the class-level per-row rules.
+    /// Every <c>…When</c>/<c>…From</c> attribute names another member, and each of those names is resolved
+    /// here — against the symbol model, at compile time — so a typo fails the build.
+    /// </summary>
+    private static void EmitColumns(SourceProductionContext spc, INamedTypeSymbol type, StringBuilder sb)
+    {
+        var self = type.ToDisplayString();
+        sb.AppendLine("        /// <summary>Adds a column per editable property to <paramref name=\"grid\"/> (source-generated).</summary>");
+        sb.AppendLine("        public static void PopulateColumns(global::Hawkynt.NativeForms.DataGridView grid)");
+        sb.AppendLine("        {");
+
+        foreach (var member in type.GetMembers())
+        {
+            if (member is not IPropertySymbol prop
+                || prop.IsStatic || prop.IsIndexer
+                || prop.DeclaredAccessibility != Accessibility.Public
+                || prop.GetMethod is null
+                || HasAttribute(prop, "GridIgnoreAttribute"))
+                continue;
+
+            var header = GetStringArgument(prop, "GridDisplayNameAttribute") ?? prop.Name;
+            var row = $"(({self})r!)";
+
+            sb.Append("            grid.Columns.Add(new global::Hawkynt.NativeForms.DataGridViewColumn(")
+              .Append(Quote(header))
+              .Append(", r => ").Append(row).Append('.').Append(prop.Name).AppendLine(")");
+            sb.AppendLine("            {");
+            sb.Append("                Kind = global::Hawkynt.NativeForms.DataGridViewColumnKind.")
+              .Append(ColumnKindFor(prop)).AppendLine(",");
+
+            if (GetIntArgument(prop, "GridColumnWidthAttribute") is { } width)
+                sb.Append("                Width = ").Append(width.ToString(CultureInfo.InvariantCulture)).AppendLine(",");
+
+            if (GetEnumArgument(prop, "GridColumnSortModeAttribute") is { } sortMode)
+                sb.Append("                SortMode = global::Hawkynt.NativeForms.DataGridViewColumnSortMode.")
+                  .Append(sortMode).AppendLine(",");
+
+            if (prop.SetMethod is not null)
+                sb.Append("                ValueSetter = (r, v) => ").Append(row).Append('.').Append(prop.Name)
+                  .Append(" = (").Append(prop.Type.ToDisplayString()).AppendLine(")v!,");
+            else
+                sb.AppendLine("                ReadOnly = true,");
+
+            if (GetStringArgument(prop, "GridColumnReadOnlyWhenAttribute") is { } readOnlyWhen
+                && ResolveBool(spc, type, prop, "[GridColumnReadOnlyWhen]", readOnlyWhen))
+                sb.Append("                ReadOnlyCellSelector = r => ").Append(row).Append('.').Append(readOnlyWhen).AppendLine(",");
+
+            sb.AppendLine("            });");
+        }
+
+        // Class-level per-row rules, wired to the grid's shipped selectors.
+        if (GetStringArgument(type, "GridRowHiddenWhenAttribute") is { } hiddenWhen
+            && ResolveBool(spc, type, type, "[GridRowHiddenWhen]", hiddenWhen))
+            sb.Append("            grid.RowHiddenSelector = r => ((").Append(self).Append(")r!).").Append(hiddenWhen).AppendLine(";");
+
+        if (GetStringArgument(type, "GridRowSelectableWhenAttribute") is { } selectableWhen
+            && ResolveBool(spc, type, type, "[GridRowSelectableWhen]", selectableWhen))
+            sb.Append("            grid.RowSelectableSelector = r => ((").Append(self).Append(")r!).").Append(selectableWhen).AppendLine(";");
+
+        if (GetStringArgument(type, "GridRowHeightFromAttribute") is { } heightFrom
+            && Resolve(spc, type, type, "[GridRowHeightFrom]", heightFrom, SpecialType.System_Int32, "int"))
+            sb.Append("            grid.RowHeightSelector = r => ((").Append(self).Append(")r!).").Append(heightFrom).AppendLine(";");
+
+        sb.AppendLine("        }");
+    }
+
+    /// <summary>The column kind for a property type, unless <c>[GridColumnKind]</c> forces one.</summary>
+    private static string ColumnKindFor(IPropertySymbol prop)
+    {
+        if (GetEnumArgument(prop, "GridColumnKindAttribute") is { } forced)
+            return forced;
+
+        var type = prop.Type;
+        var underlying = type is INamedTypeSymbol { IsGenericType: true, ConstructedFrom.SpecialType: SpecialType.System_Nullable_T } n
+            ? n.TypeArguments[0]
+            : type;
+
+        if (underlying.SpecialType == SpecialType.System_Boolean)
+            return "Check";
+
+        if (underlying.TypeKind == TypeKind.Enum)
+            return HasFlags(underlying) ? "CheckedListBox" : "ComboBox";
+
+        var name = underlying.ToDisplayString();
+        return name switch
+        {
+            "System.DateTime" or "System.DateOnly" => "DateTime",
+            "System.TimeOnly" => "TimePicker",
+            "System.Drawing.Color" => "Color",
+            _ => IsNumeric(underlying) ? "NumericUpDown" : "Text",
+        };
+    }
+
+    private static bool IsNumeric(ITypeSymbol type) => type.SpecialType
+        is SpecialType.System_Byte or SpecialType.System_SByte
+        or SpecialType.System_Int16 or SpecialType.System_UInt16
+        or SpecialType.System_Int32 or SpecialType.System_UInt32
+        or SpecialType.System_Int64 or SpecialType.System_UInt64
+        or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+
+    /// <summary>Resolves a named member to a readable public <see cref="bool"/> property, reporting a
+    /// diagnostic when it is missing or the wrong type.</summary>
+    private static bool ResolveBool(SourceProductionContext spc, INamedTypeSymbol type, ISymbol site, string attribute, string name)
+        => Resolve(spc, type, site, attribute, name, SpecialType.System_Boolean, "bool");
+
+    private static bool Resolve(
+        SourceProductionContext spc,
+        INamedTypeSymbol type,
+        ISymbol site,
+        string attribute,
+        string name,
+        SpecialType expected,
+        string expectedName)
+    {
+        var location = site.Locations.Length > 0 ? site.Locations[0] : Location.None;
+        foreach (var member in type.GetMembers(name))
+        {
+            if (member is not IPropertySymbol prop || prop.GetMethod is null || prop.DeclaredAccessibility != Accessibility.Public)
+                continue;
+
+            if (prop.Type.SpecialType == expected)
+                return true;
+
+            spc.ReportDiagnostic(Diagnostic.Create(_WrongMemberType, location, attribute, name, expectedName, prop.Type.ToDisplayString()));
+            return false;
+        }
+
+        spc.ReportDiagnostic(Diagnostic.Create(_UnresolvedMember, location, attribute, name, type.Name));
+        return false;
+    }
+
+    private static int? GetIntArgument(ISymbol symbol, string attributeName)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+            if (attribute.AttributeClass?.Name == attributeName
+                && attribute.ConstructorArguments.Length > 0
+                && attribute.ConstructorArguments[0].Value is int value)
+                return value;
+
+        return null;
+    }
+
+    /// <summary>The name of an enum-valued attribute argument, for pasting into generated source.</summary>
+    private static string? GetEnumArgument(ISymbol symbol, string attributeName)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (attribute.AttributeClass?.Name != attributeName || attribute.ConstructorArguments.Length == 0)
+                continue;
+
+            var argument = attribute.ConstructorArguments[0];
+            if (argument.Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType || argument.Value is null)
+                continue;
+
+            foreach (var member in enumType.GetMembers())
+                if (member is IFieldSymbol { HasConstantValue: true } field && Equals(field.ConstantValue, argument.Value))
+                    return field.Name;
+        }
+
+        return null;
     }
 
     private static void AppendOptions(StringBuilder sb, string? category, string? description, double? minimum, double? maximum)

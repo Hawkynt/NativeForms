@@ -74,6 +74,46 @@ All six live in `Hawkynt.NativeForms` (declared in Core, so they compile with or
 | `[GridIgnore]` | property | — | Excludes the member from the generated grid. |
 | `[GridRange]` | property | `double minimum, double maximum` | Clamps a numeric row's committed value to the inclusive bounds. |
 
+### Grid-column attributes
+
+The same `[GridEditable]` marker also emits `PopulateColumns(DataGridView)`, so one annotated model
+drives an inspector **and** a [`DataGridView`](datagridview.md). These attributes cover what a grid has
+and an inspector does not. Following the `WindowsFormsExtensions` convention a dynamic rule names another
+member rather than taking a delegate — but the generator resolves that name at **compile time**, so a
+typo is a build error (`NFG002`) and a wrong-typed member is `NFG003`, not a silent no-op.
+
+| Attribute | Target | Argument | Effect on the generated column |
+|---|---|---|---|
+| `[GridColumnKind]` | property | `DataGridViewColumnKind kind` | Overrides the kind inferred from the property type. |
+| `[GridColumnReadOnlyWhen]` | property | `string propertyName` | Cells are read-only while the named `bool` property is true (`ReadOnlyCellSelector`). |
+| `[GridColumnSortMode]` | property | `DataGridViewColumnSortMode mode` | The column's sort mode; `Automatic` makes the header clickable. |
+| `[GridColumnWidth]` | property | `int width` | The column's starting pixel width. |
+| `[GridRowHeightFrom]` | class | `string propertyName` | Row height from the named `int` property (`RowHeightSelector`). |
+| `[GridRowHiddenWhen]` | class | `string propertyName` | Hides the row while the named `bool` property is true (`RowHiddenSelector`). |
+| `[GridRowSelectableWhen]` | class | `string propertyName` | Row is selectable only while the named `bool` property is true (`RowSelectableSelector`). |
+
+Column kinds are inferred from the property type: `bool` → `Check`, any numeric → `NumericUpDown`,
+`DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`, `Color` → `Color`, an `enum` → `ComboBox`,
+a `[Flags]` enum → `CheckedListBox`, anything else → `Text`. A settable property gets a `ValueSetter` so
+grid edits write back; a get-only property yields a read-only column.
+
+```csharp
+[GridEditable]
+[GridRowHiddenWhen(nameof(IsArchived))]
+public partial class Order
+{
+    // A gate can be hidden from the UI and still be referenced by name.
+    [GridIgnore] public bool IsArchived { get; set; }
+
+    [GridColumnWidth(90)]
+    [GridColumnSortMode(DataGridViewColumnSortMode.Automatic)]
+    [GridColumnReadOnlyWhen(nameof(IsArchived))]
+    public int Quantity { get; set; }
+}
+
+Order.PopulateColumns(grid);   // generated — static, since columns describe the type
+```
+
 Only **public, settable, non-static, non-indexer properties** become rows. The member attributes also *compile* on fields (their `AttributeUsage` permits it), but **the generator only walks properties** — a field carrying `[GridCategory]` is silently skipped. Expose it as a property, or add the row by hand.
 
 ### Getting the generator
