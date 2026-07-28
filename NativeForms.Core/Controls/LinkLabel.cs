@@ -13,6 +13,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class LinkLabel : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Link;
+
     private bool _hovered;
     private bool _focused;
 

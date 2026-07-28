@@ -17,6 +17,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class ComboBox : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.ComboBox;
+
     private int _selectedIndex = -1;
     private bool _droppedDown;
     private bool _focused;

@@ -10,6 +10,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class CheckBox : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.CheckButton;
+
     private const int _TextGap = 6;
 
     private ICheckBoxPeer? _native;

@@ -685,7 +685,23 @@ strategy (may differ per platform; note exceptions inline).
 - [~] DPI awareness & scaling — `GetDpiScale` + `Control.LogicalToDevice` groundwork done (§5);
       per-monitor v2 rescale-on-move (Windows), GDK scale and macOS backing-scale pending
 - [x] Dark mode / high contrast with live theme-change notifications — see §5
-- [ ] Accessibility (UIA on Windows, ATK/AT-SPI on GTK, NSAccessibility on macOS)
+- [~] Accessibility. `Control.AccessibleName`/`AccessibleDescription`/`AccessibleRole` (Windows-Forms
+      shaped, and packed into the existing rarely-set slot object so a control nobody has described costs
+      nothing) flow to the peer, which publishes them however the platform expresses it. This is really a
+      story about the owner-drawn path: a promoted control is already announced by the OS — that was §12's
+      point — while an owner-drawn one is a blank drawing surface to an accessibility client however
+      carefully it is painted, so the toolkit has to say what the pixels mean. Every control reports its
+      own role by default, so the common case needs no code at all.
+  - [x] **GTK/ATK**: name, description and role onto the widget's `AtkObject`, asserted by reading them
+        back out of ATK on live widgets (`GtkAccessibilityTests`) rather than trusting the call.
+  - [~] **Win32**: the name reaches the canvas window's text, which is what MSAA reads for a window it
+        knows nothing else about — verified under wine. The **role** is not expressible that way: MSAA
+        infers it from the window class, so overriding it needs a `WM_GETOBJECT`/`IAccessible` provider,
+        which is a COM *server* rather than the client-side vtable calls §13 established. That is the
+        remaining work, and it is what a UIA provider would build on.
+  - [ ] macOS/NSAccessibility, which waits on the backend itself.
+  - [ ] A screen reader announces a promoted and an owner-drawn control on both platforms — verified by
+        hand, once, since no automation substitutes for hearing it.
 - [x] Right-to-left: ambient `Control.RightToLeft`, mirrored owner-drawn painting, and container
       layout mirroring — a right-to-left container flips where its children's peers sit across the
       client width while their logical `Bounds` stay left-to-right (verified in pixels)

@@ -97,6 +97,15 @@ public abstract class Control
 
         /// <summary>The explicitly set pointer shape, or <see langword="null"/> for ambient.</summary>
         public Cursor? Cursor;
+
+        /// <summary>The explicitly set accessible name, or <see langword="null"/> for the caption.</summary>
+        public string? AccessibleName;
+
+        /// <summary>The explicitly set accessible description, or <see langword="null"/> for none.</summary>
+        public string? AccessibleDescription;
+
+        /// <summary>The explicitly set role, or <see cref="AccessibleRole.Default"/> for the control's own.</summary>
+        public AccessibleRole AccessibleRole;
     }
 
     /// <summary>The caption text: a button label, a form's title bar, a label's text.</summary>
@@ -111,6 +120,12 @@ public abstract class Control
 
             field = value;
             _peer?.SetText(value);
+
+            // The caption is the accessible name unless one was given, so renaming the control renames
+            // it for a screen reader too.
+            if (this.AccessibleName is null)
+                this.PushAccessibility();
+
             this.OnTextChanged(EventArgs.Empty);
         }
     } = string.Empty;
@@ -688,6 +703,66 @@ public abstract class Control
     /// promoted, and a promoted control reports whichever peer it currently holds (PRD §12).
     /// </summary>
     public virtual bool IsNativeWidget => true;
+
+    /// <summary>
+    /// What assistive technology calls this control. Unset, it falls back to
+    /// <see cref="DefaultAccessibleName"/>, which is the control's own text for anything that has one.
+    /// </summary>
+    /// <remarks>
+    /// Set it where the visible text is not the whole story: a toolbar button showing only an icon, a
+    /// field whose meaning lives in a separate label, a close glyph. Everything else is already named by
+    /// what it says.
+    /// </remarks>
+    public string? AccessibleName
+    {
+        get => _appearance?.AccessibleName;
+        set
+        {
+            (_appearance ??= new()).AccessibleName = value;
+            this.PushAccessibility();
+        }
+    }
+
+    /// <summary>A longer description announced after the name, for what the name cannot carry.</summary>
+    public string? AccessibleDescription
+    {
+        get => _appearance?.AccessibleDescription;
+        set
+        {
+            (_appearance ??= new()).AccessibleDescription = value;
+            this.PushAccessibility();
+        }
+    }
+
+    /// <summary>
+    /// What this control is, announced after its name. Unset, it falls back to
+    /// <see cref="DefaultAccessibleRole"/>, which every control overrides to say what it is.
+    /// </summary>
+    public AccessibleRole AccessibleRole
+    {
+        get => _appearance?.AccessibleRole ?? AccessibleRole.Default;
+        set
+        {
+            (_appearance ??= new()).AccessibleRole = value;
+            this.PushAccessibility();
+        }
+    }
+
+    /// <summary>
+    /// The name to announce when <see cref="AccessibleName"/> is unset: the control's text, which is what
+    /// the user sees. A control whose text is decorative overrides this.
+    /// </summary>
+    private protected virtual string? DefaultAccessibleName => this.Text.Length > 0 ? this.Text : null;
+
+    /// <summary>What this kind of control is. Overridden by every control with a role worth announcing.</summary>
+    private protected virtual AccessibleRole DefaultAccessibleRole => AccessibleRole.Default;
+
+    /// <summary>Hands the peer the current name, description and role.</summary>
+    private protected void PushAccessibility()
+        => _peer?.SetAccessibleInfo(
+            this.AccessibleName ?? this.DefaultAccessibleName,
+            this.AccessibleDescription,
+            this.AccessibleRole == AccessibleRole.Default ? this.DefaultAccessibleRole : this.AccessibleRole);
 
     public bool? UseNativeWidget
     {
@@ -1701,6 +1776,7 @@ public abstract class Control
         this.PushPeerBounds();
         peer.SetText(this.Text);
         peer.SetEnabled(_enabled);
+        this.PushAccessibility();
         this.PushPeerVisible();
 
         // Appearance is only flushed when set somewhere up the chain, so the overwhelmingly common

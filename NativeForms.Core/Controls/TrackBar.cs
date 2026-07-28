@@ -13,6 +13,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class TrackBar : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Slider;
+
     private ITrackBarPeer? _native;
     private bool? _nativeOffered;
 

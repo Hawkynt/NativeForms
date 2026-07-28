@@ -14,6 +14,9 @@ internal static partial class NativeMethods
     private const string GObject = "libgobject-2.0.so.0";
     private const string GLib = "libglib-2.0.so.0";
 
+    /// <summary>ATK, the accessibility layer a Linux screen reader talks to.</summary>
+    private const string Atk = "libatk-1.0.so.0";
+
     /// <summary>Value of <c>GTK_WINDOW_TOPLEVEL</c> — a normal, WM-decorated top-level window.</summary>
     internal const int GTK_WINDOW_TOPLEVEL = 0;
 
@@ -441,6 +444,32 @@ internal static partial class NativeMethods
     /// <summary>Scrolls a row into view.</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_tree_view_scroll_to_cell(nint treeView, nint path, nint column, int useAlign, float rowAlign, float colAlign);
+
+    // --- ATK (what a screen reader reads) ----------------------------------------------------------
+
+    /// <summary>The accessible object GTK keeps for a widget; created on first ask, owned by the widget.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_widget_get_accessible(nint widget);
+
+    /// <summary>Sets the name a screen reader announces for an accessible object.</summary>
+    [LibraryImport(Atk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void atk_object_set_name(nint accessible, string name);
+
+    /// <summary>Sets the longer description announced after the name.</summary>
+    [LibraryImport(Atk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void atk_object_set_description(nint accessible, string description);
+
+    /// <summary>Sets what the object is, as an <c>AtkRole</c>.</summary>
+    [LibraryImport(Atk)]
+    internal static partial void atk_object_set_role(nint accessible, int role);
+
+    /// <summary>Reads the name back — used by the real-GTK test tier to prove the round trip.</summary>
+    [LibraryImport(Atk)]
+    internal static partial nint atk_object_get_name(nint accessible);
+
+    /// <summary>Reads the role back.</summary>
+    [LibraryImport(Atk)]
+    internal static partial int atk_object_get_role(nint accessible);
 
     /// <summary>Creates a <c>GtkFrame</c> with the given caption (0 for none).</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]

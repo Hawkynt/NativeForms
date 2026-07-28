@@ -12,6 +12,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class GroupBox : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Grouping;
+
     private const int _CaptionInset = 8;
     private const int _CaptionPadding = 4;
 

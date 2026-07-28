@@ -12,6 +12,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class PictureBox : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Graphic;
+
     /// <summary>
     /// The image to display, or <see langword="null"/>. It may be an <see cref="AnimatedImage"/> (which
     /// is an <see cref="IImage"/>): when animated the box subscribes to the shared animation clock and

@@ -18,6 +18,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public abstract class ScrollBar : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.ScrollBar;
+
     private int _minimum;
     private int _maximum = 100;
     private int _value;

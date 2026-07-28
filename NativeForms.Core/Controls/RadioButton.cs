@@ -11,6 +11,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class RadioButton : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.RadioButton;
+
     private const int _CircleSize = 14;
     private const int _TextGap = 6;
 

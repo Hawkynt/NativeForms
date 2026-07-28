@@ -22,6 +22,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class MenuStrip : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.MenuBar;
+
     /// <summary>The horizontal padding on each side of a top-level item's caption.</summary>
     internal const int ItemPadding = 8;
 

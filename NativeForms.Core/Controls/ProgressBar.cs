@@ -17,6 +17,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class ProgressBar : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.ProgressBar;
+
     private IProgressBarPeer? _native;
 
     /// <summary>Whether the backend offered a widget the last time we asked; <see langword="null"/> until

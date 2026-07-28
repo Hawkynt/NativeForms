@@ -30,6 +30,9 @@ public sealed class ItemCheckEventArgs(int index, bool currentValue, bool newVal
 public class CheckedListBox : ListBox
 {
     /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.List;
+
+    /// <inheritdoc/>
     /// <remarks>
     /// Never: the check box in each row is this control's own painting, and a platform list would drop it
     /// without a trace (PRD §12).

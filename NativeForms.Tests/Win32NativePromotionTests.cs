@@ -36,6 +36,9 @@ public sealed class Win32NativePromotionTests
         /// <summary>Per assertion name, whether driving the widget round-tripped.</summary>
         public Dictionary<string, bool> RoundTrips { get; } = [];
 
+        /// <summary>The window text MSAA would read as the owner-drawn control's name.</summary>
+        public string? CanvasAccessibleName;
+
         /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
         public bool ColorTextAvailable;
 
@@ -127,10 +130,16 @@ public sealed class Win32NativePromotionTests
         var tipped = new Button { Bounds = new Rectangle(540, 140, 140, 26), Text = "tipped" };
         var toolTip = new ToolTip();
         var painter = new ColorGlyphPainter { Bounds = new Rectangle(540, 400, 200, 60) };
+        var described = new CheckBox
+        {
+            Bounds = new Rectangle(540, 470, 200, 22),
+            Text = "Enable logging",
+            UseNativeWidget = false,
+        };
 
         form.Controls.AddRange(
             check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped,
-            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost, painter);
+            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost, painter, described);
 
         // Observed from a timer rather than from Load: some of this needs the window to have been shown
         // and painted at least once — the colour-text divert is only visible after a paint has run.
@@ -215,6 +224,10 @@ public sealed class Win32NativePromotionTests
                 // PRD §13: a string with an emoji is diverted to Direct2D, one without is not. Whether
                 // the divert can succeed is a property of the machine, so the assertion is conditional on
                 // the path being available at all rather than on it being present.
+                // PRD §8: an owner-drawn control's canvas is a nameless window to MSAA unless the toolkit
+                // gives it a window text, which is what MSAA reads as the name.
+                observed.CanvasAccessibleName = WindowTextOf(described);
+
                 observed.ColorTextAvailable = !Win32ColorText.Unavailable;
                 observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
                 observed.ColorRunsForPlainText = painter.ColorRunsAfterPlain - painter.ColorRunsBeforePlain;
@@ -253,6 +266,27 @@ public sealed class Win32NativePromotionTests
         Assert.That(_observed, Is.Not.Null, "the Win32 loop never reached the observation point.");
         Assert.That(_observed!.Failure, Is.Null, _observed.Failure);
         return _observed;
+    }
+
+    /// <summary>The window text of a control's peer, read back out of the OS.</summary>
+    private static string? WindowTextOf(Control control)
+    {
+        if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+            return null;
+
+        var length = NativeMethods.GetWindowTextLengthW(peer.Handle);
+        if (length <= 0)
+            return string.Empty;
+
+        var buffer = new char[length + 1];
+        unsafe
+        {
+            fixed (char* text = buffer)
+            {
+                var copied = NativeMethods.GetWindowTextW(peer.Handle, text, buffer.Length);
+                return new string(buffer, 0, Math.Max(0, copied));
+            }
+        }
     }
 
     private static IImage Pixel()
@@ -351,4 +385,12 @@ public sealed class Win32NativePromotionTests
     [Test]
     public void A_string_without_one_never_reaches_the_colour_path()
         => Assert.That(Result().ColorRunsForPlainText, Is.Zero);
+
+    /// <summary>
+    /// PRD §8: MSAA names a window it knows nothing else about by its window text, and our canvas class
+    /// has none — so an owner-drawn control is announced as a bare pane until the toolkit supplies one.
+    /// </summary>
+    [Test]
+    public void An_owner_drawn_controls_name_reaches_the_window_MSAA_will_read()
+        => Assert.That(Result().CanvasAccessibleName, Is.EqualTo("Enable logging"));
 }

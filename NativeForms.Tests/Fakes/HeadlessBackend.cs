@@ -279,6 +279,22 @@ internal abstract class HeadlessPeer : IControlPeer
 {
     public Rectangle Bounds { get; private set; }
     public string Text { get; private set; } = string.Empty;
+
+    /// <summary>The accessible name the core last published.</summary>
+    public string? AccessibleName { get; private set; }
+
+    /// <summary>The accessible description the core last published.</summary>
+    public string? AccessibleDescription { get; private set; }
+
+    /// <summary>The role the core last published.</summary>
+    public AccessibleRole AccessibleRole { get; private set; }
+
+    public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+    {
+        this.AccessibleName = name;
+        this.AccessibleDescription = description;
+        this.AccessibleRole = role;
+    }
     public bool Visible { get; private set; }
     public bool Enabled { get; private set; }
     public bool Disposed { get; private set; }

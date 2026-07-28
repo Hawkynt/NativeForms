@@ -12,6 +12,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class ToolStrip : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.ToolBar;
+
     /// <summary>The horizontal padding inside a button, and the gap between its icon and caption.</summary>
     internal const int ButtonPadding = 4;
 

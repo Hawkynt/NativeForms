@@ -124,6 +124,23 @@ internal abstract class Win32ControlPeer : IControlPeer
     private nint _toolTipText;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// A stock control already answers for itself — a <c>BUTTON</c> tells MSAA it is a push button with
+    /// its caption, unprompted — so this only speaks for the surfaces that do not. Our canvas class has no
+    /// window text at all, which is exactly what MSAA reads as the name of a window it knows nothing else
+    /// about; giving it one is the difference between "pane" and "Enable logging, pane". The text is never
+    /// painted (the canvas draws only what the control's <c>OnPaint</c> puts there), so it is free.
+    /// <para>
+    /// The role is not expressible this way: MSAA infers it from the window class, and saying otherwise
+    /// needs a <c>WM_GETOBJECT</c> provider. Tracked in the PRD; the name is the half that carries most of
+    /// the value, since a screen reader announcing "Enable logging" is useful even when it calls it a pane.
+    /// </para>
+    /// </remarks>
+    public virtual void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+    {
+    }
+
+    /// <inheritdoc/>
     public unsafe void ShowToolTip(string? text)
     {
         if (Handle == 0)

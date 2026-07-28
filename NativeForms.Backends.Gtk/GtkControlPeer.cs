@@ -556,6 +556,7 @@ internal abstract class GtkControlPeer : IControlPeer
             SelectScrollEvents();
             ConnectPointerSignals();
             ConnectContextMenuSignals();
+            this.PushAccessible(); // state the core handed over before the widget existed
         }
 
         _parentFixed = parentFixed;
@@ -716,6 +717,77 @@ internal abstract class GtkControlPeer : IControlPeer
     private protected void RaisePointerLeave() => this.PointerLeave?.Invoke(this, EventArgs.Empty);
 
     /// <inheritdoc/>
+    /// <inheritdoc />
+    /// <remarks>
+    /// GTK keeps an <c>AtkObject</c> per widget and a real widget fills it in itself, so this only ever
+    /// adds to what the platform already knows: for a promoted control it refines the name, and for the
+    /// canvas an owner-drawn control paints on — which is otherwise an unlabelled drawing area to a
+    /// screen reader — it is the only thing there is.
+    /// </remarks>
+    public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+    {
+        _accessibleName = name;
+        _accessibleDescription = description;
+        _accessibleRole = role;
+        if (_widget != 0)
+            this.PushAccessible();
+    }
+
+    /// <summary>Writes the buffered accessibility state onto the widget's ATK object.</summary>
+    private protected void PushAccessible()
+    {
+        var accessible = NativeMethods.gtk_widget_get_accessible(_widget);
+        if (accessible == 0)
+            return;
+
+        if (_accessibleName is { } name)
+            NativeMethods.atk_object_set_name(accessible, name);
+
+        if (_accessibleDescription is { } description)
+            NativeMethods.atk_object_set_description(accessible, description);
+
+        if (_accessibleRole != AccessibleRole.Default)
+            NativeMethods.atk_object_set_role(accessible, AtkRoleOf(_accessibleRole));
+    }
+
+    private string? _accessibleName;
+    private string? _accessibleDescription;
+    private AccessibleRole _accessibleRole;
+
+    /// <summary>
+    /// The <c>AtkRole</c> matching one of ours. The numbers are ATK's enumeration order, which is ABI —
+    /// a role ATK has no word for maps to <c>ATK_ROLE_UNKNOWN</c> rather than being guessed at.
+    /// </summary>
+    private static int AtkRoleOf(AccessibleRole role)
+        => role switch
+        {
+            AccessibleRole.StaticText => 60,    // ATK_ROLE_LABEL
+            AccessibleRole.PushButton => 42,    // ATK_ROLE_PUSH_BUTTON
+            AccessibleRole.CheckButton => 8,    // ATK_ROLE_CHECK_BOX
+            AccessibleRole.RadioButton => 44,   // ATK_ROLE_RADIO_BUTTON
+            AccessibleRole.Text => 70,          // ATK_ROLE_TEXT
+            AccessibleRole.ComboBox => 11,      // ATK_ROLE_COMBO_BOX
+            AccessibleRole.List => 32,          // ATK_ROLE_LIST
+            AccessibleRole.ListItem => 33,      // ATK_ROLE_LIST_ITEM
+            AccessibleRole.Tree => 72,          // ATK_ROLE_TREE
+            AccessibleRole.Table => 65,         // ATK_ROLE_TABLE
+            AccessibleRole.Slider => 56,        // ATK_ROLE_SLIDER
+            AccessibleRole.ProgressBar => 41,   // ATK_ROLE_PROGRESS_BAR
+            AccessibleRole.ScrollBar => 48,     // ATK_ROLE_SCROLL_BAR
+            AccessibleRole.Link => 88,          // ATK_ROLE_LINK
+            AccessibleRole.Grouping => 26,      // ATK_ROLE_PANEL is closest for a captioned group
+            AccessibleRole.PageTabList => 39,   // ATK_ROLE_PAGE_TAB_LIST
+            AccessibleRole.PageTab => 38,       // ATK_ROLE_PAGE_TAB
+            AccessibleRole.MenuBar => 36,       // ATK_ROLE_MENU_BAR
+            AccessibleRole.MenuItem => 37,      // ATK_ROLE_MENU_ITEM
+            AccessibleRole.ToolBar => 71,       // ATK_ROLE_TOOL_BAR
+            AccessibleRole.Window => 77,        // ATK_ROLE_WINDOW
+            AccessibleRole.Pane => 40,          // ATK_ROLE_PANEL
+            AccessibleRole.Graphic => 25,       // ATK_ROLE_IMAGE
+            _ => 0,                             // ATK_ROLE_INVALID / unknown
+        };
+
+    /// <inheritdoc />
     public void ShowToolTip(string? text)
     {
         if (_widget == 0)

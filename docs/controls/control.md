@@ -72,6 +72,20 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 | `TabStop` | `bool` | per kind | Whether Tab stops here. Until assigned it follows the kind's default: focusable controls are stops; labels, panels, group boxes, picture boxes, progress bars, scroll bars and strips are not; the menu bar opts out (Alt reaches it), matching WinForms |
 | `UseNativeWidget` | `bool?` | `null` | Whether this control realizes onto a real platform widget rather than the owner-drawn surface; `null` follows [`Application.PreferNativeWidgets`](application.md) |
 
+### Accessibility
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `AccessibleDescription` | `string?` | `null` | A longer description announced after the name |
+| `AccessibleName` | `string?` | `null` | What assistive technology calls the control; unset, the control's `Text` is used |
+| `AccessibleRole` | `AccessibleRole` | `Default` | What the control is; unset, each control reports its own kind |
+
+A control with a caption is already named — set `AccessibleName` only where the visible text is not the whole story: a toolbar button showing an icon, a close glyph, a field whose meaning lives in a separate label. Renaming a control renames it for a screen reader too, unless you named it explicitly.
+
+This matters most for **owner-drawn** controls. A real platform widget answers for itself — a promoted [`CheckBox`](checkbox.md) tells the screen reader it is a check box with its caption, unprompted — but an owner-drawn control is a blank drawing surface to an accessibility client however carefully it is painted, so the toolkit publishes the name and role on its behalf. On GTK that goes to the widget's `AtkObject` (verified against ATK itself in `GtkAccessibilityTests`); on Win32 the name becomes the canvas window's text, which is what MSAA reads for a window it knows nothing else about.
+
+**Not yet:** the role is not published on Win32 — MSAA infers it from the window class, and overriding that needs a `WM_GETOBJECT` provider. A screen reader there announces the right name and a generic kind. See [PRD §8](../PRD.md#8-cross-cutting-features).
+
 ### Keyboard navigation
 
 Tab and Shift+Tab walk the tab order described above. `Ctrl+Tab`/`Ctrl+Shift+Tab` switch the pages of the innermost [`TabControl`](tabcontrol.md) containing the focused control — from anywhere inside a page, not only when the header has focus — and are left alone when there is no tab control above, so they stay available to an application that wants them.

@@ -40,6 +40,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class DataGridView : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Table;
+
     private const int _CellPadding = 4;
     private const int _IconGap = 4;
     private const int _WheelRows = 3;

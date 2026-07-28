@@ -14,6 +14,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class ListBox : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.List;
+
     private const int _IconGap = 4;
 
     /// <summary>The selected row indices, always kept sorted ascending.</summary>

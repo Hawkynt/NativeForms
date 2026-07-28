@@ -41,6 +41,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class ListView : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.List;
+
     private const int _IconGap = 4;
     private const int _CellPad = 2;
     private const int _CheckGap = 4;

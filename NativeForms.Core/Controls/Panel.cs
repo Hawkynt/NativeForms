@@ -24,6 +24,9 @@ public enum BorderStyle
 /// </summary>
 public class Panel : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Pane;
+
     private const int _NoThumbDrag = 0;
     private const int _VerticalThumbDrag = 1;
     private const int _HorizontalThumbDrag = 2;

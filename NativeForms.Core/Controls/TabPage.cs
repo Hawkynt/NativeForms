@@ -7,6 +7,9 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class TabPage : Panel
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.PageTab;
+
     /// <summary>Creates an untitled page.</summary>
     public TabPage() { }
 

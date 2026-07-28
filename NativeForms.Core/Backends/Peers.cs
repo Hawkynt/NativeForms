@@ -111,6 +111,20 @@ public interface IControlPeer : IDisposable
     /// control underneath. The platform tip never takes input, and it is themed by the OS for free.
     /// </summary>
     void ShowToolTip(string? text);
+
+    /// <summary>
+    /// Publishes what this control is called and what it is, so assistive technology can announce it.
+    /// </summary>
+    /// <remarks>
+    /// A real platform widget already answers for itself — a native check box tells the screen reader it
+    /// is a check box, with its caption, without being asked. This is for the surfaces that do not: an
+    /// owner-drawn control is a blank canvas to an accessibility client, however carefully we paint it, so
+    /// the toolkit has to say out loud what the pixels mean. Backends that cannot express this ignore it.
+    /// </remarks>
+    /// <param name="name">The control's name, or <see langword="null"/> to leave the platform's own.</param>
+    /// <param name="description">A longer description, or <see langword="null"/> for none.</param>
+    /// <param name="role">What the control is; <see cref="AccessibleRole.Default"/> leaves the platform's own.</param>
+    void SetAccessibleInfo(string? name, string? description, AccessibleRole role) { }
 }
 
 /// <summary>

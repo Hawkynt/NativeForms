@@ -86,6 +86,8 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     private protected void OnHandleCreated()
     {
         _canvases[this.Handle] = this;
+        if (_accessibleName is { } name)
+            NativeMethods.SetWindowTextW(this.Handle, name);
 
         if (this._children is null)
             return;
@@ -100,6 +102,21 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     /// implement light dismiss without duplicating the window procedure.
     /// </summary>
     private protected virtual bool PreProcessMessage(uint msg, nint wParam, nint lParam) => false;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The canvas is the case the base class describes: our own window class, with no caption of its own,
+    /// so its window text is free to carry the accessible name that MSAA would otherwise not have.
+    /// </remarks>
+    public override void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+    {
+        _accessibleName = name;
+        if (this.Handle != 0)
+            NativeMethods.SetWindowTextW(this.Handle, name ?? string.Empty);
+    }
+
+    /// <summary>The accessible name, buffered until the window exists.</summary>
+    private string? _accessibleName;
 
     /// <inheritdoc/>
     public void AddChild(IControlPeer child)

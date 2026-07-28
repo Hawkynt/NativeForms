@@ -22,6 +22,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class TabControl : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.PageTabList;
+
     private const int _TabPadding = 10;
     private const int _IconGap = 4;
     private const int _HeaderChrome = 6;

@@ -19,6 +19,9 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Tree;
+
     private const int _CheckCellWidth = GlyphRenderer.CheckBoxSize + 4;
     private const int _IconGap = 4;
     private const int _TextPad = 2;
