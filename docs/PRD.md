@@ -743,7 +743,20 @@ strategy (may differ per platform; note exceptions inline).
       tab stop after any visibility push (all backends, headless-tested), and the GTK peer clears the
       toplevel focus when it unmaps the widget that held it so the move lands reliably. The Pickers
       walkthrough workaround was removed and the text-entry sweep passes across repeated runs.
-- [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
+- [~] Per-platform smoke tests / screenshots for owner-drawn controls. Linux is covered by the autopilot's
+      in-process captures; Windows now has a manual route but no automation — the gallery comes up under
+      wine (with the one `Rtf` swapped for plain text, see below) and a window is captured by its own
+      drawable, because `:1` is a rootless Xwayland whose root grabs black and ImageMagick 7 here has no
+      X11 delegate:
+
+      ```py
+      from Xlib import display, X            # python-xlib; walk the tree for the window by WM name,
+      raw = win.get_image(0, 0, w, h, X.ZPixmap, 0xffffffff)   # then BGRX -> a binary PPM that
+      # ...                                  # `magick out.ppm out.png` converts without a delegate.
+      ```
+
+      Automating it needs the autopilot's injection and capture behind a backend seam — see the
+      interactive-verification entry below, which is the same gap.
 - [ ] **Win32 rendering findings from the wine run**, none of them promotion-related, all reproducible by
       bringing the gallery up as described above:
       - Controls hosted in a `ToolStrip` through `ToolStripControlHost` paint **blank** — the date picker
