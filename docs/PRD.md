@@ -753,21 +753,24 @@ strategy (may differ per platform; note exceptions inline).
       warning on a freshly mapped dialog is accepted as cosmetic until then.
 - [ ] **Fix the TimePicker double-click check (~2 in 8 runs, X11).** Investigated at length; the cause is
       **not** yet found, so the notes below exist to stop the next attempt repeating the dead ends.
-      Symptom: `the clock never opened` with `presses landed on: GtkFixed, GtkFixed` — the gesture misses
-      the picker's canvas entirely.
-      *Established:* an instrumented run showed the press going to screen Y **1220** while the field is
-      26 px tall; the offset implies `control.Height` read **186** inside the very call that converted it,
-      yet `time.Bounds` reports 26 immediately afterwards. The demo authors it as
-      `new(664, 356, 200, 26)` and never resizes it.
+      Symptom: `the clock never opened`, with `presses landed on: GtkFixed, GtkFixed`.
+      *Established:* `GtkCanvasPeer` is itself a `gtk_fixed_new()`, so **`GtkFixed` is the picker's own
+      canvas — that landing line means the presses did reach the control**, not that they missed. The
+      earlier reading of a ~80 px miss was a bug in the instrumentation, not in the gesture:
+      `control.Bounds` is parent-relative, so comparing it through `form.PointToScreen` omits the
+      TabPage's offset under the menu/toolbar/tab strip (~80 px). The gesture's coordinates are correct.
+      So the failure is a genuine **double-click recognition** miss, not a targeting one.
       *Refuted (do not retry):* (a) the gap between the two injected presses exceeding `DoubleClickTime` —
       driving press/release/press inside one pump did not help; (b) a stray popup mapped over the field —
       `Popups().Count` is 0 before the gesture; (c) measuring the offset and converting it in two separate
       marshalled reads — making that atomic did not help either.
-      *Next lead:* `control.PointToScreen` (through the peer) and `form.PointToScreen(control.Bounds)`
-      disagree by ~80 px here, which is what a **scrolled containing page** would produce. Check whether
-      the Input page sits in a scrolling panel and whether the picker's logical bounds and its peer
-      allocation diverge; a check that computes screen points from logical bounds while the peer is offset
-      would miss exactly like this.
+      *Next lead:* the control opens on the second press only when
+      `now - _lastClickTime <= Theme.DoubleClickTime`. Since the presses reach it and an atomic gesture did
+      not help, instrument `TimePicker`'s own `_lastClickTime`/`isDouble` decision rather than the harness:
+      log the observed delta against `DoubleClickTime` on a failing run. A plausible remaining cause is
+      that the first press is consumed by something else (a hover/tooltip state, or the field's caret
+      handling) so `_lastClickTime` is never set — note the original check called `ClickAt` first, which
+      also ran `DropStrayTip()`.
       *Method note:* this check has a high background variance — take **≥5 runs** before concluding a
       change helped or hurt. Two single-run A/Bs during this investigation pointed at the wrong culprit.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
