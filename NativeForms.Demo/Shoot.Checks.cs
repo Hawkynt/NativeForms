@@ -27,6 +27,12 @@ namespace Hawkynt.NativeForms.Demo;
 /// </remarks>
 internal static partial class Shoot
 {
+    /// <summary>Clicks that were injected through the OS and observed arriving.</summary>
+    public static int Clicks { get; private set; }
+
+    /// <summary>Keystrokes that were injected through the OS and observed arriving.</summary>
+    public static int Keystrokes { get; private set; }
+
     /// <summary>Every control in the tree rooted at <paramref name="control"/>, itself included.</summary>
     private static IEnumerable<Control> Walk(Control control)
     {
@@ -34,6 +40,83 @@ internal static partial class Shoot
         foreach (var child in control.Controls)
             foreach (var descendant in Walk(child))
                 yield return descendant;
+    }
+
+    /// <summary>
+    /// Drives one real click and one real keystroke through the operating system's input queue, and
+    /// checks that both reached the toolkit. Reports the number of failures; a session that cannot
+    /// deliver injected input at all is a skip, not a failure.
+    /// </summary>
+    /// <remarks>
+    /// This is the check that state round-trips cannot make. Writing <c>box.Text</c> proves the peer
+    /// stores and returns a string; a keystroke arriving from the input queue proves the window is
+    /// focusable, hit-testable, on top, and wired to the toolkit's event routing — which is where a
+    /// native-widget toolkit actually breaks.
+    /// </remarks>
+    public static int CheckInput(Control page, string windowTitle, Action<string> note)
+    {
+        if (!OperatingSystem.IsWindows() || !ShootInput.Available)
+            return 0;
+
+        var button = Walk(page).OfType<Button>().FirstOrDefault(b => b is { Visible: true, Enabled: true, Width: > 8, Height: > 8 });
+        var box = Walk(page).OfType<TextBox>().FirstOrDefault(b => b is { Visible: true, Enabled: true, ReadOnly: false } and not MaskedTextBox);
+        if (button is null && box is null)
+            return 0;
+
+        ShootInput.Activate(windowTitle);
+        var failed = 0;
+
+        if (button is not null)
+        {
+            var clicked = false;
+            void OnClick(object? sender, EventArgs e) => clicked = true;
+            button.Click += OnClick;
+            try
+            {
+                var centre = button.PointToScreen(new(button.Width / 2, button.Height / 2));
+                if (ShootInput.Click(centre))
+                {
+                    ShootInput.Drain();
+                    if (clicked)
+                        ++Clicks;
+                    else
+                    {
+                        note($"    input: a real click at {centre.X},{centre.Y} never reached Button \"{button.Text}\"");
+                        ++failed;
+                    }
+                }
+            }
+            finally
+            {
+                button.Click -= OnClick;
+            }
+        }
+
+        if (box is not null && ShootInput.Available)
+        {
+            var original = box.Text;
+            box.Text = string.Empty;
+            var centre = box.PointToScreen(new(box.Width / 2, box.Height / 2));
+            if (ShootInput.Click(centre))
+            {
+                ShootInput.Drain();
+                if (ShootInput.Type('Z'))
+                {
+                    ShootInput.Drain();
+                    if (box.Text.Contains('Z'))
+                        ++Keystrokes;
+                    else
+                    {
+                        note("    input: a real keystroke never reached the focused TextBox");
+                        ++failed;
+                    }
+                }
+            }
+
+            box.Text = original;
+        }
+
+        return failed;
     }
 
     /// <summary>

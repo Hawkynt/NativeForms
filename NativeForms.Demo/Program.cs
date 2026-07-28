@@ -124,7 +124,8 @@ if (shooting)
             if (pages is not null)
                 try
                 {
-                    var failures = Shoot.Check(pages.TabPages[page], form.ClientSize, Note);
+                    var failures = Shoot.Check(pages.TabPages[page], form.ClientSize, Note)
+                        + Shoot.CheckInput(pages.TabPages[page], form.Text, Note);
                     shootFailures += failures;
                     if (failures > 0)
                         Note($"  {name}: {failures} check(s) failed");
@@ -142,9 +143,15 @@ if (shooting)
             }
 
             shutter.Stop();
+            // Say what was actually exercised, not just that nothing complained: a run that injected
+            // nothing and reported a pass would be the same lie as a blank screenshot reporting success.
+            var injected = OperatingSystem.IsWindows()
+                ? $", {Shoot.Clicks} real click(s) and {Shoot.Keystrokes} real keystroke(s) delivered through the OS input queue"
+                : string.Empty;
+
             Note(shootFailures == 0
-                ? $"shoot: {page} page(s), every check passed"
-                : $"shoot: {shootFailures} check(s) failed across {page} page(s)");
+                ? $"shoot: {page} page(s), every check passed{injected}"
+                : $"shoot: {shootFailures} check(s) failed across {page} page(s){injected}");
 
             form.Close();
         };
