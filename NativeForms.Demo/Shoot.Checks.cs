@@ -58,8 +58,21 @@ internal static partial class Shoot
         if (!OperatingSystem.IsWindows() || !ShootInput.Available)
             return 0;
 
-        var button = Walk(page).OfType<Button>().FirstOrDefault(b => b is { Visible: true, Enabled: true, Width: > 8, Height: > 8 });
-        var box = Walk(page).OfType<TextBox>().FirstOrDefault(b => b is { Visible: true, Enabled: true, ReadOnly: false } and not MaskedTextBox);
+        // Only controls actually on screen can be clicked. A page that scrolls, or one whose panes are
+        // laid out past the viewport, puts perfectly ordinary controls at negative screen coordinates —
+        // aiming there tests nothing and reports a failure the toolkit did not earn.
+        var visible = new Rectangle(page.PointToScreen(Point.Empty), new(page.Width, page.Height));
+        bool OnScreen(Control control)
+        {
+            if (control is not { Visible: true, Enabled: true, Width: > 8, Height: > 8 })
+                return false;
+
+            var centre = control.PointToScreen(new(control.Width / 2, control.Height / 2));
+            return visible.Contains(centre) && centre is { X: >= 0, Y: >= 0 };
+        }
+
+        var button = Walk(page).OfType<Button>().FirstOrDefault(OnScreen);
+        var box = Walk(page).OfType<TextBox>().FirstOrDefault(b => b is not MaskedTextBox && b is { ReadOnly: false } && OnScreen(b));
         if (button is null && box is null)
             return 0;
 
@@ -100,7 +113,14 @@ internal static partial class Shoot
             if (ShootInput.Click(centre))
             {
                 ShootInput.Drain();
-                if (ShootInput.Type('Z'))
+
+                // Only a box the click actually focused can be typed into. A editor hosted inside a
+                // composite — a search field, a token box — may hand focus to its shell instead, and
+                // asserting a keystroke into something that never took focus invents a failure rather
+                // than finding one. Said out loud so a skip is visible rather than silent.
+                if (!box.Focused)
+                    note($"    input: the click did not focus this {box.GetType().Name}, so the keystroke was skipped");
+                else if (ShootInput.Type('Z'))
                 {
                     ShootInput.Drain();
                     if (box.Text.Contains('Z'))
