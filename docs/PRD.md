@@ -748,17 +748,29 @@ strategy (may differ per platform; note exceptions inline).
       that driving the widget round-trips (`Checked`, radio grouping *including clearing the group*,
       `LinkVisited`, `Value`, `SelectedIndex`, items added after realization, `TopIndex`,
       `IndexFromPoint`, a group box child's bounds), and that a mid-use property change swaps the peer
-      with the state intact. 32 checks, all passing. This is what turned "compile-verified" into
-      "verified" for §12. `Win32NativePromotionTests` is the same sweep as a fixture, self-skipping off
-      Windows like the real-GTK tier does, so CI's `windows-latest` job runs it against a real desktop on
-      every push.
+      with the state intact. `Win32NativePromotionTests` holds that sweep, self-skipping off Windows like
+      the real-GTK tier does, so CI's `windows-latest` job runs it against a real desktop on every push.
+      It also runs **under wine on the Linux dev box**, which is what turned "compile-verified" into
+      "verified" for §12 — wine reports itself as Windows, so the fixture executes rather than skipping.
+      The whole suite passes there: 1989 tests, 1954 passed, 0 failed, 35 skipped, and those 35 are the
+      GTK fixtures correctly standing down. Recipe, since `dotnet test` cannot cross-run:
+
+      ```sh
+      # a scratch NUnitLite host for the test assembly — the test project publishes no launcher
+      dotnet new console -o /tmp/nunitrun && cd /tmp/nunitrun
+      dotnet add package NUnitLite && dotnet add reference <repo>/NativeForms.Tests/NativeForms.Tests.csproj
+      # Program.cs: return new NUnitLite.AutoRun(typeof(Hawkynt.NativeForms.Tests.Win32NativePromotionTests).Assembly).Execute(args);
+      dotnet publish -c Release -r win-x64 --self-contained -o /tmp/nunitout
+      WINEPREFIX=/tmp/wp WINEDEBUG=-all DISPLAY=:1 wine /tmp/nunitout/nunitrun.exe \
+        --where "class =~ Win32NativePromotionTests" --noresult
+      ```
 - [ ] **The demo cannot run end-to-end under wine**: `EM_STREAMIN` faults inside wine's
       `riched20`/`msftedit`, so `RichTextBox.Rtf` takes the process down during realization. Established
       by bisection — plain `Text` is fine, only the stream-in path faults, and it still faults with *all*
       of our subclassing removed, so nothing of ours is on the hook; the `EDITSTREAM` layout and the
       `EDITSTREAMCALLBACK` signature both match the SDK. Until wine fixes it, Win32 runtime coverage comes
-      from the focused probe rather than the gallery walkthrough. Do not re-diagnose this as a toolkit
-      bug.
+      from the test tier above rather than from the gallery walkthrough. Do not re-diagnose this as a
+      toolkit bug.
 - [ ] **Autopilot capture must not touch the widget tree.** A capture is an *observation*; anything that
       mutates GTK state from inside it corrupts the very walkthrough it is documenting. Measured: adding
       a per-layer background fill that read `BackendRegistry.Resolve().Theme` made the TimePicker
