@@ -44,7 +44,7 @@ public class GroupBox : OwnerDrawnControl
 
 
     /// <summary>Whether this frame is currently rendered by a real platform widget.</summary>
-    public bool IsNativeWidget => _native is not null;
+    public override bool IsNativeWidget => _native is not null;
 
     /// <summary>
     /// Whether the current property values are all expressible by a platform frame. A stock frame's

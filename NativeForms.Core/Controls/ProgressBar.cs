@@ -25,7 +25,7 @@ public class ProgressBar : OwnerDrawnControl
 
 
     /// <summary>Whether the control is currently backed by a real platform progress indicator.</summary>
-    public bool IsNativeWidget => _native is not null;
+    public override bool IsNativeWidget => _native is not null;
 
     /// <summary>
     /// Whether the configured properties stay inside what a platform progress bar expresses. A vertical

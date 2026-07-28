@@ -18,7 +18,7 @@ public class TrackBar : OwnerDrawnControl
 
 
     /// <summary>Whether the control is currently backed by a real platform slider.</summary>
-    public bool IsNativeWidget => _native is not null;
+    public override bool IsNativeWidget => _native is not null;
 
     /// <summary>
     /// Always eligible: a platform slider carries the range, the position and the step sizes, and the

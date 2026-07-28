@@ -1377,32 +1377,62 @@ internal sealed partial class Autopilot
         {
             // The peers under this are pure interop, so nothing but a live desktop proves they were built
             // at all. Each entry is a control whose properties clear its gate (PRD §12).
-            this.ExpectTrue("CheckBox stayed owner-drawn", this.Read(() => _form.Part<CheckBox>("basics.check").IsNativeWidget));
-            this.ExpectTrue("LinkLabel stayed owner-drawn", this.Read(() => _form.Part<LinkLabel>("basics.link").IsNativeWidget));
-            this.ExpectTrue("ProgressBar stayed owner-drawn", this.Read(() => _form.Part<ProgressBar>("basics.progressHalf").IsNativeWidget));
-            this.ExpectTrue("TrackBar stayed owner-drawn", this.Read(() => _form.Part<TrackBar>("input.track").IsNativeWidget));
-            this.ExpectTrue("HScrollBar stayed owner-drawn", this.Read(() => _form.Part<HScrollBar>("input.hscroll").IsNativeWidget));
-            this.ExpectTrue("VScrollBar stayed owner-drawn", this.Read(() => _form.Part<VScrollBar>("input.vscroll").IsNativeWidget));
-            this.ExpectTrue("ComboBox stayed owner-drawn", this.Read(() => _form.Part<ComboBox>("ribbon.styleCombo").IsNativeWidget));
-            this.ExpectTrue("RadioButton stayed owner-drawn", this.Read(() => _form.Part<RadioButton>("ribbon.calendarDay").IsNativeWidget));
-            this.ExpectTrue("ListBox stayed owner-drawn", this.Read(() => _form.Part<ListBox>("lists.statusList").IsNativeWidget));
+            foreach (var name in new[]
+                     {
+                         "basics.check", "basics.link", "basics.progressHalf", "input.track", "input.hscroll",
+                         "input.vscroll", "ribbon.styleCombo", "ribbon.calendarDay", "lists.statusList",
+                     })
+            {
+                var part = _form.Part<Control>(name);
+                this.ExpectTrue($"{name} stayed owner-drawn", this.Read(() => part.IsNativeWidget));
+            }
 
             // And the ones whose state rules them out must have stayed behind.
-            this.ExpectTrue(
-                "the icon RadioButton was promoted, but no platform radio draws an image beside its caption",
-                !this.Read(() => _form.Part<RadioButton>("basics.radioSmall").IsNativeWidget));
-            this.ExpectTrue(
-                "the multi-select ListBox was promoted, but its icons and mode need the painter",
-                !this.Read(() => _form.Part<ListBox>("lists.listBox").IsNativeWidget));
-            this.ExpectTrue(
-                "the CheckedListBox was promoted, but a platform list would drop its check boxes",
-                !this.Read(() => _form.Part<CheckedListBox>("lists.checkedList").IsNativeWidget));
-            this.ExpectTrue(
-                "the icon ComboBox was promoted, but a stock combo shows no per-item icons",
-                !this.Read(() => _form.Part<ComboBox>("lists.comboList").IsNativeWidget));
-            this.ExpectTrue(
-                "the editable ComboBox was promoted, but its editor is a hosted TextBox",
-                !this.Read(() => _form.Part<ComboBox>("lists.comboEdit").IsNativeWidget));
+            foreach (var (name, why) in new[]
+                     {
+                         ("basics.radioSmall", "no platform radio draws an image beside its caption"),
+                         ("lists.listBox", "its icons and multi-selection mode need the painter"),
+                         ("lists.checkedList", "a platform list would drop its row check boxes"),
+                         ("lists.comboList", "a stock combo shows no per-item icons"),
+                         ("lists.comboEdit", "its editor is a hosted TextBox"),
+                     })
+            {
+                var part = _form.Part<Control>(name);
+                this.ExpectTrue($"{name} was promoted, but {why}", !this.Read(() => part.IsNativeWidget));
+            }
+        });
+
+        this.Check("Native promotion: the comparison page renders each control both ways at once", () =>
+        {
+            // The page builds two columns from one method with only the pin flipped, so this asserts the
+            // pin held on every row — which is what makes the screenshot a like-for-like comparison.
+            foreach (var (name, native) in new[]
+                     {
+                         ("check", true), ("link", true), ("group", true), ("radio", true), ("progress", true),
+                         ("track", true), ("hscroll", true), ("vscroll", true), ("combo", true), ("list", true),
+                         ("check", false), ("link", false), ("group", false), ("radio", false), ("progress", false),
+                         ("track", false), ("hscroll", false), ("vscroll", false), ("combo", false), ("list", false),
+                     })
+            {
+                var part = _form.Part<Control>($"native.{name}{(native ? "Native" : "Drawn")}");
+                var promoted = this.Read(() => part.UseNativeWidget) == true;
+                this.ExpectTrue(
+                    $"native.{name} was pinned to {(native ? "the widget" : "the painter")} but did not stay there",
+                    promoted == native && this.Read(() => part.IsNativeWidget) == native);
+            }
+        });
+
+        this.Check("Native promotion: the state that leaves the gate keeps its control on the painter", () =>
+        {
+            foreach (var name in new[]
+                     {
+                         "gatedCheck", "gatedRadio", "gatedProgress", "gatedCombo",
+                         "gatedEditableCombo", "gatedCheckedList", "gatedGroup",
+                     })
+            {
+                var part = _form.Part<Control>($"native.{name}");
+                this.ExpectTrue($"native.{name} was promoted, but its state is outside the gate", !this.Read(() => part.IsNativeWidget));
+            }
         });
 
         this.Check("Native promotion: a promoted ComboBox drives its selection through the platform list", () =>

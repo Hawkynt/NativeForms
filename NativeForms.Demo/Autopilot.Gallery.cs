@@ -22,7 +22,7 @@ internal sealed partial class Autopilot
         Section("Gallery captures");
 
         var tabs = _form.Part<TabControl>("chrome.tabs");
-        var names = new[] { "01-basics", "02-input", "03-lists", "04-grid", "05-layout", "06-docking", "07-pickers", "08-ribbon", "09-calendar", "19-menus", "20-toolbars", "21-datetime", "24-images", "28-widgets", "29-editors" };
+        var names = new[] { "01-basics", "02-input", "03-lists", "04-grid", "05-layout", "06-docking", "07-pickers", "08-ribbon", "09-calendar", "19-menus", "20-toolbars", "21-datetime", "24-images", "28-widgets", "29-editors", "30-native" };
         var pageCount = this.Read(() => tabs.TabPages.Count);
         if (pageCount != names.Length)
             _captureFailures.Add($"gallery names cover {names.Length} tabs but the demo has {pageCount}");

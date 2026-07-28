@@ -272,7 +272,7 @@ public class ComboBox : OwnerDrawnControl
 
 
     /// <summary>Whether this combo is currently rendered by a real platform widget.</summary>
-    public bool IsNativeWidget => _native is not null;
+    public override bool IsNativeWidget => _native is not null;
 
     /// <summary>
     /// Whether the current property values are all expressible by a platform drop-down list. A stock

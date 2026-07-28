@@ -23,6 +23,13 @@ headless autopilot. Each page below is one tab of the demo:
 | [![Grid](screenshots/04-grid.png)](screenshots/04-grid.png)<br>DataGridView | [![Layout](screenshots/05-layout.png)](screenshots/05-layout.png)<br>Layout | [![Docking](screenshots/06-docking.png)](screenshots/06-docking.png)<br>Docking |
 | [![Pickers](screenshots/07-pickers.png)](screenshots/07-pickers.png)<br>Pickers | [![Ribbon](screenshots/08-ribbon.png)](screenshots/08-ribbon.png)<br>Ribbon | [![Calendar](screenshots/09-calendar.png)](screenshots/09-calendar.png)<br>Calendar |
 | [![Widgets](screenshots/28-widgets.png)](screenshots/28-widgets.png)<br>Widgets (app shell) | [![Editors](screenshots/29-editors.png)](screenshots/29-editors.png)<br>Editors | [![Menus](screenshots/19-menus.png)](screenshots/19-menus.png)<br>Menus |
+| [![Native](screenshots/30-native.png)](screenshots/30-native.png)<br>Native peers, side by side | | |
+
+The **Native** page is the one to look at twice: it builds every promotable control from one method with
+only the pin flipped, so the left column is the platform's widget and the middle column is our painter with
+the same properties. The right column holds the states that leave the gate — an icon beside a caption, a
+per-item image, a `CheckedListBox` — which is what the painter is still there for. See
+[PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
 
 Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 [the month scheduler](screenshots/calendar-month.png), [a modal MessageBox](screenshots/messagebox.png),

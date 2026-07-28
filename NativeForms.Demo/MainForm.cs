@@ -88,7 +88,8 @@ internal sealed partial class MainForm : Form
             this.BuildDateTimePage(),
             this.BuildImagesPage(),
             this.BuildWidgetsPage(),
-            this.BuildEditorsPage());
+            this.BuildEditorsPage(),
+            this.BuildNativePage());
 
         // Building the pages set initial selections, and those raised the same change events a user
         // click does — so the status line already carried a grid message before anyone touched

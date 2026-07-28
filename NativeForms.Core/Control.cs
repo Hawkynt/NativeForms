@@ -680,6 +680,15 @@ public abstract class Control
     /// the library, and the per-instance budgets of PRD §4 do not have room for two more bytes on all of
     /// them.
     /// </remarks>
+    /// <summary>
+    /// Whether this control is currently rendered by a real platform widget rather than by the
+    /// owner-drawn painter. Controls that only ever had a native peer — <see cref="Button"/>,
+    /// <see cref="Label"/>, <see cref="TextBox"/>, <see cref="Form"/> — are always
+    /// <see langword="true"/>; <see cref="OwnerDrawnControl"/> is <see langword="false"/> unless it was
+    /// promoted, and a promoted control reports whichever peer it currently holds (PRD §12).
+    /// </summary>
+    public virtual bool IsNativeWidget => true;
+
     public bool? UseNativeWidget
     {
         get => (_state & State.NativePreferenceAssigned) == 0 ? null : (_state & State.NativePreference) != 0;

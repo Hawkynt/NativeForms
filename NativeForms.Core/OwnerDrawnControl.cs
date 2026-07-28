@@ -13,6 +13,10 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public abstract class OwnerDrawnControl : Control
 {
+    /// <inheritdoc/>
+    /// <remarks>Owner-drawn by definition, unless a subclass overrides this to report a promotion.</remarks>
+    public override bool IsNativeWidget => false;
+
     private ICanvasPeer? _canvas;
     private IPlatformBackend? _themeSource;
 

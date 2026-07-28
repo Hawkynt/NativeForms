@@ -1034,6 +1034,10 @@ would not survive the feature set we already ship (15 column kinds, merged rows,
 - [x] The allocation budgets of §4 hold on both paths.
 - [x] Every promotion is asserted on a live display, not only headlessly: the peers are pure interop, and
       nothing but a real desktop proves they were built at all.
+- [x] The demo's **Native** page builds every promotable control twice from one method with only the pin
+      flipped, so the two renderings sit side by side in one screenshot and can be compared directly; a
+      third column holds the states that leave the gate. The autopilot asserts, per control, that each pin
+      held.
 - [ ] A screen reader announces a promoted `CheckBox` on Windows and on Linux (the point of the
       exercise — verified manually, once, per control family).
 - [x] `docs/README.md`'s strategy column and each control page's header say which path a control
