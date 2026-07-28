@@ -78,6 +78,9 @@ public sealed partial class Win32Backend : IPlatformBackend
     public ICheckBoxPeer CreateCheckBox() => new CheckBoxPeer();
 
     /// <inheritdoc/>
+    public IRadioButtonPeer CreateRadioButton() => new RadioButtonPeer();
+
+    /// <inheritdoc/>
     public IProgressBarPeer CreateProgressBar()
     {
         EnsureCommonControls(NativeMethods.ICC_PROGRESS_CLASS);

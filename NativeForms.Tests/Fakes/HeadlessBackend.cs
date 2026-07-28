@@ -141,29 +141,35 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITrackBarPeer? CreateTrackBar(bool vertical)
         => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
 
-/// <summary>Whether this backend accepts the progress-bar promotion (PRD §12). Off by default.</summary>
+    /// <summary>Whether this backend accepts the progress-bar promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeProgressBar { get; set; }
 
     /// <summary>The last progress peer handed out, so a test can inspect what the widget was told.</summary>
     public HeadlessProgressBarPeer? LastProgressBar { get; private set; }
 
     public IProgressBarPeer? CreateProgressBar()
-    {
-        if (!this.OfferNativeProgressBar)
-            return null;
+        => !this.OfferNativeProgressBar ? null : this.LastProgressBar = this.Track(new HeadlessProgressBarPeer());
 
-        return this.LastProgressBar = this.Track(new HeadlessProgressBarPeer());
-    }
-
-        /// <summary>The last check-box peer handed out, so a test can drive it like the real widget.</summary>
+    /// <summary>The last check-box peer handed out, so a test can drive it like the real widget.</summary>
     public HeadlessCheckBoxPeer? LastCheckBox { get; private set; }
 
     public ICheckBoxPeer? CreateCheckBox()
+        => !this.OfferNativeCheckBox ? null : this.LastCheckBox = this.Track(new HeadlessCheckBoxPeer());
+
+    /// <summary>Whether this backend accepts the radio-button promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeRadioButton { get; set; }
+
+    /// <summary>Every radio peer handed out, in realization order, so a test can drive a whole group.</summary>
+    public List<HeadlessRadioButtonPeer> RadioButtons { get; } = [];
+
+    public IRadioButtonPeer? CreateRadioButton()
     {
-        if (!this.OfferNativeCheckBox)
+        if (!this.OfferNativeRadioButton)
             return null;
 
-        return this.LastCheckBox = this.Track(new HeadlessCheckBoxPeer());
+        var peer = this.Track(new HeadlessRadioButtonPeer());
+        this.RadioButtons.Add(peer);
+        return peer;
     }
 
     public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer(this));
@@ -1239,6 +1245,29 @@ internal sealed class HeadlessCheckBoxPeer : HeadlessPeer, ICheckBoxPeer
     public void RaiseUserToggle()
     {
         _checked = !_checked;
+        CheckedChanged?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+
+/// <summary>
+/// A stand-in for a real platform radio button. Models the GTK widget, which has already switched itself
+/// on by the time it reports; the core ignores the reported state and runs its own click path either way.
+/// </summary>
+internal sealed class HeadlessRadioButtonPeer : HeadlessPeer, IRadioButtonPeer
+{
+    private bool _checked;
+
+    public event EventHandler? CheckedChanged;
+
+    public void SetChecked(bool value) => _checked = value;
+
+    public bool GetChecked() => _checked;
+
+    /// <summary>Simulates the user selecting the widget itself.</summary>
+    public void RaiseUserSelect()
+    {
+        _checked = true;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
 }

@@ -156,6 +156,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real radio button, so this backend accepts the promotion (PRD §12).</remarks>
+    public IRadioButtonPeer? CreateRadioButton()
+    {
+        EnsureInitialized();
+        return new GtkRadioButtonPeer();
+    }
+
+    /// <inheritdoc />
     /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
     public IProgressBarPeer? CreateProgressBar()
     {

@@ -325,6 +325,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
 
+    /// <summary>Creates a <c>GtkRadioButton</c> in the group given as a <c>GSList</c> (0 starts a new group).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_radio_button_new(nint group);
+
+    /// <summary>Creates a labelled <c>GtkRadioButton</c> joining the group of an existing radio button.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint gtk_radio_button_new_with_label_from_widget(nint groupMember, string label);
+
     /// <summary>Creates a <c>GtkCheckButton</c> carrying the given caption.</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint gtk_check_button_new_with_label(string label);
@@ -676,6 +684,13 @@ internal static partial class NativeMethods
     /// <summary>Drops one reference to a <c>GObject</c>.</summary>
     [LibraryImport(GObject)]
     internal static partial void g_object_unref(nint @object);
+
+    /// <summary>
+    /// Converts a freshly constructed object's floating reference into a real one this process owns, so a
+    /// widget that is never added to a container is still kept alive and can be released deliberately.
+    /// </summary>
+    [LibraryImport(GObject)]
+    internal static partial nint g_object_ref_sink(nint @object);
 
     /// <summary>Frees memory allocated by GLib (for example the string returned by <see cref="g_object_get"/>).</summary>
     [LibraryImport(GLib)]

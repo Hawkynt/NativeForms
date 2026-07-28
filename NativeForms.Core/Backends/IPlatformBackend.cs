@@ -70,6 +70,25 @@ public interface IPlatformBackend
     /// <param name="vertical">Whether the slider runs vertically; GTK fixes this at construction.</param>
     ITrackBarPeer? CreateTrackBar(bool vertical) => null;
 
+    /// <summary>Creates a native radio-button peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    IRadioButtonPeer? CreateRadioButton() => null;
+
+    /// <summary>Creates a native scroll-bar peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    /// <param name="vertical">Whether the bar runs vertically; both platforms fix this at construction.</param>
+    IScrollBarPeer? CreateScrollBar(bool vertical) => null;
+
+    /// <summary>Creates a native caption-frame peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    IGroupBoxPeer? CreateGroupBox() => null;
+
+    /// <summary>Creates a native drop-down-list peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    IComboBoxPeer? CreateComboBox() => null;
+
+    /// <summary>Creates a native string-list peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    IListBoxPeer? CreateListBox() => null;
+
+    /// <summary>Creates a native hyperlink peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    ILinkLabelPeer? CreateLinkLabel() => null;
+
     /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
     /// <param name="owner">
     /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.

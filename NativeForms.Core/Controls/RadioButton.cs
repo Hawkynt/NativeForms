@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
@@ -23,6 +24,7 @@ public class RadioButton : OwnerDrawnControl
                 return;
 
             field = value;
+            _native?.SetChecked(value);
             if (value)
                 this.UncheckSiblings();
 
@@ -45,6 +47,9 @@ public class RadioButton : OwnerDrawnControl
 
             field = value;
             this.UpdateImageAnimation();
+            if (this.IsNativeWidget != this.WouldBeNative)
+                this.RerealizePeer();
+
             this.Invalidate();
         }
     }
@@ -57,6 +62,67 @@ public class RadioButton : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    private IRadioButtonPeer? _native;
+    private bool? _nativeOffered;
+
+    /// <summary>
+    /// Forces this button onto the native widget (<see langword="true"/>) or the owner-drawn painter
+    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
+    /// <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether this button is currently rendered by a real platform widget.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform radio button. An
+    /// <see cref="Image"/> is not: neither platform's radio draws one beside the caption.
+    /// </summary>
+    private bool IsNativeEligible => this.Image is null;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
+        {
+            var offered = backend.CreateRadioButton();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                peer.SetChecked(this.Checked);
+                peer.CheckedChanged += this.OnNativeCheckedChanged;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <summary>
+    /// Adopts a click the widget reported. The peers are non-automatic, so the widget has not changed
+    /// its own state yet and this runs the same <see cref="OnClick"/> path as the owner-drawn button —
+    /// which checks it, unchecks the siblings and raises <see cref="Control.Click"/>.
+    /// </summary>
+    private void OnNativeCheckedChanged(object? sender, EventArgs e) => this.OnClick(EventArgs.Empty);
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        if (_native is { } peer)
+        {
+            peer.CheckedChanged -= this.OnNativeCheckedChanged;
+            _native = null;
+        }
+
+        base.OnUnrealized();
+    }
 
     /// <summary>Raises <see cref="CheckedChanged"/>.</summary>
     protected virtual void OnCheckedChanged(EventArgs e) => this.CheckedChanged?.Invoke(this, e);

@@ -469,6 +469,128 @@ public interface ICheckBoxPeer : IControlPeer
 
 
 /// <summary>
+/// A native radio button (Win32 <c>BUTTON</c> with <c>BS_RADIOBUTTON</c>, GTK <c>GtkRadioButton</c>).
+/// Created only when a <see cref="RadioButton"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+/// <remarks>
+/// The contract is the check box's, because the difference between the two is entirely how the platform
+/// paints them: grouping stays in the core, which already unchecks the siblings sharing a parent. Both
+/// platforms are therefore asked for a <em>non-automatic</em> radio, one that reports the click and
+/// leaves the state to us — an automatic one would define its own group and fight the core over who owns
+/// the selection.
+/// </remarks>
+public interface IRadioButtonPeer : ICheckBoxPeer;
+
+
+/// <summary>
+/// A native scroll bar (Win32 <c>SCROLLBAR</c>, GTK <c>GtkScrollbar</c>). Created only when an
+/// <see cref="HScrollBar"/> or <see cref="VScrollBar"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+public interface IScrollBarPeer : IControlPeer
+{
+    /// <summary>Raised when the user scrolls. Programmatic <see cref="SetValue"/> must not raise it.</summary>
+    event EventHandler? ValueChanged;
+
+    /// <summary>
+    /// Sets the scrollable range and the size of the visible window within it, which is what gives the
+    /// thumb its proportional length. The reachable maximum is <c>maximum - largeChange + 1</c>, the
+    /// Windows Forms convention.
+    /// </summary>
+    void SetRange(int minimum, int maximum, int largeChange, int smallChange);
+
+    /// <summary>Pushes the position into the widget without raising <see cref="ValueChanged"/>.</summary>
+    void SetValue(int value);
+
+    /// <summary>The widget's current position, read when it reports a change.</summary>
+    int GetValue();
+}
+
+
+/// <summary>
+/// A native caption frame (Win32 <c>BUTTON</c> with <c>BS_GROUPBOX</c>, GTK <c>GtkFrame</c>). Created only
+/// when a <see cref="GroupBox"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+/// <remarks>
+/// A group box owns children, so the peer is an <see cref="IContainerPeer"/>: the frame supplies the
+/// border and caption, and the children are parented into the area inside it.
+/// </remarks>
+public interface IGroupBoxPeer : IContainerPeer
+{
+    /// <summary>
+    /// The inset from the peer's own bounds to the area children occupy, so the core can lay out against
+    /// the same rectangle the platform reserves for content.
+    /// </summary>
+    Padding GetContentInset();
+}
+
+
+/// <summary>
+/// A native drop-down list (Win32 <c>COMBOBOX</c> with <c>CBS_DROPDOWNLIST</c>, GTK
+/// <c>GtkComboBoxText</c>). Created only when a <see cref="ComboBox"/> is promoted to a real widget —
+/// see PRD §12.
+/// </summary>
+public interface IComboBoxPeer : IControlPeer
+{
+    /// <summary>Raised when the user picks an item. Programmatic changes must not raise it.</summary>
+    event EventHandler? SelectionChanged;
+
+    /// <summary>Replaces the whole item list, then restores the selection the core asks for.</summary>
+    void SetItems(ReadOnlySpan<string> items, int selectedIndex);
+
+    /// <summary>Pushes the selected index (-1 for none) without raising <see cref="SelectionChanged"/>.</summary>
+    void SetSelectedIndex(int index);
+
+    /// <summary>The widget's current selection, read when it reports a change.</summary>
+    int GetSelectedIndex();
+}
+
+
+/// <summary>
+/// A native list of strings (Win32 <c>LISTBOX</c>, GTK <c>GtkTreeView</c> in a scrolled window). Created
+/// only when a <see cref="ListBox"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+public interface IListBoxPeer : IControlPeer
+{
+    /// <summary>Raised when the user changes the selection. Programmatic changes must not raise it.</summary>
+    event EventHandler? SelectionChanged;
+
+    /// <summary>Raised when the user activates an item (double-click or Enter).</summary>
+    event EventHandler? ItemActivated;
+
+    /// <summary>Replaces the whole item list, then restores the selection the core asks for.</summary>
+    void SetItems(ReadOnlySpan<string> items, int selectedIndex);
+
+    /// <summary>Pushes the selected index (-1 for none) without raising <see cref="SelectionChanged"/>.</summary>
+    void SetSelectedIndex(int index);
+
+    /// <summary>The widget's current selection, read when it reports a change.</summary>
+    int GetSelectedIndex();
+
+    /// <summary>Scrolls the given index into view.</summary>
+    void ScrollIntoView(int index);
+}
+
+
+/// <summary>
+/// A native hyperlink (Win32 <c>SysLink</c>, GTK <c>GtkLinkButton</c>). Created only when a
+/// <see cref="LinkLabel"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+/// <remarks>
+/// Both platforms own the visited state and the hand cursor, and both suppress their built-in "open the
+/// URI" behaviour when the host handles the activation — which the core always does, because
+/// <see cref="LinkLabel.LinkClicked"/> is the application's hook.
+/// </remarks>
+public interface ILinkLabelPeer : IControlPeer
+{
+    /// <summary>Raised when the user activates the link by click or Enter.</summary>
+    event EventHandler? LinkActivated;
+
+    /// <summary>Marks the link visited, so the platform paints it in its visited colour.</summary>
+    void SetVisited(bool visited);
+}
+
+
+/// <summary>
 /// A native progress indicator (Win32 <c>msctls_progress32</c>, GTK <c>GtkProgressBar</c>). Created only
 /// when a <see cref="ProgressBar"/> is promoted to a real widget — see PRD §12.
 /// </summary>
