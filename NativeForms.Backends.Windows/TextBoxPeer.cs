@@ -28,7 +28,8 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     private static readonly ConcurrentDictionary<nint, TextBoxPeer> _edits = new();
 
     /// <summary>The window procedure the EDIT class installed, chained to for everything unclaimed.</summary>
-    private nint _baseProc;
+    /// <summary>This peer's identity in the window's subclass chain; distinct from the base's.</summary>
+    private const nuint _EditSubclassId = 2;
 
     /// <summary>Whether the peer is reporting a change — see <see cref="GetSelection"/>.</summary>
     private bool _inChange;
@@ -71,30 +72,40 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         this.FlushEditState();
     }
 
-    /// <summary>Installs the key-intercepting window procedure on the freshly created EDIT.</summary>
+    /// <summary>
+    /// Adds the key-intercepting procedure to the EDIT's subclass chain.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately <c>SetWindowSubclass</c> rather than swapping <c>GWLP_WNDPROC</c>: the base peer has
+    /// already put a COMCTL32 subclass on this window for the pointer channel, and replacing the window
+    /// procedure out from under that dispatcher is exactly what its documentation forbids — the chain is
+    /// then re-entered out of band through <c>CallWindowProc</c>, which faults. Both procedures belong in
+    /// the one chain, where COMCTL32 runs the last installed first, so this one still sees keys before
+    /// the control does.
+    /// </remarks>
     private void Subclass()
     {
         if (Handle == 0)
             return;
 
         _edits[Handle] = this;
-        _baseProc = NativeMethods.SetWindowLongPtrW(
+        NativeMethods.SetWindowSubclass(
             Handle,
-            NativeMethods.GWLP_WNDPROC,
-            (nint)(delegate* unmanaged<nint, uint, nint, nint, nint>)&EditProc);
+            (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&EditProc,
+            _EditSubclassId,
+            0);
     }
 
-    /// <summary>Restores the EDIT's own window procedure and forgets the handle.</summary>
+    /// <summary>Takes the procedure back out of the chain and forgets the handle.</summary>
     private void Unsubclass()
     {
         if (Handle == 0)
             return;
 
-        if (_baseProc != 0)
-        {
-            NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWLP_WNDPROC, _baseProc);
-            _baseProc = 0;
-        }
+        NativeMethods.RemoveWindowSubclass(
+            Handle,
+            (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&EditProc,
+            _EditSubclassId);
 
         _edits.TryRemove(Handle, out _);
     }
@@ -107,19 +118,19 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     }
 
     /// <summary>
-    /// The subclassed EDIT procedure: gives the owning control first refusal on every key down and
-    /// swallows the ones it claims, then chains to the control's own behavior.
+    /// The EDIT's subclass procedure: gives the owning control first refusal on every key down and
+    /// swallows the ones it claims, then defers to the rest of the chain. The peer is found by HWND
+    /// rather than through the reference data, so an entry the chain reports without one is harmless.
     /// </summary>
     [UnmanagedCallersOnly]
-    private static nint EditProc(nint hwnd, uint msg, nint wParam, nint lParam)
+    private static nint EditProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nint refData)
     {
-        if (!_edits.TryGetValue(hwnd, out var peer))
-            return NativeMethods.DefWindowProcW(hwnd, msg, wParam, lParam);
-
-        if (msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN && peer.RaiseKeyDown(wParam))
+        if (_edits.TryGetValue(hwnd, out var peer)
+            && msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN
+            && peer.RaiseKeyDown(wParam))
             return 0;
 
-        return NativeMethods.CallWindowProcW(peer._baseProc, hwnd, msg, wParam, lParam);
+        return NativeMethods.DefSubclassProc(hwnd, msg, wParam, lParam);
     }
 
     /// <summary>Raises <see cref="KeyDown"/> and reports whether a handler consumed the key.</summary>
