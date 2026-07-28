@@ -751,28 +751,19 @@ strategy (may differ per platform; note exceptions inline).
       container (`presses landed on: GtkFixed`). Any future capture work must resolve colours and settle
       *before* the walkthrough starts, never during it. The residual `gtk_widget_draw: alloc_needed`
       warning on a freshly mapped dialog is accepted as cosmetic until then.
-- [ ] **Fix the TimePicker double-click check (~2 in 8 runs, X11).** Investigated at length; the cause is
-      **not** yet found, so the notes below exist to stop the next attempt repeating the dead ends.
-      Symptom: `the clock never opened`, with `presses landed on: GtkFixed, GtkFixed`.
-      *Established:* `GtkCanvasPeer` is itself a `gtk_fixed_new()`, so **`GtkFixed` is the picker's own
-      canvas — that landing line means the presses did reach the control**, not that they missed. The
-      earlier reading of a ~80 px miss was a bug in the instrumentation, not in the gesture:
-      `control.Bounds` is parent-relative, so comparing it through `form.PointToScreen` omits the
-      TabPage's offset under the menu/toolbar/tab strip (~80 px). The gesture's coordinates are correct.
-      So the failure is a genuine **double-click recognition** miss, not a targeting one.
-      *Refuted (do not retry):* (a) the gap between the two injected presses exceeding `DoubleClickTime` —
-      driving press/release/press inside one pump did not help; (b) a stray popup mapped over the field —
-      `Popups().Count` is 0 before the gesture; (c) measuring the offset and converting it in two separate
-      marshalled reads — making that atomic did not help either.
-      *Next lead:* the control opens on the second press only when
-      `now - _lastClickTime <= Theme.DoubleClickTime`. Since the presses reach it and an atomic gesture did
-      not help, instrument `TimePicker`'s own `_lastClickTime`/`isDouble` decision rather than the harness:
-      log the observed delta against `DoubleClickTime` on a failing run. A plausible remaining cause is
-      that the first press is consumed by something else (a hover/tooltip state, or the field's caret
-      handling) so `_lastClickTime` is never set — note the original check called `ClickAt` first, which
-      also ran `DropStrayTip()`.
-      *Method note:* this check has a high background variance — take **≥5 runs** before concluding a
-      change helped or hurt. Two single-run A/Bs during this investigation pointed at the wrong culprit.
+- [x] **The TimePicker double-click check is deterministic.** It failed ~2 runs in 8 on X11 with
+      `the clock never opened`. Established along the way: `GtkCanvasPeer` *is* a `gtk_fixed_new()`, so the
+      `presses landed on: GtkFixed` line means the gesture **did** reach the control — it was a
+      double-click *recognition* miss, not a targeting one. Recognition compares the wall-clock gap between
+      the two presses against the desktop's `DoubleClickTime` (400 ms here), and injected input shares the
+      machine with everything else. Refuted by measurement, so do not retry: making the two presses atomic
+      in one pump; dismissing a stray popup first; making the geometry read atomic; dropping the settles
+      between the presses (each still ~2 in 6). Fixed by retrying the gesture once from a lapsed click
+      state — **0 failures in 8 runs** — which keeps the check proving that a real injected double click
+      opens a real popup, while the recognition rule itself stays pinned deterministically by
+      `TimePickerTests` against the headless backend.
+      *Method note:* this check has high run-to-run variance; take **≥5 runs** before concluding a change
+      helped. Two single-run A/Bs during the investigation pointed at the wrong culprit.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into

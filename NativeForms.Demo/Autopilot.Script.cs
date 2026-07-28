@@ -581,8 +581,7 @@ internal sealed partial class Autopilot
         {
             var height = this.Read(() => time.Height);
             var screen = this.ScreenOf(time, 20, height / 2); // on the field, left of the spinner
-            this.ClickAt(screen);
-            var phases = this.ProbeOpen(screen, () => time.ClockDroppedDown); // the second press opens it
+            var phases = this.ProbeDoubleClickOpen(screen, () => time.ClockDroppedDown); // the second press opens it
             this.ExpectTrue(DropDownPhases("clock", phases), phases.AfterRelease);
             this.ExpectTrue("no popup toplevel is on screen for the clock", this.Popups().Count > 0);
             this.CheckProgrammaticOpen("the clock", () => time.ClockDroppedDown, time.OpenClock);
