@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
-using Hawkynt.NativeForms.Backends;
 
 namespace Hawkynt.NativeForms.Demo;
 
@@ -135,12 +134,6 @@ internal static unsafe partial class Capture
     [LibraryImport(_Cairo)]
     private static partial void cairo_paint(nint cr);
 
-    [LibraryImport(_Cairo)]
-    private static partial void cairo_rectangle(nint cr, double x, double y, double width, double height);
-
-    [LibraryImport(_Cairo)]
-    private static partial void cairo_fill(nint cr);
-
     // --- Capture ---------------------------------------------------------------------------------
 
     /// <summary>One toplevel to composite: the widget that paints and where it sits on screen.</summary>
@@ -169,23 +162,8 @@ internal static unsafe partial class Capture
 
         // Let each toplevel finish the frame it owes before anyone reads its pixels; otherwise a
         // capture taken straight after a gesture records the state before the relayout.
-        //
-        // Draining first is not redundant with waiting for a draw: a freshly mapped toplevel (a modal
-        // dialog) can still have a *pending size allocation* queued at idle priority. Drawing it in
-        // that state trips `gtk_widget_draw: assertion '!widget->priv->alloc_needed'` and paints the
-        // child widgets without the dialog's own background — buttons floating on the parent window.
-        // Running the loop lets the queued resize land, so the toplevel draws complete.
-        // Two drains around a short quiet period, because a queued resize can be waiting on a frame
-        // callback rather than on the event queue — non-blocking iterations alone never run it, which is
-        // what still tripped the assertion under Wayland.
-        Injection.Drain();
-        System.Threading.Thread.Sleep(20);
-        Injection.Drain();
-
         foreach (var layer in layers)
             gtk_test_widget_wait_for_draw(layer.Widget);
-
-        Injection.Drain();
 
         var surface = cairo_image_surface_create(_CairoFormatRgb24, frame.Width, frame.Height);
         var cr = cairo_create(surface);
@@ -196,20 +174,10 @@ internal static unsafe partial class Capture
             cairo_set_source_rgb(cr, 0.36, 0.36, 0.38);
             cairo_paint(cr);
 
-            var window = BackendRegistry.Resolve().Theme.ControlBackground;
             foreach (var layer in layers)
             {
                 cairo_save(cr);
                 cairo_translate(cr, layer.Bounds.X - frame.X, layer.Bounds.Y - frame.Y);
-
-                // A GtkWindow's background belongs to its GdkWindow (the server paints it), not to the
-                // widget's draw handler — so gtk_widget_draw emits child content only. The gallery hides
-                // that because its children cover every pixel; a dialog's do not, and the uncovered gaps
-                // would show whatever this composite already had underneath. Lay the window colour down
-                // per layer so each toplevel is opaque, exactly as it is on screen.
-                cairo_set_source_rgb(cr, window.R / 255.0, window.G / 255.0, window.B / 255.0);
-                cairo_rectangle(cr, 0, 0, layer.Bounds.Width, layer.Bounds.Height);
-                cairo_fill(cr);
                 // A GTK_WINDOW_POPUP renders nothing through its own toplevel — no warning, just an
                 // empty rectangle where the drop-down should be — so for those the surface that
                 // actually holds the menu, the window's single child, is drawn instead. An ordinary

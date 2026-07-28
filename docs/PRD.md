@@ -742,6 +742,15 @@ strategy (may differ per platform; note exceptions inline).
       `Panel` was fixed for.
 - [ ] The Win32 halves of the native-tooltip support (child window subclassing, `TOOLTIPS_CLASS`)
       are compile-verified only; they have never executed, since the sweep ran on GTK.
+- [ ] **Autopilot capture must not touch the widget tree.** A capture is an *observation*; anything that
+      mutates GTK state from inside it corrupts the very walkthrough it is documenting. Measured: adding
+      a per-layer background fill that read `BackendRegistry.Resolve().Theme` made the TimePicker
+      double-click check fail **4 runs in 5** (0 in 5 without it) — because `GtkTheme`'s constructor
+      creates and destroys a `GtkLabel` to sample the style context, and pumping the main loop from a
+      capture settles pending relayouts, which moved a later check's press onto the container. Any future
+      capture work must resolve colours and settle *before* the walkthrough starts, never during it.
+      The residual `gtk_widget_draw: alloc_needed` warning on a freshly mapped dialog is accepted as
+      cosmetic until then.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
