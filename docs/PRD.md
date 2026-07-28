@@ -742,6 +742,21 @@ strategy (may differ per platform; note exceptions inline).
       `Panel` was fixed for.
 - [ ] The Win32 halves of the native-tooltip support (child window subclassing, `TOOLTIPS_CLASS`)
       are compile-verified only; they have never executed, since the sweep ran on GTK.
+- [x] **The Win32 native-peer promotions have executed**, under wine on the Linux dev box: a probe
+      publishes `win-x64` self-contained, registers `Win32Backend`, and asserts on the live desktop that
+      each of the nine promotions really reached a widget, that each gated control stayed on the painter,
+      that driving the widget round-trips (`Checked`, radio grouping *including clearing the group*,
+      `LinkVisited`, `Value`, `SelectedIndex`, items added after realization, `TopIndex`,
+      `IndexFromPoint`, a group box child's bounds), and that a mid-use property change swaps the peer
+      with the state intact. 32 checks, all passing. This is what turned "compile-verified" into
+      "verified" for §12.
+- [ ] **The demo cannot run end-to-end under wine**: `EM_STREAMIN` faults inside wine's
+      `riched20`/`msftedit`, so `RichTextBox.Rtf` takes the process down during realization. Established
+      by bisection — plain `Text` is fine, only the stream-in path faults, and it still faults with *all*
+      of our subclassing removed, so nothing of ours is on the hook; the `EDITSTREAM` layout and the
+      `EDITSTREAMCALLBACK` signature both match the SDK. Until wine fixes it, Win32 runtime coverage comes
+      from the focused probe rather than the gallery walkthrough. Do not re-diagnose this as a toolkit
+      bug.
 - [ ] **Autopilot capture must not touch the widget tree.** A capture is an *observation*; anything that
       mutates GTK state from inside it corrupts the very walkthrough it is documenting. Measured: adding
       a per-layer background fill that read `BackendRegistry.Resolve().Theme` made the TimePicker
