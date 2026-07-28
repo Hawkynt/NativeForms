@@ -122,28 +122,34 @@ internal static unsafe partial class ShootWindows
 
         var previous = SelectObject(memory, dib);
         var length = width * height * 4;
+        var best = (byte[]?)null;
+        var bestScore = 0;
         var how = (string?)null;
 
-        if (PrintWindow(hwnd, memory, _PwRenderFullContent) && HasContent(bits, length))
-            how = "PrintWindow";
+        // Every route is scored rather than merely tried, because "produced pixels" is too weak a
+        // test to separate them. Under wine PrintWindow reports success and paints the top few rows
+        // of one label — enough variation to pass a not-flat check and nothing anyone would call a
+        // screenshot. Detail wins instead, and the winner is named in the log.
+        new Span<byte>(bits, length).Clear();
+        if (PrintWindow(hwnd, memory, _PwRenderFullContent))
+            Keep(bits, length, "PrintWindow", ref best, ref bestScore, ref how);
 
-        if (how is null)
-        {
-            var windowDc = GetDC(hwnd);
-            if (BitBlt(memory, 0, 0, width, height, windowDc, 0, 0, _SrcCopy) && HasContent(bits, length))
-                how = "BitBlt";
+        new Span<byte>(bits, length).Clear();
+        var windowDc = GetDC(hwnd);
+        if (BitBlt(memory, 0, 0, width, height, windowDc, 0, 0, _SrcCopy))
+            Keep(bits, length, "BitBlt", ref best, ref bestScore, ref how);
 
-            ReleaseDC(hwnd, windowDc);
-        }
+        ReleaseDC(hwnd, windowDc);
 
-        if (how is null && PrintWindow(hwnd, memory, 0) && HasContent(bits, length))
-            how = "PrintWindow(client)";
+        new Span<byte>(bits, length).Clear();
+        if (PrintWindow(hwnd, memory, 0))
+            Keep(bits, length, "PrintWindow(client)", ref best, ref bestScore, ref how);
 
         Size? result = null;
-        if (how is not null)
+        if (best is not null)
         {
-            WritePng(path, width, height, bits);
-            Console.WriteLine($"      capture route: {how}");
+            WritePng(path, width, height, best);
+            Console.WriteLine($"      capture route: {how} (detail {bestScore})");
             result = new(width, height);
         }
 
@@ -154,26 +160,42 @@ internal static unsafe partial class ShootWindows
         return result;
     }
 
-    /// <summary>Whether a captured surface is more than one flat colour, which is what a stub returns.</summary>
-    private static bool HasContent(byte* bits, int length)
+    /// <summary>Keeps a route's output when it carries more detail than the best one so far.</summary>
+    private static void Keep(byte* bits, int length, string route, ref byte[]? best, ref int bestScore, ref string? how)
     {
-        if (length < 8)
-            return false;
+        var score = Detail(bits, length);
+        if (score <= bestScore)
+            return;
 
-        var first = *(uint*)bits;
+        best ??= new byte[length];
+        new ReadOnlySpan<byte>(bits, length).CopyTo(best);
+        bestScore = score;
+        how = route;
+    }
+
+    /// <summary>
+    /// How much detail a surface carries: the number of pixels differing from the one before them.
+    /// Flat fills score zero, a half-drawn window scores a little, a real render scores a lot — which
+    /// is the only distinction that matters when picking between routes that all claim success.
+    /// </summary>
+    private static int Detail(byte* bits, int length)
+    {
+        var changes = 0;
         for (var i = 4; i < length; i += 4)
-            if (*(uint*)(bits + i) != first)
-                return true;
+            if (*(uint*)(bits + i) != *(uint*)(bits + i - 4))
+                ++changes;
 
-        return false;
+        return changes;
     }
 
     /// <summary>
     /// Writes bottom-up BGRA rows as a PNG, using the toolkit's own encoder-free path: a zlib stream
     /// of unfiltered scanlines, which <see cref="Drawing.ImageDecoder"/> reads straight back.
     /// </summary>
-    private static void WritePng(string path, int width, int height, byte* bits)
+    private static void WritePng(string path, int width, int height, byte[] pixels)
     {
+        fixed (byte* bits = pixels)
+        {
         var raw = new byte[height * ((width * 3) + 1)];
         var at = 0;
         for (var y = height - 1; y >= 0; --y)   // stored bottom-up, written top-down
@@ -189,9 +211,11 @@ internal static unsafe partial class ShootWindows
         }
 
         using var file = File.Create(path);
+        file.Write([0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A]);
         WriteChunk(file, "IHDR", Ihdr(width, height));
         WriteChunk(file, "IDAT", Zlib(raw));
         WriteChunk(file, "IEND", []);
+        }
     }
 
     private static byte[] Ihdr(int width, int height)

@@ -40,7 +40,8 @@ if (measureStartup)
 // --measure-startup stops the clock when the form loads (its whole peer tree realized, the window
 // up) and reports the cold time to first window, then closes on the first tick — once the message
 // loop is actually running, so the shutdown is clean — without driving the gallery.
-if (measureStartup)
+var shooting = Array.IndexOf(args, "--shoot") >= 0;
+if (measureStartup && !shooting)
     form.Load += (_, _) =>
     {
         startup.Stop();
@@ -59,7 +60,10 @@ if (measureStartup)
 // the same switch runs on a CI runner with no session, under wine, and on a real machine, and each
 // writes the same PNGs. The capture is in-process on both backends for the reason Autopilot.Capture
 // gives — there is no screenshot tool to point at a headless runner.
-if (Array.IndexOf(args, "--shoot") >= 0)
+// Pairing it with --measure-startup-minimal is how the Win32 capture gets exercised without a
+// Windows desktop: the bare one-label window has none of the controls that make the gallery
+// interesting, but it has a real HWND, which is all the capture route selection needs.
+if (shooting)
 {
     var shootIndex = Array.IndexOf(args, "--shoot");
     var directory = shootIndex + 1 < args.Length && !args[shootIndex + 1].StartsWith('-')
