@@ -15,6 +15,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The real-Win32 test tier asks the OS which window classes this process actually resolved, so it
+         can assert the promotion rule rather than a fixed answer (PRD §12). -->
+    <InternalsVisibleTo Include="Hawkynt.NativeForms.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
   </ItemGroup>
 

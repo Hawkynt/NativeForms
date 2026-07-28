@@ -206,7 +206,6 @@ public sealed class Win32NativePromotionTests
 
     [TestCase("CheckBox")]
     [TestCase("RadioButton")]
-    [TestCase("LinkLabel")]
     [TestCase("ProgressBar")]
     [TestCase("TrackBar")]
     [TestCase("HScrollBar")]
@@ -217,6 +216,26 @@ public sealed class Win32NativePromotionTests
     [TestCase("mixed widget half")]
     public void An_eligible_control_realizes_onto_a_real_widget(string control)
         => Assert.That(Result().Promoted[control], Is.True, $"{control} stayed on the owner-drawn painter");
+
+    /// <summary>
+    /// The one promotion whose window class can genuinely be missing: <c>SysLink</c> arrived with ComCtl32
+    /// version 6, which a process only reaches through an application manifest. The rule is therefore not
+    /// "always promoted" but "promoted exactly when the class resolved" — because the alternative, creating
+    /// a window that fails and leaving the control invisible, is what this pins against.
+    /// </summary>
+    [Test]
+    public void The_hyperlink_is_promoted_exactly_when_its_window_class_resolved()
+    {
+        var promoted = Result().Promoted["LinkLabel"];
+        var available = NativeMethods.GetClassInfoExW(0, NativeMethods.WC_LINK, out _);
+
+        Assert.That(
+            promoted,
+            Is.EqualTo(available),
+            available
+                ? "SysLink is registered, so the promotion should have been taken"
+                : "SysLink is absent, so the backend must decline and leave the painter in charge");
+    }
 
     [TestCase("gated CheckBox")]
     [TestCase("gated RadioButton")]

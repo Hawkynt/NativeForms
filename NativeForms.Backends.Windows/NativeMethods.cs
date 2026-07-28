@@ -419,6 +419,14 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll", SetLastError = true)]
     internal static partial ushort RegisterClassExW(in WNDCLASSEXW lpwcx);
 
+    /// <summary>
+    /// Reports whether a window class is registered in this process, so a peer can be declined before the
+    /// core commits to it rather than producing a window that was never created.
+    /// </summary>
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetClassInfoExW(nint hInstance, string lpszClass, out WNDCLASSEXW lpwcx);
+
     /// <summary>Creates an overlapped, pop-up, or child window.</summary>
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     internal static partial nint CreateWindowExW(

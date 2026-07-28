@@ -764,13 +764,22 @@ strategy (may differ per platform; note exceptions inline).
       WINEPREFIX=/tmp/wp WINEDEBUG=-all DISPLAY=:1 wine /tmp/nunitout/nunitrun.exe \
         --where "class =~ Win32NativePromotionTests" --noresult
       ```
+- [x] **The GTK backdrop assertions need the display to themselves.**
+      `GtkPopupPlacementTests.Opening_a_…_does_not_push_its_window_into_the_backdrop_state` asserts the
+      toplevel has *not* entered GTK's `:backdrop` state, which is precisely "another window took focus" —
+      so anything else opening a window on the same `DISPLAY` during the run fails it. Measured: 2 failures
+      in 40 full-suite runs while wine apps were being launched on `:1`, and 0 in 20 with the display quiet.
+      Not a defect; do not chase it. Run the suite without competing windows, or accept the retry.
 - [ ] **The demo cannot run end-to-end under wine**: `EM_STREAMIN` faults inside wine's
       `riched20`/`msftedit`, so `RichTextBox.Rtf` takes the process down during realization. Established
       by bisection — plain `Text` is fine, only the stream-in path faults, and it still faults with *all*
       of our subclassing removed, so nothing of ours is on the hook; the `EDITSTREAM` layout and the
       `EDITSTREAMCALLBACK` signature both match the SDK. Until wine fixes it, Win32 runtime coverage comes
       from the test tier above rather than from the gallery walkthrough. Do not re-diagnose this as a
-      toolkit bug.
+      toolkit bug. Swapping that one `Rtf` for plain text locally does let the whole gallery come up under
+      wine, which is how the Win32 rendering was eyeballed and how the `SysLink` fallback below was found —
+      worth repeating after Win32 work, since the autopilot itself cannot help there: its injection and
+      capture are GTK calls, so `--autopilot` aborts on `libgtk-3.so.0` the moment it tries to settle.
 - [ ] **Autopilot capture must not touch the widget tree.** A capture is an *observation*; anything that
       mutates GTK state from inside it corrupts the very walkthrough it is documenting. Measured: adding
       a per-layer background fill that read `BackendRegistry.Resolve().Theme` made the TimePicker

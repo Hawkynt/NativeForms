@@ -93,24 +93,30 @@ public sealed partial class Win32Backend : IPlatformBackend
     public IGroupBoxPeer CreateGroupBox() => new GroupBoxPeer();
 
     /// <inheritdoc/>
-    public ILinkLabelPeer CreateLinkLabel()
+    /// <remarks>
+    /// <c>SysLink</c> only exists in ComCtl32 version 6, which a process reaches through an application
+    /// manifest — so unlike the stock classes it can genuinely be absent, and then the promotion has to be
+    /// declined rather than attempted. Creating the window and discovering the failure later is too late:
+    /// the core has committed to the peer by then, and the control would render nothing at all.
+    /// </remarks>
+    public ILinkLabelPeer? CreateLinkLabel()
     {
         EnsureCommonControls(NativeMethods.ICC_LINK_CLASS);
-        return new LinkLabelPeer();
+        return ClassExists(NativeMethods.WC_LINK) ? new LinkLabelPeer() : null;
     }
 
     /// <inheritdoc/>
-    public IProgressBarPeer CreateProgressBar()
+    public IProgressBarPeer? CreateProgressBar()
     {
         EnsureCommonControls(NativeMethods.ICC_PROGRESS_CLASS);
-        return new ProgressBarPeer();
+        return ClassExists(NativeMethods.PROGRESS_CLASS) ? new ProgressBarPeer() : null;
     }
 
     /// <inheritdoc/>
-    public ITrackBarPeer CreateTrackBar(bool vertical)
+    public ITrackBarPeer? CreateTrackBar(bool vertical)
     {
         EnsureCommonControls(NativeMethods.ICC_BAR_CLASSES);
-        return new TrackBarPeer(vertical);
+        return ClassExists(NativeMethods.TRACKBAR_CLASS) ? new TrackBarPeer(vertical) : null;
     }
 
     /// <summary>
@@ -136,6 +142,15 @@ public sealed partial class Win32Backend : IPlatformBackend
 
     /// <summary>The <c>ICC_*</c> blocks already registered by <see cref="EnsureCommonControls"/>.</summary>
     private static uint _registeredCommonControls;
+
+    /// <summary>
+    /// Whether a window class can actually be instantiated in this process. The stock classes always can;
+    /// the common controls depend on which ComCtl32 the process resolved, so a promotion that rests on one
+    /// asks first. A peer that answers here and then fails to create its window would leave the control
+    /// invisible — the core has already taken the native path by then, and the painter is no longer in play.
+    /// </summary>
+    /// <param name="className">The window class to look for.</param>
+    private static bool ClassExists(string className) => NativeMethods.GetClassInfoExW(0, className, out _);
 
     /// <inheritdoc/>
     public ICanvasPeer CreateCanvas() => new Win32CanvasPeer();
