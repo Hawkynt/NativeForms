@@ -92,8 +92,11 @@ public sealed class Win32NativePromotionTests
         gatedList.Items.AddRange(["a", "b"]);
         var gatedGroup = new GroupBox { Bounds = new Rectangle(270, 300, 240, 60), Text = "gated", Image = icon };
 
+        var tipped = new Button { Bounds = new Rectangle(540, 140, 140, 26), Text = "tipped" };
+        var toolTip = new ToolTip();
+
         form.Controls.AddRange(
-            check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group,
+            check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped,
             gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost);
 
         form.Load += (_, _) =>
@@ -162,6 +165,15 @@ public sealed class Win32NativePromotionTests
 
                 combo.ImageSelector = static _ => null;
                 observed.RoundTrips["ComboBox swap keeps selection"] = !combo.IsNativeWidget && combo.SelectedIndex == 3;
+
+                // The platform tooltip: a real tooltips_class32 window has to exist once a tip is raised,
+                // which is the half of this that a headless fake cannot see.
+                observed.RoundTrips["no tooltip window before a tip"] =
+                    NativeMethods.FindWindowExW(0, 0, NativeMethods.TOOLTIPS_CLASS, null) == 0;
+                toolTip.SetToolTip(tipped, "a native tip");
+                tipped.Peer?.ShowToolTip("a native tip");
+                observed.RoundTrips["the platform tooltip window exists"] =
+                    NativeMethods.FindWindowExW(0, 0, NativeMethods.TOOLTIPS_CLASS, null) != 0;
             }
             catch (Exception exception)
             {
@@ -261,6 +273,8 @@ public sealed class Win32NativePromotionTests
     [TestCase("GroupBox child bounds")]
     [TestCase("painted half takes the selection")]
     [TestCase("widget half takes it back")]
+    [TestCase("no tooltip window before a tip")]
+    [TestCase("the platform tooltip window exists")]
     public void Driving_the_real_widget_round_trips(string what)
         => Assert.That(Result().RoundTrips[what], Is.True, $"{what} did not survive the platform widget");
 

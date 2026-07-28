@@ -760,8 +760,10 @@ strategy (may differ per platform; note exceptions inline).
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
       `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect
       `Panel` was fixed for.
-- [ ] The Win32 halves of the native-tooltip support (child window subclassing, `TOOLTIPS_CLASS`)
-      are compile-verified only; they have never executed, since the sweep ran on GTK.
+- [x] The Win32 halves of the native-tooltip support (child window subclassing, `TOOLTIPS_CLASS`) have
+      now executed: `Win32NativePromotionTests` raises a tip on a native button and asserts a real
+      `tooltips_class32` window appears where there was none before — the half a headless fake cannot see.
+      Verified under wine as well as on the CI runner.
 - [x] **The Win32 native-peer promotions have executed**, under wine on the Linux dev box: a probe
       publishes `win-x64` self-contained, registers `Win32Backend`, and asserts on the live desktop that
       each of the nine promotions really reached a widget, that each gated control stayed on the painter,

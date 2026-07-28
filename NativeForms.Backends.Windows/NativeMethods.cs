@@ -420,6 +420,13 @@ internal static partial class NativeMethods
     internal static partial ushort RegisterClassExW(in WNDCLASSEXW lpwcx);
 
     /// <summary>
+    /// Finds a child or top-level window by class name; used by the real-Win32 test tier to observe that a
+    /// control really created the common-control window it asked for.
+    /// </summary>
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial nint FindWindowExW(nint hWndParent, nint hWndChildAfter, string? lpszClass, string? lpszWindow);
+
+    /// <summary>
     /// Reports whether a window class is registered in this process, so a peer can be declined before the
     /// core commits to it rather than producing a window that was never created.
     /// </summary>
