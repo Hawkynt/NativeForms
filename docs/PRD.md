@@ -1268,20 +1268,33 @@ Feedback from porting an existing application, kept separate from the roadmap ab
 evidence rather than intent: each line is something a real program wanted and did not find.
 
 - [ ] **JPEG decoding.** The decoder covers PNG/BMP/GIF/ICO/PCX/CUR/ANI, so an image preview shows a note
-      instead of pixels for the single most common photographic format. The most concrete item here, and
-      self-contained: baseline JPEG is a decoder, testable headlessly against known images, and it fits the
-      decoder-free-of-dependencies rule the others already follow.
-- [ ] **Marquee (rubber-band) selection.** Dragging a selection rectangle across a `ListView`/`DataGridView`
-      or a custom surface. Dropped outright in the port because there is nothing to map it onto.
+      instead of pixels for the single most common photographic format. Testable headlessly against known
+      images, and it fits the no-dependencies rule the other formats already follow.
+      **Port it rather than write it**: `PNGCrushCS/FileFormats/FileFormat.Jpeg` is a complete managed
+      implementation — baseline *and* progressive — under LGPL-3.0, the same licence family as this
+      toolkit. Decoding needs roughly half of it (`JpegReader`, `JpegMarkerParser`, `JpegBaselineDecoder`,
+      `JpegProgressiveDecoder`, `JpegHuffmanDecoder`/`Table`, `JpegBitReader`, `JpegDct`, `JpegQuantizer`,
+      `JpegZigZag`, `JpegColorConverter`, `JpegStandardTables`, the header/component records); the encoders
+      and the coefficient-rewriting half stay behind. Watch the two constraints that differ from a
+      command-line tool: no allocation on the paint path, and the `[LibraryImport]`/no-reflection rules of
+      §2 — a decoder that is pure managed arithmetic should satisfy both, but it needs checking rather than
+      assuming.
+- [ ] **Marquee (rubber-band) selection, with the modifiers.** Dragging a selection rectangle inside a
+      `ListView` or `DataGridView`, with Ctrl adding to the selection and Shift extending it. Not an extra:
+      this is what those controls do everywhere else, so its absence reads as a bug rather than a missing
+      feature. Both controls already track a selection and an anchor for keyboard range-select, so the
+      model is there and it is the gesture that is missing.
 - [ ] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
       move from drag gestures onto context menus. The gestures are the affordance users know; the menus are
       a workaround. `DockPanel` already has drag-to-dock, so the pattern exists to build on.
-- [ ] **Type-to-filter menus.** A menu that narrows as you type, rather than only mnemonics and arrows.
-- [ ] **An application-level accent/theme override.** Deliberate today — colours come from the desktop, so
-      an app's own theme-variant, accent and skin settings stop meaning anything. That is the right default
-      and the right reason, but an application that *offers* those settings currently cannot honour them.
-      Worth deciding explicitly rather than leaving as a side effect: an override on `ITheme` would keep
-      the default intact while letting an app that wants a skin have one.
+- [ ] **Type-to-filter menus**, built out of what already exists rather than as a new control: a
+      [`SearchBox`](controls/searchbox.md) hosted as the first entry of a `ContextMenuStrip`, narrowing the
+      items below it as you type. The same mechanism serves `DataGridView`, whose column and value filters
+      want exactly this. Reusing the search box means one editor, one clear glyph and one set of keyboard
+      semantics rather than three.
+Deliberately **not** doing: an application-level accent/theme override. Colours come from the desktop, and
+an app's own theme-variant, accent and skin settings stop meaning anything here. That is the point of the
+toolkit, not a gap in it, and the port losing those knobs is the correct outcome.
 
 ## 15. What's next — candidate workstreams
 
