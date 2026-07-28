@@ -79,6 +79,40 @@ jobs:
           path: /tmp/nativeforms-autopilot/*.png
           if-no-files-found: warn
 
+  screenshots:
+    name: screenshots (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build NativeForms.sln --configuration Release
+      # What the toolkit actually renders on Windows, which nothing else here can answer: the unit
+      # tests run against headless fakes and never create a real HWND, and the autopilot above is GTK
+      # from top to bottom. This is the only job that puts the gallery on screen with the Win32
+      # backend, so it is also the first place a real common control, a real theme and a real DPI get
+      # exercised at all.
+      #
+      # A hosted runner has no interactive desktop session, which is exactly why the capture is
+      # in-process (see NativeForms.Demo/Shoot.Windows.cs) rather than a screenshot tool.
+      #
+      # Advisory for now, like the autopilot: this job is new and its job is to tell us what Windows
+      # does, not yet to gate on it. Read the artifact.
+      - name: Shoot the gallery
+        continue-on-error: true
+        run: dotnet run --project NativeForms.Demo --configuration Release --no-build -- --shoot "${{ runner.temp }}/shots"
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
+          path: ${{ runner.temp }}/shots/*.png
+          if-no-files-found: warn
+
   aot:
     name: aot ${{ matrix.rid }}
     strategy:

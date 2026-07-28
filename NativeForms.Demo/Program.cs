@@ -54,5 +54,39 @@ if (measureStartup)
         closer.Start();
     };
 
+// --shoot photographs the gallery and exits. It exists so "what does this actually look like on
+// Windows" has an answer that does not depend on someone having a Windows desktop in front of them:
+// the same switch runs on a CI runner with no session, under wine, and on a real machine, and each
+// writes the same PNGs. The capture is in-process on both backends for the reason Autopilot.Capture
+// gives — there is no screenshot tool to point at a headless runner.
+if (Array.IndexOf(args, "--shoot") >= 0)
+{
+    var shootIndex = Array.IndexOf(args, "--shoot");
+    var directory = shootIndex + 1 < args.Length && !args[shootIndex + 1].StartsWith('-')
+        ? args[shootIndex + 1]
+        : Path.Combine(Path.GetTempPath(), "nativeforms-shots");
+
+    Directory.CreateDirectory(directory);
+    form.Load += (_, _) =>
+    {
+        // One tick of the real loop first, so the shot is of a window the platform has finished
+        // mapping and painting rather than one caught mid-realization.
+        var shutter = new Hawkynt.NativeForms.Timer { Interval = 400 };
+        shutter.Tick += (_, _) =>
+        {
+            shutter.Stop();
+            var path = Path.Combine(directory, "gallery.png");
+            var size = Shoot.Window(form, path);
+            Console.WriteLine(size is { } written
+                ? $"shot: {path} ({written.Width}×{written.Height})"
+                : $"shot failed: {path} — no capture route produced pixels");
+
+            form.Close();
+        };
+
+        shutter.Start();
+    };
+}
+
 Application.Run(form);
 return Autopilot.ExitCode;
