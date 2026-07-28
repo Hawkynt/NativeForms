@@ -106,6 +106,9 @@ public class DataGridView : OwnerDrawnControl
 
     private bool _verticalScrollBarVisible;
     private bool _horizontalScrollBarVisible;
+    /// <summary>The live rubber-band gesture, allocated only while one is in flight.</summary>
+    private MarqueeDrag? _marquee;
+
     private bool _scrollDragging;
     private bool _scrollDragVertical;
     private int _scrollDragOffset;
@@ -1578,6 +1581,10 @@ public class DataGridView : OwnerDrawnControl
 
         var rowIndex = this.HitTestRow(e.Y, out var rowTop, out var rowHeight);
         _ = rowTop;
+
+        // Armed before the press selects anything, so Ctrl comes out right: the press toggles the row
+        // under the pointer, the band covers that same row, and the two must not cancel out.
+        this.BeginMarquee(e);
         if (rowIndex < 0)
             return;
 
@@ -1739,6 +1746,9 @@ public class DataGridView : OwnerDrawnControl
             return;
         }
 
+        if (this.DragMarquee(e))
+            return;
+
         this.TrackHoverCell(e);
     }
 
@@ -1778,6 +1788,129 @@ public class DataGridView : OwnerDrawnControl
 
         _resizeColumnIndex = -1;
         _dragColumnIndex = -1;
+        this.EndMarquee();
+    }
+
+    // --- Rubber-band selection -------------------------------------------------------------------
+
+    /// <summary>
+    /// Arms a rubber band at the press point, snapshotting the selection before the press changes it.
+    /// Nothing moves until the pointer passes <see cref="MarqueeDrag.Threshold"/>, so a plain click
+    /// still behaves as a plain click.
+    /// </summary>
+    private void BeginMarquee(MouseEventArgs e)
+    {
+        if (!this.MultiSelect)
+            return;
+
+        var combine = (e.Modifiers & KeyModifiers.Control) != 0
+            ? MarqueeCombine.Toggle
+            : (e.Modifiers & KeyModifiers.Shift) != 0
+                ? MarqueeCombine.Add
+                : MarqueeCombine.Replace;
+
+        _marquee?.Dispose();
+        _marquee = new(new(e.X, e.Y), combine, _multiSelection is { } multi ? [.. multi] : []);
+    }
+
+    /// <summary>Grows the band to the pointer and re-derives the selection, reporting whether it owns
+    /// the move.</summary>
+    private bool DragMarquee(MouseEventArgs e)
+    {
+        var drag = _marquee;
+        if (drag is null)
+            return false;
+
+        if (!drag.MoveTo(new(e.X, e.Y)))
+            return false;
+
+        this.ApplyMarquee();
+        drag.AutoScroll(this.Backend, this.OnMarqueeScroll, e.Y < this.HeaderHeight || e.Y >= this.Height);
+        this.Invalidate();
+        return true;
+    }
+
+    /// <summary>Ends the gesture, keeping whatever the band last selected.</summary>
+    private void EndMarquee()
+    {
+        var drag = _marquee;
+        if (drag is null)
+            return;
+
+        _marquee = null;
+        var swept = drag.Active;
+        drag.Dispose();
+
+        if (swept)
+            this.Invalidate();
+    }
+
+    /// <summary>Scrolls one row while the pointer sits outside the viewport, and re-sweeps the band.</summary>
+    private void OnMarqueeScroll(object? sender, EventArgs e)
+    {
+        var drag = _marquee;
+        if (drag is null)
+            return;
+
+        this.ScrollRows(drag.Current.Y < this.HeaderHeight ? -1 : 1);
+        this.ApplyMarquee();
+    }
+
+    /// <summary>Replaces the multi-selection with the one the band implies, reporting it once per move.</summary>
+    private void ApplyMarquee()
+    {
+        var drag = _marquee;
+        if (drag is null || !drag.Active)
+            return;
+
+        var multi = _multiSelection ??= [];
+        this.CollectBandRows(drag.Band, drag.Covered);
+        drag.BuildDesired(this.IsRowNavigable);
+        if (drag.Matches(multi))
+            return;
+
+        multi.Clear();
+        multi.AddRange(drag.Desired);
+
+        // The current row follows the edge the pointer is dragging, as it would if the same rows had
+        // been walked with Shift held on the keyboard.
+        var current = multi.Count > 0 ? (drag.Current.Y >= drag.Origin.Y ? multi[^1] : multi[0]) : _selectedRowIndex;
+        _selectedRowIndex = current;
+        this.Invalidate();
+        this.OnSelectionChanged(EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Collects the rows the band crosses, walking the visible display rows once. A grid row spans the
+    /// full width, so only the band's vertical extent can decide — a band drawn over one column still
+    /// selects whole rows, which is what row selection means.
+    /// </summary>
+    private void CollectBandRows(Rectangle band, List<int> into)
+    {
+        into.Clear();
+        this.EnsureSortMap();
+
+        var count = this.RowSourceCount;
+        var height = this.Height;
+        var y = this.HeaderHeight;
+        var display = Math.Max(0, _topRow);
+
+        while (y < height && display < count)
+        {
+            var modelIndex = this.ToModelIndex(display);
+            if (!this.TryGetRowItem(modelIndex, out var item))
+                break;
+
+            ++display;
+            if (this.IsRowHidden(item))
+                continue;
+
+            var rowHeight = this.GetRowHeightFor(item);
+            if (band.Y < y + rowHeight && band.Bottom > y && this.IsRowNavigable(modelIndex))
+                into.Add(modelIndex);
+
+            y += rowHeight;
+        }
     }
 
     /// <inheritdoc/>
@@ -1966,6 +2099,9 @@ public class DataGridView : OwnerDrawnControl
             else
                 this.PaintColumnGridLineSegments(g, theme, header, height, count);
         }
+
+        if (_marquee is { Active: true } marquee)
+            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band);
 
         g.PopClip();
 
@@ -3098,6 +3234,10 @@ public class DataGridView : OwnerDrawnControl
     {
         base.OnUnrealized();
         this.CancelEdit();
+
+        // A band in flight owns an auto-scroll timer, whose source is the backend that just went away.
+        _marquee?.Dispose();
+        _marquee = null;
         _editPopupShown = false;
         _editPopup?.Dispose();
         _editPopup = null;

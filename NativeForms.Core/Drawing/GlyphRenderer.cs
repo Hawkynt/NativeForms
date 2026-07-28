@@ -143,6 +143,22 @@ internal static class GlyphRenderer
     public static void FillSelection(IGraphics g, ITheme theme, Rectangle bounds)
         => g.FillRectangle(theme.SelectionBackground, bounds);
 
+    /// <summary>Draws the rubber-band rectangle of a marquee selection: a quarter-strength accent wash
+    /// under a full-accent outline. The wash is arithmetic rather than alpha, like the focus ring, so
+    /// it renders identically on GDI; under high contrast it is dropped altogether, where a wash over
+    /// text costs more legibility than the outline alone gives back.</summary>
+    public static void DrawSelectionBand(IGraphics g, ITheme theme, Rectangle band)
+    {
+        if (band.Width <= 0 || band.Height <= 0)
+            return;
+
+        var accent = theme.Accent;
+        if (!theme.IsHighContrast)
+            g.FillRectangle(Blend(Blend(accent, theme.ControlBackground), theme.ControlBackground), band);
+
+        g.DrawRectangle(accent, band);
+    }
+
     /// <summary>Mixes two opaque colors 50:50, channel-wise.</summary>
     private static Color Blend(Color a, Color b)
         => Color.FromArgb(0xFF, (a.R + b.R) / 2, (a.G + b.G) / 2, (a.B + b.B) / 2);

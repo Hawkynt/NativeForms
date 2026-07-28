@@ -300,6 +300,15 @@ extends the range; `SelectedRowIndex` stays the current row, `SelectedItems` enu
 model order. With `ShowRowHeaders`, a click on the row-header strip selects the row without raising
 `CellClick`.
 
+Pressing on a row and dragging sweeps a rubber band over the rows it crosses. A grid row spans the
+full width, so only the band's vertical extent decides — a band drawn inside one column still selects
+whole rows. Nothing moves until the pointer travels four pixels, which keeps a click a click; a plain
+band becomes the selection, **Shift** adds it to what was already selected, and **Ctrl** flips what it
+covers. The current row follows the edge being dragged, so a downward band leaves it on the bottom
+row and an upward one on the top. Dragging past the top or bottom edge scrolls a row at a time and
+keeps sweeping. Hidden, unselectable and merged rows are skipped, as they are for every other
+selection gesture.
+
 ### Read-only
 
 Three levels — grid `ReadOnly`, column `ReadOnly`, per-cell `ReadOnlyCellSelector` — and any level

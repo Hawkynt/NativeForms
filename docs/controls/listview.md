@@ -163,6 +163,15 @@ flags stay in sync (writes to them join or leave the selection), removing items 
 the indices, and every gesture raises at most one `SelectedIndexChanged` and one repaint. With
 `CheckBoxes` off (and `MultiSelect` on), Space toggles the caret item's membership.
 
+**Rubber-band selection.** Pressing on empty space and dragging sweeps a band, exactly as a file
+manager does — a press on an item is a press on that item, so only the gaps start one. Nothing moves
+until the pointer travels four pixels, which keeps a click a click. A plain band becomes the
+selection, **Shift** adds it to what was already selected, and **Ctrl** flips what it covers (an item
+selected before the drag and swept by the band ends up deselected). Dragging past the top or bottom
+edge scrolls a row at a time and keeps sweeping while the pointer stays outside. Only the visible
+rows are tested against the band, so a band over a virtual list of a million rows costs the same as
+one over ten.
+
 **Check boxes.** Details, List and SmallIcon draw the themed glyph inline before the icon and
 label; LargeIcon and Tile overlay it in the cell's top-left corner. A click on the glyph toggles
 without selecting; a click past it selects without toggling; Space toggles every selected item (or

@@ -532,6 +532,9 @@ public class ListView : OwnerDrawnControl
     private bool _draggingScroll;
     private int _scrollDragOffset;
 
+    /// <summary>The live rubber-band gesture, allocated only while one is in flight.</summary>
+    private MarqueeDrag? _marquee;
+
     /// <summary>Whether the content is taller than the item area, so the scroll bar is drawn.</summary>
     private bool ScrollBarVisible => this.FlatRowCount > this.VisibleRowCount;
 
@@ -832,6 +835,10 @@ public class ListView : OwnerDrawnControl
     {
         base.OnUnrealized();
         this.AbandonEdit();
+
+        // A band in flight owns an auto-scroll timer, whose source is the backend that just went away.
+        _marquee?.Dispose();
+        _marquee = null;
     }
 
     /// <summary>Drops a pending label edit without committing or raising events — the edited item
@@ -1028,6 +1035,18 @@ public class ListView : OwnerDrawnControl
             this.SyncItemSelected(index, true);
         }
 
+        return true;
+    }
+
+    /// <summary>Adds one index to the sorted selection, reporting whether it was not already there.</summary>
+    private bool AddToSelectionCore(int index)
+    {
+        var position = _selectedIndices.BinarySearch(index);
+        if (position >= 0)
+            return false;
+
+        _selectedIndices.Insert(~position, index);
+        this.SyncItemSelected(index, true);
         return true;
     }
 
@@ -1400,6 +1419,10 @@ public class ListView : OwnerDrawnControl
         if (index < 0)
         {
             _lastClickIndex = -1;
+
+            // Empty space is where a rubber band starts, exactly as it does in a file manager: a press
+            // on an item means "drag the item", so only the gaps are free to sweep.
+            this.BeginMarquee(e);
             return;
         }
 
@@ -1476,11 +1499,141 @@ public class ListView : OwnerDrawnControl
     protected override void OnMouseMove(MouseEventArgs e)
     {
         if (_draggingScroll)
+        {
             this.ScrollDragTo(e.Y);
+            return;
+        }
+
+        this.DragMarquee(e);
     }
 
     /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e) => _draggingScroll = false;
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _draggingScroll = false;
+        this.EndMarquee();
+    }
+
+    // --- Rubber-band selection -------------------------------------------------------------------
+
+    /// <summary>
+    /// Arms a rubber band at the press point, snapshotting the selection <em>before</em> the press
+    /// changes it. Nothing is selected or deselected until the pointer passes
+    /// <see cref="MarqueeDrag.Threshold"/>, so a plain click on empty space behaves as it always did.
+    /// </summary>
+    private void BeginMarquee(MouseEventArgs e)
+    {
+        if (!this.MultiSelect)
+            return;
+
+        var combine = (e.Modifiers & KeyModifiers.Control) != 0
+            ? MarqueeCombine.Toggle
+            : (e.Modifiers & KeyModifiers.Shift) != 0
+                ? MarqueeCombine.Add
+                : MarqueeCombine.Replace;
+
+        _marquee?.Dispose();
+        _marquee = new(new(e.X, e.Y), combine, [.. _selectedIndices]);
+    }
+
+    /// <summary>Grows the band to the pointer and re-derives the selection it implies.</summary>
+    private void DragMarquee(MouseEventArgs e)
+    {
+        var drag = _marquee;
+        if (drag is null)
+            return;
+
+        if (!drag.MoveTo(new(e.X, e.Y)))
+            return;
+
+        this.ApplyMarquee();
+        drag.AutoScroll(this.Backend, this.OnMarqueeScroll, e.Y < this.HeaderHeight || e.Y >= this.Height);
+        this.Invalidate();
+    }
+
+    /// <summary>Ends the gesture, keeping whatever the band last selected.</summary>
+    private void EndMarquee()
+    {
+        var drag = _marquee;
+        if (drag is null)
+            return;
+
+        _marquee = null;
+        var swept = drag.Active;
+        drag.Dispose();
+
+        if (swept)
+            this.Invalidate();
+    }
+
+    /// <summary>Scrolls one row while the pointer sits outside the viewport, and re-sweeps the band.</summary>
+    private void OnMarqueeScroll(object? sender, EventArgs e)
+    {
+        var drag = _marquee;
+        if (drag is null)
+            return;
+
+        _topIndex += drag.Current.Y < this.HeaderHeight ? -1 : 1;
+        this.ClampScroll();
+        this.ApplyMarquee();
+        this.Invalidate();
+    }
+
+    /// <summary>
+    /// Replaces the selection with the one the band implies, at most one
+    /// <see cref="SelectedIndexChanged"/> per move.
+    /// </summary>
+    private void ApplyMarquee()
+    {
+        var drag = _marquee;
+        if (drag is null || !drag.Active)
+            return;
+
+        this.CollectBandItems(drag.Band, drag.Covered);
+        drag.BuildDesired(static _ => true);
+        if (drag.Matches(_selectedIndices))
+            return;
+
+        this.ClearSelectionCore();
+        foreach (var index in drag.Desired)
+            this.AddToSelectionCore(index);
+
+        this.FinishSelectionGesture(true);
+    }
+
+    /// <summary>
+    /// Collects the items whose cells the band touches, walking the visible flat rows once. Only the
+    /// visible ones can be touched — the band lives in client coordinates — so this costs a screenful
+    /// rather than the whole list, which is what keeps a band over a virtual list of a million rows
+    /// as cheap as one over ten.
+    /// </summary>
+    private void CollectBandItems(Rectangle band, List<int> into)
+    {
+        into.Clear();
+
+        var rowCount = this.FlatRowCount;
+        var height = this.Height;
+        var cell = this.CellSize;
+        var y = this.HeaderHeight;
+
+        for (var r = _topIndex; r < rowCount && y < height; ++r)
+        {
+            var row = this.GetFlatRow(r);
+            var rowHeight = this.RowHeightOf(row);
+            if (row.Count == 0)
+                break; // the row source ran out, as in the paint walk
+
+            if (row.Count > 0 && band.Y < y + rowHeight && band.Bottom > y)
+                for (var k = 0; k < row.Count; ++k)
+                {
+                    var left = k * cell.Width;
+                    if (band.X < left + cell.Width && band.Right > left)
+                        into.Add(this.DisplayItem(row.Start + k));
+                }
+
+            y += rowHeight;
+        }
+    }
 
     /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -1625,6 +1778,9 @@ public class ListView : OwnerDrawnControl
 
             y += rowHeight;
         }
+
+        if (_marquee is { Active: true } marquee)
+            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band);
 
         if (gutter > 0)
             g.PopClip();

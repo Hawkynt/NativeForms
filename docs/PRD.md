@@ -1282,11 +1282,16 @@ evidence rather than intent: each line is something a real program wanted and di
       Tested against libjpeg-turbo itself: each fixture is embedded beside the pixels
       `djpeg -nosmooth -dct int` produced from it, and the decode has to match within one level per
       channel.
-- [ ] **Marquee (rubber-band) selection, with the modifiers.** Dragging a selection rectangle inside a
-      `ListView` or `DataGridView`, with Ctrl adding to the selection and Shift extending it. Not an extra:
-      this is what those controls do everywhere else, so its absence reads as a bug rather than a missing
-      feature. Both controls already track a selection and an anchor for keyboard range-select, so the
-      model is there and it is the gesture that is missing.
+- [x] **Marquee (rubber-band) selection, with the modifiers.** One `MarqueeDrag` engine driven by both
+      `ListView` and `DataGridView`, so they answer to one set of semantics rather than two that drift: a
+      four-pixel threshold keeps a click a click, a plain band replaces the selection, Shift adds it and
+      Ctrl flips what it covers, and dragging past an edge auto-scrolls a row per 60 ms while the pointer
+      stays outside. The baseline is snapshotted *before* the initiating press applies, which is what makes
+      Ctrl come out right — the press toggles the row under the pointer, the band covers that same row, and
+      the two must not cancel out. A band starts on empty space in a list view (a press on an item belongs
+      to the item) and on any row in a grid, where rows span the full width and only the vertical extent
+      decides. Only visible rows are tested, so a band over a virtual list of a million rows costs a
+      screenful.
 - [ ] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
       move from drag gestures onto context menus. The gestures are the affordance users know; the menus are
       a workaround. `DockPanel` already has drag-to-dock, so the pattern exists to build on.
