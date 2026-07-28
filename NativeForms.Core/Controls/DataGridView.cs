@@ -2173,7 +2173,8 @@ public class DataGridView : OwnerDrawnControl
                 var iconTop = cellRect.Y + inset + Math.Max(0, (cellRect.Height - (2 * inset) - iconSize) / 2);
                 for (var i = 0; i < images.Count; ++i)
                 {
-                    g.DrawImage(images[i], new Rectangle(x, iconTop, iconSize, iconSize));
+                    if (this.CurrentFrameOf(images[i]) is { } frame)
+                        g.DrawImage(frame, new Rectangle(x, iconTop, iconSize, iconSize));
                     x += stride;
                 }
 
@@ -2219,7 +2220,11 @@ public class DataGridView : OwnerDrawnControl
             default:
             {
                 var text = this.GetDisplayText(column, item, modelIndex);
-                var icon = column.ImageSelector?.Invoke(item);
+                // Resolve through CurrentFrameOf, as every other icon-bearing control does: a
+                // selector may hand back an AnimatedImage (a decoded PNG, an animated GIF), which is
+                // a description of pixels rather than a bitmap the backend can blit. Drawing it raw
+                // silently paints nothing.
+                var icon = this.CurrentFrameOf(column.ImageSelector?.Invoke(item));
                 if (icon is null)
                 {
                     var plain = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - (2 * _CellPadding)), cellRect.Height);
@@ -2243,7 +2248,7 @@ public class DataGridView : OwnerDrawnControl
                 if (!imageRect.IsEmpty)
                 {
                     g.DrawImage(icon, imageRect);
-                    PaintOverlays(g, column, item, imageRect);
+                    this.PaintOverlays(g, column, item, imageRect);
                 }
 
                 if (text.Length > 0)
@@ -2294,7 +2299,7 @@ public class DataGridView : OwnerDrawnControl
 
     /// <summary>Draws the column's conditional badge overlays over a cell icon: bottom-right anchored,
     /// each shifted one badge width left, so several conditions stack on one icon.</summary>
-    private static void PaintOverlays(IGraphics g, DataGridViewColumn column, object? item, Rectangle host)
+    private void PaintOverlays(IGraphics g, DataGridViewColumn column, object? item, Rectangle host)
     {
         var overlays = column.OverlayImagesSelector?.Invoke(item);
         if (overlays is null || overlays.Count == 0)
@@ -2304,7 +2309,8 @@ public class DataGridView : OwnerDrawnControl
         var x = host.Right - badge;
         var y = host.Bottom - badge;
         for (var i = 0; i < overlays.Count && x + badge > host.Left; ++i, x -= badge)
-            g.DrawImage(overlays[i], new Rectangle(x, y, badge, badge));
+            if (this.CurrentFrameOf(overlays[i]) is { } frame)
+                g.DrawImage(frame, new Rectangle(x, y, badge, badge));
     }
 
     /// <summary>The icon edge and stride of a <see cref="DataGridViewColumnKind.MultiImage"/> cell, shared
