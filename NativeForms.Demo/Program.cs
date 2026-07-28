@@ -71,6 +71,22 @@ if (shooting)
         : Path.Combine(Path.GetTempPath(), "nativeforms-shots");
 
     Directory.CreateDirectory(directory);
+
+    // A WinExe has no console to complain to, and on a CI runner nobody is watching one anyway: the
+    // first attempt at this exited 1 in two seconds having said nothing at all, which is a diagnosis
+    // of precisely nothing. Everything the shoot has to say goes into the artifact beside the PNGs,
+    // including whatever killed it.
+    var log = Path.Combine(directory, "shoot.log");
+    void Note(string line)
+    {
+        Console.WriteLine(line);
+        File.AppendAllText(log, line + Environment.NewLine);
+    }
+
+    File.WriteAllText(log, $"shoot on {Environment.OSVersion} / {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}{Environment.NewLine}");
+    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        File.AppendAllText(log, $"unhandled: {e.ExceptionObject}{Environment.NewLine}");
+
     form.Load += (_, _) =>
     {
         // One tick of the real loop first, so the shot is of a window the platform has finished
@@ -80,16 +96,25 @@ if (shooting)
         {
             shutter.Stop();
             var path = Path.Combine(directory, "gallery.png");
-            var size = Shoot.Window(form, path);
-            Console.WriteLine(size is { } written
-                ? $"shot: {path} ({written.Width}×{written.Height})"
-                : $"shot failed: {path} — no capture route produced pixels");
+            try
+            {
+                var size = Shoot.Window(form, path);
+                Note(size is { } written
+                    ? $"shot: {path} ({written.Width}x{written.Height})"
+                    : $"shot failed: {path} - no capture route produced pixels");
+            }
+            catch (Exception e)
+            {
+                Note($"shot threw: {e}");
+            }
 
             form.Close();
         };
 
         shutter.Start();
     };
+
+    Note("gallery constructed, waiting for the window");
 }
 
 Application.Run(form);

@@ -110,7 +110,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-screenshots
-          path: ${{ runner.temp }}/shots/*.png
+          # The log comes too: a WinExe cannot report a startup failure to a console nobody is
+          # attached to, so the artifact has to be able to explain an empty shot on its own.
+          path: |
+            ${{ runner.temp }}/shots/*.png
+            ${{ runner.temp }}/shots/*.log
           if-no-files-found: warn
 
   aot:

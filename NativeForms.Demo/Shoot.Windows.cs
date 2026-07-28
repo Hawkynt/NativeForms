@@ -24,6 +24,9 @@ namespace Hawkynt.NativeForms.Demo;
 /// </remarks>
 internal static unsafe partial class ShootWindows
 {
+    /// <summary>Which route won and by how much, so the log in the artifact says how the shot was taken.</summary>
+    public static string? Route { get; private set; }
+
     private const uint _PwRenderFullContent = 0x00000002;
     private const uint _SrcCopy = 0x00CC0020;
     private const uint _DibRgbColors = 0;
@@ -150,6 +153,7 @@ internal static unsafe partial class ShootWindows
         {
             WritePng(path, width, height, best);
             Console.WriteLine($"      capture route: {how} (detail {bestScore})");
+            Route = $"{how} (detail {bestScore})";
             result = new(width, height);
         }
 
