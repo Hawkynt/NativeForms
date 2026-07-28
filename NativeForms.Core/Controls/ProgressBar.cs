@@ -17,6 +17,24 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class ProgressBar : OwnerDrawnControl
 {
+    private IProgressBarPeer? _native;
+
+    /// <summary>
+    /// Whether this bar realizes onto a real platform progress indicator rather than the owner-drawn
+    /// surface. <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether the control is currently backed by a real platform progress indicator.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the configured properties stay inside what a platform progress bar expresses. A vertical
+    /// bar is excluded: GTK needs the orientation set at construction and Win32 needs a distinct style, so
+    /// the owner-drawn path keeps that case until the peers carry it.
+    /// </summary>
+    private bool IsNativeEligible => this.Orientation == Orientation.Horizontal;
+
     private int _minimum;
     private int _maximum = 100;
     private int _value;
@@ -70,6 +88,7 @@ public class ProgressBar : OwnerDrawnControl
                 return;
 
             _value = clamped;
+            this.PushNativeFraction();
             this.Invalidate();
             this.OnValueChanged(EventArgs.Empty);
         }
@@ -86,6 +105,8 @@ public class ProgressBar : OwnerDrawnControl
                 return;
 
             field = value;
+            _native?.SetMarquee(value == ProgressBarStyle.Marquee);
+            this.PushNativeFraction();
             this.UpdateMarqueeTimer();
             this.Invalidate();
         }
@@ -133,6 +154,39 @@ public class ProgressBar : OwnerDrawnControl
     /// <summary>Raises <see cref="ValueChanged"/>.</summary>
     protected virtual void OnValueChanged(EventArgs e) => this.ValueChanged?.Invoke(this, e);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The promotion point (PRD §12): a horizontal bar on a willing backend becomes a real platform
+    /// progress indicator, so the desktop's own trough, fill and animation are used. Everything else falls
+    /// back to the owner-drawn canvas.
+    /// </remarks>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets)
+            && this.IsNativeEligible
+            && backend.CreateProgressBar() is { } peer)
+        {
+            _native = peer;
+            peer.SetMarquee(this.Style == ProgressBarStyle.Marquee);
+            peer.SetFraction(this.Fraction);
+            return peer;
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <summary>The filled share of the track in 0..1, shared by the drawn and the native path.</summary>
+    private double Fraction
+    {
+        get
+        {
+            var range = _maximum - _minimum;
+            return range <= 0 ? 0 : Math.Clamp((double)(_value - _minimum) / range, 0, 1);
+        }
+    }
+
+    private void PushNativeFraction() => _native?.SetFraction(this.Fraction);
+
     private protected override void OnRealized(IControlPeer peer)
     {
         base.OnRealized(peer);
@@ -143,6 +197,7 @@ public class ProgressBar : OwnerDrawnControl
     private protected override void OnUnrealized()
     {
         base.OnUnrealized();
+        _native = null;
         _marqueeTimer?.Dispose();
         _marqueeTimer = null;
     }
@@ -245,6 +300,12 @@ public class ProgressBar : OwnerDrawnControl
             return;
 
         _marqueePhase = (_marqueePhase + Math.Max(1, period / 50)) % period;
-        this.Invalidate();
+
+        // A native indicator animates from its own pulse, not from our phase; both are driven by the same
+        // timer so the animation speed stays the control's property either way.
+        if (_native is { } peer)
+            peer.Pulse();
+        else
+            this.Invalidate();
     }
 }

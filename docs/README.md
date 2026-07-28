@@ -83,7 +83,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `NumericUpDown` | owner-drawn + hosted editor | [numericupdown.md](controls/numericupdown.md) |
 | `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
 | `PictureBox` | owner-drawn | [picturebox.md](controls/picturebox.md) |
-| `ProgressBar` | owner-drawn | [progressbar.md](controls/progressbar.md) |
+| `ProgressBar` | native (GTK, horizontal) or owner-drawn — see [PRD §12](PRD.md) | [progressbar.md](controls/progressbar.md) |
 | `ProgressTile` | owner-drawn | [progresstile.md](controls/progresstile.md) |
 | `PropertyGrid` | owner-drawn + hosted editors/pickers | [propertygrid.md](controls/propertygrid.md) |
 | `RadioButton` | owner-drawn | [radiobutton.md](controls/radiobutton.md) |

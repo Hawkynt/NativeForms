@@ -285,6 +285,22 @@ internal static partial class NativeMethods
 
     // --- Buttons and labels ---------------------------------------------------------------------
 
+    /// <summary>Creates a <c>GtkProgressBar</c>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_progress_bar_new();
+
+    /// <summary>Sets the filled fraction (0..1) of a progress bar.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_progress_bar_set_fraction(nint progressBar, double fraction);
+
+    /// <summary>Advances an indeterminate progress bar by one step.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_progress_bar_pulse(nint progressBar);
+
+    /// <summary>Sets how far a pulse moves the block, as a fraction of the trough.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
+
     /// <summary>Creates a <c>GtkCheckButton</c> carrying the given caption.</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint gtk_check_button_new_with_label(string label);

@@ -826,8 +826,8 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   demoed and documented.
 - **M11 — Native-peer promotion (§12).** Opt into real platform widgets for the controls that have a
   faithful counterpart, keeping the owner-drawn path as the fallback. `[~]` — the mechanism (gate,
-  opt-in switch, declining backends, identical-behaviour tests) ships with `CheckBox` on GTK; the Win32
-  half and the remaining candidates follow.
+  opt-in switch, declining backends, identical-behaviour tests) ships, with `CheckBox` and `ProgressBar`
+  promoted on GTK; the Win32 halves and the remaining candidates follow.
 - **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `TreeView`. `[~]` (`DataGridView` virtual mode shipped)
@@ -979,7 +979,7 @@ backend without the widget, and what runs the moment an app asks for something t
 | ------------------------------- | ------------------------------- | ----------------- | -------------------------------------------------- |
 | [x] `CheckBox`                  | `BUTTON` (`BS_AUTOCHECKBOX`) — pending    | `GtkCheckButton` — SHIPPED  | no `Image`                     |
 | [ ] `RadioButton`               | `BUTTON` (`BS_AUTORADIOBUTTON`) | `GtkRadioButton`  | as above                                           |
-| [ ] `ProgressBar`               | `msctls_progress32`             | `GtkProgressBar`  | always (incl. marquee)                             |
+| [x] `ProgressBar`               | `msctls_progress32` — pending             | `GtkProgressBar` — SHIPPED  | horizontal only                             |
 | [ ] `TrackBar`                  | `msctls_trackbar32`             | `GtkScale`        | no custom tick painting                            |
 | [ ] `HScrollBar` / `VScrollBar` | `SCROLLBAR`                     | `GtkScrollbar`    | always                                             |
 | [ ] `GroupBox`                  | `BUTTON` (`BS_GROUPBOX`)        | `GtkFrame`        | no caption image                                   |

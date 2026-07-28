@@ -44,6 +44,18 @@ bar.Style = ProgressBarStyle.Marquee;   // indeterminate sweep, timer-driven
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
+## Native widget promotion
+
+On a backend that offers one — GTK today, Win32 to follow — a **horizontal** bar realizes onto a real
+`GtkProgressBar`, so the desktop's own trough, fill and marquee animation are used. The public surface is
+identical either way; `IsNativeWidget` reports which path was taken, and `UseNativeWidget` overrides
+[`Application.PreferNativeWidgets`](application.md) per control.
+
+A **vertical** bar stays owner-drawn: GTK needs the orientation fixed at construction and Win32 needs a
+distinct window style, so that case waits until the peers carry it. `MarqueeAnimationSpeed` still drives
+the animation on both paths — the same timer either advances our phase or pulses the widget. See
+[PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - Painted with the platform `ITheme` (`FieldBackground` track, `Accent` fill, `Border` outline), so it matches the host desktop; testable headlessly through the test backend's recording canvas.

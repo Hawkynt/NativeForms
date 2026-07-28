@@ -132,7 +132,23 @@ internal sealed class HeadlessBackend : IPlatformBackend
     /// </summary>
     public bool OfferNativeCheckBox { get; set; }
 
-    /// <summary>The last check-box peer handed out, so a test can drive it like the real widget.</summary>
+/// <summary>Whether this backend accepts the progress-bar promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeProgressBar { get; set; }
+
+    /// <summary>The last progress peer handed out, so a test can inspect what the widget was told.</summary>
+    public HeadlessProgressBarPeer? LastProgressBar { get; private set; }
+
+    public IProgressBarPeer? CreateProgressBar()
+    {
+        if (!this.OfferNativeProgressBar)
+            return null;
+
+        this.LastProgressBar = new HeadlessProgressBarPeer();
+        this.Created.Add(this.LastProgressBar);
+        return this.LastProgressBar;
+    }
+
+        /// <summary>The last check-box peer handed out, so a test can drive it like the real widget.</summary>
     public HeadlessCheckBoxPeer? LastCheckBox { get; private set; }
 
     public ICheckBoxPeer? CreateCheckBox()
@@ -1220,4 +1236,21 @@ internal sealed class HeadlessCheckBoxPeer : HeadlessPeer, ICheckBoxPeer
         _checked = !_checked;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
+}
+
+
+/// <summary>A stand-in for a real platform progress indicator, so the promoted path is testable.</summary>
+internal sealed class HeadlessProgressBarPeer : HeadlessPeer, IProgressBarPeer
+{
+    public double Fraction { get; private set; }
+
+    public bool Marquee { get; private set; }
+
+    public int Pulses { get; private set; }
+
+    public void SetFraction(double fraction) => this.Fraction = fraction;
+
+    public void SetMarquee(bool marquee) => this.Marquee = marquee;
+
+    public void Pulse() => ++this.Pulses;
 }

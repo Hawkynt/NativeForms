@@ -63,6 +63,9 @@ public interface IPlatformBackend
     /// </summary>
     ICheckBoxPeer? CreateCheckBox() => null;
 
+    /// <summary>Creates a native progress-indicator peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    IProgressBarPeer? CreateProgressBar() => null;
+
     /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
     /// <param name="owner">
     /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.

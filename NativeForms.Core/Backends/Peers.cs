@@ -466,3 +466,20 @@ public interface ICheckBoxPeer : IControlPeer
     /// platform actually did rather than inferring a flip.</summary>
     bool GetChecked();
 }
+
+
+/// <summary>
+/// A native progress indicator (Win32 <c>msctls_progress32</c>, GTK <c>GtkProgressBar</c>). Created only
+/// when a <see cref="ProgressBar"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+public interface IProgressBarPeer : IControlPeer
+{
+    /// <summary>Sets the filled fraction, clamped to 0..1 by the caller.</summary>
+    void SetFraction(double fraction);
+
+    /// <summary>Switches the indicator between a determinate fill and an indeterminate marquee.</summary>
+    void SetMarquee(bool marquee);
+
+    /// <summary>Advances an indeterminate indicator by one animation step.</summary>
+    void Pulse();
+}

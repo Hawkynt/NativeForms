@@ -124,4 +124,49 @@ internal sealed class NativePeerPromotionTests
             Assert.That(raised, Is.EqualTo(1), "and raises the public event exactly once, not twice");
         });
     }
+
+    // --- ProgressBar: the same mechanism, a second control ---------------------------------------
+
+    private static ProgressBar RealizeBar(ProgressBar bar, HeadlessBackend backend)
+    {
+        var form = new Form();
+        form.Controls.Add(bar);
+        Application.Run(form, backend);
+        return bar;
+    }
+
+    [Test]
+    public void A_horizontal_progress_bar_promotes_and_pushes_its_fraction()
+    {
+        var backend = new HeadlessBackend { OfferNativeProgressBar = true };
+        var bar = RealizeBar(new ProgressBar { Bounds = new(0, 0, 200, 20), Minimum = 0, Maximum = 200 }, backend);
+
+        bar.Value = 50;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.True);
+            Assert.That(backend.LastProgressBar!.Fraction, Is.EqualTo(0.25).Within(0.001), "50 of 200 is a quarter");
+        });
+    }
+
+    [Test]
+    public void A_vertical_progress_bar_stays_owner_drawn()
+    {
+        var backend = new HeadlessBackend { OfferNativeProgressBar = true };
+        var bar = RealizeBar(new ProgressBar { Bounds = new(0, 0, 20, 200), Orientation = Orientation.Vertical }, backend);
+
+        Assert.That(bar.IsNativeWidget, Is.False, "the peers do not carry a vertical orientation yet");
+    }
+
+    [Test]
+    public void Marquee_switches_the_widget_into_its_indeterminate_mode()
+    {
+        var backend = new HeadlessBackend { OfferNativeProgressBar = true };
+        var bar = RealizeBar(new ProgressBar { Bounds = new(0, 0, 200, 20) }, backend);
+
+        bar.Style = ProgressBarStyle.Marquee;
+
+        Assert.That(backend.LastProgressBar!.Marquee, Is.True);
+    }
 }
