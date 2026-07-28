@@ -1457,6 +1457,28 @@ internal sealed partial class Autopilot
             }
         });
 
+        this.Check("Native promotion: a radio group works across a widget/painter split", () =>
+        {
+            var widget = _form.Part<RadioButton>("native.mixedNative");
+            var painted = _form.Part<RadioButton>("native.mixedDrawn");
+            this.ExpectTrue("the widget half was not promoted", this.Read(() => widget.IsNativeWidget));
+            this.ExpectTrue("the painted half was promoted despite its image", !this.Read(() => painted.IsNativeWidget));
+
+            this.Do(() => widget.Checked = true);
+            this.Settle();
+            this.Do(() => painted.Checked = true);
+            this.Settle();
+            this.ExpectTrue(
+                "selecting the painted half did not clear the promoted one",
+                this.Read(() => painted.Checked) && !this.Read(() => widget.Checked));
+
+            this.Do(() => widget.Checked = true);
+            this.Settle();
+            this.ExpectTrue(
+                "selecting the promoted half did not clear the painted one",
+                this.Read(() => widget.Checked) && !this.Read(() => painted.Checked));
+        });
+
         this.Check("Native promotion: a promoted ComboBox drives its selection through the platform list", () =>
         {
             var combo = _form.Part<ComboBox>("ribbon.styleCombo");

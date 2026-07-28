@@ -43,6 +43,11 @@ Promotion happens only when the configured properties stay inside what the platf
 `Image` is the one thing neither a stock `BUTTON` radio nor a `GtkRadioButton` renders beside the caption
 the way this control does, so a button with one stays owner-drawn.
 
+**A group may be half promoted and half painted**, because the gate is per control: one button carrying
+an `Image` keeps the painter while its siblings are real widgets. Grouping reaches across that split in
+both directions — whichever member takes the selection, every other member loses it, and a promoted
+loser's *widget* is cleared, not just its flag. `MixedRadioButtonGroupTests` pins each case.
+
 **Grouping stays here either way.** Both platforms are asked for a *non-automatic* radio — one that reports
 the click and leaves the state alone — because an automatic one defines its own group, and on Windows that
 group comes from the `WS_GROUP` runs of the tab order rather than from the parent. Clearing `Checked`

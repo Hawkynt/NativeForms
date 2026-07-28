@@ -1025,12 +1025,18 @@ really stayed on the painter.
 
 Two of these needed a decision the obvious reading would have got wrong:
 
-- **Radio grouping stays in the core.** Both peers are asked for a *non-automatic* radio. An automatic
+- **Radio grouping stays in the core**, which is also what makes a *mixed* group work — the gate is per
+  control, so one button with an `Image` keeps the painter while its siblings are widgets, and the
+  selection has to cross that split in both directions.
+  Both peers are asked for a *non-automatic* radio. An automatic
   one defines its own group — on Windows from the `WS_GROUP` runs of the tab order, which is a different
   notion of "group" from the core's (the controls sharing a parent) — and the two would fight over the
   selection. GTK additionally refuses to leave a group with nothing selected, so each peer carries a
   private, never-parented group anchor that is activated to mean "none": the core allows a `RadioButton`
-  to be cleared outright, and the widget has to allow it too.
+  to be cleared outright, and the widget has to allow it too. `MixedRadioButtonGroupTests` pins the mixed
+  case specifically, including the one defect it found: re-realizing a control re-establishes its keyboard
+  focus, and a radio button selects itself on focus — so the swap handed it a selection it was supposed to
+  leave alone. `Control.IsRestoringFocus` tells the two apart.
 - **The group box hosts its frame rather than being hosted by it.** Both platforms build it as a plain
   container carrying the control's own coordinate system, with the real frame widget behind everything,
   filling it. Parenting the children *into* the frame would shift them by whatever inset the platform

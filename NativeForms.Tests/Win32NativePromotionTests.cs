@@ -74,6 +74,14 @@ public sealed class Win32NativePromotionTests
         var inside = new Button { Bounds = new Rectangle(14, 30, 120, 26), Text = "child" };
         group.Controls.Add(inside);
 
+        // A group whose members do not share a rendering path: the gate is per control, so the image
+        // keeps one of these on the painter while the other is a real BS_RADIOBUTTON. Grouping has to
+        // reach across that split in both directions.
+        var mixedHost = new GroupBox { Bounds = new Rectangle(540, 300, 140, 90), Text = "mixed" };
+        var mixedNative = new RadioButton { Bounds = new Rectangle(10, 24, 120, 20), Text = "widget" };
+        var mixedDrawn = new RadioButton { Bounds = new Rectangle(10, 50, 120, 20), Text = "painted", Image = Pixel() };
+        mixedHost.Controls.AddRange(mixedNative, mixedDrawn);
+
         // Each of these puts one property outside its gate, so each must stay on the painter.
         var icon = Pixel();
         var gatedCheck = new CheckBox { Bounds = new Rectangle(270, 140, 240, 20), Text = "gated", Image = icon };
@@ -86,7 +94,7 @@ public sealed class Win32NativePromotionTests
 
         form.Controls.AddRange(
             check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group,
-            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup);
+            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost);
 
         form.Load += (_, _) =>
         {
@@ -136,6 +144,15 @@ public sealed class Win32NativePromotionTests
                 observed.RoundTrips["ListBox geometry"] = list.TopIndex >= 0 && list.IndexFromPoint(10, 4) >= 0;
 
                 observed.RoundTrips["GroupBox child bounds"] = inside.Bounds == new Rectangle(14, 30, 120, 26);
+
+                observed.Promoted["mixed widget half"] = mixedNative.IsNativeWidget;
+                observed.Promoted["mixed painted half"] = mixedDrawn.IsNativeWidget;
+
+                mixedNative.Checked = true;
+                mixedDrawn.Checked = true;
+                observed.RoundTrips["painted half takes the selection"] = mixedDrawn.Checked && !mixedNative.Checked;
+                mixedNative.Checked = true;
+                observed.RoundTrips["widget half takes it back"] = mixedNative.Checked && !mixedDrawn.Checked;
 
                 // The swap has to be invisible to the application, in both directions.
                 check.Image = icon;
@@ -197,6 +214,7 @@ public sealed class Win32NativePromotionTests
     [TestCase("ComboBox")]
     [TestCase("ListBox")]
     [TestCase("GroupBox")]
+    [TestCase("mixed widget half")]
     public void An_eligible_control_realizes_onto_a_real_widget(string control)
         => Assert.That(Result().Promoted[control], Is.True, $"{control} stayed on the owner-drawn painter");
 
@@ -206,6 +224,7 @@ public sealed class Win32NativePromotionTests
     [TestCase("editable ComboBox")]
     [TestCase("CheckedListBox")]
     [TestCase("gated GroupBox")]
+    [TestCase("mixed painted half")]
     public void A_control_outside_its_gate_stays_owner_drawn(string control)
         => Assert.That(Result().Promoted[control], Is.False, $"{control} was promoted despite its state");
 
@@ -221,6 +240,8 @@ public sealed class Win32NativePromotionTests
     [TestCase("ListBox.SelectedIndex")]
     [TestCase("ListBox geometry")]
     [TestCase("GroupBox child bounds")]
+    [TestCase("painted half takes the selection")]
+    [TestCase("widget half takes it back")]
     public void Driving_the_real_widget_round_trips(string what)
         => Assert.That(Result().RoundTrips[what], Is.True, $"{what} did not survive the platform widget");
 

@@ -86,9 +86,25 @@ internal sealed partial class MainForm
         };
         iconGroup.Controls.Add(new Label { Bounds = new(12, 26, 220, 18), Text = "boxes stay owner-drawn" });
 
+        // The gate is per control, so a group can be half widget and half painter — and grouping still
+        // has to reach across the split, which is the case worth showing rather than only describing.
+        var mixedGroup = new GroupBox
+        {
+            Bounds = new(_NativeGated, gatedTop + 312, _NativeColumn, 88),
+            Text = "One group, both renderings",
+        };
+        var mixedNative = new RadioButton { Bounds = new(14, 26, _NativeColumn - 28, 20), Text = "widget", Checked = true };
+        var mixedDrawn = new RadioButton
+        {
+            Bounds = new(14, 52, _NativeColumn - 28, 20),
+            Text = "painted (has an image)",
+            Image = this.SquareImage(Color.MediumPurple),
+        };
+        mixedGroup.Controls.AddRange(mixedNative, mixedDrawn);
+
         page.Controls.AddRange(
             Caption("Outside the gate — still painted", _NativeGated, 12, _NativeColumn),
-            iconCheck, iconRadio, verticalBar, iconCombo, editableCombo, checkedList, iconGroup);
+            iconCheck, iconRadio, verticalBar, iconCombo, editableCombo, checkedList, iconGroup, mixedGroup);
 
         this.Publish("native.page", page);
         this.Publish("native.gatedCheck", iconCheck);
@@ -98,6 +114,8 @@ internal sealed partial class MainForm
         this.Publish("native.gatedEditableCombo", editableCombo);
         this.Publish("native.gatedCheckedList", checkedList);
         this.Publish("native.gatedGroup", iconGroup);
+        this.Publish("native.mixedNative", mixedNative);
+        this.Publish("native.mixedDrawn", mixedDrawn);
         return page;
     }
 

@@ -767,6 +767,21 @@ public abstract class Control
     /// <summary>Raises <see cref="TextChanged"/>.</summary>
     protected virtual void OnTextChanged(EventArgs e) => this.TextChanged?.Invoke(this, e);
 
+    /// <summary>
+    /// Whether the focus arriving right now is a peer swap putting it back where it was rather than the
+    /// user moving it. Thread-static because a toolkit may run more than one UI thread, and the flag
+    /// describes a moment on one of them.
+    /// </summary>
+    [ThreadStatic]
+    private static bool _restoringFocus;
+
+    /// <summary>
+    /// Whether this focus arrival came from re-realizing a peer (PRD §12) rather than from the user.
+    /// A promotion is state transparent, so a control that would otherwise change its own state on
+    /// focus has to sit that one out.
+    /// </summary>
+    private protected static bool IsRestoringFocus => _restoringFocus;
+
     /// <summary>Raises <see cref="GotFocus"/>.</summary>
     protected virtual void OnGotFocus(EventArgs e) => this.GotFocus?.Invoke(this, e);
 
@@ -1758,8 +1773,21 @@ public abstract class Control
         this.DisposePeerTree();
         parent.RealizeAddedChild(this);
 
-        if (hadFocus)
+        if (!hadFocus)
+            return;
+
+        // Putting the keyboard back is not the user moving it, and a control that reacts to gaining
+        // focus must be able to tell the two apart — a radio button selects itself on focus, which
+        // would hand it a selection the swap was supposed to leave alone.
+        _restoringFocus = true;
+        try
+        {
             this.Focus();
+        }
+        finally
+        {
+            _restoringFocus = false;
+        }
     }
 
     /// <summary>

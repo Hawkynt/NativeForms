@@ -152,10 +152,15 @@ public class RadioButton : OwnerDrawnControl
     /// so <see cref="OwnerDrawnControl.IsMousePressInFlight"/> is the honest keyboard gate — a
     /// click defers selection to the click path and selects exactly once.
     /// </summary>
+    /// <remarks>
+    /// Focus handed back by a peer swap is not the user arriving, so it selects nothing: crossing the
+    /// promotion gate (PRD §12) must leave the group's selection exactly where it was, which matters
+    /// most in a group whose members do not all take the same rendering path.
+    /// </remarks>
     protected override void OnGotFocus(EventArgs e)
     {
         base.OnGotFocus(e);
-        if (!this.IsMousePressInFlight && !this.Checked)
+        if (!IsRestoringFocus && !this.IsMousePressInFlight && !this.Checked)
             this.Checked = true;
     }
 
