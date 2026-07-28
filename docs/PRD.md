@@ -248,6 +248,10 @@ strategy (may differ per platform; note exceptions inline).
       control kind), WinForms event order (Enter→GotFocus / LostFocus→Leave with container-chain
       crossing), `Form.ActiveControl` + initial focus, Tab/Shift+Tab navigation through nested
       containers, `IsInputKey` claims, form-wide menu shortcuts + Alt-mnemonic bar activation
+- [x] Tab order and page switching: Tab/Shift+Tab walk the flattened order; `Ctrl+Tab`/`Ctrl+Shift+Tab`
+      cycle the innermost enclosing `TabControl`'s pages from anywhere inside them, and are not swallowed
+      when there is none; `Form.SelectNextControl(control, forward, tabStopOnly, nested, wrap)` drives the
+      same traversal from code.
 - [~] Keyboard — `KeyDown`/`KeyUp`/`KeyPress` on owner-drawn surfaces, mnemonics/accelerators via the
       form dialog-key chain done; a native `TextBox` now previews its keys through that chain over the
       peer key seam (Enter → `AcceptButton`, Escape → `CancelButton`, Tab/Shift+Tab navigation, menu

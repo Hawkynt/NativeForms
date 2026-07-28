@@ -72,6 +72,12 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 | `TabStop` | `bool` | per kind | Whether Tab stops here. Until assigned it follows the kind's default: focusable controls are stops; labels, panels, group boxes, picture boxes, progress bars, scroll bars and strips are not; the menu bar opts out (Alt reaches it), matching WinForms |
 | `UseNativeWidget` | `bool?` | `null` | Whether this control realizes onto a real platform widget rather than the owner-drawn surface; `null` follows [`Application.PreferNativeWidgets`](application.md) |
 
+### Keyboard navigation
+
+Tab and Shift+Tab walk the tab order described above. `Ctrl+Tab`/`Ctrl+Shift+Tab` switch the pages of the innermost [`TabControl`](tabcontrol.md) containing the focused control — from anywhere inside a page, not only when the header has focus — and are left alone when there is no tab control above, so they stay available to an application that wants them.
+
+`SelectNextControl(Control?, bool forward, bool tabStopOnly, bool nested, bool wrap)` on [`Form`](form.md) drives the same traversal from code, so a program moving focus itself and a user pressing the key cannot disagree. `nested` is accepted for source compatibility and always behaves as `true`: this toolkit has no container that hides its children from the tab order.
+
 ### Native-widget promotion
 
 `UseNativeWidget` is a preference, never an override of the truth: a control is promoted only while its properties stay inside what the platform widget can express, and a backend without such a widget declines regardless — the owner-drawn painter is always the fallback. Controls with no platform counterpart ignore it entirely.

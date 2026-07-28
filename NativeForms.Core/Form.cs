@@ -376,6 +376,12 @@ public class Form : Control
                 this.MoveFocus(source, forward: (keyData & Keys.Shift) == 0);
                 return true;
 
+            case Keys.Tab | Keys.Control:
+            case Keys.Tab | Keys.Control | Keys.Shift:
+                // Windows Forms switches pages from anywhere inside the tab control, not only when its
+                // header has focus — the shortcut belongs to the container the user is working in.
+                return CycleEnclosingTabControl(source, forward: (keyData & Keys.Shift) == 0);
+
             case Keys.Enter:
                 return PerformDialogClick(this.AcceptButton);
 
@@ -386,6 +392,47 @@ public class Form : Control
                 return false;
         }
     }
+
+    /// <summary>
+    /// Advances the innermost <see cref="TabControl"/> containing <paramref name="source"/> by one page,
+    /// wrapping. Reports whether one was found — a Ctrl+Tab with no tab control above it is not ours, so
+    /// it is left for whatever else might want it rather than swallowed.
+    /// </summary>
+    private static bool CycleEnclosingTabControl(Control source, bool forward)
+    {
+        for (var control = source; control is not null; control = control.Parent)
+        {
+            if (control is not TabControl tabs)
+                continue;
+
+            var count = tabs.TabPages.Count;
+            if (count == 0)
+                return false;
+
+            tabs.SelectedIndex = ((tabs.SelectedIndex + (forward ? 1 : -1)) % count + count) % count;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Moves focus to the next or previous control in the tab order, the Windows Forms way.
+    /// </summary>
+    /// <param name="control">Where to start, or <see langword="null"/> to start at the beginning.</param>
+    /// <param name="forward">Whether to move forward.</param>
+    /// <param name="tabStopOnly">Whether to consider only controls whose <see cref="Control.TabStop"/> is set.</param>
+    /// <param name="nested">Whether to descend into child containers.</param>
+    /// <param name="wrap">Whether to continue from the other end when the search runs off this one.</param>
+    /// <returns>Whether focus moved.</returns>
+    /// <remarks>
+    /// The traversal is the same one Tab uses, so a program driving focus itself and a user pressing the
+    /// key cannot disagree. <paramref name="nested"/> is accepted for source compatibility and is always
+    /// treated as <see langword="true"/>: this toolkit has no notion of a container that hides its
+    /// children from the tab order, so honouring <see langword="false"/> would mean inventing one.
+    /// </remarks>
+    public bool SelectNextControl(Control? control, bool forward, bool tabStopOnly, bool nested, bool wrap)
+        => this.MoveFocus(control, forward, tabStopOnly, wrap);
 
     /// <summary>Clicks a dialog button when it is present, visible and enabled.</summary>
     private static bool PerformDialogClick(Button? button)
@@ -492,24 +539,30 @@ public class Form : Control
     /// Moves focus to the next (or previous) tab stop relative to <paramref name="from"/>, wrapping
     /// around the form. <see langword="null"/> starts from the top — the initial-focus walk.
     /// </summary>
-    internal void MoveFocus(Control? from, bool forward)
+    internal bool MoveFocus(Control? from, bool forward, bool tabStopOnly = true, bool wrap = true)
     {
         var order = this.BuildTabOrder();
         var count = order.Count;
         if (count == 0)
-            return;
+            return false;
 
         var start = from is null ? forward ? -1 : count : order.IndexOf(from);
         var step = forward ? 1 : -1;
         for (var i = 1; i <= count; ++i)
         {
-            var candidate = order[(((start + (step * i)) % count) + count) % count];
-            if (!candidate.TabStop || !candidate.CanFocus)
+            var index = start + (step * i);
+            if (!wrap && (index < 0 || index >= count))
+                return false;
+
+            var candidate = order[((index % count) + count) % count];
+            if ((tabStopOnly && !candidate.TabStop) || !candidate.CanFocus)
                 continue;
 
             candidate.Focus();
-            return;
+            return true;
         }
+
+        return false;
     }
 
     /// <summary>
