@@ -21,13 +21,10 @@ namespace Hawkynt.NativeForms;
 public class SearchBox : OwnerDrawnControl
 {
     /// <summary>The width of the leading zone carrying the magnifier glyph.</summary>
-    internal const int GlyphZoneWidth = 20;
+    internal const int GlyphZoneWidth = GlyphRenderer.SearchGlyphZoneWidth;
 
     /// <summary>The width of the trailing zone carrying the clear (×) glyph.</summary>
-    internal const int ClearZoneWidth = 20;
-
-    /// <summary>The stroke half-length of the × glyph.</summary>
-    private const int _ClearArm = 3;
+    internal const int ClearZoneWidth = GlyphRenderer.SearchClearZoneWidth;
 
     private readonly TextBox _editor;
 
@@ -84,29 +81,12 @@ public class SearchBox : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        var width = this.Width;
-        var height = this.Height;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, height));
-
-        // The magnifier: a stroked lens circle with a short handle toward the lower right.
-        var glyphColor = this.Enabled ? theme.ControlText : theme.DisabledText;
-        var mid = height / 2;
-        g.DrawEllipse(glyphColor, new(5, mid - 6, 8, 8));
-        g.DrawLine(glyphColor, 12, mid + 1, 15, mid + 4);
-
-        // The clear ×: two crossing strokes, only while there is something to clear.
-        if (this.Text.Length > 0)
-        {
-            var cx = width - (ClearZoneWidth / 2);
-            g.DrawLine(glyphColor, cx - _ClearArm, mid - _ClearArm, cx + _ClearArm, mid + _ClearArm);
-            g.DrawLine(glyphColor, cx - _ClearArm, mid + _ClearArm, cx + _ClearArm, mid - _ClearArm);
-        }
-
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
-    }
+        => GlyphRenderer.DrawSearchField(
+            e.Graphics,
+            this.Theme,
+            new(0, 0, this.Width, this.Height),
+            this.Enabled,
+            showClear: this.Text.Length > 0);
 
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)

@@ -1295,11 +1295,16 @@ evidence rather than intent: each line is something a real program wanted and di
 - [ ] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
       move from drag gestures onto context menus. The gestures are the affordance users know; the menus are
       a workaround. `DockPanel` already has drag-to-dock, so the pattern exists to build on.
-- [ ] **Type-to-filter menus**, built out of what already exists rather than as a new control: a
-      [`SearchBox`](controls/searchbox.md) hosted as the first entry of a `ContextMenuStrip`, narrowing the
-      items below it as you type. The same mechanism serves `DataGridView`, whose column and value filters
-      want exactly this. Reusing the search box means one editor, one clear glyph and one set of keyboard
-      semantics rather than three.
+- [x] **Type-to-filter menus.** `ContextMenuStrip.ShowSearchBox` opens a menu with a search field as its
+      first row, narrowing the items below it as you type — matched case-insensitively anywhere in the
+      caption, with Backspace widening again, Escape clearing the filter before it closes the menu, and the
+      arrows and Enter walking only what survived. The popup re-fits in place through a new
+      `IPopupPeer.Resize`, because re-showing it would hand the light-dismiss grab round mid-typing.
+      What is shared with [`SearchBox`](controls/searchbox.md) is the field itself — the magnifier, the
+      clear glyph and the chrome now come from one renderer both call — rather than the control, which
+      hosts a native editor and cannot live inside an owner-drawn popup surface. The honest cost is
+      recorded rather than hidden: a searchable menu spends its keystrokes on the filter and so gives up
+      its mnemonics, which is why it is opt-in.
 Deliberately **not** doing: an application-level accent/theme override. Colours come from the desktop, and
 an app's own theme-variant, accent and skin settings stop meaning anything here. That is the point of the
 toolkit, not a gap in it, and the port losing those knobs is the correct outcome.

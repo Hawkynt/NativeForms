@@ -134,6 +134,20 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
         this.TakeGrab();
     }
 
+    /// <inheritdoc/>
+    public void Resize(Size size)
+    {
+        if (!_shown)
+            return;
+
+        // Size only: no move, no re-show and no grab, so a menu narrowing under a filter keeps the
+        // grab it already holds.
+        _bounds = new Rectangle(_bounds.Location, size);
+        NativeMethods.gtk_widget_set_size_request(_widget, size.Width, size.Height);
+        NativeMethods.gtk_window_resize(_window, size.Width, size.Height);
+        this.InvalidateAll();
+    }
+
     /// <summary>
     /// Takes the pointer grab that makes this the light-dismiss surface. The seat grab routes pointer
     /// events outside the application to the popup (owner events keep in-app delivery normal); the GTK

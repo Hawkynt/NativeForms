@@ -32,6 +32,18 @@ public class ContextMenuStrip : Component
     /// <summary>Whether the menu is currently open.</summary>
     public bool IsOpen => _dropDown is { IsOpen: true };
 
+    /// <summary>
+    /// Whether the menu opens with a search field as its first row, narrowing the items below it as
+    /// you type (PRD §14). Off by default, because it costs the menu its mnemonics: type-to-filter and
+    /// mnemonic access are the same keystrokes, so one menu cannot offer both.
+    /// </summary>
+    /// <remarks>
+    /// Worth turning on for the menus that got long enough to be worth searching — a column list, a
+    /// set of distinct values, a recent-files list — and worth leaving off for the short verb menus
+    /// where a mnemonic is faster than a substring.
+    /// </remarks>
+    public bool ShowSearchBox { get; set; }
+
     /// <summary>Raised before the menu opens — on the right-click path through
     /// <see cref="Control.ContextMenuStrip"/> and on explicit <see cref="Show"/> alike; set
     /// <see cref="CancelEventArgs.Cancel"/> to keep it closed.</summary>
@@ -82,7 +94,7 @@ public class ContextMenuStrip : Component
         }
 
         engine.Owner = owner;
-        engine.Open(this.Items, screenLocation);
+        engine.Open(this.Items, screenLocation, this.ShowSearchBox);
     }
 
     /// <summary>Closes the menu, if open.</summary>

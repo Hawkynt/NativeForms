@@ -46,6 +46,12 @@ internal sealed class MenuDropDown
         public Point Location;
         public Size Size;
         public int HoverIndex = -1;
+
+        /// <summary>Whether this level carries a search field, which only a root level ever does.</summary>
+        public bool Searchable;
+
+        /// <summary>What has been typed into that field; empty means every item shows.</summary>
+        public string Filter = string.Empty;
     }
 
     /// <summary>Creates an engine bound to the backend whose popups and text metrics it uses.</summary>
@@ -70,9 +76,16 @@ internal sealed class MenuDropDown
 
     /// <summary>Opens the root level at a screen position, closing any cascade already open.</summary>
     public void Open(IReadOnlyList<ToolStripItem> items, Point screenLocation)
+        => this.Open(items, screenLocation, searchable: false);
+
+    /// <summary>
+    /// Opens the root level, optionally with a search field as its first row: typing narrows the rows
+    /// below it instead of running the mnemonics (PRD §14).
+    /// </summary>
+    public void Open(IReadOnlyList<ToolStripItem> items, Point screenLocation, bool searchable)
     {
         this.CloseAll();
-        this.OpenLevel(items, screenLocation);
+        this.OpenLevel(items, screenLocation, searchable);
     }
 
     /// <summary>Closes every level, deepest first, and raises <see cref="Closed"/> once.</summary>
@@ -88,20 +101,52 @@ internal sealed class MenuDropDown
         this.Closed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>The height a level's search field occupies, zero when it has none.</summary>
+    private int SearchHeight(Level level) => level.Searchable ? _theme.RowHeight : 0;
+
+    /// <summary>
+    /// Whether a row shows: an item hidden by the application never does, and while a filter is
+    /// active only the items whose text contains it do. Separators go while filtering — a divider
+    /// between groups that are no longer both there separates nothing.
+    /// </summary>
+    private static bool RowVisible(Level level, ToolStripItem item)
+    {
+        if (!item.Visible)
+            return false;
+
+        if (level.Filter.Length == 0)
+            return true;
+
+        return item is not ToolStripSeparator
+            && item.DisplayText.Contains(level.Filter, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    /// <summary>The size a level needs as it currently stands, filter and search field included.</summary>
+    private Size ComputeLevelSize(Level level)
+    {
+        var size = this.ComputeSize(level.Items, level);
+        return new(Math.Max(size.Width, _MinSearchableWidth * (level.Searchable ? 1 : 0)), size.Height);
+    }
+
+    /// <summary>Wide enough for a search field to be worth typing into, however short the items are.</summary>
+    private const int _MinSearchableWidth = 160;
+
     /// <summary>
     /// Computes the popup size a set of items needs: an icon column, the widest text, the widest
     /// shortcut (when any item declares one), an arrow column and a 1-pixel border all around.
     /// </summary>
-    internal Size ComputeSize(IReadOnlyList<ToolStripItem> items)
+    internal Size ComputeSize(IReadOnlyList<ToolStripItem> items) => this.ComputeSize(items, level: null);
+
+    private Size ComputeSize(IReadOnlyList<ToolStripItem> items, Level? level)
     {
         var font = _theme.DefaultFont;
         var maxText = 0;
         var maxShortcut = 0;
-        var height = 2;
+        var height = 2 + (level is null ? 0 : this.SearchHeight(level));
         for (var i = 0; i < items.Count; ++i)
         {
             var item = items[i];
-            if (!item.Visible)
+            if (level is null ? !item.Visible : !RowVisible(level, item))
                 continue;
 
             if (item is ToolStripSeparator)
@@ -143,7 +188,21 @@ internal sealed class MenuDropDown
                 return true;
 
             case Keys.Escape:
+                // Escape backs out one step at a time: first whatever was typed, then the level.
+                if (level.Searchable && level.Filter.Length > 0)
+                {
+                    this.SetFilter(level, string.Empty);
+                    return true;
+                }
+
                 this.CloseDeepest();
+                return true;
+
+            case Keys.Back:
+                if (!level.Searchable || level.Filter.Length == 0)
+                    return false;
+
+                this.SetFilter(level, level.Filter[..^1]);
                 return true;
 
             case Keys.Right:
@@ -177,6 +236,19 @@ internal sealed class MenuDropDown
             return false;
 
         var level = _levels[^1];
+
+        // A searchable level spends its keystrokes on the filter. Mnemonics and type-to-filter are the
+        // same keys, so one level cannot offer both — and a menu that was opened to be searched has
+        // said which it wants.
+        if (level.Searchable)
+        {
+            if (char.IsControl(c))
+                return false;
+
+            this.SetFilter(level, level.Filter + c);
+            return true;
+        }
+
         var upper = char.ToUpperInvariant(c);
         for (var i = 0; i < level.Items.Count; ++i)
         {
@@ -190,6 +262,29 @@ internal sealed class MenuDropDown
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Replaces a level's filter and re-fits its popup to what is left. The surface is resized in
+    /// place rather than re-shown, so the light-dismiss grab it holds is never handed round mid-typing.
+    /// </summary>
+    private void SetFilter(Level level, string filter)
+    {
+        if (level.Filter == filter)
+            return;
+
+        level.Filter = filter;
+
+        // A submenu whose parent row may have just been filtered away has nothing left to hang from.
+        this.CloseBelow(level);
+
+        // The highlighted row keeps its highlight only if it survived the narrowing.
+        if (level.HoverIndex >= 0 && (level.HoverIndex >= level.Items.Count || !RowVisible(level, level.Items[level.HoverIndex])))
+            level.HoverIndex = -1;
+
+        level.Size = this.ComputeLevelSize(level);
+        level.Popup.Resize(level.Size);
+        level.Popup.InvalidateAll();
     }
 
     /// <summary>Closes only the deepest level; closing the root closes the cascade.</summary>
@@ -225,10 +320,11 @@ internal sealed class MenuDropDown
     }
 
     /// <summary>Creates, wires and shows one cascade level.</summary>
-    private void OpenLevel(IReadOnlyList<ToolStripItem> items, Point screenLocation)
+    private void OpenLevel(IReadOnlyList<ToolStripItem> items, Point screenLocation, bool searchable = false)
     {
         var popup = _backend.CreatePopup(this.Owner);
-        var level = new Level { Popup = popup, Items = items, Location = screenLocation, Size = this.ComputeSize(items) };
+        var level = new Level { Popup = popup, Items = items, Location = screenLocation, Searchable = searchable };
+        level.Size = this.ComputeLevelSize(level);
         popup.Paint += (_, e) => this.PaintLevel(level, e.Graphics);
         popup.MouseMove += (_, e) => this.OnLevelMouseMove(level, e);
         popup.MouseDown += (_, e) => this.OnLevelMouseDown(level, e);
@@ -309,7 +405,7 @@ internal sealed class MenuDropDown
             return;
 
         var item = level.Items[index];
-        if (item is ToolStripSeparator || !item.Visible)
+        if (item is ToolStripSeparator || !RowVisible(level, item))
             return;
 
         if (item is ToolStripDropDownItem { HasDropDownItems: true } parent)
@@ -338,7 +434,7 @@ internal sealed class MenuDropDown
         for (var i = index + direction; i >= 0 && i < level.Items.Count; i += direction)
         {
             var item = level.Items[i];
-            if (item is ToolStripSeparator || !item.Visible)
+            if (item is ToolStripSeparator || !RowVisible(level, item))
                 continue;
 
             level.HoverIndex = i;
@@ -440,11 +536,11 @@ internal sealed class MenuDropDown
     /// <summary>The index of the visible row at client-space <paramref name="y"/>, or -1.</summary>
     private int ItemAt(Level level, int y)
     {
-        var top = 1;
+        var top = 1 + this.SearchHeight(level);
         for (var i = 0; i < level.Items.Count; ++i)
         {
             var item = level.Items[i];
-            if (!item.Visible)
+            if (!RowVisible(level, item))
                 continue;
 
             var height = item is ToolStripSeparator ? SeparatorHeight : _theme.RowHeight;
@@ -460,11 +556,11 @@ internal sealed class MenuDropDown
     /// <summary>The y-offset of the row at <paramref name="index"/> within its popup.</summary>
     private int ItemTop(Level level, int index)
     {
-        var top = 1;
+        var top = 1 + this.SearchHeight(level);
         for (var i = 0; i < index; ++i)
         {
             var item = level.Items[i];
-            if (item.Visible)
+            if (RowVisible(level, item))
                 top += item is ToolStripSeparator ? SeparatorHeight : _theme.RowHeight;
         }
 
@@ -479,10 +575,32 @@ internal sealed class MenuDropDown
         g.FillRectangle(theme.ControlBackground, new(0, 0, size.Width, size.Height));
 
         var top = 1;
+        if (level.Searchable)
+        {
+            var field = new Rectangle(1, top, size.Width - 2, _theme.RowHeight);
+            GlyphRenderer.DrawSearchField(g, theme, field, enabled: true, showClear: level.Filter.Length > 0);
+
+            var textRect = new Rectangle(
+                field.X + GlyphRenderer.SearchGlyphZoneWidth,
+                field.Y,
+                Math.Max(0, field.Width - GlyphRenderer.SearchGlyphZoneWidth - GlyphRenderer.SearchClearZoneWidth),
+                field.Height);
+
+            var typed = level.Filter.Length > 0;
+            g.DrawText(
+                typed ? level.Filter : Strings.SearchPlaceholder,
+                theme.DefaultFont,
+                typed ? theme.ControlText : theme.DisabledText,
+                textRect,
+                ContentAlignment.MiddleLeft);
+
+            top += _theme.RowHeight;
+        }
+
         for (var i = 0; i < level.Items.Count; ++i)
         {
             var item = level.Items[i];
-            if (!item.Visible)
+            if (!RowVisible(level, item))
                 continue;
 
             if (item is ToolStripSeparator)

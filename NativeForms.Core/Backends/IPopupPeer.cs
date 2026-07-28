@@ -32,6 +32,15 @@ public interface IPopupPeer : ICanvasPeer
     /// dismiss unless <see cref="LightDismiss"/> was turned off.</summary>
     void ShowAt(Point screenLocation, Size size);
 
+    /// <summary>
+    /// Resizes an already-shown surface in place, leaving its position, its grab and its stacking
+    /// alone. A filtered menu shrinks as it narrows, and re-showing it to do that would hand the grab
+    /// round again mid-gesture — which is exactly the churn multi-level light dismiss is fragile to.
+    /// A backend that cannot resize a mapped surface keeps the size it opened with, hence the no-op
+    /// default.
+    /// </summary>
+    void Resize(Size size) { }
+
     /// <summary>Hides the surface and releases any grab, without raising <see cref="Dismissed"/>.</summary>
     void Hide();
 

@@ -1109,6 +1109,11 @@ internal sealed class HeadlessPopupPeer : HeadlessCanvasPeer, IPopupPeer
     /// chains to the level that opened it rather than to the owning window.</summary>
     public IPopupPeer? ParentPopup { get; private set; }
 
+    /// <summary>Every in-place resize, so a test can assert that a filtered menu re-fits itself.</summary>
+    public List<Size> ResizeCalls { get; } = [];
+
+    public void Resize(Size size) => this.ResizeCalls.Add(size);
+
     public void ExpectGrabHandoff() => ++this.ExpectGrabHandoffCount;
     public void Regrab() => ++this.RegrabCount;
     public void SetParentPopup(IPopupPeer parent) => this.ParentPopup = parent;

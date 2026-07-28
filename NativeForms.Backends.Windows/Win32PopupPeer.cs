@@ -38,6 +38,25 @@ internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
     public Action<Point>? OutsidePointerMove { get; set; }
 
     /// <inheritdoc/>
+    /// <inheritdoc/>
+    public void Resize(Size size)
+    {
+        if (!this._shown || this.Handle == 0)
+            return;
+
+        // Size only: no move, no activation and no z-order change, so the capture this surface already
+        // holds for light dismiss is untouched.
+        NativeMethods.SetWindowPos(
+            this.Handle,
+            0,
+            0,
+            0,
+            size.Width,
+            size.Height,
+            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOZORDER);
+        this.InvalidateAll();
+    }
+
     public void ShowAt(Point screenLocation, Size size)
     {
         this.EnsureHandle();

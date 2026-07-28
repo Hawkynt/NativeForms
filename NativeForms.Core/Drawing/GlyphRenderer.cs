@@ -159,6 +159,44 @@ internal static class GlyphRenderer
         g.DrawRectangle(accent, band);
     }
 
+    /// <summary>The width of a search field's leading zone, which carries the magnifier glyph.</summary>
+    public const int SearchGlyphZoneWidth = 20;
+
+    /// <summary>The width of a search field's trailing zone, which carries the clear (×) glyph.</summary>
+    public const int SearchClearZoneWidth = 20;
+
+    /// <summary>The stroke half-length of the × glyph.</summary>
+    private const int _ClearArm = 3;
+
+    /// <summary>
+    /// Draws the chrome of a search field — sunken face, magnifier at the left, a clear (×) at the
+    /// right while there is something to clear, and a border — leaving the text to the caller, which
+    /// is a hosted native editor in <see cref="SearchBox"/> and painted text in a filterable menu.
+    /// </summary>
+    /// <remarks>
+    /// Shared so the two surfaces cannot drift into looking like two different controls: a user who
+    /// learns that the × empties the box in one has learned it for both.
+    /// </remarks>
+    public static void DrawSearchField(IGraphics g, ITheme theme, Rectangle bounds, bool enabled, bool showClear)
+    {
+        g.FillRectangle(theme.FieldBackground, bounds);
+
+        // The magnifier: a stroked lens circle with a short handle toward the lower right.
+        var color = enabled ? theme.ControlText : theme.DisabledText;
+        var middle = bounds.Y + (bounds.Height / 2);
+        g.DrawEllipse(color, new(bounds.X + 5, middle - 6, 8, 8));
+        g.DrawLine(color, bounds.X + 12, middle + 1, bounds.X + 15, middle + 4);
+
+        if (showClear)
+        {
+            var center = bounds.Right - (SearchClearZoneWidth / 2);
+            g.DrawLine(color, center - _ClearArm, middle - _ClearArm, center + _ClearArm, middle + _ClearArm);
+            g.DrawLine(color, center - _ClearArm, middle + _ClearArm, center + _ClearArm, middle - _ClearArm);
+        }
+
+        g.DrawRectangle(theme.Border, new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
+    }
+
     /// <summary>Mixes two opaque colors 50:50, channel-wise.</summary>
     private static Color Blend(Color a, Color b)
         => Color.FromArgb(0xFF, (a.R + b.R) / 2, (a.G + b.G) / 2, (a.B + b.B) / 2);
