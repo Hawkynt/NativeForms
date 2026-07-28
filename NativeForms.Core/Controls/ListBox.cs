@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.ComponentModel;
 using Hawkynt.NativeForms.Drawing;
 
@@ -49,7 +50,19 @@ public class ListBox : OwnerDrawnControl
     } = static item => item?.ToString() ?? string.Empty;
 
     /// <summary>Optional selector producing an icon for an item; <see langword="null"/> for none.</summary>
-    public Func<object?, IImage?>? ImageSelector { get; set; }
+    public Func<object?, IImage?>? ImageSelector
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.ReconsiderPromotion(); // per-item icons are what a stock list cannot show
+            this.Invalidate();
+        }
+    }
 
     /// <summary>The pixel height of a row. Defaults to the theme row height.</summary>
     public int ItemHeight
@@ -58,6 +71,7 @@ public class ListBox : OwnerDrawnControl
         set
         {
             _itemHeight = Math.Max(1, value);
+            this.ReconsiderPromotion(); // a stock list lays rows out at its own height
             this.Invalidate();
         }
     }
@@ -73,6 +87,7 @@ public class ListBox : OwnerDrawnControl
 
             field = value;
             this.FinishSelectionGesture(this.ClearSelectionCore());
+            this.ReconsiderPromotion(); // only the single-selection mode maps onto a stock list
         }
     } = SelectionMode.One;
 
@@ -119,10 +134,111 @@ public class ListBox : OwnerDrawnControl
 
     /// <summary>The caret row keyboard navigation operates on — independent of the selection in the
     /// multi modes — or -1 before any interaction.</summary>
-    public int FocusedIndex => _focusedIndex;
+    /// <remarks>A promoted list has one selection and one caret, and the platform keeps them together.</remarks>
+    public int FocusedIndex => _native is null ? _focusedIndex : this.SelectedIndex;
 
     /// <summary>The index of the first visible row (scroll position).</summary>
-    public int TopIndex => _topIndex;
+    public int TopIndex => _native is { } peer ? peer.GetTopIndex() : _topIndex;
+
+    private IListBoxPeer? _native;
+    private bool? _nativeOffered;
+
+    /// <summary>
+    /// Forces this list onto the native widget (<see langword="true"/>) or the owner-drawn painter
+    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
+    /// <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether this list is currently rendered by a real platform widget.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform list. A stock list shows
+    /// rows of plain text at its own row height and carries one selection, so per-item icons, a custom
+    /// <see cref="ItemHeight"/> and every multi-selection mode keep the painter.
+    /// </summary>
+    /// <remarks>
+    /// A subclass that paints anything of its own into a row — a check box, a badge — must override this
+    /// to <see langword="false"/>: a platform list has no idea the extra content exists and would drop it
+    /// silently. <see cref="CheckedListBox"/> is the one in this library.
+    /// </remarks>
+    private protected virtual bool IsNativeEligible
+        => this.SelectionMode == SelectionMode.One
+        && this.ImageSelector is null
+        && _itemHeight is null;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
+        {
+            var offered = backend.CreateListBox();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                this.PushNativeItems(peer);
+                peer.SelectionChanged += this.OnNativeSelectionChanged;
+                peer.ItemActivated += this.OnNativeItemActivated;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        if (_native is { } peer)
+        {
+            peer.SelectionChanged -= this.OnNativeSelectionChanged;
+            peer.ItemActivated -= this.OnNativeItemActivated;
+            _native = null;
+        }
+
+        base.OnUnrealized();
+    }
+
+    /// <summary>Re-realizes the control when a property change crossed the eligibility line.</summary>
+    private void ReconsiderPromotion()
+    {
+        if (this.IsNativeWidget != this.WouldBeNative)
+            this.RerealizePeer();
+    }
+
+    /// <summary>Renders every item through <see cref="DisplaySelector"/> and hands the list over whole.</summary>
+    private void PushNativeItems(IListBoxPeer peer)
+    {
+        var count = this.Items.Count;
+        var texts = count == 0 ? [] : new string[count];
+        for (var i = 0; i < count; ++i)
+            texts[i] = this.DisplaySelector(this.Items[i]) ?? string.Empty;
+
+        peer.SetItems(texts, this.SelectedIndex);
+    }
+
+    /// <summary>The widget's selection moved; mirror it through the same path a click takes.</summary>
+    private void OnNativeSelectionChanged(object? sender, EventArgs e)
+    {
+        if (_native is not { } peer)
+            return;
+
+        var index = peer.GetSelectedIndex();
+        this.FinishSelectionGesture(index < 0 ? this.ClearSelectionCore() : this.SelectOnlyCore(index));
+    }
+
+    /// <summary>
+    /// A row was double-clicked or activated with Enter. Both platforms fold those into one activation,
+    /// and the owner-drawn list reports the same thing as a double click, so that is what is raised.
+    /// </summary>
+    private void OnNativeItemActivated(object? sender, EventArgs e)
+        => this.RaiseMouseDoubleClick(new(MouseButtons.Left, 2, 0, 0, 0));
 
     /// <summary>Raised once per gesture when the set of selected indices changes.</summary>
     public event EventHandler? SelectedIndexChanged;
@@ -181,6 +297,10 @@ public class ListBox : OwnerDrawnControl
     {
         if (x < 0 || x >= this.Width || y < 0 || y >= this.Height)
             return -1;
+
+        // The widget lays its own rows out, so it is the only honest source of this once promoted.
+        if (_native is { } peer)
+            return peer.IndexFromPoint(x, y);
 
         var row = _topIndex + (y / this.ItemHeight);
         return row >= 0 && row < this.Items.Count ? row : -1;
@@ -259,6 +379,10 @@ public class ListBox : OwnerDrawnControl
             }
         }
 
+        // The widget holds its own copy of the list, so any structural change re-sends it whole.
+        if (_native is { } peer)
+            this.PushNativeItems(peer);
+
         this.ClampScroll();
         this.Invalidate();
         if (changed)
@@ -278,6 +402,12 @@ public class ListBox : OwnerDrawnControl
     {
         if (index < 0)
             return;
+
+        if (_native is { } peer)
+        {
+            peer.ScrollIntoView(index);
+            return;
+        }
 
         if (index < _topIndex)
             _topIndex = index;
@@ -339,6 +469,7 @@ public class ListBox : OwnerDrawnControl
         if (!changed)
             return;
 
+        _native?.SetSelectedIndex(this.SelectedIndex);
         this.Invalidate();
         this.OnSelectedIndexChanged(EventArgs.Empty);
     }

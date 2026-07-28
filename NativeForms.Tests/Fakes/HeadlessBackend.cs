@@ -141,6 +141,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITrackBarPeer? CreateTrackBar(bool vertical)
         => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
 
+    /// <summary>Whether this backend accepts the list promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeListBox { get; set; }
+
+    /// <summary>The last list peer handed out, so a test can drive it like the real widget.</summary>
+    public HeadlessListBoxPeer? LastListBox { get; private set; }
+
+    public IListBoxPeer? CreateListBox()
+        => !this.OfferNativeListBox ? null : this.LastListBox = this.Track(new HeadlessListBoxPeer());
+
     /// <summary>Whether this backend accepts the drop-down-list promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeComboBox { get; set; }
 
@@ -1297,6 +1306,63 @@ internal sealed class HeadlessRadioButtonPeer : HeadlessPeer, IRadioButtonPeer
         _checked = true;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
+}
+
+
+/// <summary>A stand-in for a real platform list, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessListBoxPeer : HeadlessPeer, IListBoxPeer
+{
+    /// <summary>The row height the fake lays its rows out at, so the geometry readers have an answer.</summary>
+    private const int _RowHeight = 20;
+
+    private int _selectedIndex = -1;
+
+    public event EventHandler? SelectionChanged;
+
+    public event EventHandler? ItemActivated;
+
+    /// <summary>The item texts the core last handed over.</summary>
+    public string[] Items { get; private set; } = [];
+
+    /// <summary>The index the widget was last told to scroll to.</summary>
+    public int ScrolledTo { get; private set; } = -1;
+
+    /// <summary>The first visible row, as a real widget would report it.</summary>
+    public int TopIndex { get; set; }
+
+    public void SetItems(ReadOnlySpan<string> items, int selectedIndex)
+    {
+        this.Items = items.ToArray();
+        _selectedIndex = selectedIndex;
+    }
+
+    public void SetSelectedIndex(int index) => _selectedIndex = index;
+
+    public int GetSelectedIndex() => _selectedIndex;
+
+    public void ScrollIntoView(int index)
+    {
+        this.ScrolledTo = index;
+        this.TopIndex = index;
+    }
+
+    public int GetTopIndex() => this.TopIndex;
+
+    public int IndexFromPoint(int x, int y)
+    {
+        var index = this.TopIndex + (y / _RowHeight);
+        return index >= 0 && index < this.Items.Length ? index : -1;
+    }
+
+    /// <summary>Simulates the user picking a row.</summary>
+    public void RaiseUserSelect(int index)
+    {
+        _selectedIndex = index;
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Simulates the user activating a row by double click or Enter.</summary>
+    public void RaiseUserActivate() => ItemActivated?.Invoke(this, EventArgs.Empty);
 }
 
 

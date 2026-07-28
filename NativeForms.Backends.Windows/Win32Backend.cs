@@ -87,6 +87,9 @@ public sealed partial class Win32Backend : IPlatformBackend
     public IComboBoxPeer CreateComboBox() => new ComboBoxPeer();
 
     /// <inheritdoc/>
+    public IListBoxPeer CreateListBox() => new ListBoxPeer();
+
+    /// <inheritdoc/>
     public ILinkLabelPeer CreateLinkLabel()
     {
         EnsureCommonControls(NativeMethods.ICC_LINK_CLASS);

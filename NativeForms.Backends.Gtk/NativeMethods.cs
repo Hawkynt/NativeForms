@@ -325,6 +325,123 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
 
+    // --- GtkTreeView (the promoted ListBox) --------------------------------------------------------
+
+    /// <summary>A row cursor into a <c>GtkTreeModel</c>; opaque, but fixed-size and blittable.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct GtkTreeIter
+    {
+        /// <summary>The model's stamp, used to detect a stale iterator.</summary>
+        internal int stamp;
+
+        /// <summary>Model-private.</summary>
+        internal nint user_data;
+
+        /// <summary>Model-private.</summary>
+        internal nint user_data2;
+
+        /// <summary>Model-private.</summary>
+        internal nint user_data3;
+    }
+
+    /// <summary>Creates a list store over the given column types.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_list_store_newv(int columns, nint[] types);
+
+    /// <summary>Empties a list store.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_list_store_clear(nint store);
+
+    /// <summary>Appends an empty row and hands back a cursor onto it.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_list_store_append(nint store, out GtkTreeIter iter);
+
+    /// <summary>
+    /// Writes one string column of a row through the variadic setter, mapped at its one fixed shape:
+    /// a column index, a value, then the -1 terminator.
+    /// </summary>
+    [LibraryImport(Gtk, EntryPoint = "gtk_list_store_set", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_list_store_set_string(nint store, ref GtkTreeIter iter, int column, string value, int terminator);
+
+    /// <summary>Creates a tree view showing the given model.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_tree_view_new_with_model(nint model);
+
+    /// <summary>Shows or hides a tree view's column headers.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_tree_view_set_headers_visible(nint treeView, int visible);
+
+    /// <summary>Creates a cell renderer that draws text.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_cell_renderer_text_new();
+
+    /// <summary>Creates an empty tree view column.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_tree_view_column_new();
+
+    /// <summary>Puts a renderer at the start of a column.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_tree_view_column_pack_start(nint column, nint renderer, int expand);
+
+    /// <summary>Binds one of a renderer's properties to a model column.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_tree_view_column_add_attribute(nint column, nint renderer, string attribute, int modelColumn);
+
+    /// <summary>Appends a column to a tree view.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_tree_view_append_column(nint treeView, nint column);
+
+    /// <summary>A tree view's selection object.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_tree_view_get_selection(nint treeView);
+
+    /// <summary>Reads the selected row; returns 0 when nothing is selected.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_tree_selection_get_selected(nint selection, out nint model, out GtkTreeIter iter);
+
+    /// <summary>Selects the row at a path.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_tree_selection_select_path(nint selection, nint path);
+
+    /// <summary>Clears the selection.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_tree_selection_unselect_all(nint selection);
+
+    /// <summary>Builds a path from a run of indices.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_tree_path_new_from_indicesv(int[] indices, nuint length);
+
+    /// <summary>The path of a row in a model.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_tree_model_get_path(nint model, ref GtkTreeIter iter);
+
+    /// <summary>How many indices a path carries.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_tree_path_get_depth(nint path);
+
+    /// <summary>A pointer to a path's indices, owned by the path.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_tree_path_get_indices(nint path);
+
+    /// <summary>Releases a path.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_tree_path_free(nint path);
+
+    /// <summary>The path of the row under a point in bin-window coordinates; returns 0 for none.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_tree_view_get_path_at_pos(
+        nint treeView,
+        int x,
+        int y,
+        out nint path,
+        out nint column,
+        out int cellX,
+        out int cellY);
+
+    /// <summary>Scrolls a row into view.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_tree_view_scroll_to_cell(nint treeView, nint path, nint column, int useAlign, float rowAlign, float colAlign);
+
     /// <summary>Creates a <c>GtkComboBoxText</c> — a drop-down list of plain strings.</summary>
     [LibraryImport(Gtk)]
     internal static partial nint gtk_combo_box_text_new();

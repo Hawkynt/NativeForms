@@ -192,6 +192,12 @@ internal static partial class NativeMethods
     /// <summary>List box: scrolls an index into view without selecting it.</summary>
     internal const uint LB_SETTOPINDEX = 0x0197;
 
+    /// <summary>List box: reads the index of the first visible row.</summary>
+    internal const uint LB_GETTOPINDEX = 0x018E;
+
+    /// <summary>List box: reads the index under a point; the high word is set when the point misses.</summary>
+    internal const uint LB_ITEMFROMPOINT = 0x01A9;
+
     /// <summary>List box: the selection changed.</summary>
     internal const int LBN_SELCHANGE = 1;
 

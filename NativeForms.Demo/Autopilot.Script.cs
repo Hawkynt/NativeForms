@@ -1385,11 +1385,18 @@ internal sealed partial class Autopilot
             this.ExpectTrue("VScrollBar stayed owner-drawn", this.Read(() => _form.Part<VScrollBar>("input.vscroll").IsNativeWidget));
             this.ExpectTrue("ComboBox stayed owner-drawn", this.Read(() => _form.Part<ComboBox>("ribbon.styleCombo").IsNativeWidget));
             this.ExpectTrue("RadioButton stayed owner-drawn", this.Read(() => _form.Part<RadioButton>("ribbon.calendarDay").IsNativeWidget));
+            this.ExpectTrue("ListBox stayed owner-drawn", this.Read(() => _form.Part<ListBox>("lists.statusList").IsNativeWidget));
 
             // And the ones whose state rules them out must have stayed behind.
             this.ExpectTrue(
                 "the icon RadioButton was promoted, but no platform radio draws an image beside its caption",
                 !this.Read(() => _form.Part<RadioButton>("basics.radioSmall").IsNativeWidget));
+            this.ExpectTrue(
+                "the multi-select ListBox was promoted, but its icons and mode need the painter",
+                !this.Read(() => _form.Part<ListBox>("lists.listBox").IsNativeWidget));
+            this.ExpectTrue(
+                "the CheckedListBox was promoted, but a platform list would drop its check boxes",
+                !this.Read(() => _form.Part<CheckedListBox>("lists.checkedList").IsNativeWidget));
             this.ExpectTrue(
                 "the icon ComboBox was promoted, but a stock combo shows no per-item icons",
                 !this.Read(() => _form.Part<ComboBox>("lists.comboList").IsNativeWidget));

@@ -29,6 +29,13 @@ public sealed class ItemCheckEventArgs(int index, bool currentValue, bool newVal
 /// </summary>
 public class CheckedListBox : ListBox
 {
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Never: the check box in each row is this control's own painting, and a platform list would drop it
+    /// without a trace (PRD §12).
+    /// </remarks>
+    private protected override bool IsNativeEligible => false;
+
     private const int _GlyphGap = 4;
 
     /// <summary>Per-item check states, index-aligned with <see cref="ListBox.Items"/>.</summary>

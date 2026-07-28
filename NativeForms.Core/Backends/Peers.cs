@@ -583,6 +583,15 @@ public interface IListBoxPeer : IControlPeer
 
     /// <summary>Scrolls the given index into view.</summary>
     void ScrollIntoView(int index);
+
+    /// <summary>
+    /// The index of the first visible row, so <see cref="ListBox.TopIndex"/> reports the widget's own
+    /// scroll position rather than the arithmetic of a painter that is not running.
+    /// </summary>
+    int GetTopIndex();
+
+    /// <summary>The index of the row at the given client coordinates, or -1 for none.</summary>
+    int IndexFromPoint(int x, int y);
 }
 
 

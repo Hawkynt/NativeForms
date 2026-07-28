@@ -82,13 +82,23 @@ internal sealed partial class MainForm
         };
         comboEdit.Items.AddRange(["alpha", "beta", "release-candidate", "stable"]);
 
+        // Plain enough to clear the native-peer gate, unlike the one above it: single selection, no
+        // per-item icons, the theme's own row height (PRD §12).
+        var statusList = new ListBox { Bounds = new(16, 450, 300, 80) };
+        statusList.Items.AddRange(["Draft", "In review", "Published"]);
+        statusList.SelectedIndex = 0;
+        statusList.SelectedIndexChanged += (_, _)
+            => this.SetStatus($"ListBox: {statusList.SelectedItem ?? "(none)"} selected.");
+
         page.Controls.AddRange(
             Caption("ListBox (MultiExtended, icons)", 16, 12),
             listBox,
             Caption("CheckedListBox (CheckOnClick)", 16, 188),
             checkedList,
             Caption("ComboBox (DropDownList + DropDown)", 16, 344),
-            comboList, comboEdit);
+            comboList, comboEdit,
+            Caption("ListBox (single selection, plain)", 16, 430),
+            statusList);
 
         // --- Column 2: list views ---------------------------------------------------------------
 
@@ -284,6 +294,7 @@ internal sealed partial class MainForm
         this.Publish("lists.checkedList", checkedList);
         this.Publish("lists.comboList", comboList);
         this.Publish("lists.comboEdit", comboEdit);
+        this.Publish("lists.statusList", statusList);
         this.Publish("lists.details", details);
         this.Publish("lists.smallIcons", smallIcons);
         this.Publish("lists.tree", tree);
