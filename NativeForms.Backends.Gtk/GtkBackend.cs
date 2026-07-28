@@ -92,6 +92,16 @@ public sealed partial class GtkBackend : IPlatformBackend
             var handler = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSettingsChanged;
             NativeMethods.g_signal_connect_data(settings, "notify::gtk-theme-name", handler, 0, 0, 0);
             NativeMethods.g_signal_connect_data(settings, "notify::gtk-application-prefer-dark-theme", handler, 0, 0, 0);
+
+            // A scaling change is the same kind of event: every metric the toolkit measures in pixels
+            // comes from the theme and is derived from the DPI, so the cached snapshot goes stale exactly
+            // as it does for a colour change. gtk-xft-dpi covers a fractional text-scale change, and the
+            // monitor's scale-factor covers the integer one GTK applies to whole widgets.
+            NativeMethods.g_signal_connect_data(settings, "notify::gtk-xft-dpi", handler, 0, 0, 0);
+
+            if (NativeMethods.gdk_display_get_default() is var display && display != 0
+                && NativeMethods.gdk_display_get_primary_monitor(display) is var monitor && monitor != 0)
+                NativeMethods.g_signal_connect_data(monitor, "notify::scale-factor", handler, 0, 0, 0);
         }
     }
 

@@ -21,6 +21,50 @@ public sealed partial class Win32Backend : IPlatformBackend
     /// <summary>Registers this instance as the receiver of system theme-change notifications.</summary>
     public Win32Backend() => _current = this;
 
+    /// <summary>
+    /// Tells Windows this process scales its own windows, before any window exists.
+    /// </summary>
+    /// <remarks>
+    /// Without this a process is DPI <em>unaware</em>, which is not a neutral default: Windows renders the
+    /// window at 96 DPI and stretches the bitmap to the display's scale, so everything is soft, and
+    /// <c>GetDpiForSystem</c> answers 96 whatever the display is actually set to — the toolkit would be
+    /// told nothing is wrong. Per-monitor v2 additionally scales the non-client frame and delivers
+    /// <c>WM_DPICHANGED</c> when a window moves between displays of different scale. Older Windows gets
+    /// the system-wide opt-in, which is still far better than none.
+    /// </remarks>
+    /// <remarks>
+    /// Called from the first window rather than from the constructor: a backend is constructed to be
+    /// <em>registered</em>, and an application registers every backend it was built with before
+    /// <see cref="IsSupported"/> picks one — so on Linux this type is instantiated with no <c>user32</c>
+    /// to call into. Declaring awareness must still happen before any window exists, which the first
+    /// <see cref="CreateWindow"/> guarantees.
+    /// </remarks>
+    private static void DeclareDpiAwareness()
+    {
+        if (_dpiAwarenessDeclared)
+            return;
+
+        _dpiAwarenessDeclared = true;
+        try
+        {
+            if (NativeMethods.SetProcessDpiAwarenessContext(NativeMethods.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+                return;
+
+            NativeMethods.SetProcessDPIAware();
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // Before Windows 10 1703 the context API is absent, and older still lacks both. The process
+            // stays unaware, which is the behaviour that shipped until now.
+        }
+        catch (DllNotFoundException)
+        {
+            // Not Windows at all — this backend was registered but will not be the one chosen.
+        }
+    }
+
+    private static bool _dpiAwarenessDeclared;
+
     /// <inheritdoc/>
     public string Name => "Win32";
 
@@ -53,14 +97,55 @@ public sealed partial class Win32Backend : IPlatformBackend
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Per-monitor, so a window on a second display at a different scale is measured against its own —
+    /// which is the whole point of the awareness declared above. <see cref="ActiveWindowForDpi"/> is the
+    /// window currently being realized or painted; with none, the desktop's own scaling is the best
+    /// answer available.
+    /// </remarks>
     public double GetDpiScale()
     {
-        var dpi = NativeMethods.GetDpiForSystem();
+        var window = ActiveWindowForDpi;
+        var dpi = window != 0 ? NativeMethods.GetDpiForWindow(window) : 0;
+        if (dpi == 0)
+            dpi = NativeMethods.GetDpiForSystem();
+
         return dpi > 0 ? dpi / 96.0 : 1.0;
     }
 
+    /// <summary>
+    /// The window whose display the scale is read from. Set by the window peer as it realizes and as it
+    /// moves, so the answer follows the window rather than the desktop.
+    /// </summary>
+    internal static nint ActiveWindowForDpi { get; set; }
+
+    /// <summary>
+    /// Records the new scale, drops the cached theme and tells every realized control to re-measure.
+    /// </summary>
+    /// <remarks>
+    /// Reported through <see cref="ThemeChanged"/> rather than an event of its own, because from the
+    /// toolkit's side a scale change <em>is</em> a theme change: everything measured in pixels — the
+    /// default font, the row height, the scroll-bar thickness, every owner-drawn metric of §5 — is read
+    /// from <see cref="Theme"/> and derived from the DPI, so the snapshot is stale in exactly the same way
+    /// and the listeners that already handle it are exactly the ones that need to react.
+    /// </remarks>
+    /// <param name="window">The window that reported the change; it becomes the one scale is read from.</param>
+    internal static void NotifyDpiChanged(nint window)
+    {
+        if (_current is not { } backend)
+            return;
+
+        ActiveWindowForDpi = window;
+        backend._theme = null;
+        backend.ThemeChanged?.Invoke(backend, EventArgs.Empty);
+    }
+
     /// <inheritdoc/>
-    public IWindowPeer CreateWindow() => new WindowPeer();
+    public IWindowPeer CreateWindow()
+    {
+        DeclareDpiAwareness();
+        return new WindowPeer();
+    }
 
     /// <inheritdoc/>
     public IButtonPeer CreateButton() => new ButtonPeer();

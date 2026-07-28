@@ -747,6 +747,33 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial uint GetDpiForSystem();
 
+    /// <summary>The DPI of the display a window is on; 0 on a version that predates per-monitor DPI.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetDpiForWindow(nint hwnd);
+
+    /// <summary>
+    /// Declares how this process handles scaling. Passing
+    /// <see cref="DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2"/> is what stops Windows bitmap-scaling —
+    /// and blurring — every window on a display that is not at 100%.
+    /// </summary>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetProcessDpiAwarenessContext(nint value);
+
+    /// <summary>The pre-Windows-10 opt-in, which only knows one DPI for the whole desktop.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetProcessDPIAware();
+
+    /// <summary>
+    /// Each window scales to the display it is on, is told when that changes, and has its non-client
+    /// area scaled by Windows to match.
+    /// </summary>
+    internal static readonly nint DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+
+    /// <summary>The display a window sits on changed its scaling, or the window moved to another.</summary>
+    internal const uint WM_DPICHANGED = 0x02E0;
+
     // --- Double buffering ---
 
     /// <summary>Copies the source rectangle unchanged (<see cref="BitBlt"/> raster operation).</summary>

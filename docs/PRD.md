@@ -682,8 +682,27 @@ strategy (may differ per platform; note exceptions inline).
 ---
 
 ## 8. Cross-cutting features
-- [~] DPI awareness & scaling — `GetDpiScale` + `Control.LogicalToDevice` groundwork done (§5);
-      per-monitor v2 rescale-on-move (Windows), GDK scale and macOS backing-scale pending
+- [~] DPI awareness & scaling.
+  - [x] **Win32 declares itself per-monitor-v2 aware**, before the first window. This was the load-bearing
+        gap: a process that says nothing is DPI *unaware*, so Windows renders at 96 and stretches the
+        bitmap to the display — everything soft — while `GetDpiForSystem` answers 96 and the toolkit is
+        told nothing is wrong. Falls back to the system-wide opt-in on Windows before 1703, and to nothing
+        at all where neither export exists. Declared from the first `CreateWindow` rather than the
+        constructor, because a backend is constructed to be *registered*: on Linux this type is
+        instantiated with no `user32` to call.
+  - [x] **The scale follows the window, not the desktop** (`GetDpiForWindow`), which is what per-monitor
+        awareness is for.
+  - [x] **A change mid-run is handled**: `WM_DPICHANGED` honours the rectangle Windows suggests — so the
+        window keeps its physical size across displays — then drops the theme snapshot and re-raises
+        `ThemeChanged`. On GTK the same is done from `notify::gtk-xft-dpi` and the monitor's
+        `notify::scale-factor`. Reported as a theme change rather than through an event of its own,
+        because that is what it is from the toolkit's side: every pixel metric — default font, row height,
+        scroll-bar thickness, the owner-drawn metrics of §5 — is read from `ITheme` and derived from the
+        DPI, so the listeners that already re-measure are exactly the ones that must.
+  - [ ] `Control.LogicalToDevice` exists but is called in one place (a tooltip offset), so authored
+        layout, font sizes and control metrics are still in device pixels. Making scaling apply to
+        *layout* is the remaining work and is a larger change than awareness was.
+  - [ ] macOS backing-scale, which waits on the backend.
 - [x] Dark mode / high contrast with live theme-change notifications — see §5
 - [~] Accessibility. `Control.AccessibleName`/`AccessibleDescription`/`AccessibleRole` (Windows-Forms
       shaped, and packed into the existing rarely-set slot object so a control nobody has described costs

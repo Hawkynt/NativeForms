@@ -497,6 +497,26 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
 
                 return 0;
 
+            case NativeMethods.WM_DPICHANGED:
+                // lParam points at the rectangle Windows wants the window moved and resized to so it
+                // keeps its physical size on the new display; honouring it is what per-monitor v2 asks of
+                // an application, and skipping it leaves the window the wrong size.
+                if (lParam != 0)
+                {
+                    var suggested = (NativeMethods.RECT*)lParam;
+                    NativeMethods.SetWindowPos(
+                        hwnd,
+                        0,
+                        suggested->left,
+                        suggested->top,
+                        suggested->right - suggested->left,
+                        suggested->bottom - suggested->top,
+                        NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
+                }
+
+                Win32Backend.NotifyDpiChanged(hwnd);
+                return 0;
+
             case NativeMethods.WM_HSCROLL:
             case NativeMethods.WM_VSCROLL:
                 // A slider or scroll bar reports through its parent, identifying itself by HWND in lParam
