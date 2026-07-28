@@ -37,6 +37,19 @@ form.Controls.Add(bar);
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
+## Native widget promotion
+
+On a backend that offers one — GTK today, Win32 to follow — a slider realizes onto a real `GtkScale`, so
+the desktop draws the groove and thumb and its own keyboard and scroll conventions apply. The public
+surface is identical either way; `IsNativeWidget` reports which path was taken, and `UseNativeWidget`
+overrides [`Application.PreferNativeWidgets`](application.md) per control.
+
+Nothing gates a slider out: the platform widget carries the range, the position and both step sizes.
+`TickFrequency` is the one thing GTK and Win32 place differently from us, and ticks are decoration rather
+than behaviour, so they do not force the owner-drawn path. Turning a live slider rebuilds the widget —
+GTK fixes a scale's orientation at construction — keeping the value and the keyboard focus. See
+[PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - Painted with the platform `ITheme` (`FieldBackground` groove, `Accent` traveled portion and thumb, `Border` outlines, `ControlText` ticks), so it matches the host desktop; testable headlessly through the test backend's recording canvas.

@@ -285,6 +285,30 @@ internal static partial class NativeMethods
 
     // --- Buttons and labels ---------------------------------------------------------------------
 
+    /// <summary>Creates a <c>GtkScale</c> over a new adjustment for the given orientation.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_scale_new_with_range(int orientation, double min, double max, double step);
+
+    /// <summary>Sets a range widget's current value.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_range_set_value(nint range, double value);
+
+    /// <summary>Reads a range widget's current value.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial double gtk_range_get_value(nint range);
+
+    /// <summary>Sets a range widget's bounds.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_range_set_range(nint range, double min, double max);
+
+    /// <summary>Sets the arrow-key and page step increments.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_range_set_increments(nint range, double step, double page);
+
+    /// <summary>Whether the scale paints its current value beside the slider.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_scale_set_draw_value(nint scale, int drawValue);
+
     /// <summary>Creates a <c>GtkProgressBar</c>.</summary>
     [LibraryImport(Gtk)]
     internal static partial nint gtk_progress_bar_new();

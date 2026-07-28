@@ -104,7 +104,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `TokenBox` | owner-drawn + hosted editor | [tokenbox.md](controls/tokenbox.md) |
 | `ToolStrip` | owner-drawn | [toolstrip.md](controls/toolstrip.md) |
 | `ToolTip` | owner-drawn (popup) | [tooltip.md](controls/tooltip.md) |
-| `TrackBar` | owner-drawn | [trackbar.md](controls/trackbar.md) |
+| `TrackBar` | native (GTK) or owner-drawn — see [PRD §12](PRD.md) | [trackbar.md](controls/trackbar.md) |
 | `TreeListView` | owner-drawn | [treelistview.md](controls/treelistview.md) |
 | `TreeView` | owner-drawn | [treeview.md](controls/treeview.md) |
 | `ZoomPanel` | owner-drawn | [zoompanel.md](controls/zoompanel.md) |

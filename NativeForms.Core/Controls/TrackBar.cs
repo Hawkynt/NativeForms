@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
@@ -12,6 +13,29 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public class TrackBar : OwnerDrawnControl
 {
+    private ITrackBarPeer? _native;
+    private bool? _nativeOffered;
+
+    /// <summary>
+    /// Whether this slider realizes onto a real platform slider rather than the owner-drawn surface.
+    /// <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether the control is currently backed by a real platform slider.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Always eligible: a platform slider carries the range, the position and the step sizes, and the
+    /// orientation is chosen when the widget is built. Tick marks are the one thing GTK and Win32 place
+    /// differently from us, and they are decoration rather than behaviour, so they do not gate.
+    /// </summary>
+    private static bool IsNativeEligible => true;
+
+    /// <summary>Which path this control would take if it were realized right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible && (_nativeOffered ?? true);
+
     /// <summary>Track inset at both ends, leaving room for the thumb to center over the extremes.</summary>
     private const int _EndMargin = 8;
 
@@ -77,6 +101,7 @@ public class TrackBar : OwnerDrawnControl
                 return;
 
             _value = clamped;
+            _native?.SetValue(clamped); // silent: the peer must not re-raise what we are about to raise
             this.Invalidate();
             this.OnValueChanged(EventArgs.Empty);
         }
@@ -121,6 +146,12 @@ public class TrackBar : OwnerDrawnControl
                 return;
 
             field = value;
+
+            // GTK fixes a scale's orientation at construction, so a live turn rebuilds the widget rather
+            // than leaving a horizontal one drawn sideways.
+            if (this.IsNativeWidget)
+                this.RerealizePeer();
+
             this.Invalidate();
         }
     }
@@ -202,6 +233,53 @@ public class TrackBar : OwnerDrawnControl
                 ? new(crossStart, axisStart, breadth, _ThumbLength)
                 : new(axisStart, crossStart, _ThumbLength, breadth);
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The promotion point (PRD §12): on a willing backend the slider becomes a real platform slider, so
+    /// the desktop's groove, thumb and input conventions apply. Otherwise it falls back to the canvas.
+    /// </remarks>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible)
+        {
+            var offered = backend.CreateTrackBar(this.Orientation == Orientation.Vertical);
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                peer.SetRange(_minimum, _maximum);
+                peer.SetSteps(this.SmallChange, this.LargeChange);
+                peer.SetValue(_value);
+                peer.ValueChanged += this.OnNativeValueChanged;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        if (_native is { } peer)
+        {
+            peer.ValueChanged -= this.OnNativeValueChanged;
+            _native = null;
+        }
+
+        base.OnUnrealized();
+    }
+
+    /// <summary>The widget moved; mirror it into the managed state, which raises the public event once.</summary>
+    private void OnNativeValueChanged(object? sender, EventArgs e)
+    {
+        if (_native is not { } peer)
+            return;
+
+        this.Value = peer.GetValue();
+        this.OnScroll(EventArgs.Empty);
     }
 
     /// <inheritdoc/>

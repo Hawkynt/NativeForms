@@ -249,4 +249,80 @@ internal sealed class NativePeerPromotionTests
             Assert.That(backend.LastProgressBar!.Fraction, Is.EqualTo(0.4).Within(0.001), "the fresh peer is seeded with the current value");
         });
     }
+
+    [Test]
+    public void A_focused_control_keeps_the_keyboard_across_the_swap()
+    {
+        var backend = Promoting();
+        var box = Realize(new CheckBox { Bounds = new(0, 0, 120, 20) }, backend);
+        box.Focus();
+        Assume.That(box.Focused, Is.True, "precondition: it holds the keyboard");
+
+        box.Image = new HeadlessImage(8, 8); // demotes to the canvas
+
+        Assert.That(box.Focused, Is.True, "promotion is state-transparent, so the keyboard comes back");
+    }
+
+    // --- TrackBar --------------------------------------------------------------------------------
+
+    private static TrackBar RealizeTrack(TrackBar bar, HeadlessBackend backend)
+    {
+        var form = new Form();
+        form.Controls.Add(bar);
+        Application.Run(form, backend);
+        return bar;
+    }
+
+    [Test]
+    public void A_track_bar_promotes_and_seeds_the_widget_with_its_range_and_steps()
+    {
+        var backend = new HeadlessBackend { OfferNativeTrackBar = true };
+        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Minimum = 5, Maximum = 25, Value = 12, SmallChange = 2, LargeChange = 7 }, backend);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.True);
+            Assert.That(backend.LastTrackBar!.Minimum, Is.EqualTo(5));
+            Assert.That(backend.LastTrackBar!.Maximum, Is.EqualTo(25));
+            Assert.That(backend.LastTrackBar!.GetValue(), Is.EqualTo(12));
+            Assert.That(backend.LastTrackBar!.SmallChange, Is.EqualTo(2));
+            Assert.That(backend.LastTrackBar!.LargeChange, Is.EqualTo(7));
+        });
+    }
+
+    [Test]
+    public void A_drag_on_the_widget_surfaces_as_ValueChanged_and_Scroll_once()
+    {
+        var backend = new HeadlessBackend { OfferNativeTrackBar = true };
+        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Maximum = 100 }, backend);
+        int changed = 0, scrolled = 0;
+        bar.ValueChanged += (_, _) => ++changed;
+        bar.Scroll += (_, _) => ++scrolled;
+
+        backend.LastTrackBar!.RaiseUserDrag(42);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.Value, Is.EqualTo(42));
+            Assert.That(changed, Is.EqualTo(1));
+            Assert.That(scrolled, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Turning_a_promoted_slider_rebuilds_it_in_the_new_orientation()
+    {
+        var backend = new HeadlessBackend { OfferNativeTrackBar = true };
+        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Maximum = 100, Value = 30 }, backend);
+        Assume.That(backend.LastTrackBar!.Vertical, Is.False);
+
+        bar.Orientation = Orientation.Vertical;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.True, "it stays native — only the widget is rebuilt");
+            Assert.That(backend.LastTrackBar!.Vertical, Is.True, "GTK fixes orientation at construction");
+            Assert.That(backend.LastTrackBar!.GetValue(), Is.EqualTo(30), "and the value survives");
+        });
+    }
 }

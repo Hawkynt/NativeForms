@@ -483,3 +483,27 @@ public interface IProgressBarPeer : IControlPeer
     /// <summary>Advances an indeterminate indicator by one animation step.</summary>
     void Pulse();
 }
+
+
+/// <summary>
+/// A native slider (Win32 <c>msctls_trackbar32</c>, GTK <c>GtkScale</c>). Created only when a
+/// <see cref="TrackBar"/> is promoted to a real widget — see PRD §12.
+/// </summary>
+public interface ITrackBarPeer : IControlPeer
+{
+    /// <summary>Raised when the user moves the slider. Programmatic <see cref="SetValue"/> must not
+    /// raise it — the core owns that decision so both render paths behave identically.</summary>
+    event EventHandler? ValueChanged;
+
+    /// <summary>Sets the range the slider spans.</summary>
+    void SetRange(int minimum, int maximum);
+
+    /// <summary>Pushes the position into the widget without raising <see cref="ValueChanged"/>.</summary>
+    void SetValue(int value);
+
+    /// <summary>The widget's current position, read when it reports a change.</summary>
+    int GetValue();
+
+    /// <summary>Sets the arrow-key and page step sizes.</summary>
+    void SetSteps(int smallChange, int largeChange);
+}

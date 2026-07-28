@@ -66,6 +66,10 @@ public interface IPlatformBackend
     /// <summary>Creates a native progress-indicator peer, or <see langword="null"/> to decline (PRD §12).</summary>
     IProgressBarPeer? CreateProgressBar() => null;
 
+    /// <summary>Creates a native slider peer, or <see langword="null"/> to decline (PRD §12).</summary>
+    /// <param name="vertical">Whether the slider runs vertically; GTK fixes this at construction.</param>
+    ITrackBarPeer? CreateTrackBar(bool vertical) => null;
+
     /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
     /// <param name="owner">
     /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.

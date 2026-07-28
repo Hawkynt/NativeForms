@@ -826,8 +826,9 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   demoed and documented.
 - **M11 — Native-peer promotion (§12).** Opt into real platform widgets for the controls that have a
   faithful counterpart, keeping the owner-drawn path as the fallback. `[~]` — the mechanism (gate,
-  opt-in switch, declining backends, identical-behaviour tests) ships, with `CheckBox` and `ProgressBar`
-  promoted on GTK; the Win32 halves and the remaining candidates follow.
+  opt-in switch, declining backends, state-transparent re-realization, identical-behaviour tests) ships,
+  with `CheckBox`, `ProgressBar` and `TrackBar` promoted on GTK; the Win32 halves and the remaining
+  candidates follow.
 - **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `TreeView`. `[~]` (`DataGridView` virtual mode shipped)
@@ -961,8 +962,9 @@ backend without the widget, and what runs the moment an app asks for something t
       `CreatePeer` override, so the decision is made once, before a peer exists.
 - [x] **Escaping the gate after realization.** The rule is **re-realize**, not ignore: setting a property
       that leaves the gate rebuilds the peer onto the canvas (and re-entering it takes the widget back),
-      via `Control.RerealizePeer()` — `RemoveChild` → `DisposePeerTree` → `RealizeAddedChild`. Managed
-      state survives; keyboard focus, which belonged to the destroyed widget, does not. The rebuild is
+      via `Control.RerealizePeer()` — `RemoveChild` → `DisposePeerTree` → `RealizeAddedChild`. The swap is
+      **state-transparent**: managed state survives and keyboard focus is re-established on the new widget
+      when the old one held it. The rebuild is
       driven by whether the *outcome* would differ (`IsNativeWidget != WouldBeNative`), not by the gate
       alone, so a control on a declining backend never churns its canvas for nothing — each control caches
       whether the backend has ever offered it a widget.
@@ -984,7 +986,7 @@ backend without the widget, and what runs the moment an app asks for something t
 | [x] `CheckBox`                  | `BUTTON` (`BS_AUTOCHECKBOX`) — pending    | `GtkCheckButton` — SHIPPED  | no `Image`                     |
 | [ ] `RadioButton`               | `BUTTON` (`BS_AUTORADIOBUTTON`) | `GtkRadioButton`  | as above                                           |
 | [x] `ProgressBar`               | `msctls_progress32` — pending             | `GtkProgressBar` — SHIPPED  | horizontal only                             |
-| [ ] `TrackBar`                  | `msctls_trackbar32`             | `GtkScale`        | no custom tick painting                            |
+| [x] `TrackBar`                  | `msctls_trackbar32` — pending             | `GtkScale` — SHIPPED        | always (ticks are decoration)                            |
 | [ ] `HScrollBar` / `VScrollBar` | `SCROLLBAR`                     | `GtkScrollbar`    | always                                             |
 | [ ] `GroupBox`                  | `BUTTON` (`BS_GROUPBOX`)        | `GtkFrame`        | no caption image                                   |
 | [ ] `ComboBox`                  | `COMBOBOX`                      | `GtkComboBoxText` | no per-item image, no owner-draw, no placeholder   |

@@ -164,6 +164,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real scale, so this backend accepts the promotion (PRD §12).</remarks>
+    public ITrackBarPeer? CreateTrackBar(bool vertical)
+    {
+        EnsureInitialized();
+        return new GtkTrackBarPeer(vertical);
+    }
+
+    /// <inheritdoc />
     public ICanvasPeer CreateCanvas()
     {
         EnsureInitialized();

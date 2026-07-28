@@ -1684,18 +1684,25 @@ public abstract class Control
     /// </summary>
     /// <remarks>
     /// A no-op before realization — the gate is simply evaluated on the first realize — and for a control
-    /// with no parent to re-parent into. The managed state is untouched, so the rebuilt peer is flushed
-    /// with the same bounds, text, colours and enabled/visible flags the old one had; keyboard focus,
-    /// which belongs to the destroyed widget, is not carried over.
+    /// with no parent to re-parent into. The swap is state-transparent: the managed state is untouched, so
+    /// the rebuilt peer is flushed with the same bounds, text, colours and enabled/visible flags the old
+    /// one had, and keyboard focus is re-established on the new widget when the old one held it.
     /// </remarks>
     private protected void RerealizePeer()
     {
         if (_peer is null || this.Parent is not { } parent)
             return;
 
+        // The swap must be invisible to the app, so the keyboard goes back where it was: disposing the
+        // old peer drops the focus flag, and the new widget has to be told to take it again.
+        var hadFocus = this.Focused;
+
         parent.UnrealizeChildPeer(this);
         this.DisposePeerTree();
         parent.RealizeAddedChild(this);
+
+        if (hadFocus)
+            this.Focus();
     }
 
     /// <summary>

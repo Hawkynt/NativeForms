@@ -49,8 +49,8 @@ this control does, so a box with one stays owner-drawn.
 
 **Setting or clearing `Image` on a live control swaps the peer** rather than silently dropping the image:
 the box falls back to the canvas when it gains one and returns to the widget when it loses one, keeping
-`Checked` and the rest of its state. Keyboard focus does not survive the swap, because it belonged to the
-destroyed widget. `UseNativeWidget` itself is read at realization only — a form that is already showing
+`Checked` and the rest of its state. Keyboard focus survives the swap — the promotion is state-transparent.
+`UseNativeWidget` itself is read at realization only — a form that is already showing
 should not change its rendering out from under the user. See
 [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
 

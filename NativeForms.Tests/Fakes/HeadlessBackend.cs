@@ -132,6 +132,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     /// </summary>
     public bool OfferNativeCheckBox { get; set; }
 
+    /// <summary>Whether this backend accepts the slider promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeTrackBar { get; set; }
+
+    /// <summary>The last slider peer handed out, so a test can drive it like the real widget.</summary>
+    public HeadlessTrackBarPeer? LastTrackBar { get; private set; }
+
+    public ITrackBarPeer? CreateTrackBar(bool vertical)
+        => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
+
 /// <summary>Whether this backend accepts the progress-bar promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeProgressBar { get; set; }
 
@@ -143,9 +152,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
         if (!this.OfferNativeProgressBar)
             return null;
 
-        this.LastProgressBar = new HeadlessProgressBarPeer();
-        this.Created.Add(this.LastProgressBar);
-        return this.LastProgressBar;
+        return this.LastProgressBar = this.Track(new HeadlessProgressBarPeer());
     }
 
         /// <summary>The last check-box peer handed out, so a test can drive it like the real widget.</summary>
@@ -156,9 +163,7 @@ internal sealed class HeadlessBackend : IPlatformBackend
         if (!this.OfferNativeCheckBox)
             return null;
 
-        this.LastCheckBox = new HeadlessCheckBoxPeer();
-        this.Created.Add(this.LastCheckBox);
-        return this.LastCheckBox;
+        return this.LastCheckBox = this.Track(new HeadlessCheckBoxPeer());
     }
 
     public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer(this));
@@ -1253,4 +1258,38 @@ internal sealed class HeadlessProgressBarPeer : HeadlessPeer, IProgressBarPeer
     public void SetMarquee(bool marquee) => this.Marquee = marquee;
 
     public void Pulse() => ++this.Pulses;
+}
+
+
+/// <summary>A stand-in for a real platform slider, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessTrackBarPeer : HeadlessPeer, ITrackBarPeer
+{
+    private int _value;
+
+    public event EventHandler? ValueChanged;
+
+    public bool Vertical { get; init; }
+
+    public int Minimum { get; private set; }
+
+    public int Maximum { get; private set; }
+
+    public int SmallChange { get; private set; }
+
+    public int LargeChange { get; private set; }
+
+    public void SetRange(int minimum, int maximum) => (this.Minimum, this.Maximum) = (minimum, maximum);
+
+    public void SetValue(int value) => _value = value;
+
+    public int GetValue() => _value;
+
+    public void SetSteps(int smallChange, int largeChange) => (this.SmallChange, this.LargeChange) = (smallChange, largeChange);
+
+    /// <summary>Simulates the user dragging the slider to a position.</summary>
+    public void RaiseUserDrag(int value)
+    {
+        _value = value;
+        ValueChanged?.Invoke(this, EventArgs.Empty);
+    }
 }
