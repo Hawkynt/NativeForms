@@ -1331,8 +1331,11 @@ public class ListView : OwnerDrawnControl
     /// <summary>The icon to draw for an item: its explicit image, or its index into the view's image list.</summary>
     private IImage? GetIcon(ListViewItem item)
     {
+        // Resolve through CurrentFrameOf: an explicitly assigned image may be an AnimatedImage — what
+        // the decoders return, and what a caller builds for a thumbnail — which describes pixels
+        // rather than being a bitmap the backend can blit. Handed over raw it paints nothing.
         if (item.Image is { } image)
-            return image;
+            return this.CurrentFrameOf(image);
 
         var list = this.View is ListViewView.LargeIcon or ListViewView.Tile ? this.LargeImageList : this.SmallImageList;
         var backend = this.Backend;
