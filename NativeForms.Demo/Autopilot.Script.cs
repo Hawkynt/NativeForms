@@ -58,24 +58,46 @@ internal sealed partial class Autopilot
 
         this.Check("TabControl: every tab header is reachable by a click", () =>
         {
-            for (var x = 6; x < width - 6; x += 14)
+            void ProbeStrip()
             {
-                var before = this.Read(() => tabs.SelectedIndex);
-                this.Pump("a header probe", () =>
+                for (var x = 6; x < width - 6; x += 14)
                 {
-                    var screen = tabs.PointToScreen(new Point(x, headerY));
+                    var before = this.Read(() => tabs.SelectedIndex);
+                    this.Pump("a header probe", () =>
+                    {
+                        var screen = tabs.PointToScreen(new Point(x, headerY));
+                        Injection.Move(_root, screen);
+                        Injection.Press(_root, screen, 1, 0);
+                        Injection.Release(_root, screen, 1, 0);
+                        Injection.Drain();
+                    });
+
+                    var after = this.Read(() => tabs.SelectedIndex);
+                    if (after >= 0 && after < count && found[after] < 0)
+                        found[after] = x;
+
+                    if (after == before && found[before] < 0)
+                        found[before] = x;
+                }
+            }
+
+            ProbeStrip();
+
+            // A strip too narrow for its tabs scrolls behind arrows, so the headers past the fold are not
+            // on screen for the sweep above to hit. Advance the strip and sweep again until every header
+            // has had its turn — which is the window width being small, not a header being unclickable.
+            for (var scrolls = 0; scrolls < count && Array.IndexOf(found, -1) >= 0; ++scrolls)
+            {
+                this.Pump("the header forward arrow", () =>
+                {
+                    var screen = tabs.PointToScreen(new Point(width - 8, headerY));
                     Injection.Move(_root, screen);
                     Injection.Press(_root, screen, 1, 0);
                     Injection.Release(_root, screen, 1, 0);
                     Injection.Drain();
                 });
 
-                var after = this.Read(() => tabs.SelectedIndex);
-                if (after >= 0 && after < count && found[after] < 0)
-                    found[after] = x;
-
-                if (after == before && found[before] < 0)
-                    found[before] = x;
+                ProbeStrip();
             }
 
             for (var i = 0; i < count; ++i)
