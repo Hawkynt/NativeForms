@@ -35,6 +35,25 @@ form.Controls.Add(link);
 
 A mouse activation also raises the inherited `Click` (Click first, then `LinkClicked`), matching WinForms; keyboard activation raises `LinkClicked` only. Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`). The inherited `Text` is the link text.
 
+## Native widget promotion
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform hyperlink. |
+| `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
+
+Nothing gates it: one link spanning the whole caption is all this control models, and both platforms carry
+that plus the visited flag. (Per-character link ranges — the WinForms `LinkArea` — remain a non-goal, and
+are the thing that would need a gate if they arrived.)
+
+**Neither platform is allowed to follow the link itself**, because `LinkClicked` is the application's hook:
+GTK is handed an empty URI and told the activation was handled, and the Windows `SysLink` gets an anchor
+with no `href`. An activation raises `Click` and then `LinkClicked`, the same pair the owner-drawn mouse
+path raises.
+
+`UseNativeWidget` itself is read at realization only — a form that is already
+showing should not change its rendering out from under the user. See [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - Painted with the platform `ITheme`: `Accent` text with an underline drawn under the measured text extent, over the `ControlBackground`. Hovering the text shifts the color 30 % toward `ControlText`; `LinkVisited` blends it 50 % toward `DisabledText` first.

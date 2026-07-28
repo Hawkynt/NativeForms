@@ -47,12 +47,12 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `Breadcrumb` | owner-drawn | [breadcrumb.md](controls/breadcrumb.md) |
 | `Button` | native | [button.md](controls/button.md) |
 | `CalendarView` | owner-drawn | [calendarview.md](controls/calendarview.md) |
-| `CheckBox` | native (GTK) or owner-drawn — see [PRD §12](PRD.md) | [checkbox.md](controls/checkbox.md) |
-| `CheckedListBox` | owner-drawn | [checkedlistbox.md](controls/checkedlistbox.md) |
+| `CheckBox` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [checkbox.md](controls/checkbox.md) |
+| `CheckedListBox` | owner-drawn (never promoted — its row check boxes are its own painting) | [checkedlistbox.md](controls/checkedlistbox.md) |
 | `ClockFace` | owner-drawn + popup dial | [clockface.md](controls/clockface.md) |
 | `CodeTextBox` | owner-drawn + completion popup | [codetextbox.md](controls/codetextbox.md) |
 | `ColorPicker` | owner-drawn | [colorpicker.md](controls/colorpicker.md) |
-| `ComboBox` | owner-drawn + popup | [combobox.md](controls/combobox.md) |
+| `ComboBox` | native or owner-drawn + popup — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [combobox.md](controls/combobox.md) |
 | `ContextMenuStrip` | owner-drawn (popup engine) | [contextmenustrip.md](controls/contextmenustrip.md) |
 | `Control` (base class) | — | [control.md](controls/control.md) |
 | `DataGridView` | owner-drawn | [datagridview.md](controls/datagridview.md) |
@@ -65,14 +65,14 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `FolderPicker` | owner-drawn + hosted editor | [folderpicker.md](controls/folderpicker.md) |
 | `Form` (incl. modal + window management) | native | [form.md](controls/form.md) |
 | `GridPicker` (Office table-size chooser) | owner-drawn | [gridpicker.md](controls/gridpicker.md) |
-| `GroupBox` | owner-drawn | [groupbox.md](controls/groupbox.md) |
-| `HScrollBar` / `VScrollBar` | owner-drawn | [scrollbar.md](controls/scrollbar.md) |
+| `GroupBox` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [groupbox.md](controls/groupbox.md) |
+| `HScrollBar` / `VScrollBar` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [scrollbar.md](controls/scrollbar.md) |
 | `IconLabel` | owner-drawn | [iconlabel.md](controls/iconlabel.md) |
 | `ImageList` | — | [imagelist.md](controls/imagelist.md) |
 | `InfoBar` / `Toast` | owner-drawn | [infobar.md](controls/infobar.md) |
 | `Label` | native | [label.md](controls/label.md) |
-| `LinkLabel` | owner-drawn | [linklabel.md](controls/linklabel.md) |
-| `ListBox` | owner-drawn | [listbox.md](controls/listbox.md) |
+| `LinkLabel` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [linklabel.md](controls/linklabel.md) |
+| `ListBox` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [listbox.md](controls/listbox.md) |
 | `ListView` | owner-drawn | [listview.md](controls/listview.md) |
 | `MaskedTextBox` | native + core mask engine | [maskedtextbox.md](controls/maskedtextbox.md) |
 | `MenuStrip` + menu items | owner-drawn (popup engine) | [menustrip.md](controls/menustrip.md) |
@@ -83,10 +83,10 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `NumericUpDown` | owner-drawn + hosted editor | [numericupdown.md](controls/numericupdown.md) |
 | `Panel` (incl. `AutoScroll`) | owner-drawn | [panel.md](controls/panel.md) |
 | `PictureBox` | owner-drawn | [picturebox.md](controls/picturebox.md) |
-| `ProgressBar` | native (GTK, horizontal) or owner-drawn — see [PRD §12](PRD.md) | [progressbar.md](controls/progressbar.md) |
+| `ProgressBar` | native (horizontal) or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [progressbar.md](controls/progressbar.md) |
 | `ProgressTile` | owner-drawn | [progresstile.md](controls/progresstile.md) |
 | `PropertyGrid` | owner-drawn + hosted editors/pickers | [propertygrid.md](controls/propertygrid.md) |
-| `RadioButton` | owner-drawn | [radiobutton.md](controls/radiobutton.md) |
+| `RadioButton` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [radiobutton.md](controls/radiobutton.md) |
 | `RangeSlider` | owner-drawn | [rangeslider.md](controls/rangeslider.md) |
 | `Ribbon` (tabs, groups, items) | owner-drawn + popup | [ribbon.md](controls/ribbon.md) |
 | `RichTextBox` | native | [richtextbox.md](controls/richtextbox.md) |
@@ -104,7 +104,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `TokenBox` | owner-drawn + hosted editor | [tokenbox.md](controls/tokenbox.md) |
 | `ToolStrip` | owner-drawn | [toolstrip.md](controls/toolstrip.md) |
 | `ToolTip` | owner-drawn (popup) | [tooltip.md](controls/tooltip.md) |
-| `TrackBar` | native (GTK) or owner-drawn — see [PRD §12](PRD.md) | [trackbar.md](controls/trackbar.md) |
+| `TrackBar` | native or owner-drawn — see [PRD §12](PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one) | [trackbar.md](controls/trackbar.md) |
 | `TreeListView` | owner-drawn | [treelistview.md](controls/treelistview.md) |
 | `TreeView` | owner-drawn | [treeview.md](controls/treeview.md) |
 | `ZoomPanel` | owner-drawn | [zoompanel.md](controls/zoompanel.md) |

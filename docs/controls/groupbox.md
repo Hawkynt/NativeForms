@@ -25,6 +25,25 @@ form.Controls.Add(group);
 
 The caption itself is the inherited `Text` property. Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
+## Native widget promotion
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform frame. |
+| `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
+
+Promotion happens only when the caption is text. An `Image` beside it is the one thing neither a
+`BS_GROUPBOX` button nor a `GtkFrame` renders, so a frame with one stays owner-drawn.
+
+**The children are unaffected.** The peer is a plain container carrying this control's own coordinate
+system, with the real frame widget behind everything else, filling it — so a child at `(12, 34)` lands in
+the same place on both rendering paths. `DisplayRectangle` still reserves the caption strip.
+
+**Setting or clearing `Image` on a live control swaps the peer**, keeping the children and the rest of the
+state. Keyboard focus survives the swap — the promotion is state-transparent.
+`UseNativeWidget` itself is read at realization only — a form that is already
+showing should not change its rendering out from under the user. See [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - Painted with the platform `ITheme` (`ControlBackground`, `Border`, `ControlText`, `DefaultFont`), so it matches the host desktop; testable headlessly through the test backend's recording canvas.

@@ -66,6 +66,29 @@ The inherited `Text` property is overridden: in the editable style it mirrors th
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
+## Native widget promotion
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform drop-down list. |
+| `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
+
+A stock combo box shows a flat list of strings and nothing else, so the gate is narrow. The control stays
+owner-drawn when `DropDownStyle` is `DropDown` (whose editor is a hosted `TextBox`), when
+`PlaceholderText` is set, or when `ImageSelector`, `ImageIndexSelector` or `ImageList` would put an icon
+beside a row.
+
+**The widget owns the list.** `OpenDropDown`, `CloseDropDown` and `DroppedDown` drive and follow the
+platform's own drop-down; `DropDown` and `DropDownClosed` still fire, but there is no popup surface of
+ours on screen to inspect. `Items`, `SelectedIndex` and `SelectedIndexChanged` behave identically either
+way — items are rendered through `DisplaySelector` and handed over whole whenever the collection changes.
+
+**Crossing the gate on a live control swaps the peer** in either direction — assigning an
+`ImageSelector`, switching to the editable style, setting or clearing a placeholder — keeping the items and
+the selection. Keyboard focus survives the swap — the promotion is state-transparent.
+`UseNativeWidget` itself is read at realization only — a form that is already
+showing should not change its rendering out from under the user. See [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - **Keyboard model, matching the classic control.** Alt+Down and F4 open the drop-down (F4 also closes it). While *closed*, Up/Down move the selection directly and typing a letter cycles through the items whose display text starts with it. While *open*, Up/Down move only the hover row, typing jumps the hover to the next prefix match, Enter commits the hovered row, and Escape closes without committing. The wheel scrolls the popup three rows per notch.

@@ -46,7 +46,7 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 ## Native widget promotion
 
-On a backend that offers one — GTK today, Win32 to follow — a **horizontal** bar realizes onto a real
+On a backend that offers one — Win32 and GTK both do — a **horizontal** bar realizes onto a real
 `GtkProgressBar`, so the desktop's own trough, fill and marquee animation are used. The public surface is
 identical either way; `IsNativeWidget` reports which path was taken, and `UseNativeWidget` overrides
 [`Application.PreferNativeWidgets`](application.md) per control.

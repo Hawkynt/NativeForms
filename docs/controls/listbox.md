@@ -69,6 +69,27 @@ Inherits the common members of [`Control`](control.md).
 | `IndexFromPoint(int x, int y)` | The row index at the given client coordinates, or `-1` for none. |
 | `SetSelected(int index, bool value)` | Adds the row to or removes it from the selection; throws `ArgumentException` while `SelectionMode` is `None`. |
 
+## Native widget promotion
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform list. |
+| `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
+
+A stock list shows rows of plain text at its own row height and carries one selection, so the control stays
+owner-drawn when `SelectionMode` is anything but `One`, when `ImageSelector` would put an icon beside a
+row, or when `ItemHeight` has been set. [`CheckedListBox`](checkedlistbox.md) is **never** promoted: the
+check box in each row is its own painting, and a platform list would drop it without a trace.
+
+**The widget owns the scrolling.** `TopIndex`, `IndexFromPoint` and `EnsureVisible` go through it rather
+than through arithmetic over a painter that is not running, so they report where the rows actually are.
+`FocusedIndex` follows the selection, which is what a single-selection platform list keeps them as.
+
+**Crossing the gate on a live control swaps the peer** in either direction, keeping the items and the
+selection. Keyboard focus survives the swap — the promotion is state-transparent.
+`UseNativeWidget` itself is read at realization only — a form that is already
+showing should not change its rendering out from under the user. See [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 **Virtualization.** `OnPaint` walks only the visible row window (`TopIndex` through

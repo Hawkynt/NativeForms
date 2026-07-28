@@ -38,6 +38,24 @@ form.Controls.Add(bar);
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
+## Native widget promotion
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform scroll bar. |
+| `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
+
+Nothing gates it: everything this control models — the range, the page, the step, and which gesture moved
+the thumb — is carried by both platforms' scroll bars.
+
+**The anatomy becomes the platform's.** GTK 3 has no stepper arrows at all and warps the thumb to a primary
+click in the trough, so a promoted bar looks and responds like the desktop's own rather than like the
+owner-drawn one. `Value`, `Scroll` and `ValueChanged` are unaffected, including the `ScrollEventType` the
+gesture carries.
+
+`UseNativeWidget` itself is read at realization only — a form that is already
+showing should not change its rendering out from under the user. See [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - **Win32 range semantics**: like its namesake, the highest value the user can scroll to is `Maximum − LargeChange + 1`, not `Maximum` — `Value` assignments clamp to that scrollable range too. With the defaults (`Maximum` 100, `LargeChange` 10) the reachable maximum is 91.

@@ -70,6 +70,15 @@ Realization walks the **whole tree** depth-first: any control can parent childre
 | `Focused` | `bool` | `false` | Whether the peer currently holds keyboard focus |
 | `TabIndex` | `int` | `0` | Position in the container's tab order: siblings ascend by `TabIndex` (ties keep insertion order), depth-first through nested containers — the WinForms traversal |
 | `TabStop` | `bool` | per kind | Whether Tab stops here. Until assigned it follows the kind's default: focusable controls are stops; labels, panels, group boxes, picture boxes, progress bars, scroll bars and strips are not; the menu bar opts out (Alt reaches it), matching WinForms |
+| `UseNativeWidget` | `bool?` | `null` | Whether this control realizes onto a real platform widget rather than the owner-drawn surface; `null` follows [`Application.PreferNativeWidgets`](application.md) |
+
+### Native-widget promotion
+
+`UseNativeWidget` is a preference, never an override of the truth: a control is promoted only while its properties stay inside what the platform widget can express, and a backend without such a widget declines regardless — the owner-drawn painter is always the fallback. Controls with no platform counterpart ignore it entirely.
+
+Assigning it on a realized control does **not** swap the peer: a form already on screen should not change its rendering out from under the user. A property change that crosses the eligibility line does, because there the alternative is drawing something wrong; that swap is state transparent, keyboard focus included. Which controls take part, and the gate for each, is in [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
+Setting it to `false` is the escape hatch for a host that imposes a size a platform widget will not accept — [`ToolStripControlHost`](toolstrip.md) does exactly that, because a toolbar row is shorter than several desktops will draw a combo box in.
 
 ### Appearance (ambient)
 

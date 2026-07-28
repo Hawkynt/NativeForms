@@ -39,7 +39,8 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 ## Native widget promotion
 
-On a backend that offers one — GTK today, Win32 to follow — a slider realizes onto a real `GtkScale`, so
+On a backend that offers one — Win32 and GTK both do — a slider realizes onto a real widget
+(`msctls_trackbar32`, `GtkScale`), so
 the desktop draws the groove and thumb and its own keyboard and scroll conventions apply. The public
 surface is identical either way; `IsNativeWidget` reports which path was taken, and `UseNativeWidget`
 overrides [`Application.PreferNativeWidgets`](application.md) per control.

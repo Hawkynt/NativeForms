@@ -161,9 +161,9 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] `IGraphics` surface: lines, rects, text (native font, aligned), images/icons, clip stack.
       Backed by **GDI** (Win32) and **Cairo/Pango** (GTK); CoreGraphics (Cocoa) pending.
 - [~] Colour emoji in any control's `Text`: GTK renders it on both native widgets and the owner-drawn
-      path (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font); the
-      Win32 owner-drawn path is monochrome-only (GDI `DrawTextW` can't emit COLR/CBDT layers — colour
-      there needs a DirectWrite/Direct2D text path, tracked).
+      path (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font); on
+      Win32 the native widgets get it from the OS but the owner-drawn path is monochrome-only, because
+      GDI cannot emit COLR/CPAL layers. §13 specifies the DirectWrite path that closes it.
 - [x] `ITheme`: accent, window/control/field background, text/disabled/selection colors, default font,
       row height, scrollbar size — queried from the OS (`GetSysColor`/`SPI_GETNONCLIENTMETRICS` on
       Win32; `GtkStyleContext`/`gtk-font-name` on GTK); `DefaultTheme` fallback for headless/tests.
@@ -972,8 +972,14 @@ backend without the widget, and what runs the moment an app asks for something t
       `NativePeerPromotionTests` asserts the *same* observable behaviour against both paths, including that
       a widget-originated toggle raises the public event exactly once.
 - [x] **Opt-in switch.** `Application.PreferNativeWidgets` (default on) plus a per-control override
-      (`CheckBox.UseNativeWidget`), so an app that wants pixel-identical cross-platform rendering can keep
-      everything owner-drawn.
+      (`Control.UseNativeWidget`, packed into the state flags so it costs no per-instance bytes), so an app
+      that wants pixel-identical cross-platform rendering can keep everything owner-drawn.
+      `ToolStripControlHost` sets it to `false` on what it hosts: a toolbar row is a fixed, deliberately
+      short strip, and several desktops will not draw a combo box that small — the widget keeps its own
+      minimum and is clipped.
+- [x] **A subclass may withdraw.** Eligibility is `private protected virtual` where a control can be
+      derived from, because a subclass that paints into a row the platform knows nothing about would lose
+      it silently. `CheckedListBox` overrides it to `false` for exactly that reason.
 - [x] **Backends may decline.** `IPlatformBackend.CreateCheckBox()` is a **default interface method
       returning `null`**, so a backend opts in by overriding rather than being broken by a new member.
       macOS and the headless test backend decline for free — which is what keeps the paint-level test
@@ -981,19 +987,38 @@ backend without the widget, and what runs the moment an app asks for something t
 
 ### Promotion candidates, in payoff order
 
-| Control                         | Win32                           | GTK 3             | Gate — stays native while…                         |
-| ------------------------------- | ------------------------------- | ----------------- | -------------------------------------------------- |
-| [x] `CheckBox`                  | `BUTTON` (`BS_AUTOCHECKBOX`) — pending    | `GtkCheckButton` — SHIPPED  | no `Image`                     |
-| [ ] `RadioButton`               | `BUTTON` (`BS_AUTORADIOBUTTON`) | `GtkRadioButton`  | as above                                           |
-| [x] `ProgressBar`               | `msctls_progress32` — pending             | `GtkProgressBar` — SHIPPED  | horizontal only                             |
-| [x] `TrackBar`                  | `msctls_trackbar32` — pending             | `GtkScale` — SHIPPED        | always (ticks are decoration)                            |
-| [ ] `HScrollBar` / `VScrollBar` | `SCROLLBAR`                     | `GtkScrollbar`    | always                                             |
-| [ ] `GroupBox`                  | `BUTTON` (`BS_GROUPBOX`)        | `GtkFrame`        | no caption image                                   |
-| [ ] `ComboBox`                  | `COMBOBOX`                      | `GtkComboBoxText` | no per-item image, no owner-draw, no placeholder   |
-| [ ] `ListBox`                   | `LISTBOX`                       | `GtkListBox`      | plain string items, single/extended selection only |
-| [ ] `LinkLabel`                 | `SysLink`                       | `GtkLinkButton`   | single link spanning the whole text                |
-| [ ] `NumericUpDown`             | `EDIT` + `msctls_updown32`      | `GtkSpinButton`   | no custom formatting delegate                      |
-| [ ] `ToolTip`                   | `tooltips_class32`              | `GtkTooltip`      | text-only tips                                     |
+Both backends ship every promotion below. Win32 is compile-verified and pattern-matched against the
+peers already in the backend; the GTK half is additionally asserted on a live X11 and Wayland display by
+the autopilot, which checks per control that each eligible one really reached a widget and each gated one
+really stayed on the painter.
+
+| Control                         | Win32                                | GTK 3             | Gate — stays native while…                                   |
+| ------------------------------- | ------------------------------------ | ----------------- | ------------------------------------------------------------ |
+| [x] `CheckBox`                  | `BUTTON` (`BS_AUTOCHECKBOX`)         | `GtkCheckButton`  | no `Image`                                                    |
+| [x] `RadioButton`               | `BUTTON` (`BS_RADIOBUTTON`)          | `GtkRadioButton`  | no `Image`                                                    |
+| [x] `ProgressBar`               | `msctls_progress32`                  | `GtkProgressBar`  | horizontal only                                               |
+| [x] `TrackBar`                  | `msctls_trackbar32`                  | `GtkScale`        | always (ticks are decoration)                                 |
+| [x] `HScrollBar` / `VScrollBar` | `SCROLLBAR`                          | `GtkScrollbar`    | always                                                        |
+| [x] `GroupBox`                  | `BUTTON` (`BS_GROUPBOX`), hosted     | `GtkFrame`        | no caption image                                              |
+| [x] `ComboBox`                  | `COMBOBOX` (`CBS_DROPDOWNLIST`)      | `GtkComboBoxText` | `DropDownList` style, no per-item image, no placeholder       |
+| [x] `ListBox`                   | `LISTBOX`                            | `GtkTreeView`     | single selection, no per-item image, default `ItemHeight`     |
+| [x] `LinkLabel`                 | `SysLink`                            | `GtkLinkButton`   | always (one link spanning the text is all this control models)|
+| [ ] `NumericUpDown`             | `EDIT` + `msctls_updown32`           | `GtkSpinButton`   | no custom formatting delegate                                 |
+| [ ] `ToolTip`                   | `tooltips_class32`                   | `GtkTooltip`      | text-only tips                                                |
+
+Two of these needed a decision the obvious reading would have got wrong:
+
+- **Radio grouping stays in the core.** Both peers are asked for a *non-automatic* radio. An automatic
+  one defines its own group — on Windows from the `WS_GROUP` runs of the tab order, which is a different
+  notion of "group" from the core's (the controls sharing a parent) — and the two would fight over the
+  selection. GTK additionally refuses to leave a group with nothing selected, so each peer carries a
+  private, never-parented group anchor that is activated to mean "none": the core allows a `RadioButton`
+  to be cleared outright, and the widget has to allow it too.
+- **The group box hosts its frame rather than being hosted by it.** Both platforms build it as a plain
+  container carrying the control's own coordinate system, with the real frame widget behind everything,
+  filling it. Parenting the children *into* the frame would shift them by whatever inset the platform
+  reserves — so the same bounds would land in a different place on each rendering path — and on Windows it
+  would strand their `WM_COMMAND` notifications at a stock window procedure that discards them.
 
 Asymmetric candidates (one platform only, so the other keeps owner-draw): `ToggleSwitch` →
 `GtkSwitch`; `Expander` → `GtkExpander`; `SplitContainer` → `GtkPaned`.
@@ -1005,16 +1030,79 @@ would not survive the feature set we already ship (15 column kinds, merged rows,
 
 ### Acceptance
 
-- [ ] A control with a native peer and its owner-drawn twin pass the **same** behavior test suite.
-- [ ] The allocation budgets of §4 hold on both paths.
+- [x] A control with a native peer and its owner-drawn twin pass the **same** behavior test suite.
+- [x] The allocation budgets of §4 hold on both paths.
+- [x] Every promotion is asserted on a live display, not only headlessly: the peers are pure interop, and
+      nothing but a real desktop proves they were built at all.
 - [ ] A screen reader announces a promoted `CheckBox` on Windows and on Linux (the point of the
       exercise — verified manually, once, per control family).
-- [ ] `docs/README.md`'s strategy column and each control page's header say which path a control
+- [x] `docs/README.md`'s strategy column and each control page's header say which path a control
       takes and what the gate is.
 
 ---
 
-## 13. What's next — candidate workstreams
+## 13. Colour emoji in text on Win32
+
+**Where we are.** GTK gets this for free: `pango_cairo_show_layout` is colour-glyph-capable and picks up
+the system emoji font, so `🐣` in a `Text` renders in colour on both the native widgets and the
+owner-drawn path — visible in every Linux screenshot in `docs/`. Win32 does not. GDI's `DrawTextW` and
+`ExtTextOut` rasterize one monochrome alpha mask per glyph; the COLR/CPAL layer table that Segoe UI Emoji
+carries is invisible to them, so the same string comes out as flat outlines. Nothing in GDI, GDI+,
+`DrawThemeTextEx` or Uniscribe changes that — colour glyph rendering on Windows lives in DirectWrite.
+
+**The goal.** The same string looks the same on both desktops, without giving up the GDI paint path that
+every owner-drawn control already runs on, without a new redistributable, and without spending anything
+on the overwhelming majority of strings that contain no emoji at all.
+
+### The shape
+
+- [ ] **Detect, then divert.** `Win32Graphics.DrawText`/`MeasureText` first ask a cheap scanner whether
+      the string contains anything that could be a colour glyph — a surrogate pair in the U+1F000 range,
+      or U+FE0F, or U+2600–U+27BF. No hit (the normal case) → the existing GDI call, byte for byte
+      unchanged, no allocation, no new object on the paint path. A hit → the colour path below.
+- [ ] **`ID2D1DCRenderTarget` bound to the HDC we already have.** `D2D1CreateFactory` →
+      `CreateDCRenderTarget` → `BindDC(hdc, rect)` → `DrawText` with
+      `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT`. This is the interop Direct2D exists for: it draws
+      straight onto a GDI device context, so the canvas peer, the double buffer and the clip stack all
+      stay exactly as they are. One flag is the whole feature.
+- [ ] **Measure with the renderer that paints.** The colour path measures through `IDWriteTextLayout`
+      rather than `GetTextExtentPoint32W`, so hit-testing, caret positions and layout agree with what
+      lands on screen. A string that takes the GDI path keeps measuring through GDI — the two never mix
+      within one string.
+- [ ] **COM without COM interop.** No `[ComImport]`, no `Marshal.GetObjectForIUnknown`, no
+      `[DllImport]` — none of which survive the rules of §2. Only two entry points are imported
+      (`D2D1CreateFactory`, `DWriteCreateFactory`, both `[LibraryImport]`); every interface is reached by
+      indexing its vtable and calling through a `delegate* unmanaged<...>`. That is AOT-safe, allocation-
+      free per call, and the same technique the backend already uses for GTK signal trampolines.
+- [ ] **Degrade, never fail.** `d2d1.dll`/`dwrite.dll` missing, factory creation failing, `BindDC`
+      refusing the DC: each falls back to the GDI call and latches a flag so the attempt is made once per
+      process, not once per paint. Monochrome emoji is a worse rendering, not a broken one.
+- [ ] **Native widgets need nothing.** A promoted `CheckBox` or `Button` is a real HWND drawn by the OS,
+      which has been colour-emoji-capable since Windows 8.1. This work is only about the owner-drawn
+      surface — which is why it belongs in `Win32Graphics` and nowhere else.
+
+### Why not the alternatives
+
+| Approach | Why not |
+| --- | --- |
+| Bundle emoji bitmaps and draw them through `IImage` | Tens of thousands of glyphs; kills the kilobytes goal of §4, and freezes the emoji set at build time |
+| `IDWriteFactory2.TranslateColorGlyphRun` + manual layer compositing into a DIB | Correct, but it is re-implementing what `ENABLE_COLOR_FONT` already does, with shaping and bidi to get right by hand |
+| Move the whole Win32 paint path to Direct2D | Far larger change, a different resource lifetime model, and it buys nothing for the 99% of drawing that is lines, rectangles and images |
+| Render text through a native `STATIC` child per label | Reintroduces a native object per control, which §2's buffered-then-flushed design exists to avoid |
+
+### Acceptance
+
+- [ ] A string mixing text and emoji renders in colour on Windows in an owner-drawn control, and the
+      autopilot's Windows run captures it.
+- [ ] A string with no emoji produces the identical byte stream from the recording graphics as before,
+      proving the fast path is untouched.
+- [ ] Measurement and painting agree: a caret placed by `IndexFromPoint` lands where the glyph is.
+- [ ] The AOT publish stays clean, and the toolkit still starts on a Windows build with the DirectWrite
+      DLLs unavailable.
+
+---
+
+## 14. What's next — candidate workstreams
 
 Ranked by how much they unblock, not by effort. Nothing here is committed; this section exists so the
 next change starts from a considered list instead of an inbox.
@@ -1058,7 +1146,7 @@ next change starts from a considered list instead of an inbox.
 
 
 
-## 14. Attribute-driven grids & lists — extend the generator to `DataGridView`
+## 15. Attribute-driven grids & lists — extend the generator to `DataGridView`
 
 **The reference.** `Hawkynt/C--FrameworkExtensions` (`System.Windows.Forms.Extensions`) drives a
 `DataGridView` entirely from attributes on the bound row type: annotate the model, call
@@ -1081,7 +1169,7 @@ strictly better failure mode, AOT-clean.
 `ImagesSelector`, `TooltipSelector`, `CellStyleSelector`, `EnabledSelector`, `ReadOnlyCellSelector`,
 `ItemsSelector`, `SortComparison` — from generated, strongly-typed lambdas.
 
-### 14.1 Column types
+### 15.1 Column types
 
 The reference ships custom column types plus attributes that select them. Ours already has 15 kinds, so
 this is mostly a mapping exercise — and we cover more kinds than the reference does.
@@ -1106,7 +1194,7 @@ this is mostly a mapping exercise — and we cover more kinds than the reference
       numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
       `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
 
-### 14.2 Images
+### 15.2 Images
 
 The reference has a richer image model than a single selector, and this is the part of the parity map
 that needs new grid capability rather than new plumbing:
@@ -1133,7 +1221,7 @@ that needs new grid capability rather than new plumbing:
       (`OverlayImagesSelector` + `OverlaySize`; the selector returns only the badges that currently
       apply, so several conditions compose).
 
-### 14.3 The rest of the parity map
+### 15.3 The rest of the parity map
 
 | Reference attribute                         | Capability                                                                                                                         | Our target                                       |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -1156,7 +1244,7 @@ Beyond the grid the same library annotates `ListView` — `ListViewColumnAttribu
 the matching surface, so it is a cheap follow-on from the same symbol walk: same generator, different
 populator.
 
-### 14.4 Design rules
+### 15.4 Design rules
 
 - [x] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)`,
       `PopulateColumns(DataGridView)`, `PopulateColumns(ListView)` and `ToListViewItem()`.
@@ -1173,7 +1261,7 @@ populator.
 - [x] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
       hand-built columns still work; only the generated method is absent.
 
-### 14.5 Acceptance
+### 15.5 Acceptance
 
 - [ ] An annotated model generates a grid whose column kinds, headers, widths, order, images and
       per-row styling match the annotations, asserted headlessly.

@@ -33,8 +33,8 @@ Inherits the common members of [`Control`](control.md), plus the owner-drawn sur
 
 ## Native widget promotion
 
-On a backend that offers one — GTK today, Win32 to follow — a check box realizes onto a **real platform
-widget** (`GtkCheckButton`) instead of the owner-drawn canvas, so the desktop draws the indicator, animates
+On a backend that offers one — Win32 and GTK both do — a check box realizes onto a **real platform
+widget** (a `BS_AUTOCHECKBOX` button, a `GtkCheckButton`) instead of the owner-drawn canvas, so the desktop draws the indicator, animates
 the hover and press, and exposes the control to assistive technology. The public surface is identical
 either way; `IsNativeWidget` reports which path was taken.
 
