@@ -71,37 +71,34 @@ internal static partial class Shoot
             return visible.Contains(centre) && centre is { X: >= 0, Y: >= 0 };
         }
 
-        var button = Walk(page).OfType<Button>().FirstOrDefault(OnScreen);
+        // A check box, never a button. The click target has to be something whose handler cannot block:
+        // the first run on a real runner clicked "Show a modal MessageBox...", which did exactly what it
+        // says, and the message pump then sat inside a dialog nobody was there to dismiss. A check box
+        // exercises the identical path — hit-test, focus, z-order, event routing — and only toggles.
+        var target = Walk(page).OfType<CheckBox>().FirstOrDefault(OnScreen);
         var box = Walk(page).OfType<TextBox>().FirstOrDefault(b => b is not MaskedTextBox && b is { ReadOnly: false } && OnScreen(b));
-        if (button is null && box is null)
+        if (target is null && box is null)
             return 0;
 
         ShootInput.Activate(windowTitle);
         var failed = 0;
 
-        if (button is not null)
+        if (target is not null)
         {
-            var clicked = false;
-            void OnClick(object? sender, EventArgs e) => clicked = true;
-            button.Click += OnClick;
-            try
+            var before = target.Checked;
+            var centre = target.PointToScreen(new(target.Width / 2, target.Height / 2));
+            if (ShootInput.Click(centre))
             {
-                var centre = button.PointToScreen(new(button.Width / 2, button.Height / 2));
-                if (ShootInput.Click(centre))
+                ShootInput.Drain();
+                if (target.Checked != before)
+                    ++Clicks;
+                else
                 {
-                    ShootInput.Drain();
-                    if (clicked)
-                        ++Clicks;
-                    else
-                    {
-                        note($"    input: a real click at {centre.X},{centre.Y} never reached Button \"{button.Text}\"");
-                        ++failed;
-                    }
+                    note($"    input: a real click at {centre.X},{centre.Y} never reached CheckBox \"{target.Text}\"");
+                    ++failed;
                 }
-            }
-            finally
-            {
-                button.Click -= OnClick;
+
+                target.Checked = before;
             }
         }
 
