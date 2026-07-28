@@ -12,6 +12,7 @@ leading bytes and returns a `DecodedImage` (one frame for the stills, several fo
 |---|---|
 | **PNG** | 8-bit-per-channel, non-interlaced: grayscale, grayscale+alpha, RGB, RGBA, palette; all five scanline filters. (16-bit, interlaced and `tRNS` palette transparency are not decoded.) |
 | **BMP** | Uncompressed `BI_RGB` at 8-bit (palette), 24-bit and 32-bit; bottom-up or top-down. |
+| **JPEG** | Baseline and progressive DCT at 8-bit precision, grayscale or three components, any sampling factors (4:4:4, 4:2:2, 4:2:0, …), restart intervals, and Adobe's untransformed-RGB flag. Chroma is upsampled by sample replication. (Arithmetic coding, the lossless and hierarchical modes, 12-bit samples and four-component CMYK/YCCK are refused by name rather than approximated.) |
 | **PCX** | RLE, 8-bit indexed (VGA trailer palette) or 24-bit (three 8-bit planes). |
 | **GIF** (87a/89a) | LZW image data composited onto the logical screen, per-frame delay, disposal and transparency, and the NETSCAPE loop count → a multi-frame animation. |
 | **ICO** | Directory of embedded PNG or classic `BI_RGB` bitmap entries (32-bit BGRA, or 24-bit BGR + 1-bit AND mask); the best-fit size is chosen. |

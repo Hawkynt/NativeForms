@@ -16,6 +16,9 @@ namespace Hawkynt.NativeForms.Drawing;
 /// bitmaps: 32-bit BGRA (its own alpha channel) and 24-bit BGR with the 1-bit AND mask supplying
 /// transparency; a CUR is an ICO with directory type 2.
 /// BMP — uncompressed <c>BI_RGB</c> at 8-bit (palette), 24-bit and 32-bit, bottom-up or top-down.
+/// JPEG — baseline and progressive DCT at 8-bit precision, grayscale or three components, any
+/// sampling factors, restart intervals; arithmetic, lossless and CMYK files are rejected by name
+/// rather than approximated. See <c>ImageDecoder.Jpeg.cs</c>.
 /// PCX — RLE, 8-bit indexed (VGA trailer palette) or 24-bit (three 8-bit planes).
 /// GIF (87a/89a) — LZW image data composited onto the logical screen with per-frame delay, disposal
 /// and transparency, and the NETSCAPE loop count, producing a multi-frame <see cref="DecodedImage"/>.
@@ -24,14 +27,15 @@ namespace Hawkynt.NativeForms.Drawing;
 /// The <see cref="Decode(System.ReadOnlySpan{byte})"/> entry point sniffs the format from the leading
 /// bytes and returns a <see cref="DecodedImage"/> (one frame for the stills, several for GIF/ANI).
 /// </summary>
-public static class ImageDecoder
+public static partial class ImageDecoder
 {
     /// <summary>The eight-byte PNG file signature.</summary>
     private static ReadOnlySpan<byte> PngSignature => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     /// <summary>
     /// Sniffs the format from the leading bytes and decodes into a <see cref="DecodedImage"/> — one
-    /// frame for the still formats (PNG, BMP, PCX, ICO, CUR), several for the animated ones (GIF, ANI).
+    /// frame for the still formats (PNG, BMP, JPEG, PCX, ICO, CUR), several for the animated ones
+    /// (GIF, ANI).
     /// </summary>
     /// <exception cref="FormatException">The bytes are not a recognized format or use an unsupported feature.</exception>
     public static DecodedImage Decode(ReadOnlySpan<byte> data)
@@ -41,6 +45,9 @@ public static class ImageDecoder
 
         if (data.Length >= 2 && data[0] == 0x42 && data[1] == 0x4D) // "BM"
             return Still(DecodeBmp(data));
+
+        if (data.Length >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) // SOI then a marker
+            return Still(DecodeJpeg(data));
 
         if (data.Length >= 6 && data[0] == (byte)'G' && data[1] == (byte)'I' && data[2] == (byte)'F') // "GIF"
             return DecodeGif(data);

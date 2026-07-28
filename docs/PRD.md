@@ -743,7 +743,8 @@ strategy (may differ per platform; note exceptions inline).
       the interop rules). Clipboard: text set/get seams done (DGV copy/paste)
 - [x] `ImageDecoder`: pure-managed multi-format decode into a frame model (`DecodedImage`/`ImageFrame`,
       ARGB + per-frame delay + loop count) via a magic-byte `Decode` dispatcher — PNG (8-bit, all
-      filters, non-interlaced), BMP (8/24/32-bit BI_RGB), PCX (8-bit palette / 24-bit planes),
+      filters, non-interlaced), BMP (8/24/32-bit BI_RGB), JPEG (baseline + progressive DCT, any
+      sampling, restart intervals), PCX (8-bit palette / 24-bit planes),
       ICO/CUR (PNG/32-bit/24-bit+mask entries), animated GIF (LZW, disposal/transparency, NETSCAPE
       loop) and ANI (RIFF/ACON icon frames + rate/seq) — with `ImageList.AddPng`/`AddIco`
       (nearest-neighbor resample); the encoders live only in the test project
@@ -1267,18 +1268,20 @@ on the overwhelming majority of strings that contain no emoji at all.
 Feedback from porting an existing application, kept separate from the roadmap above because it is
 evidence rather than intent: each line is something a real program wanted and did not find.
 
-- [ ] **JPEG decoding.** The decoder covers PNG/BMP/GIF/ICO/PCX/CUR/ANI, so an image preview shows a note
-      instead of pixels for the single most common photographic format. Testable headlessly against known
-      images, and it fits the no-dependencies rule the other formats already follow.
-      **Port it rather than write it**: `PNGCrushCS/FileFormats/FileFormat.Jpeg` is a complete managed
-      implementation — baseline *and* progressive — under LGPL-3.0, the same licence family as this
-      toolkit. Decoding needs roughly half of it (`JpegReader`, `JpegMarkerParser`, `JpegBaselineDecoder`,
-      `JpegProgressiveDecoder`, `JpegHuffmanDecoder`/`Table`, `JpegBitReader`, `JpegDct`, `JpegQuantizer`,
-      `JpegZigZag`, `JpegColorConverter`, `JpegStandardTables`, the header/component records); the encoders
-      and the coefficient-rewriting half stay behind. Watch the two constraints that differ from a
-      command-line tool: no allocation on the paint path, and the `[LibraryImport]`/no-reflection rules of
-      §2 — a decoder that is pure managed arithmetic should satisfy both, but it needs checking rather than
-      assuming.
+- [x] **JPEG decoding.** `ImageDecoder.DecodeJpeg` — baseline and progressive DCT at 8-bit precision,
+      grayscale or three components, any sampling factors, restart intervals and Adobe's untransformed-RGB
+      flag; arithmetic, lossless, hierarchical, 12-bit and four-component CMYK files are refused by name.
+      Ported from `PNGCrushCS/FileFormats/FileFormat.Jpeg` (LGPL-3.0, the same licence family) rather than
+      written, with the encoder half left behind and three defects fixed on the way in:
+      the bit reader latched end-of-data on a restart marker and never cleared it, so every interval after
+      the first decoded as zeroes; progressive AC scans walked the padded MCU grid instead of the
+      component's own (T.81 A.2.4), which is wrong for any image not filling its last MCU; and the
+      end-of-data latch discarded a scan's final Huffman symbol, which in an interleaved DC scan is a
+      whole block's differential. Coefficients live in one flat array per component and the inverse DCT
+      keeps its workspace on the stack, so the transform allocates nothing per block.
+      Tested against libjpeg-turbo itself: each fixture is embedded beside the pixels
+      `djpeg -nosmooth -dct int` produced from it, and the decode has to match within one level per
+      channel.
 - [ ] **Marquee (rubber-band) selection, with the modifiers.** Dragging a selection rectangle inside a
       `ListView` or `DataGridView`, with Ctrl adding to the selection and Shift extending it. Not an extra:
       this is what those controls do everywhere else, so its absence reads as a bug rather than a missing
