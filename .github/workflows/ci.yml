@@ -100,10 +100,11 @@ jobs:
       # A hosted runner has no interactive desktop session, which is exactly why the capture is
       # in-process (see NativeForms.Demo/Shoot.Windows.cs) rather than a screenshot tool.
       #
-      # Advisory for now, like the autopilot: this job is new and its job is to tell us what Windows
-      # does, not yet to gate on it. Read the artifact.
+      # A gate, not advisory. This job started advisory and immediately found that the gallery could
+      # not start on Windows at all — RichTextBox took the process down during realization. That is
+      # exactly the class of regression nothing else here can catch, so failing to bring the window up
+      # and photograph it now breaks the build.
       - name: Shoot the gallery
-        continue-on-error: true
         run: dotnet run --project NativeForms.Demo --configuration Release --no-build -- --shoot "${{ runner.temp }}/shots"
       - name: Upload screenshots
         if: always()
