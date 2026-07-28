@@ -737,6 +737,19 @@ strategy (may differ per platform; note exceptions inline).
       toplevel focus when it unmaps the widget that held it so the move lands reliably. The Pickers
       walkthrough workaround was removed and the text-entry sweep passes across repeated runs.
 - [ ] Per-platform smoke tests / screenshots for owner-drawn controls.
+- [ ] **Win32 rendering findings from the wine run**, none of them promotion-related, all reproducible by
+      bringing the gallery up as described above:
+      - Controls hosted in a `ToolStrip` through `ToolStripControlHost` paint **blank** — the date picker
+        and the zoom combo are empty boxes, while the colour swatch beside them draws. Owner-drawn controls
+        everywhere else on the page paint fine, so this is specific to the strip's hosting, and it predates
+        the promotions (the date picker was never promotable). It became more visible once
+        `ToolStripControlHost` started pinning what it hosts to the painter, which is the right call for
+        GTK — a toolbar row is shorter than a platform combo will draw in.
+      - Emoji come out as replacement boxes, which is §13 exactly: GDI cannot emit COLR/CPAL layers. A
+        plain `→` also falls back, so the font-fallback chain for the owner-drawn text path deserves a look
+        alongside that work.
+      - The `RichTextBox` cannot be exercised at all under wine (see below), so its Win32 paint path
+        remains unobserved.
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
       `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect
       `Panel` was fixed for.
