@@ -214,6 +214,47 @@ public class ComboBox : OwnerDrawnControl
         }
     }
 
+
+    /// <summary>
+    /// Replaces the items from a sequence and resolves <paramref name="displayMember"/> and
+    /// <paramref name="valueMember"/> to accessors at compile time, so the Windows Forms shape —
+    /// a data source plus member <em>names</em> — works without reflection.
+    /// </summary>
+    /// <remarks>
+    /// The names go through the lookup the <c>[Bindable]</c> generator emitted on <typeparamref name="T"/>,
+    /// so they are ordinary property reads by the time anything runs and survive trimming and NativeAOT.
+    /// A name the type does not have throws here, at the call, rather than yielding blank rows later.
+    /// Passing <see langword="null"/> for a member leaves the corresponding selector alone, so this
+    /// composes with <see cref="DisplaySelector"/> and <see cref="ValueSelector"/> rather than replacing
+    /// them.
+    /// </remarks>
+    /// <typeparam name="T">The item type, which must carry <c>[Bindable]</c>.</typeparam>
+    /// <param name="items">The items to show.</param>
+    /// <param name="displayMember">The property whose value is displayed, or <see langword="null"/>.</param>
+    /// <param name="valueMember">The property behind <see cref="SelectedValue"/>, or <see langword="null"/>.</param>
+    /// <exception cref="ArgumentException">A named member is not a public readable property of <typeparamref name="T"/>.</exception>
+    public void SetDataSource<T>(IEnumerable<T> items, string? displayMember = null, string? valueMember = null)
+        where T : IBindableMembers
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        if (displayMember is not null)
+        {
+            var accessor = BindableMembers.Require<T>(displayMember, nameof(displayMember));
+            this.DisplaySelector = item => accessor(item)?.ToString() ?? string.Empty;
+        }
+
+        if (valueMember is not null)
+        {
+            var accessor = BindableMembers.Require<T>(valueMember, nameof(valueMember));
+            this.ValueSelector = item => accessor(item);
+        }
+
+        this.Items.Clear();
+        foreach (var item in items)
+            this.Items.Add(item);
+    }
+
     /// <summary>Replaces the items from a snapshot of any sequence (one-way binding convenience).</summary>
     public IEnumerable? DataSource
     {

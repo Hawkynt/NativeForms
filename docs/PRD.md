@@ -202,8 +202,15 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       `CellStyleSelector`, `ReadOnlyCellSelector`, `EnabledSelector`, `DisplaySelector`,
       `TooltipSelector` — never string member names, never `Expression<>` trees (none exist in Core;
       enforced by the no-reflection rule, exercised by the binding and column-type tests).
-- [ ] Source-generated `[Bindable]`/property-accessor generator so `DataSource`+`DisplayMember`
-      resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe).
+- [x] Source-generated `[Bindable]`/property-accessor generator so `DataSource`+`DisplayMember`
+      resolve member getters at **compile time** (keeps list binding reflection-free/AOT-safe). The
+      generated `GetMemberAccessor` is a `switch` from name to a static lambda reading that property, and
+      the control surface is `ComboBox.SetDataSource<T>(items, displayMember, valueMember)` /
+      `ListBox.SetDataSource<T>(items, displayMember)` constrained to `T : IBindableMembers` — a static
+      abstract interface member, so the lookup is reached from the type argument without ever naming a
+      `Type`. A name the model does not have throws at the call that named it, rather than binding blank
+      the way the reflection-based libraries this shape is borrowed from do. Diagnostic `NFG004` covers a
+      `[Bindable]` class that is not a non-nested partial.
 - [x] `ObservableList<T>` with granular change events — add/remove/replace/reset, plus `Move`
       (`ListChangeType.Moved` carrying `OldIndex` + `Index`) and the read-only `IReadOnlyObservableList<T>`
       view for consumers that observe but do not mutate.

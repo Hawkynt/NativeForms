@@ -237,6 +237,36 @@ public class ListBox : OwnerDrawnControl
     /// <summary>Raised once per gesture when the set of selected indices changes.</summary>
     public event EventHandler? SelectedIndexChanged;
 
+
+    /// <summary>
+    /// Replaces the items from a sequence and resolves <paramref name="displayMember"/> to an accessor at
+    /// compile time, so the Windows Forms shape — a data source plus a member <em>name</em> — works
+    /// without reflection.
+    /// </summary>
+    /// <remarks>
+    /// The name goes through the lookup the <c>[Bindable]</c> generator emitted on <typeparamref name="T"/>.
+    /// A name the type does not have throws here, at the call, rather than yielding blank rows later.
+    /// </remarks>
+    /// <typeparam name="T">The item type, which must carry <c>[Bindable]</c>.</typeparam>
+    /// <param name="items">The items to show.</param>
+    /// <param name="displayMember">The property whose value is displayed, or <see langword="null"/>.</param>
+    /// <exception cref="ArgumentException">The named member is not a public readable property of <typeparamref name="T"/>.</exception>
+    public void SetDataSource<T>(IEnumerable<T> items, string? displayMember = null)
+        where T : IBindableMembers
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        if (displayMember is not null)
+        {
+            var accessor = BindableMembers.Require<T>(displayMember, nameof(displayMember));
+            this.DisplaySelector = item => accessor(item)?.ToString() ?? string.Empty;
+        }
+
+        this.Items.Clear();
+        foreach (var item in items)
+            this.Items.Add(item);
+    }
+
     /// <summary>Replaces the items from any sequence (one-way binding convenience).</summary>
     public IEnumerable? DataSource
     {

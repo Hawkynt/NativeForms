@@ -316,6 +316,45 @@ grid.DataSource = new[] { new Person("Dan", 22) }; // replaces all rows
 | `ListChangeType ChangeType` | `Added`, `Removed`, `Replaced` or `Reset` (clear/bulk). |
 | `int Index` | The affected index, or −1 for `Reset`. |
 
+## Binding a list by member name — `[Bindable]`
+
+Selectors are the primary surface here: `DisplaySelector`, `ValueSelector` and their siblings take a
+lambda, so the compiler checks them and nothing is resolved at run time. Two cases a lambda cannot serve
+are code ported from Windows Forms, where the member is a string, and configuration that genuinely
+arrives as one. For those, `[Bindable]` has the generator emit a compile-time lookup:
+
+```csharp
+[Bindable]
+internal partial class Person
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
+combo.SetDataSource(people, displayMember: nameof(Person.Name), valueMember: nameof(Person.Id));
+listBox.SetDataSource(people, nameof(Person.Name));
+```
+
+The generated `Person.GetMemberAccessor("Name")` is a `switch` returning a static lambda that reads the
+property, so by the time anything runs it is an ordinary property read — no `PropertyInfo`, nothing for a
+trimmer to miss, and the AOT publish stays clean. `SetDataSource` is generic over `T : IBindableMembers`,
+which is how the lookup is reached without ever naming a `Type`.
+
+| | |
+|---|---|
+| **In the lookup** | every public, readable, non-static, non-indexer property — including get-only computed ones |
+| **Not in it** | fields, private or protected properties, static properties, indexers |
+| **Matching** | exact and case-sensitive |
+| **A name that is not there** | throws `ArgumentException` from `SetDataSource`, naming the member and the type |
+
+That last row is the point of doing it at compile time. A reflection-based binder answers a typo with a
+blank column and no explanation; here the mistake surfaces at the call that made it. Omit a member and the
+corresponding selector is left alone, so this composes with the lambda surface rather than replacing it.
+
+Without the generator the attribute is inert: the class still compiles and the selector surfaces still
+work — only `SetDataSource`'s name overload is unavailable, because the interface is unimplemented. See
+[PropertyGrid — getting the generator](controls/propertygrid.md#getting-the-generator).
+
 ## Worked example
 
 The demo's bound counter, self-contained: `CounterViewModel` from above plus the form that binds to

@@ -41,6 +41,7 @@ Inherits the common members of [`Control`](control.md).
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
+| `SetDataSource<T>(IEnumerable<T>, string?)` | Replaces the items and resolves `displayMember` through the `[Bindable]` generator — the Windows Forms shape, without reflection. See [MVVM](../mvvm.md#binding-a-list-by-member-name--bindable). |
 | `DisplaySelector` | `Func<object?, string>` | `ToString()` | Produces the display text for an item. Setting `null` restores the default. |
 | `FocusedIndex` | `int` (get) | `-1` | The caret row keyboard navigation operates on — independent of the selection in the multi modes. |
 | `ImageSelector` | `Func<object?, IImage?>?` | `null` | Optional selector producing a leading icon per item; `null` result means none. |

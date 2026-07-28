@@ -34,6 +34,7 @@ Plain values work without any selector: the default `DisplaySelector` calls `ToS
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
+| `SetDataSource<T>(IEnumerable<T>, string?, string?)` | Replaces the items and resolves `displayMember`/`valueMember` names through the `[Bindable]` generator — the Windows Forms shape, without reflection. See [MVVM](../mvvm.md#binding-a-list-by-member-name--bindable). |
 | `DisplaySelector` | `Func<object?, string>` | `ToString()` | Produces the display text for an item. Setting `null` restores the default. |
 | `DropDownStyle` | `ComboBoxStyle` | `DropDownList` | Closed and owner-painted (`DropDownList`) or editable through a hosted native `TextBox` (`DropDown`). `Simple` throws `NotSupportedException`. |
 | `DroppedDown` | `bool` | `false` | Whether the drop-down is currently open. Settable, like its WinForms namesake. |
