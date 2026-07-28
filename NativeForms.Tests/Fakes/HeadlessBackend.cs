@@ -125,6 +125,26 @@ internal sealed class HeadlessBackend : IPlatformBackend
         return this.FontDialogResult;
     }
 
+/// <summary>
+    /// Whether this backend accepts the check-box promotion (PRD §12). Off by default, so every test that
+    /// does not ask for it keeps exercising the owner-drawn path — which is what the paint-level
+    /// assertions throughout the suite depend on.
+    /// </summary>
+    public bool OfferNativeCheckBox { get; set; }
+
+    /// <summary>The last check-box peer handed out, so a test can drive it like the real widget.</summary>
+    public HeadlessCheckBoxPeer? LastCheckBox { get; private set; }
+
+    public ICheckBoxPeer? CreateCheckBox()
+    {
+        if (!this.OfferNativeCheckBox)
+            return null;
+
+        this.LastCheckBox = new HeadlessCheckBoxPeer();
+        this.Created.Add(this.LastCheckBox);
+        return this.LastCheckBox;
+    }
+
     public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer(this));
     public IButtonPeer CreateButton() => this.Track(new HeadlessButtonPeer());
     public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
@@ -1180,4 +1200,24 @@ internal sealed class RecordingGraphics : IGraphics
         => this.TextDraws.Exists(d => d.Text.Contains(substring) && d.Font == font);
 
     private static string Hex(Color c) => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+}
+
+
+/// <summary>A stand-in for a real platform check box, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessCheckBoxPeer : HeadlessPeer, ICheckBoxPeer
+{
+    private bool _checked;
+
+    public event EventHandler? CheckedChanged;
+
+    public void SetChecked(bool value) => _checked = value;
+
+    public bool GetChecked() => _checked;
+
+    /// <summary>Simulates the user toggling the widget itself.</summary>
+    public void RaiseUserToggle()
+    {
+        _checked = !_checked;
+        CheckedChanged?.Invoke(this, EventArgs.Empty);
+    }
 }

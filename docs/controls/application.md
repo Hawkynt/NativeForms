@@ -27,6 +27,17 @@ Application.Run(form);
 
 Tests bypass the registry and pass a backend directly — `Application.Run(form, new HeadlessBackend())` returns immediately because the headless `Run` does not block.
 
+## Native widget promotion
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `PreferNativeWidgets` | `bool` | `true` | Whether controls with a faithful platform counterpart realize onto a **real native widget** rather than the owner-drawn surface, when their properties stay inside what that widget supports. Set it to `false` before `Run` for pixel-identical rendering on every platform. |
+
+A backend that does not implement a given widget declines regardless, so this is a preference and never a
+guarantee — the owner-drawn path is always the fallback. Individual controls can override it (see
+[`CheckBox.UseNativeWidget`](checkbox.md#native-widget-promotion)). Rationale and the candidate list are in
+[PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## API
 
 `Application`:

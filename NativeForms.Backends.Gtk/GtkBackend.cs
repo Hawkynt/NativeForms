@@ -148,6 +148,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real check button, so this backend accepts the promotion (PRD §12).</remarks>
+    public ICheckBoxPeer? CreateCheckBox()
+    {
+        EnsureInitialized();
+        return new GtkCheckBoxPeer();
+    }
+
+    /// <inheritdoc />
     public ICanvasPeer CreateCanvas()
     {
         EnsureInitialized();

@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
@@ -11,6 +12,30 @@ public class CheckBox : OwnerDrawnControl
 {
     private const int _TextGap = 6;
 
+    private ICheckBoxPeer? _native;
+
+    /// <summary>
+    /// Whether this box realizes onto a real platform check box rather than the owner-drawn surface.
+    /// <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    /// <remarks>
+    /// Only honoured while the control stays inside what the platform widget can express — see
+    /// <see cref="IsNativeEligible"/>. The decision is made once, at realization; changing this or the
+    /// properties the gate looks at afterwards does not swap an existing peer.
+    /// </remarks>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether the control is currently backed by a real platform check box.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the configured properties stay inside what a platform check box can express. An
+    /// <see cref="Image"/> is the one thing neither Win32's <c>BS_AUTOCHECKBOX</c> nor
+    /// <c>GtkCheckButton</c> renders beside the caption the way this control does, so a box with one
+    /// stays owner-drawn.
+    /// </summary>
+    private bool IsNativeEligible => this.Image is null;
+
     /// <summary>Whether the box is checked.</summary>
     public bool Checked
     {
@@ -21,6 +46,7 @@ public class CheckBox : OwnerDrawnControl
                 return;
 
             field = value;
+            _native?.SetChecked(value); // silent: the peer must not re-raise what we are about to raise
             this.Invalidate();
             this.OnCheckedChanged(EventArgs.Empty);
         }
@@ -46,6 +72,48 @@ public class CheckBox : OwnerDrawnControl
 
     /// <inheritdoc/>
     private protected override IImage? AnimatedImageSlot => this.Image;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The promotion point (PRD §12): when the app prefers native widgets, the gate passes and the backend
+    /// offers one, the box becomes a real platform check box; otherwise it falls back to the owner-drawn
+    /// canvas. The public surface is identical either way — the only observable difference is
+    /// <see cref="IsNativeWidget"/>.
+    /// </remarks>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets)
+            && this.IsNativeEligible
+            && backend.CreateCheckBox() is { } peer)
+        {
+            _native = peer;
+            peer.SetChecked(this.Checked);
+            peer.CheckedChanged += this.OnNativeCheckedChanged;
+            return peer;
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        if (_native is { } peer)
+        {
+            peer.CheckedChanged -= this.OnNativeCheckedChanged;
+            _native = null;
+        }
+
+        base.OnUnrealized();
+    }
+
+    /// <summary>The widget toggled itself; mirror it into the managed state and raise the public event
+    /// exactly once, so a handler cannot tell which path it is on.</summary>
+    private void OnNativeCheckedChanged(object? sender, EventArgs e)
+    {
+        if (_native is { } peer)
+            this.Checked = peer.GetChecked();
+    }
 
     /// <summary>Raised when <see cref="Checked"/> changes.</summary>
     public event EventHandler? CheckedChanged;

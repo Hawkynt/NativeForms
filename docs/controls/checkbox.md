@@ -31,6 +31,24 @@ form.Controls.Add(check);
 
 Inherits the common members of [`Control`](control.md), plus the owner-drawn surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
+## Native widget promotion
+
+On a backend that offers one — GTK today, Win32 to follow — a check box realizes onto a **real platform
+widget** (`GtkCheckButton`) instead of the owner-drawn canvas, so the desktop draws the indicator, animates
+the hover and press, and exposes the control to assistive technology. The public surface is identical
+either way; `IsNativeWidget` reports which path was taken.
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform check box. |
+| `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
+
+The decision is made **once, at realization**, and only when the configured properties stay inside what the
+platform widget can express. An `Image` is the one thing neither `BS_AUTOCHECKBOX` nor `GtkCheckButton`
+renders beside the caption the way this control does, so a box with one stays owner-drawn. Changing
+`Image` or `UseNativeWidget` after the form is shown does not swap an existing peer. See
+[PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
+
 ## Notes
 
 - Painted with the platform `ITheme` (`FieldBackground` box, `Accent` checkmark and checked border, `ControlText`/`DisabledText` label), so it matches the host desktop; testable headlessly through the test backend's recording canvas. The 14 px check square itself is drawn by the shared `GlyphRenderer` (`DrawCheckBox`), the same glyph `DateTimePicker`'s check box uses.

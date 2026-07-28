@@ -56,6 +56,13 @@ public interface IPlatformBackend
     /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
     ICanvasPeer CreateCanvas();
 
+    /// <summary>
+    /// Creates a native check-box peer, or <see langword="null"/> to decline — which is the default, so a
+    /// backend opts in by overriding rather than being broken by a new member. Declining leaves the
+    /// control on its owner-drawn path (PRD §12).
+    /// </summary>
+    ICheckBoxPeer? CreateCheckBox() => null;
+
     /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
     /// <param name="owner">
     /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.

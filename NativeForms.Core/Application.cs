@@ -9,6 +9,19 @@ namespace Hawkynt.NativeForms;
 /// </summary>
 public static class Application
 {
+    /// <summary>
+    /// Whether controls that have a faithful platform counterpart realize onto a **real native widget**
+    /// instead of the owner-drawn surface, when their configured properties stay inside what that widget
+    /// supports (PRD §12). Defaults to <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// Set it to <see langword="false"/> before <see cref="Run(Form)"/> for pixel-identical rendering on
+    /// every platform, which is what a screenshot-comparing test suite wants. A backend that does not
+    /// implement a given widget declines regardless, so this is a preference and never a guarantee; an
+    /// individual control can override it (for example <see cref="CheckBox.UseNativeWidget"/>).
+    /// </remarks>
+    public static bool PreferNativeWidgets { get; set; } = true;
+
     /// <summary>The managed id of the thread pumping the loop, or -1 outside <see cref="Run(Form)"/>.</summary>
     private static int _loopThreadId = -1;
 

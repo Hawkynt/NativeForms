@@ -285,6 +285,18 @@ internal static partial class NativeMethods
 
     // --- Buttons and labels ---------------------------------------------------------------------
 
+    /// <summary>Creates a <c>GtkCheckButton</c> carrying the given caption.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint gtk_check_button_new_with_label(string label);
+
+    /// <summary>Sets a toggle button's (and therefore a check button's) state.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_toggle_button_set_active(nint toggleButton, int isActive);
+
+    /// <summary>Reads a toggle button's state.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial int gtk_toggle_button_get_active(nint toggleButton);
+
     /// <summary>Creates a push button carrying the given label text (UTF-8).</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint gtk_button_new_with_label(string label);

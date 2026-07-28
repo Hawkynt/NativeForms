@@ -47,7 +47,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | `Breadcrumb` | owner-drawn | [breadcrumb.md](controls/breadcrumb.md) |
 | `Button` | native | [button.md](controls/button.md) |
 | `CalendarView` | owner-drawn | [calendarview.md](controls/calendarview.md) |
-| `CheckBox` | owner-drawn | [checkbox.md](controls/checkbox.md) |
+| `CheckBox` | native (GTK) or owner-drawn — see [PRD §12](PRD.md) | [checkbox.md](controls/checkbox.md) |
 | `CheckedListBox` | owner-drawn | [checkedlistbox.md](controls/checkedlistbox.md) |
 | `ClockFace` | owner-drawn + popup dial | [clockface.md](controls/clockface.md) |
 | `CodeTextBox` | owner-drawn + completion popup | [codetextbox.md](controls/codetextbox.md) |

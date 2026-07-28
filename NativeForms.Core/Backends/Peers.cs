@@ -447,3 +447,22 @@ public interface ITimerPeer : IDisposable
     /// <summary>Raised on the UI thread once per elapsed interval.</summary>
     event EventHandler? Tick;
 }
+
+/// <summary>
+/// A native two-state check box (Win32 <c>BUTTON</c> with <c>BS_AUTOCHECKBOX</c>, GTK
+/// <c>GtkCheckButton</c>). Created only when a <see cref="CheckBox"/> is promoted to a real widget —
+/// see PRD §12; a backend without one declines and the control stays owner-drawn.
+/// </summary>
+public interface ICheckBoxPeer : IControlPeer
+{
+    /// <summary>Raised when the user toggles the box. Programmatic <see cref="SetChecked"/> must not
+    /// raise it — the core owns that decision so both render paths behave identically.</summary>
+    event EventHandler? CheckedChanged;
+
+    /// <summary>Pushes the checked state into the widget without raising <see cref="CheckedChanged"/>.</summary>
+    void SetChecked(bool value);
+
+    /// <summary>The widget's current state, read when it reports a change so the core mirrors what the
+    /// platform actually did rather than inferring a flip.</summary>
+    bool GetChecked();
+}

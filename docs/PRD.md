@@ -80,11 +80,11 @@ Hawkynt.NativeForms.Generators         (Roslyn generator, packed as an analyzer 
 
 ## 3. Patterns: MVVM / MVC / MVP
 
-| Pattern | How NativeForms supports it |
-|---|---|
+| Pattern  | How NativeForms supports it                                                                                                                                                                                                                        |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **MVVM** | `ObservableObject` view-models, `RelayCommand`/`RelayCommand<T>` (`ICommand`), and `PropertyBinding<T>` two-way binding between VM properties and control properties, `BindingExtensions.Bind` lambda sugar, converters, fallbacks, chained paths. |
-| **MVC** | Controls raise events; a controller mediates model↔view. Provided by the plain event surface + one-way `PropertyBinding` from model to view. |
-| **MVP** | Views expose interfaces (`interface IFooView`); a presenter drives them. NativeForms controls are interface-friendly (events + properties); `[ ]` ship a small `IView`/passive-view sample. |
+| **MVC**  | Controls raise events; a controller mediates model↔view. Provided by the plain event surface + one-way `PropertyBinding` from model to view.                                                                                                       |
+| **MVP**  | Views expose interfaces (`interface IFooView`); a presenter drives them. NativeForms controls are interface-friendly (events + properties); `[ ]` ship a small `IView`/passive-view sample.                                                        |
 
 - [x] `ObservableObject` (INotifyPropertyChanging/Changed, `SetProperty`)
 - [x] `RelayCommand`, `RelayCommand<T>`
@@ -825,7 +825,9 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   (+ the `[GridEditable]` source generator), CodeTextBox. `[x]` — all ten shipped, tested,
   demoed and documented.
 - **M11 — Native-peer promotion (§12).** Opt into real platform widgets for the controls that have a
-  faithful counterpart, keeping the owner-drawn path as the fallback. `[ ]`
+  faithful counterpart, keeping the owner-drawn path as the fallback. `[~]` — the mechanism (gate,
+  opt-in switch, declining backends, identical-behaviour tests) ships with `CheckBox` on GTK; the Win32
+  half and the remaining candidates follow.
 - **M12 — Editor depth (§13).** The refinements the shipped M10 controls still want: undo/redo and
   find/replace in `CodeTextBox`, multiline and nested rows in `PropertyGrid`, virtual mode for
   `TreeView`. `[~]` (`DataGridView` virtual mode shipped)
@@ -848,79 +850,79 @@ This matrix tracks the rest of "done": a section in the `NativeForms.Demo` tabbe
 reference page under `docs/`. Every change that ships a control/feature extends this table in the
 same commit. `—` = not applicable.
 
-| Feature | Tests | Demo | Docs |
-|---|---|---|---|
-| Architecture (core/peer/realization/containers/popups/modal) | ✔ | — | [architecture.md](architecture.md) |
-| `Application` + `BackendRegistry` | ✔ | ✔ | [controls/application.md](controls/application.md) |
-| `Control` base (incl. `Margin`, `PointToScreen`, `ContextMenuStrip`) | ✔ | ✔ | [controls/control.md](controls/control.md) |
-| `Form` (modal, window management, icon) | ✔ | ✔ | [controls/form.md](controls/form.md) |
-| `Timer` | ✔ | ✔ | [controls/timer.md](controls/timer.md) |
-| `ImageList` (+ badges) | ✔ | ✔ | [controls/imagelist.md](controls/imagelist.md) |
-| `Button` (image, `DialogResult`) | ✔ | ✔ | [controls/button.md](controls/button.md) |
-| `Label` (AutoSize/TextAlign/mnemonics/image) | ✔ | ✔ | [controls/label.md](controls/label.md) |
-| `LinkLabel` | ✔ | ✔ | [controls/linklabel.md](controls/linklabel.md) |
-| `TextBox` | ✔ | ✔ | [controls/textbox.md](controls/textbox.md) |
-| `MaskedTextBox` | ✔ | ✔ | [controls/maskedtextbox.md](controls/maskedtextbox.md) |
-| `RichTextBox` (+ RTF subset) | ✔ | ✔ | [controls/richtextbox.md](controls/richtextbox.md) |
-| `SearchBox` | ✔ | ✔ | [controls/searchbox.md](controls/searchbox.md) |
-| `FilePicker` / `FolderPicker` | ✔ | ✔ | [controls/filepicker.md](controls/filepicker.md) · [folderpicker.md](controls/folderpicker.md) |
-| `IconLabel` (image **and** text) | ✔ | ✔ | [controls/iconlabel.md](controls/iconlabel.md) |
-| `CheckBox` / `RadioButton` (images) | ✔ | ✔ | [controls/checkbox.md](controls/checkbox.md) · [radiobutton.md](controls/radiobutton.md) |
-| `ToggleSwitch` | ✔ | ✔ | [controls/toggleswitch.md](controls/toggleswitch.md) |
-| `SplitButton` / `DropDownButton` | ✔ | ✔ | [controls/splitbutton.md](controls/splitbutton.md) |
-| `NumericUpDown` / `DomainUpDown` | ✔ | ✔ | [controls/numericupdown.md](controls/numericupdown.md) · [domainupdown.md](controls/domainupdown.md) |
-| `TrackBar` | ✔ | ✔ | [controls/trackbar.md](controls/trackbar.md) |
-| `HScrollBar` / `VScrollBar` | ✔ | ✔ | [controls/scrollbar.md](controls/scrollbar.md) |
-| `ProgressBar` (incl. marquee) | ✔ | ✔ | [controls/progressbar.md](controls/progressbar.md) |
-| `ProgressTile` (Explorer-style drive tile) | ✔ | ✔ | [controls/progresstile.md](controls/progresstile.md) |
-| `Breadcrumb` (Explorer navigation bar) | ✔ | ✔ | [controls/breadcrumb.md](controls/breadcrumb.md) |
-| `DateTimePicker` | ✔ | ✔ | [controls/datetimepicker.md](controls/datetimepicker.md) |
-| `MonthCalendar` (title drill-down) | ✔ | ✔ | [controls/monthcalendar.md](controls/monthcalendar.md) |
-| `CalendarView` (Day/WorkWeek/Week/Month scheduler) | ✔ | ✔ | [controls/calendarview.md](controls/calendarview.md) |
-| `TimePicker` (double-click analog clock) | ✔ | ✔ | [controls/timepicker.md](controls/timepicker.md) |
-| `ClockFace` (analog dial, stand-alone or popup) | ✔ | ✔ | [controls/clockface.md](controls/clockface.md) |
-| `ColorPicker` (SV/wheel mixer, RGB·HSL·HSV·CMYK tabs, alpha, eyedropper) | ✔ | ✔ | [controls/colorpicker.md](controls/colorpicker.md) |
-| `PictureBox` | ✔ | ✔ | [controls/picturebox.md](controls/picturebox.md) |
-| `Panel` (AutoScroll) | ✔ | ✔ | [controls/panel.md](controls/panel.md) |
-| `GroupBox` (caption image, nesting) | ✔ | ✔ | [controls/groupbox.md](controls/groupbox.md) |
-| `TabControl` / `TabPage` | ✔ | ✔ | [controls/tabcontrol.md](controls/tabcontrol.md) |
-| `SplitContainer` | ✔ | ✔ | [controls/splitcontainer.md](controls/splitcontainer.md) |
-| `Expander` | ✔ | ✔ | [controls/expander.md](controls/expander.md) |
-| `Accordion` / `AccordionPane` | ✔ | ✔ | [controls/accordion.md](controls/accordion.md) |
-| `Ribbon` (tabs, groups, item model, overflow, minimize-to-strip + tab flyout) | ✔ | ✔ | [controls/ribbon.md](controls/ribbon.md) |
-| `GridPicker` / `RibbonGridButton` (Office table-size chooser) | ✔ | ✔ | [controls/gridpicker.md](controls/gridpicker.md) |
-| `DockPanel` / `DockContent` (dock, float, tab, split, auto-hide, persistence) | ✔ | ✔ | [controls/dockpanel.md](controls/dockpanel.md) |
-| `FlowLayoutPanel` | ✔ | ✔ | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md) |
-| `TableLayoutPanel` | ✔ | ✔ | [controls/tablelayoutpanel.md](controls/tablelayoutpanel.md) |
-| `ListBox` (selection modes, icons) | ✔ | ✔ | [controls/listbox.md](controls/listbox.md) |
-| `CheckedListBox` | ✔ | ✔ | [controls/checkedlistbox.md](controls/checkedlistbox.md) |
-| `ComboBox` | ✔ | ✔ | [controls/combobox.md](controls/combobox.md) |
-| `ListView` (5 views, groups, checks, sort, label edit, virtual mode, scroll bar) | ✔ | ✔ | [controls/listview.md](controls/listview.md) |
-| `TreeView` | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
-| `TreeListView` | ✔ | ✔ | [controls/treelistview.md](controls/treelistview.md) |
-| `DataGridView` (kinds, editing, frozen, reorder, clipboard) | ✔ | ✔ | [controls/datagridview.md](controls/datagridview.md) |
-| `MenuStrip` + item model | ✔ | ✔ | [controls/menustrip.md](controls/menustrip.md) |
-| `ContextMenuStrip` | ✔ | ✔ | [controls/contextmenustrip.md](controls/contextmenustrip.md) |
-| `ToolStrip` | ✔ | ✔ | [controls/toolstrip.md](controls/toolstrip.md) |
-| `StatusStrip` | ✔ | ✔ | [controls/statusstrip.md](controls/statusstrip.md) |
-| `ToolTip` | ✔ | ✔ | [controls/tooltip.md](controls/tooltip.md) |
-| `NotifyIcon` | ✔ | — | [controls/notifyicon.md](controls/notifyicon.md) |
-| Modal forms + `MessageBox` + common dialogs | ✔ | ✔ | [controls/dialogs.md](controls/dialogs.md) |
-| `SegmentedControl` | ✔ | ✔ | [controls/segmentedcontrol.md](controls/segmentedcontrol.md) |
-| `RangeSlider` (two-thumb) | ✔ | ✔ | [controls/rangeslider.md](controls/rangeslider.md) |
-| `InfoBar` + `Toast` (stacked, fading) | ✔ | ✔ | [controls/infobar.md](controls/infobar.md) |
-| `NavigationView` (collapsible rail) | ✔ | ✔ | [controls/navigationview.md](controls/navigationview.md) |
-| `TokenBox` (chips, autocomplete, per-chip style) | ✔ | ✔ | [controls/tokenbox.md](controls/tokenbox.md) |
-| `ZoomPanel` (wheel-zoom, pan, rulers, grid, zoom slider) | ✔ | ✔ | [controls/zoompanel.md](controls/zoompanel.md) |
-| `PropertyGrid` (typed rows, pickers, attribute generator) | ✔ | ✔ | [controls/propertygrid.md](controls/propertygrid.md) |
-| `CodeTextBox` (gutter, tokenizer, completion) | ✔ | ✔ | [controls/codetextbox.md](controls/codetextbox.md) |
-| `TreeView` inline label editing (F2) | ✔ | ✔ | [controls/treeview.md](controls/treeview.md) |
-| `[GridEditable]` source generator (packed as an analyzer in Core) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#attributes) |
-| `DataGridView` virtual mode (known + unknown size) | ✔ | — | [controls/datagridview.md](controls/datagridview.md) |
-| Attribute-driven `DataGridView` columns (generator) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes) |
-| Attribute-driven `ListView` columns + row factory (generator) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes) |
-| MVVM primitives + binding + `ICommand` wiring | ✔ | ✔ | [mvvm.md](mvvm.md) |
-| Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
+| Feature                                                                          | Tests | Demo | Docs                                                                                                 |
+| -------------------------------------------------------------------------------- | ----- | ---- | ---------------------------------------------------------------------------------------------------- |
+| Architecture (core/peer/realization/containers/popups/modal)                     | ✔     | —    | [architecture.md](architecture.md)                                                                   |
+| `Application` + `BackendRegistry`                                                | ✔     | ✔    | [controls/application.md](controls/application.md)                                                   |
+| `Control` base (incl. `Margin`, `PointToScreen`, `ContextMenuStrip`)             | ✔     | ✔    | [controls/control.md](controls/control.md)                                                           |
+| `Form` (modal, window management, icon)                                          | ✔     | ✔    | [controls/form.md](controls/form.md)                                                                 |
+| `Timer`                                                                          | ✔     | ✔    | [controls/timer.md](controls/timer.md)                                                               |
+| `ImageList` (+ badges)                                                           | ✔     | ✔    | [controls/imagelist.md](controls/imagelist.md)                                                       |
+| `Button` (image, `DialogResult`)                                                 | ✔     | ✔    | [controls/button.md](controls/button.md)                                                             |
+| `Label` (AutoSize/TextAlign/mnemonics/image)                                     | ✔     | ✔    | [controls/label.md](controls/label.md)                                                               |
+| `LinkLabel`                                                                      | ✔     | ✔    | [controls/linklabel.md](controls/linklabel.md)                                                       |
+| `TextBox`                                                                        | ✔     | ✔    | [controls/textbox.md](controls/textbox.md)                                                           |
+| `MaskedTextBox`                                                                  | ✔     | ✔    | [controls/maskedtextbox.md](controls/maskedtextbox.md)                                               |
+| `RichTextBox` (+ RTF subset)                                                     | ✔     | ✔    | [controls/richtextbox.md](controls/richtextbox.md)                                                   |
+| `SearchBox`                                                                      | ✔     | ✔    | [controls/searchbox.md](controls/searchbox.md)                                                       |
+| `FilePicker` / `FolderPicker`                                                    | ✔     | ✔    | [controls/filepicker.md](controls/filepicker.md) · [folderpicker.md](controls/folderpicker.md)       |
+| `IconLabel` (image **and** text)                                                 | ✔     | ✔    | [controls/iconlabel.md](controls/iconlabel.md)                                                       |
+| `CheckBox` / `RadioButton` (images)                                              | ✔     | ✔    | [controls/checkbox.md](controls/checkbox.md) · [radiobutton.md](controls/radiobutton.md)             |
+| `ToggleSwitch`                                                                   | ✔     | ✔    | [controls/toggleswitch.md](controls/toggleswitch.md)                                                 |
+| `SplitButton` / `DropDownButton`                                                 | ✔     | ✔    | [controls/splitbutton.md](controls/splitbutton.md)                                                   |
+| `NumericUpDown` / `DomainUpDown`                                                 | ✔     | ✔    | [controls/numericupdown.md](controls/numericupdown.md) · [domainupdown.md](controls/domainupdown.md) |
+| `TrackBar`                                                                       | ✔     | ✔    | [controls/trackbar.md](controls/trackbar.md)                                                         |
+| `HScrollBar` / `VScrollBar`                                                      | ✔     | ✔    | [controls/scrollbar.md](controls/scrollbar.md)                                                       |
+| `ProgressBar` (incl. marquee)                                                    | ✔     | ✔    | [controls/progressbar.md](controls/progressbar.md)                                                   |
+| `ProgressTile` (Explorer-style drive tile)                                       | ✔     | ✔    | [controls/progresstile.md](controls/progresstile.md)                                                 |
+| `Breadcrumb` (Explorer navigation bar)                                           | ✔     | ✔    | [controls/breadcrumb.md](controls/breadcrumb.md)                                                     |
+| `DateTimePicker`                                                                 | ✔     | ✔    | [controls/datetimepicker.md](controls/datetimepicker.md)                                             |
+| `MonthCalendar` (title drill-down)                                               | ✔     | ✔    | [controls/monthcalendar.md](controls/monthcalendar.md)                                               |
+| `CalendarView` (Day/WorkWeek/Week/Month scheduler)                               | ✔     | ✔    | [controls/calendarview.md](controls/calendarview.md)                                                 |
+| `TimePicker` (double-click analog clock)                                         | ✔     | ✔    | [controls/timepicker.md](controls/timepicker.md)                                                     |
+| `ClockFace` (analog dial, stand-alone or popup)                                  | ✔     | ✔    | [controls/clockface.md](controls/clockface.md)                                                       |
+| `ColorPicker` (SV/wheel mixer, RGB·HSL·HSV·CMYK tabs, alpha, eyedropper)         | ✔     | ✔    | [controls/colorpicker.md](controls/colorpicker.md)                                                   |
+| `PictureBox`                                                                     | ✔     | ✔    | [controls/picturebox.md](controls/picturebox.md)                                                     |
+| `Panel` (AutoScroll)                                                             | ✔     | ✔    | [controls/panel.md](controls/panel.md)                                                               |
+| `GroupBox` (caption image, nesting)                                              | ✔     | ✔    | [controls/groupbox.md](controls/groupbox.md)                                                         |
+| `TabControl` / `TabPage`                                                         | ✔     | ✔    | [controls/tabcontrol.md](controls/tabcontrol.md)                                                     |
+| `SplitContainer`                                                                 | ✔     | ✔    | [controls/splitcontainer.md](controls/splitcontainer.md)                                             |
+| `Expander`                                                                       | ✔     | ✔    | [controls/expander.md](controls/expander.md)                                                         |
+| `Accordion` / `AccordionPane`                                                    | ✔     | ✔    | [controls/accordion.md](controls/accordion.md)                                                       |
+| `Ribbon` (tabs, groups, item model, overflow, minimize-to-strip + tab flyout)    | ✔     | ✔    | [controls/ribbon.md](controls/ribbon.md)                                                             |
+| `GridPicker` / `RibbonGridButton` (Office table-size chooser)                    | ✔     | ✔    | [controls/gridpicker.md](controls/gridpicker.md)                                                     |
+| `DockPanel` / `DockContent` (dock, float, tab, split, auto-hide, persistence)    | ✔     | ✔    | [controls/dockpanel.md](controls/dockpanel.md)                                                       |
+| `FlowLayoutPanel`                                                                | ✔     | ✔    | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md)                                           |
+| `TableLayoutPanel`                                                               | ✔     | ✔    | [controls/tablelayoutpanel.md](controls/tablelayoutpanel.md)                                         |
+| `ListBox` (selection modes, icons)                                               | ✔     | ✔    | [controls/listbox.md](controls/listbox.md)                                                           |
+| `CheckedListBox`                                                                 | ✔     | ✔    | [controls/checkedlistbox.md](controls/checkedlistbox.md)                                             |
+| `ComboBox`                                                                       | ✔     | ✔    | [controls/combobox.md](controls/combobox.md)                                                         |
+| `ListView` (5 views, groups, checks, sort, label edit, virtual mode, scroll bar) | ✔     | ✔    | [controls/listview.md](controls/listview.md)                                                         |
+| `TreeView`                                                                       | ✔     | ✔    | [controls/treeview.md](controls/treeview.md)                                                         |
+| `TreeListView`                                                                   | ✔     | ✔    | [controls/treelistview.md](controls/treelistview.md)                                                 |
+| `DataGridView` (kinds, editing, frozen, reorder, clipboard)                      | ✔     | ✔    | [controls/datagridview.md](controls/datagridview.md)                                                 |
+| `MenuStrip` + item model                                                         | ✔     | ✔    | [controls/menustrip.md](controls/menustrip.md)                                                       |
+| `ContextMenuStrip`                                                               | ✔     | ✔    | [controls/contextmenustrip.md](controls/contextmenustrip.md)                                         |
+| `ToolStrip`                                                                      | ✔     | ✔    | [controls/toolstrip.md](controls/toolstrip.md)                                                       |
+| `StatusStrip`                                                                    | ✔     | ✔    | [controls/statusstrip.md](controls/statusstrip.md)                                                   |
+| `ToolTip`                                                                        | ✔     | ✔    | [controls/tooltip.md](controls/tooltip.md)                                                           |
+| `NotifyIcon`                                                                     | ✔     | —    | [controls/notifyicon.md](controls/notifyicon.md)                                                     |
+| Modal forms + `MessageBox` + common dialogs                                      | ✔     | ✔    | [controls/dialogs.md](controls/dialogs.md)                                                           |
+| `SegmentedControl`                                                               | ✔     | ✔    | [controls/segmentedcontrol.md](controls/segmentedcontrol.md)                                         |
+| `RangeSlider` (two-thumb)                                                        | ✔     | ✔    | [controls/rangeslider.md](controls/rangeslider.md)                                                   |
+| `InfoBar` + `Toast` (stacked, fading)                                            | ✔     | ✔    | [controls/infobar.md](controls/infobar.md)                                                           |
+| `NavigationView` (collapsible rail)                                              | ✔     | ✔    | [controls/navigationview.md](controls/navigationview.md)                                             |
+| `TokenBox` (chips, autocomplete, per-chip style)                                 | ✔     | ✔    | [controls/tokenbox.md](controls/tokenbox.md)                                                         |
+| `ZoomPanel` (wheel-zoom, pan, rulers, grid, zoom slider)                         | ✔     | ✔    | [controls/zoompanel.md](controls/zoompanel.md)                                                       |
+| `PropertyGrid` (typed rows, pickers, attribute generator)                        | ✔     | ✔    | [controls/propertygrid.md](controls/propertygrid.md)                                                 |
+| `CodeTextBox` (gutter, tokenizer, completion)                                    | ✔     | ✔    | [controls/codetextbox.md](controls/codetextbox.md)                                                   |
+| `TreeView` inline label editing (F2)                                             | ✔     | ✔    | [controls/treeview.md](controls/treeview.md)                                                         |
+| `[GridEditable]` source generator (packed as an analyzer in Core)                | ✔     | —    | [controls/propertygrid.md](controls/propertygrid.md#attributes)                                      |
+| `DataGridView` virtual mode (known + unknown size)                               | ✔     | —    | [controls/datagridview.md](controls/datagridview.md)                                                 |
+| Attribute-driven `DataGridView` columns (generator)                              | ✔     | —    | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes)                          |
+| Attribute-driven `ListView` columns + row factory (generator)                    | ✔     | —    | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes)                          |
+| MVVM primitives + binding + `ICommand` wiring                                    | ✔     | ✔    | [mvvm.md](mvvm.md)                                                                                   |
+| Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives)                | ✔     | ✔    | [custom-controls.md](custom-controls.md)                                                             |
 
 `NotifyIcon` has no gallery section (a tray icon in a demo is intrusive; Win32-only today).
 Colour and font dialogs are demoed indirectly through the modal `MessageBox` round-trip. The file
@@ -953,35 +955,39 @@ backend without the widget, and what runs the moment an app asks for something t
 
 ### Design rules (decide these before the first control moves)
 
-- [ ] **Capability gate per control.** Each promotable control declares the property subset that keeps
-      it native (e.g. a `ComboBox` with no per-item image, no custom `ItemHeight`, no `ForeColor`
-      override). Inside the gate → native peer; outside → canvas. The gate is evaluated **at
-      realization**, so the decision is made once, before a peer exists.
+- [x] **Capability gate per control.** Each promotable control declares the property subset that keeps
+      it native (`CheckBox`: no `Image`, since no platform box renders one beside the caption the way we
+      do). Inside the gate → native peer; outside → canvas. Evaluated **at realization**, in the control's
+      `CreatePeer` override, so the decision is made once, before a peer exists.
 - [ ] **Escaping the gate after realization.** Setting a property that leaves the gate must either
       re-realize the control onto a canvas peer or be documented as ignored. Pick one rule and apply
       it everywhere; silent divergence between backends is the failure mode to avoid.
-- [ ] **No behavioral fork in the public API.** `Checked`, `CheckedChanged`, `Items`, … behave
-      identically either way. Tests assert the *same* observable behavior against both paths.
-- [ ] **Opt-in switch.** A global (`Application.PreferNativeWidgets`) plus a per-control override, so
-      an app that wants pixel-identical cross-platform rendering can keep everything owner-drawn.
-- [ ] **Backends may decline.** A backend without the widget returns `null` from the factory and Core
-      falls back silently. macOS gets this for free — it declines everything until §10 M9 lands.
+- [x] **No behavioral fork in the public API.** `Checked`/`CheckedChanged` behave identically either way;
+      `NativePeerPromotionTests` asserts the *same* observable behaviour against both paths, including that
+      a widget-originated toggle raises the public event exactly once.
+- [x] **Opt-in switch.** `Application.PreferNativeWidgets` (default on) plus a per-control override
+      (`CheckBox.UseNativeWidget`), so an app that wants pixel-identical cross-platform rendering can keep
+      everything owner-drawn.
+- [x] **Backends may decline.** `IPlatformBackend.CreateCheckBox()` is a **default interface method
+      returning `null`**, so a backend opts in by overriding rather than being broken by a new member.
+      macOS and the headless test backend decline for free — which is what keeps the paint-level test
+      suite on the owner-drawn path.
 
 ### Promotion candidates, in payoff order
 
-| Control | Win32 | GTK 3 | Gate — stays native while… |
-|---|---|---|---|
-| [ ] `CheckBox` | `BUTTON` (`BS_AUTOCHECKBOX`) | `GtkCheckButton` | no `Image`, no colour override |
-| [ ] `RadioButton` | `BUTTON` (`BS_AUTORADIOBUTTON`) | `GtkRadioButton` | as above |
-| [ ] `ProgressBar` | `msctls_progress32` | `GtkProgressBar` | always (incl. marquee) |
-| [ ] `TrackBar` | `msctls_trackbar32` | `GtkScale` | no custom tick painting |
-| [ ] `HScrollBar` / `VScrollBar` | `SCROLLBAR` | `GtkScrollbar` | always |
-| [ ] `GroupBox` | `BUTTON` (`BS_GROUPBOX`) | `GtkFrame` | no caption image |
-| [ ] `ComboBox` | `COMBOBOX` | `GtkComboBoxText` | no per-item image, no owner-draw, no placeholder |
-| [ ] `ListBox` | `LISTBOX` | `GtkListBox` | plain string items, single/extended selection only |
-| [ ] `LinkLabel` | `SysLink` | `GtkLinkButton` | single link spanning the whole text |
-| [ ] `NumericUpDown` | `EDIT` + `msctls_updown32` | `GtkSpinButton` | no custom formatting delegate |
-| [ ] `ToolTip` | `tooltips_class32` | `GtkTooltip` | text-only tips |
+| Control                         | Win32                           | GTK 3             | Gate — stays native while…                         |
+| ------------------------------- | ------------------------------- | ----------------- | -------------------------------------------------- |
+| [x] `CheckBox`                  | `BUTTON` (`BS_AUTOCHECKBOX`) — pending    | `GtkCheckButton` — SHIPPED  | no `Image`                     |
+| [ ] `RadioButton`               | `BUTTON` (`BS_AUTORADIOBUTTON`) | `GtkRadioButton`  | as above                                           |
+| [ ] `ProgressBar`               | `msctls_progress32`             | `GtkProgressBar`  | always (incl. marquee)                             |
+| [ ] `TrackBar`                  | `msctls_trackbar32`             | `GtkScale`        | no custom tick painting                            |
+| [ ] `HScrollBar` / `VScrollBar` | `SCROLLBAR`                     | `GtkScrollbar`    | always                                             |
+| [ ] `GroupBox`                  | `BUTTON` (`BS_GROUPBOX`)        | `GtkFrame`        | no caption image                                   |
+| [ ] `ComboBox`                  | `COMBOBOX`                      | `GtkComboBoxText` | no per-item image, no owner-draw, no placeholder   |
+| [ ] `ListBox`                   | `LISTBOX`                       | `GtkListBox`      | plain string items, single/extended selection only |
+| [ ] `LinkLabel`                 | `SysLink`                       | `GtkLinkButton`   | single link spanning the whole text                |
+| [ ] `NumericUpDown`             | `EDIT` + `msctls_updown32`      | `GtkSpinButton`   | no custom formatting delegate                      |
+| [ ] `ToolTip`                   | `tooltips_class32`              | `GtkTooltip`      | text-only tips                                     |
 
 Asymmetric candidates (one platform only, so the other keeps owner-draw): `ToggleSwitch` →
 `GtkSwitch`; `Expander` → `GtkExpander`; `SplitContainer` → `GtkPaned`.
@@ -1074,18 +1080,18 @@ strictly better failure mode, AOT-clean.
 The reference ships custom column types plus attributes that select them. Ours already has 15 kinds, so
 this is mostly a mapping exercise — and we cover more kinds than the reference does.
 
-| Reference column / attribute | Our `DataGridViewColumnKind` |
-|---|---|
-| `DataGridViewBoundComboBoxColumn` · `DataGridViewComboboxColumnAttribute` | `ComboBox` + `ItemsSelector` |
-| `DataGridViewDateTimePickerColumn` | `DateTime` |
-| `DataGridViewDisableButtonColumn` · `DataGridViewButtonColumnAttribute` | `Button` + `EnabledSelector` |
-| `DataGridViewImageAndTextColumn` · `DataGridViewImageAndTextColumnAttribute` | `Text` + `ImageSelector` |
-| `DataGridViewMultiImageColumn` · `DataGridViewMultiImageColumnAttribute` | `MultiImage` + `ImagesSelector` |
-| `DataGridViewNumericUpDownColumn` · `DataGridViewNumericUpDownColumnAttribute` | `NumericUpDown` |
-| `DataGridViewProgressBarColumn` · `DataGridViewProgressBarColumnAttribute` | `Progress` + `ProgressSelector` |
-| `DataGridViewCheckboxColumnAttribute` | `Check` + `CheckedSelector`/`CheckedSetter` |
-| `DataGridViewImageColumnAttribute` | `Text` + `ImageSelector` (image-only cell) |
-| — (no reference equivalent) | `Link`, `MaskedText`, `DomainUpDown`, `Color`, `ListBox`, `CheckedListBox`, `TimePicker` |
+| Reference column / attribute                                                   | Our `DataGridViewColumnKind`                                                             |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `DataGridViewBoundComboBoxColumn` · `DataGridViewComboboxColumnAttribute`      | `ComboBox` + `ItemsSelector`                                                             |
+| `DataGridViewDateTimePickerColumn`                                             | `DateTime`                                                                               |
+| `DataGridViewDisableButtonColumn` · `DataGridViewButtonColumnAttribute`        | `Button` + `EnabledSelector`                                                             |
+| `DataGridViewImageAndTextColumn` · `DataGridViewImageAndTextColumnAttribute`   | `Text` + `ImageSelector`                                                                 |
+| `DataGridViewMultiImageColumn` · `DataGridViewMultiImageColumnAttribute`       | `MultiImage` + `ImagesSelector`                                                          |
+| `DataGridViewNumericUpDownColumn` · `DataGridViewNumericUpDownColumnAttribute` | `NumericUpDown`                                                                          |
+| `DataGridViewProgressBarColumn` · `DataGridViewProgressBarColumnAttribute`     | `Progress` + `ProgressSelector`                                                          |
+| `DataGridViewCheckboxColumnAttribute`                                          | `Check` + `CheckedSelector`/`CheckedSetter`                                              |
+| `DataGridViewImageColumnAttribute`                                             | `Text` + `ImageSelector` (image-only cell)                                               |
+| — (no reference equivalent)                                                    | `Link`, `MaskedText`, `DomainUpDown`, `Color`, `ListBox`, `CheckedListBox`, `TimePicker` |
 
 - [ ] Attributes must be able to select **every one of our 15 kinds**, not only the nine the reference
       covers — the extra seven get attributes of their own so the annotation route is never weaker than
@@ -1099,15 +1105,15 @@ this is mostly a mapping exercise — and we cover more kinds than the reference
 The reference has a richer image model than a single selector, and this is the part of the parity map
 that needs new grid capability rather than new plumbing:
 
-| Capability | Reference | Ours today |
-|---|---|---|
-| Image from an `ImageList` + key/index property | `imageListPropertyName` + `imageKeyPropertyName` | expressible — the generated `ImageSelector` closes over our [`ImageList`](controls/imagelist.md) |
-| Image straight from a property | `imagePropertyName` | expressible — `ImageSelector` |
-| Several images per cell | `DataGridViewMultiImageColumnAttribute` (+ max size, padding, margin, per-image click and tooltip provider) | `ImagesSelector` + `MaxImageSize`/`ImageGap`/`ImagePadding`/`ImageTooltipSelector`; per-icon click reports its index via `CellContentClick` (shipped) |
-| Image *and* text in one cell, with relation | `textImageRelation` (`ImageBeforeText`, …) | `ImageSelector` + `TextImageRelation` (shipped) |
-| Fixed image box + aspect ratio | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio` | `ImageSize` + `KeepImageAspectRatio` (shipped) |
-| Conditional image overlay, stackable | `SupportsConditionalImageAttribute` (`AllowMultiple`) | `OverlayImagesSelector` (shipped) |
-| Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side) | **missing** |
+| Capability                                      | Reference                                                                                                   | Ours today                                                                                                                                            |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Image from an `ImageList` + key/index property  | `imageListPropertyName` + `imageKeyPropertyName`                                                            | expressible — the generated `ImageSelector` closes over our [`ImageList`](controls/imagelist.md)                                                      |
+| Image straight from a property                  | `imagePropertyName`                                                                                         | expressible — `ImageSelector`                                                                                                                         |
+| Several images per cell                         | `DataGridViewMultiImageColumnAttribute` (+ max size, padding, margin, per-image click and tooltip provider) | `ImagesSelector` + `MaxImageSize`/`ImageGap`/`ImagePadding`/`ImageTooltipSelector`; per-icon click reports its index via `CellContentClick` (shipped) |
+| Image *and* text in one cell, with relation     | `textImageRelation` (`ImageBeforeText`, …)                                                                  | `ImageSelector` + `TextImageRelation` (shipped)                                                                                                       |
+| Fixed image box + aspect ratio                  | `fixedImageWidth`, `fixedImageHeight`, `keepAspectRatio`                                                    | `ImageSize` + `KeepImageAspectRatio` (shipped)                                                                                                        |
+| Conditional image overlay, stackable            | `SupportsConditionalImageAttribute` (`AllowMultiple`)                                                       | `OverlayImagesSelector` (shipped)                                                                                                                     |
+| Repeated image N times (rating/severity strips) | `ListViewRepeatedImageAttribute` (list side)                                                                | **missing**                                                                                                                                           |
 
 - [x] Add `TextImageRelation` to `DataGridViewColumn` (we already have the enum, used by
       [`IconLabel`](controls/iconlabel.md) and [`Button`](controls/button.md)) — placed through the shared
@@ -1123,20 +1129,20 @@ that needs new grid capability rather than new plumbing:
 
 ### 14.3 The rest of the parity map
 
-| Reference attribute | Capability | Our target |
-|---|---|---|
-| `DataGridViewCellDisplayTextAttribute` | Cell text sourced from another property | `ValueSelector` pointed at the named property |
-| `DataGridViewCellStyleAttribute` | Per-cell fore/back/format/alignment/wrap — each literal *or* from a named property — gated by `conditionalPropertyName`; stackable | `CellStyleSelector` |
-| `DataGridViewCellTooltipAttribute` | Tooltip literal or property-sourced, with format + condition; stackable | `TooltipSelector` |
-| `DataGridViewClickableAttribute` | `onClickMethodName` / `onDoubleClickMethodName` per cell | `CellContentClick` routed to the resolved method |
-| `DataGridViewColumnSortModeAttribute` | Per-column sort mode | `SortMode` (+ `SortComparison`) |
-| `DataGridViewColumnWidthAttribute` | Width in pixels, in characters, or sized to a sample string; auto-size mode | `Width` / `AutoSizeMode` |
-| `DataGridViewConditionalReadOnlyAttribute` | Read-only while a named `bool` property is true | `ReadOnlyCellSelector` |
-| `DataGridViewConditionalRowHiddenAttribute` | Hide the row while a named property is true | `RowHiddenSelector` (shipped) |
-| `DataGridViewFullMergedRowAttribute` | Row drawn as one merged heading cell, heading text from a property | bind to our existing merged rows |
-| `DataGridViewRowHeightAttribute` | Fixed height, or height from a named property, condition-gated | `RowHeightSelector` (shipped) |
-| `DataGridViewRowSelectableAttribute` | Row selectable only while a named property is true | `RowSelectableSelector` (shipped) |
-| `DataGridViewRowStyleAttribute` | Per-row fore/back/format + bold/italic/underline/strikeout, literal or property-sourced, condition-gated; stackable | `CellStyleSelector` applied row-wide |
+| Reference attribute                         | Capability                                                                                                                         | Our target                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `DataGridViewCellDisplayTextAttribute`      | Cell text sourced from another property                                                                                            | `ValueSelector` pointed at the named property    |
+| `DataGridViewCellStyleAttribute`            | Per-cell fore/back/format/alignment/wrap — each literal *or* from a named property — gated by `conditionalPropertyName`; stackable | `CellStyleSelector`                              |
+| `DataGridViewCellTooltipAttribute`          | Tooltip literal or property-sourced, with format + condition; stackable                                                            | `TooltipSelector`                                |
+| `DataGridViewClickableAttribute`            | `onClickMethodName` / `onDoubleClickMethodName` per cell                                                                           | `CellContentClick` routed to the resolved method |
+| `DataGridViewColumnSortModeAttribute`       | Per-column sort mode                                                                                                               | `SortMode` (+ `SortComparison`)                  |
+| `DataGridViewColumnWidthAttribute`          | Width in pixels, in characters, or sized to a sample string; auto-size mode                                                        | `Width` / `AutoSizeMode`                         |
+| `DataGridViewConditionalReadOnlyAttribute`  | Read-only while a named `bool` property is true                                                                                    | `ReadOnlyCellSelector`                           |
+| `DataGridViewConditionalRowHiddenAttribute` | Hide the row while a named property is true                                                                                        | `RowHiddenSelector` (shipped)                    |
+| `DataGridViewFullMergedRowAttribute`        | Row drawn as one merged heading cell, heading text from a property                                                                 | bind to our existing merged rows                 |
+| `DataGridViewRowHeightAttribute`            | Fixed height, or height from a named property, condition-gated                                                                     | `RowHeightSelector` (shipped)                    |
+| `DataGridViewRowSelectableAttribute`        | Row selectable only while a named property is true                                                                                 | `RowSelectableSelector` (shipped)                |
+| `DataGridViewRowStyleAttribute`             | Per-row fore/back/format + bold/italic/underline/strikeout, literal or property-sourced, condition-gated; stackable                | `CellStyleSelector` applied row-wide             |
 
 Beyond the grid the same library annotates `ListView` — `ListViewColumnAttribute`,
 `ListViewColumnColorAttribute`, `ListItemImageAttribute` (image list + key/index),
