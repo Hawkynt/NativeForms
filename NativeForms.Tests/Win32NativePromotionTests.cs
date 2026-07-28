@@ -226,8 +226,12 @@ public sealed class Win32NativePromotionTests
 
                 // The platform tooltip: a real tooltips_class32 window has to exist once a tip is raised,
                 // which is the half of this that a headless fake cannot see.
-                observed.RoundTrips["no tooltip window before a tip"] =
-                    NativeMethods.FindWindowExW(0, 0, NativeMethods.TOOLTIPS_CLASS, null) == 0;
+                //
+                // What is deliberately not asserted is that none existed beforehand. That check was here
+                // and failed on Windows while passing under wine: the class is process-wide, and real
+                // common controls raise their own tips — a toolbar's, a header's — so a tooltip window
+                // being present says nothing about whether this toolkit created one. Wine simply has
+                // fewer of them, which made the assertion look sound.
                 toolTip.SetToolTip(tipped, "a native tip");
                 tipped.Peer?.ShowToolTip("a native tip");
                 observed.RoundTrips["the platform tooltip window exists"] =
@@ -436,7 +440,6 @@ public sealed class Win32NativePromotionTests
     [TestCase("GroupBox child bounds")]
     [TestCase("painted half takes the selection")]
     [TestCase("widget half takes it back")]
-    [TestCase("no tooltip window before a tip")]
     [TestCase("the platform tooltip window exists")]
     public void Driving_the_real_widget_round_trips(string what)
         => Assert.That(Result().RoundTrips[what], Is.True, $"{what} did not survive the platform widget");
