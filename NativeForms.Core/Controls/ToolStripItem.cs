@@ -184,8 +184,13 @@ public abstract class ToolStripItem
     /// <see cref="ImageIndex"/>/<see cref="ImageKey"/> materialized against <paramref name="backend"/>.</summary>
     internal IImage? ResolveImage(IPlatformBackend? backend)
     {
+        // An AnimatedImage — what the decoders hand back, and what a caller builds for a drawn icon —
+        // describes pixels rather than being a bitmap the backend can blit, so it is resolved to its
+        // current frame here. Handing it over raw paints nothing at all.
         if (this.Image is { } direct)
-            return direct;
+            return direct is AnimatedImage animated && backend is not null
+                ? animated.FrameImage(backend, animated.CurrentFrameIndex(Environment.TickCount64))
+                : direct;
 
         var images = this.ImageList;
         var index = ImageList.ResolveIndex(images, this.ImageIndex, this.ImageKey);
