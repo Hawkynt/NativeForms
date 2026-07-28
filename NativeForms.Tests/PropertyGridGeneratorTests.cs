@@ -115,6 +115,8 @@ internal sealed class PropertyGridGeneratorTests
 
             var width = grid.Columns.Single(c => c.HeaderText == "Width");
             Assert.That(width.Kind, Is.EqualTo(DataGridViewColumnKind.NumericUpDown), "int infers a numeric column");
+            Assert.That(width.Minimum, Is.EqualTo(0m), "[GridRange] clamps the grid editor as well as the inspector's");
+            Assert.That(width.Maximum, Is.EqualTo(400m));
             Assert.That(width.Width, Is.EqualTo(90), "[GridColumnWidth]");
             Assert.That(width.SortMode, Is.EqualTo(DataGridViewColumnSortMode.Automatic), "[GridColumnSortMode]");
 

@@ -1257,9 +1257,10 @@ this is mostly a mapping exercise — and we cover more kinds than the reference
 | `DataGridViewImageColumnAttribute`                                             | `Text` + `ImageSelector` (image-only cell)                                               |
 | — (no reference equivalent)                                                    | `Link`, `MaskedText`, `DomainUpDown`, `Color`, `ListBox`, `CheckedListBox`, `TimePicker` |
 
-- [ ] Attributes must be able to select **every one of our 15 kinds**, not only the nine the reference
-      covers — the extra seven get attributes of their own so the annotation route is never weaker than
-      hand-built columns.
+- [x] Attributes must be able to select **every one of our 15 kinds**, not only the nine the reference
+      covers. `[GridColumnKind]` takes the enum, so every kind is nameable, and the eight a property type
+      implies are inferred; `GeneratedColumnKindTests` sweeps the enum and fails if a kind is ever added
+      without an annotation route.
 - [x] Kind is **inferred from the property type** and overridable by `[GridColumnKind]`: `bool` → `Check`,
       numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
       `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
@@ -1326,26 +1327,34 @@ populator.
 - [x] **Member references are `nameof`-friendly strings, resolved at compile time.** An unresolved name
       is `NFG002` and a wrong-typed one is `NFG003` — both **build errors**. Handler-signature checking
       arrives with the click attributes.
-- [ ] **Stackable attributes stay stackable.** Style, tooltip and conditional-image attributes are
-      `AllowMultiple` in the reference and must remain so here — first matching condition wins, with
-      the evaluation order documented.
-- [ ] **Reuse the inspector vocabulary where the meaning is identical** (`[GridIgnore]`,
-      `[GridDisplayName]`, `[GridDescription]`, `[GridRange]`); grid-only concerns get grid-only
-      attributes.
+- [x] **Conditions compose — through the model, not through stacked attributes.** The reference makes
+      its conditional-image attribute `AllowMultiple` and evaluates the list in order. We reached the same
+      capability from the other side: `[GridColumnOverlayImages]` names one member that returns *the badges
+      that currently apply*, so several conditions compose in ordinary C# where they can be read, debugged
+      and unit-tested, and the order is the order of the returned list. That is one attribute instead of a
+      stack of them, and it removes the question of what an attribute's evaluation order even means when
+      two of them disagree. The porting table on [`datagridview.md`](controls/datagridview.md) maps the
+      reference's spelling onto it.
+- [x] **Reuse the inspector vocabulary where the meaning is identical**: `[GridIgnore]` drops a member
+      from both populators, `[GridDisplayName]` names both the row and the column header, and
+      `[GridRange]` now clamps the grid's numeric editor as well as the inspector's — one model does not
+      describe two ranges. `[GridDescription]` stays inspector-only, since a grid has nowhere to put it
+      that is not a tooltip, and tooltips are per cell rather than per column here. Grid-only concerns
+      keep grid-only attributes.
 - [x] **Columns only.** The populator never materializes rows, so it composes with §13's virtual mode.
 - [x] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
       hand-built columns still work; only the generated method is absent.
 
 ### 15.5 Acceptance
 
-- [ ] An annotated model generates a grid whose column kinds, headers, widths, order, images and
+- [x] An annotated model generates a grid whose column kinds, headers, widths, order, images and
       per-row styling match the annotations, asserted headlessly.
 - [x] Editing a generated cell writes through to the model instance (`ValueSetter`; a get-only property
       yields a read-only column).
 - [~] A misspelled `…PropertyName` (`NFG002`) and a wrong-typed condition (`NFG003`) fail the **build**;
       handler-signature checking lands with the click attributes.
-- [ ] Every one of the 15 column kinds is reachable from attributes.
+- [x] Every one of the 15 column kinds is reachable from attributes.
 - [x] The same model still generates a working `PropertyGrid`.
 - [x] `dotnet publish -p:PublishAot=true` on a consumer stays clean.
-- [ ] [`datagridview.md`](controls/datagridview.md) and [`propertygrid.md`](controls/propertygrid.md)
+- [x] [`datagridview.md`](controls/datagridview.md) and [`propertygrid.md`](controls/propertygrid.md)
       document the shared vocabulary, with a porting table from the reference library's names.

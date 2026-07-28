@@ -179,6 +179,14 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
                 && ResolveBool(spc, type, prop, "[GridColumnReadOnlyWhen]", readOnlyWhen))
                 sb.Append("                ReadOnlyCellSelector = r => ").Append(row).Append('.').Append(readOnlyWhen).AppendLine(",");
 
+            // The inspector's own bounds carry over: the same annotation that clamps a PropertyGrid
+            // editor clamps the grid's numeric editor, so one model does not describe two ranges.
+            if (GetRange(prop) is { } range)
+                sb.Append("                Minimum = ").Append(range.Min.ToString("R", CultureInfo.InvariantCulture))
+                  .AppendLine("m,")
+                  .Append("                Maximum = ").Append(range.Max.ToString("R", CultureInfo.InvariantCulture))
+                  .AppendLine("m,");
+
             EmitImages(sb, spc, type, prop, row);
 
             sb.AppendLine("            });");
