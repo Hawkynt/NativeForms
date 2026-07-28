@@ -1783,6 +1783,9 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>The width of the header zone the filter funnel claims from the sort/reorder gesture.</summary>
     private const int _FilterZoneWidth = 16;
 
+    /// <summary>The width the sort arrow occupies at a header's trailing edge.</summary>
+    private const int _SortArrowZoneWidth = 14;
+
     /// <summary>The funnel's own width inside that zone.</summary>
     private const int _FilterGlyphWidth = 10;
 
@@ -2294,11 +2297,30 @@ public class DataGridView : OwnerDrawnControl
 
             if (column.Frozen == frozen)
             {
-                GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, column.Width, header), column.HeaderText, column.Alignment, _CellPadding, separator: false);
-                if (ReferenceEquals(column, _sortedColumn) && _sortOrder != SortOrder.None)
-                    GlyphRenderer.DrawSortArrow(g, theme.HeaderText, new Rectangle(x + column.Width - 14, 0, 10, header), _sortOrder == SortOrder.Ascending);
+                // The funnel takes the trailing corner and the sort arrow sits inboard of it, so the
+                // two never share pixels and the caption is told what both cost.
+                var filterReserve = this.AllowUserToFilterColumns ? _FilterZoneWidth : 0;
+                var sorted = ReferenceEquals(column, _sortedColumn) && _sortOrder != SortOrder.None;
+                var sortReserve = sorted ? _SortArrowZoneWidth : 0;
 
-                if (this.AllowUserToFilterColumns)
+                GlyphRenderer.DrawHeaderCell(
+                    g,
+                    theme,
+                    new Rectangle(x, 0, column.Width, header),
+                    column.HeaderText,
+                    column.Alignment,
+                    _CellPadding,
+                    separator: false,
+                    trailingReserve: filterReserve + sortReserve);
+
+                if (sorted)
+                    GlyphRenderer.DrawSortArrow(
+                        g,
+                        theme.HeaderText,
+                        new Rectangle(x + column.Width - _SortArrowZoneWidth - filterReserve, 0, 10, header),
+                        _sortOrder == SortOrder.Ascending);
+
+                if (filterReserve > 0)
                     GlyphRenderer.DrawFilterFunnel(
                         g,
                         column.Filter is null ? theme.HeaderText : theme.Accent,

@@ -1196,6 +1196,10 @@ internal sealed class RecordingGraphics : IGraphics
     /// <summary>Every text draw with the font it used, so tests can assert font adoption.</summary>
     public List<(string Text, Font Font)> TextDraws { get; } = [];
 
+    /// <summary>The rectangle each text draw was laid out in, so a test can assert that a glyph in the
+    /// trailing corner of a header was actually reserved space rather than painted over the caption.</summary>
+    public List<(string Text, Rectangle Bounds)> TextRects { get; } = [];
+
     /// <summary>
     /// The clip the surface starts with — the control's client rectangle. Unbounded by default so
     /// the many tests that only assert draw calls stay unaffected; the canvas peer sets it to the
@@ -1253,6 +1257,7 @@ internal sealed class RecordingGraphics : IGraphics
     {
         this.Record($"text \"{text}\" {Hex(color)} {alignment} @{bounds.X},{bounds.Y}", bounds);
         this.TextDraws.Add((text, font));
+        this.TextRects.Add((text, bounds));
     }
 
     public Size MeasureText(string text, Font font) => Measure(text);

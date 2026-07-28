@@ -263,6 +263,38 @@ internal sealed class DataGridViewColumnFilterTests
         });
     }
 
+    /// <summary>The rectangle a header caption was laid out in.</summary>
+    private static System.Drawing.Rectangle HeaderRectOf(HeadlessCanvasPeer canvas, string caption)
+        => canvas.RaisePaint().TextRects.First(draw => draw.Text == caption).Bounds;
+
+    [Test]
+    public void The_funnel_is_reserved_space_rather_than_painted_over_the_caption()
+    {
+        // Found on screen, not here: with the caption laid out across the whole cell, a right-aligned
+        // header ran straight under the funnel. A headless test sees text and a glyph both drawn and
+        // is perfectly happy; only the rectangles say whether they overlap.
+        var grid = MakeGrid(out _, out var canvas);
+        var withFunnels = HeaderRectOf(canvas, "City");
+
+        grid.AllowUserToFilterColumns = false;
+        var without = HeaderRectOf(canvas, "City");
+
+        Assert.That(withFunnels.Right, Is.LessThanOrEqualTo(without.Right - 16), "the funnel's 16 px are kept clear");
+    }
+
+    [Test]
+    public void A_sorted_and_filtered_header_reserves_room_for_both_glyphs()
+    {
+        var grid = MakeGrid(out _, out var canvas);
+        var filteredOnly = HeaderRectOf(canvas, "City");
+
+        grid.Columns[1].SortMode = DataGridViewColumnSortMode.Automatic;
+        grid.Sort(grid.Columns[1], SortOrder.Ascending);
+        var both = HeaderRectOf(canvas, "City");
+
+        Assert.That(both.Right, Is.LessThanOrEqualTo(filteredOnly.Right - 14), "the arrow sits inboard of the funnel, not under it");
+    }
+
     [Test]
     public void A_filtered_row_takes_no_selection()
     {

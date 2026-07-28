@@ -109,6 +109,12 @@ internal static class GlyphRenderer
 
     /// <summary>Draws one column-header cell: header-colored face, the caption clipped and padded
     /// inside it, and optionally the separator after its trailing edge.</summary>
+    /// <param name="trailingReserve">
+    /// Width kept clear at the trailing edge for glyphs the caller paints there — a sort arrow, a
+    /// filter funnel. The face still fills the whole cell; only the caption gives way. Without it a
+    /// right-aligned caption runs straight under those glyphs, which is invisible in a headless test
+    /// and obvious on screen.
+    /// </param>
     public static void DrawHeaderCell(
         IGraphics g,
         ITheme theme,
@@ -116,11 +122,12 @@ internal static class GlyphRenderer
         string text,
         ContentAlignment alignment,
         int textPadding,
-        bool separator)
+        bool separator,
+        int trailingReserve = 0)
     {
         g.FillRectangle(theme.HeaderBackground, bounds);
         g.PushClip(bounds);
-        var textRect = new Rectangle(bounds.X + textPadding, bounds.Y, Math.Max(0, bounds.Width - (2 * textPadding)), bounds.Height);
+        var textRect = new Rectangle(bounds.X + textPadding, bounds.Y, Math.Max(0, bounds.Width - (2 * textPadding) - trailingReserve), bounds.Height);
         g.DrawText(text, theme.DefaultFont, theme.HeaderText, textRect, alignment);
         g.PopClip();
 
@@ -206,19 +213,19 @@ internal static class GlyphRenderer
         var left = bounds.X;
         var width = Math.Max(6, Math.Min(bounds.Width, 8));
         var top = bounds.Y + ((bounds.Height - 7) / 2);
-
-        // The bowl: four lines narrowing by one pixel a side, then a two-pixel stem below it.
-        for (var row = 0; row < 4; ++row)
-            g.DrawLine(color, left + row, top + row, left + width - row, top + row);
-
         var stem = left + (width / 2);
+
+        // The outline: a rim, two sides tapering to the stem, and the stem below it.
+        g.DrawLine(color, left, top, left + width, top);
+        g.DrawLine(color, left, top, stem, top + 4);
+        g.DrawLine(color, left + width, top, stem, top + 4);
         g.DrawLine(color, stem, top + 4, stem, top + 6);
 
         if (!active)
             return;
 
-        // An active filter fills the bowl, which reads as "this column is doing something" without
-        // needing a second glyph or a colour the theme does not offer.
+        // An active filter fills the bowl. Shape rather than colour, so the header still says which
+        // columns are narrowing under high contrast or on a monochrome print of a bug report.
         for (var row = 1; row < 4; ++row)
             g.DrawLine(color, left + row, top + row, left + width - row, top + row);
     }
