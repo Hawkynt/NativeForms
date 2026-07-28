@@ -190,6 +190,17 @@ public sealed class DataGridViewColumn
     /// <see cref="DataGridViewColumnSortMode.NotSortable"/>.</summary>
     public DataGridViewColumnSortMode SortMode { get; set; }
 
+    /// <summary>
+    /// The display values this column accepts, or <see langword="null"/> when it filters nothing.
+    /// A row shows only while every filtered column accepts the text that column displays for it.
+    /// </summary>
+    /// <remarks>
+    /// Values rather than a predicate, because that is what the filter menu offers and what a saved
+    /// layout can round-trip. A column whose set is empty hides every row, which is what unchecking
+    /// everything in the menu means and is deliberately not silently corrected to "no filter".
+    /// </remarks>
+    public IReadOnlyCollection<string>? Filter { get; set; }
+
     /// <summary>Optional row-item comparison used when this column sorts; <see langword="null"/> falls
     /// back to comparing the values <see cref="ValueSelector"/> produces.</summary>
     public Comparison<object?>? SortComparison { get; set; }

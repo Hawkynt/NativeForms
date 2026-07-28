@@ -29,6 +29,28 @@ public static class Strings
         }
     } = "Search";
 
+    /// <summary>The all-or-nothing entry heading a column's filter menu.</summary>
+    public static string FilterAll
+    {
+        get => field;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            field = value;
+        }
+    } = "(All)";
+
+    /// <summary>What a column's filter menu calls the empty value, which would otherwise be a blank row.</summary>
+    public static string FilterBlank
+    {
+        get => field;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            field = value;
+        }
+    } = "(Blank)";
+
     /// <summary>The header of the implicit <see cref="ListView"/> group holding ungrouped items.</summary>
     public static string DefaultListViewGroupHeader
     {
@@ -130,6 +152,8 @@ public static class Strings
     public static void Reset()
     {
         SearchPlaceholder = "Search";
+        FilterAll = "(All)";
+        FilterBlank = "(Blank)";
         DefaultListViewGroupHeader = "Default";
         ShortcutControlPrefix = "Ctrl+";
         ShortcutShiftPrefix = "Shift+";

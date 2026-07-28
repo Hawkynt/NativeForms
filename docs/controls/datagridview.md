@@ -49,7 +49,12 @@ Inherits the common members of [`Control`](control.md).
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `AllowUserToOrderColumns` | `bool` | `false` | Whether dragging a header past a neighbor reorders the display by rewriting `DisplayIndex` — `Columns` keeps its model order. |
+| `AllowUserToFilterColumns` | `bool` | `false` | Whether each header shows a filter funnel that opens the column's distinct values as a searchable, checkable menu. |
 | `AllowUserToResizeColumns` | `bool` | `true` | Whether dragging a column divider in the header resizes that column (±3 px grab zone). |
+| `ColumnFilterChanged` | event | Raised after a column's filter changed, from the menu or from `SetColumnFilter`; `ColumnIndex` names the column. |
+| `CreateColumnFilterMenu(DataGridViewColumn)` | method | Builds the searchable filter menu for a column — open it from your own gesture instead of the header funnel. |
+| `GetFilterValues(DataGridViewColumn)` | method | The column's distinct display values in first-seen order, computed over the rows the *other* columns' filters still admit. |
+| `SetColumnFilter(DataGridViewColumn, IReadOnlyCollection<string>?)` | method | Applies a column's accepted display values (`null` clears the filter) and re-lays out. |
 | `AlternatingRowColor` | `Color` | `#F6F6F6` | Background tint of alternating rows. |
 | `AlternatingRows` | `bool` | `false` | Whether every other data row (in display order) is tinted with `AlternatingRowColor`. |
 | `ColumnHeaderHeight` | `int` | `RetrieveVirtualRow` | `event EventHandler<RetrieveVirtualRowEventArgs>` | — | Fetches the row item at an index while `VirtualMode` is on. Called once per visible row per paint. |
@@ -152,6 +157,7 @@ Core members:
 | `MinimumWidth` | `int` | `8` | The narrowest width the column accepts (floored at 2 px): the lower bound of a divider drag and of a `Fill` column's share. |
 | `ReadOnly` | `bool` | `false` | Whether every cell in the column refuses edits and check toggling. |
 | `ReadOnlyCellSelector` | `Func<object?, bool>?` | `null` | Per-cell read-only predicate over the row item. |
+| `Filter` | `IReadOnlyCollection<string>?` | `null` | The display values this column accepts; `null` filters nothing and an empty set hides every row. |
 | `Resizable` | `DataGridViewTriState` | `NotSet` | Whether the user may drag this column's divider: `True`/`False` override the grid's `AllowUserToResizeColumns`; `NotSet` inherits it — WinForms semantics. |
 | `SortComparison` | `Comparison<object?>?` | `null` | Row-item comparison used when this column sorts; `null` compares the `ValueSelector` values. |
 | `SortMode` | `DataGridViewColumnSortMode` | `NotSortable` | `Automatic` makes a header click toggle ascending/descending. |
@@ -373,6 +379,26 @@ Row-level validation piggybacks on the current row: leaving it for another one r
 committed.
 
 ### Columns: resize, auto-size, frozen, reorder
+
+### Filtering
+
+With `AllowUserToFilterColumns`, every header carries a funnel glyph in its right-hand 16 px, drawn
+solid and in the accent colour once that column is actually narrowing the rows. Clicking it opens the
+column's distinct values as a checkable [context menu](contextmenustrip.md) with `ShowSearchBox` on —
+which is the point of building type-to-filter into the menu engine rather than into the grid: a column
+of four values needs no search box and a column of four hundred is unusable without one, and the same
+menu serves both. The rest of the header keeps its click, so filtering never costs the column its sort.
+
+A column's filter is a set of accepted *display* values (`Filter`, or `SetColumnFilter`), so it
+round-trips through a saved layout and matches what the menu offers. Filters on several columns all
+apply, and a filtered row is hidden exactly as `RowHiddenSelector` hides one — it takes no selection,
+no keyboard navigation and no place in the scroll range. Unchecking every value hides every row, which
+is what unchecking every value means and is deliberately not corrected to "no filter"; re-checking the
+last missing value clears the filter outright, so the funnel stops claiming one is active.
+
+`GetFilterValues` builds a column's menu from the rows the *other* columns' filters still admit, while
+leaving the column being filtered offering all of its own values — otherwise narrowing a column would
+empty its own menu and the filter could never be widened again.
 
 Dragging a header divider resizes down to a minimum of 8 px (`AllowUserToResizeColumns` disables
 it). `AutoSizeMode.AllCells` fits the widest visible cell text (plus icon and padding), remeasured

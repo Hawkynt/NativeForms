@@ -1304,7 +1304,10 @@ evidence rather than intent: each line is something a real program wanted and di
       clear glyph and the chrome now come from one renderer both call — rather than the control, which
       hosts a native editor and cannot live inside an owner-drawn popup surface. The honest cost is
       recorded rather than hidden: a searchable menu spends its keystrokes on the filter and so gives up
-      its mnemonics, which is why it is opt-in.
+      its mnemonics, which is why it is opt-in. `DataGridView.AllowUserToFilterColumns` is the first
+      caller: a funnel in each header opens that column's distinct values as one of these menus, which is
+      why the search box belongs to the menu engine rather than to the grid — a column of four values
+      needs none and a column of four hundred is unusable without one, and the same menu serves both.
 Deliberately **not** doing: an application-level accent/theme override. Colours come from the desktop, and
 an app's own theme-variant, accent and skin settings stop meaning anything here. That is the point of the
 toolkit, not a gap in it, and the port losing those knobs is the correct outcome.

@@ -197,6 +197,32 @@ internal static class GlyphRenderer
         g.DrawRectangle(theme.Border, new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
     }
 
+    /// <summary>
+    /// Draws the filter funnel a column header shows: a tapering stack of lines over a short stem,
+    /// filled solid once a filter is actually narrowing the rows so the header says so at a glance.
+    /// </summary>
+    public static void DrawFilterFunnel(IGraphics g, Color color, Rectangle bounds, bool active)
+    {
+        var left = bounds.X;
+        var width = Math.Max(6, Math.Min(bounds.Width, 8));
+        var top = bounds.Y + ((bounds.Height - 7) / 2);
+
+        // The bowl: four lines narrowing by one pixel a side, then a two-pixel stem below it.
+        for (var row = 0; row < 4; ++row)
+            g.DrawLine(color, left + row, top + row, left + width - row, top + row);
+
+        var stem = left + (width / 2);
+        g.DrawLine(color, stem, top + 4, stem, top + 6);
+
+        if (!active)
+            return;
+
+        // An active filter fills the bowl, which reads as "this column is doing something" without
+        // needing a second glyph or a colour the theme does not offer.
+        for (var row = 1; row < 4; ++row)
+            g.DrawLine(color, left + row, top + row, left + width - row, top + row);
+    }
+
     /// <summary>Mixes two opaque colors 50:50, channel-wise.</summary>
     private static Color Blend(Color a, Color b)
         => Color.FromArgb(0xFF, (a.R + b.R) / 2, (a.G + b.G) / 2, (a.B + b.B) / 2);

@@ -229,6 +229,18 @@ public class DataGridView : OwnerDrawnControl
     /// <see langword="true"/>; the grab zone is ±3 px around the divider.</summary>
     public bool AllowUserToResizeColumns { get; set; } = true;
 
+    /// <summary>
+    /// Whether each column header offers a filter: a funnel glyph that opens the column's distinct
+    /// display values as a searchable, checkable menu (PRD §14). Defaults to <see langword="false"/>.
+    /// </summary>
+    /// <remarks>
+    /// The menu is a <see cref="ContextMenuStrip"/> with <see cref="ContextMenuStrip.ShowSearchBox"/>
+    /// on, which is the whole point of building type-to-filter into the menu engine rather than into
+    /// this grid: a column of four values needs no search box and a column of four hundred is
+    /// unusable without one, and the same menu serves both.
+    /// </remarks>
+    public bool AllowUserToFilterColumns { get; set; }
+
     /// <summary>Whether dragging a column header past a neighbor reorders the display: the drag
     /// rewrites <see cref="DataGridViewColumn.DisplayIndex"/> on every column while
     /// <see cref="Columns"/> keeps its model order. Defaults to <see langword="false"/>.</summary>
@@ -990,7 +1002,134 @@ public class DataGridView : OwnerDrawnControl
         return leftKey != rightKey ? leftKey - rightKey : leftModel - rightModel;
     }
 
-    private bool IsRowHidden(object? item) => this.RowHiddenSelector?.Invoke(item) ?? false;
+    private bool IsRowHidden(object? item)
+        => (this.RowHiddenSelector?.Invoke(item) ?? false) || this.IsFilteredOut(item);
+
+    /// <summary>Whether any column's filter rejects the text that column displays for this row.</summary>
+    private bool IsFilteredOut(object? item)
+    {
+        for (var i = 0; i < _columns.Count; ++i)
+        {
+            var column = _columns[i];
+            if (column.Filter is not { } accepted)
+                continue;
+
+            if (!accepted.Contains(ComputeDisplayText(column, item)))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The distinct values a column displays, in first-seen order, as the filter menu offers them.
+    /// Built from the rows the <em>other</em> columns' filters still admit, so narrowing one column
+    /// does not empty the menus of the rest — the behaviour every spreadsheet has.
+    /// </summary>
+    public IReadOnlyList<string> GetFilterValues(DataGridViewColumn column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        var seen = new HashSet<string>(StringComparer.CurrentCulture);
+        var values = new List<string>();
+        var count = this.RowSourceCount;
+        for (var i = 0; i < count; ++i)
+        {
+            if (!this.TryGetRowItem(i, out var item))
+                break;
+
+            if ((this.RowHiddenSelector?.Invoke(item) ?? false) || this.IsFilteredOutByOthers(item, column))
+                continue;
+
+            var text = ComputeDisplayText(column, item);
+            if (seen.Add(text))
+                values.Add(text);
+        }
+
+        return values;
+    }
+
+    /// <summary>Whether a row is rejected by some column's filter other than <paramref name="except"/>.</summary>
+    private bool IsFilteredOutByOthers(object? item, DataGridViewColumn except)
+    {
+        for (var i = 0; i < _columns.Count; ++i)
+        {
+            var column = _columns[i];
+            if (ReferenceEquals(column, except) || column.Filter is not { } accepted)
+                continue;
+
+            if (!accepted.Contains(ComputeDisplayText(column, item)))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Applies a column's accepted values and re-lays the grid out. A set covering every value the
+    /// column shows is stored as no filter at all, so the header glyph stops claiming one is active.
+    /// </summary>
+    public void SetColumnFilter(DataGridViewColumn column, IReadOnlyCollection<string>? accepted)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        column.Filter = accepted;
+        _sortDirty = true;
+        this.ClampScroll();
+        this.Invalidate();
+        this.OnColumnFilterChanged(new(-1, _columns.IndexOf(column)));
+    }
+
+    /// <summary>Raised after a column's filter changed, whether from the menu or from code.</summary>
+    public event EventHandler<DataGridViewCellEventArgs>? ColumnFilterChanged;
+
+    /// <summary>Raises <see cref="ColumnFilterChanged"/>.</summary>
+    protected virtual void OnColumnFilterChanged(DataGridViewCellEventArgs e) => this.ColumnFilterChanged?.Invoke(this, e);
+
+    /// <summary>
+    /// Builds the filter menu for a column: a searchable list of its distinct values as check items,
+    /// headed by an all-or-nothing toggle. Public so an application can open it from its own gesture
+    /// — a keyboard shortcut, a toolbar button — rather than only from the header glyph.
+    /// </summary>
+    public ContextMenuStrip CreateColumnFilterMenu(DataGridViewColumn column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        var values = this.GetFilterValues(column);
+        var accepted = column.Filter;
+        var menu = new ContextMenuStrip { ShowSearchBox = true };
+
+        var all = new ToolStripMenuItem(Strings.FilterAll) { Checked = accepted is null, CheckOnClick = true };
+        all.Click += (_, _) => this.SetColumnFilter(column, all.Checked ? null : []);
+        menu.Items.Add(all);
+        menu.Items.Add(new ToolStripSeparator());
+
+        foreach (var value in values)
+        {
+            var text = value;
+            var item = new ToolStripMenuItem(text.Length > 0 ? text : Strings.FilterBlank)
+            {
+                Checked = accepted is null || accepted.Contains(text),
+                CheckOnClick = true,
+            };
+
+            item.Click += (_, _) =>
+            {
+                // The click has already flipped the item, so the new state is what to apply.
+                var next = new HashSet<string>(accepted ?? values, StringComparer.CurrentCulture);
+                if (item.Checked)
+                    next.Add(text);
+                else
+                    next.Remove(text);
+
+                this.SetColumnFilter(column, next.Count == values.Count ? null : next);
+            };
+
+            menu.Items.Add(item);
+        }
+
+        return menu;
+    }
 
     private bool IsRowSelectable(object? item) => this.RowSelectableSelector?.Invoke(item) ?? true;
 
@@ -1616,9 +1755,17 @@ public class DataGridView : OwnerDrawnControl
             return;
         }
 
-        var columnIndex = this.HitTestColumn(x, out _);
+        var columnIndex = this.HitTestColumn(x, out var columnLeft);
         if (columnIndex < 0)
             return;
+
+        // The funnel owns its corner of the header: a press there opens the filter rather than
+        // sorting, which is what every grid that carries one does.
+        if (this.AllowUserToFilterColumns && x >= columnLeft + _columns[columnIndex].Width - _FilterZoneWidth)
+        {
+            this.OpenColumnFilterMenu(columnIndex, columnLeft);
+            return;
+        }
 
         if (this.AllowUserToOrderColumns)
             _dragColumnIndex = columnIndex; // armed; a later move past a neighbor reorders
@@ -1631,6 +1778,23 @@ public class DataGridView : OwnerDrawnControl
             ? SortOrder.Descending
             : SortOrder.Ascending;
         this.Sort(column, order);
+    }
+
+    /// <summary>The width of the header zone the filter funnel claims from the sort/reorder gesture.</summary>
+    private const int _FilterZoneWidth = 16;
+
+    /// <summary>The funnel's own width inside that zone.</summary>
+    private const int _FilterGlyphWidth = 10;
+
+    /// <summary>The filter menu currently open, kept alive for as long as it is showing.</summary>
+    private ContextMenuStrip? _filterMenu;
+
+    /// <summary>Opens a column's filter menu under its header cell.</summary>
+    private void OpenColumnFilterMenu(int columnIndex, int columnLeft)
+    {
+        _filterMenu?.Dispose();
+        _filterMenu = this.CreateColumnFilterMenu(_columns[columnIndex]);
+        _filterMenu.Show(this, new(columnLeft, this.HeaderHeight));
     }
 
     /// <summary>Whether the user may drag this column's divider: the column's tri-state
@@ -2133,6 +2297,13 @@ public class DataGridView : OwnerDrawnControl
                 GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, column.Width, header), column.HeaderText, column.Alignment, _CellPadding, separator: false);
                 if (ReferenceEquals(column, _sortedColumn) && _sortOrder != SortOrder.None)
                     GlyphRenderer.DrawSortArrow(g, theme.HeaderText, new Rectangle(x + column.Width - 14, 0, 10, header), _sortOrder == SortOrder.Ascending);
+
+                if (this.AllowUserToFilterColumns)
+                    GlyphRenderer.DrawFilterFunnel(
+                        g,
+                        column.Filter is null ? theme.HeaderText : theme.Accent,
+                        new Rectangle(x + column.Width - _FilterZoneWidth, 0, _FilterGlyphWidth, header),
+                        active: column.Filter is not null);
             }
 
             x += column.Width;
@@ -3238,6 +3409,9 @@ public class DataGridView : OwnerDrawnControl
         // A band in flight owns an auto-scroll timer, whose source is the backend that just went away.
         _marquee?.Dispose();
         _marquee = null;
+
+        _filterMenu?.Dispose();
+        _filterMenu = null;
         _editPopupShown = false;
         _editPopup?.Dispose();
         _editPopup = null;
