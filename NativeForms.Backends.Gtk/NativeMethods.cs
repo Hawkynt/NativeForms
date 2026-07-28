@@ -325,6 +325,25 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
 
+    /// <summary>Creates a <c>GtkScrollbar</c> along the given orientation over an adjustment (0 makes one).</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_scrollbar_new(int orientation, nint adjustment);
+
+    /// <summary>The <c>GtkAdjustment</c> backing a <c>GtkRange</c>.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_range_get_adjustment(nint range);
+
+    /// <summary>Writes every member of an adjustment at once, emitting a single "changed".</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_adjustment_configure(
+        nint adjustment,
+        double value,
+        double lower,
+        double upper,
+        double stepIncrement,
+        double pageIncrement,
+        double pageSize);
+
     /// <summary>Creates a <c>GtkLinkButton</c> showing <paramref name="label"/> and pointing at <paramref name="uri"/>.</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint gtk_link_button_new_with_label(string uri, string label);

@@ -404,11 +404,30 @@ internal sealed partial class Autopilot
             this.Expect("the echoing label", this.Read(() => label.Text), this.Read(() => track.Value).ToString());
         });
 
-        this.Check("HScrollBar: the increase arrow, the channel and a thumb drag all move Value", () =>
+        this.Check("HScrollBar: pointing at each end of the bar drives Value both ways", () =>
         {
             var bar = _form.Part<HScrollBar>("input.hscroll");
             var size = this.Read(() => bar.Size);
             var arrow = Math.Min(size.Height, size.Width / 2);
+
+            // A promoted bar is the platform's own, and its anatomy is the platform's business: GTK 3 has
+            // dropped stepper arrows altogether and warps the thumb to a primary click in the trough. Only
+            // the direction of travel is common to both renderings, so only that is asserted natively.
+            if (this.Read(() => bar.IsNativeWidget))
+            {
+                var start = this.Read(() => bar.Value);
+                this.Click(bar, size.Width - 4, size.Height / 2);
+                this.ExpectTrue(
+                    $"pointing at the far end of the bar should raise Value above {start}, observed {this.Read(() => bar.Value)}",
+                    this.Read(() => bar.Value) > start);
+
+                start = this.Read(() => bar.Value);
+                this.Click(bar, 4, size.Height / 2);
+                this.ExpectTrue(
+                    $"pointing at the near end should lower Value below {start}, observed {this.Read(() => bar.Value)}",
+                    this.Read(() => bar.Value) < start);
+                return;
+            }
 
             var before = this.Read(() => bar.Value);
             this.Click(bar, size.Width - (arrow / 2), size.Height / 2);
@@ -428,13 +447,19 @@ internal sealed partial class Autopilot
                 this.Read(() => bar.Value) > before);
         });
 
-        this.Check("VScrollBar: a thumb drag toward the top lowers Value", () =>
+        this.Check("VScrollBar: a drag toward the top lowers Value", () =>
         {
             var bar = _form.Part<VScrollBar>("input.vscroll");
             var size = this.Read(() => bar.Size);
             var arrow = Math.Min(size.Width, size.Height / 2);
             var before = this.Read(() => bar.Value);
-            var thumb = ThumbCentre(size, vertical: true, this.Read(() => bar.Minimum), this.Read(() => bar.Maximum), before, this.Read(() => bar.LargeChange));
+
+            // Natively the thumb sits wherever the platform put it, so the drag starts from the position
+            // the value implies along the whole bar rather than from the owner-drawn thumb rectangle.
+            var thumb = this.Read(() => bar.IsNativeWidget)
+                ? new Point(size.Width / 2, size.Height * (before - this.Read(() => bar.Minimum)) / Math.Max(1, this.Read(() => bar.Maximum) - this.Read(() => bar.Minimum)))
+                : ThumbCentre(size, vertical: true, this.Read(() => bar.Minimum), this.Read(() => bar.Maximum), before, this.Read(() => bar.LargeChange));
+
             this.Drag(bar, thumb, new(size.Width / 2, arrow + 2));
             this.ExpectTrue(
                 $"dragging the thumb to the top should lower Value below {before}, observed {this.Read(() => bar.Value)}",

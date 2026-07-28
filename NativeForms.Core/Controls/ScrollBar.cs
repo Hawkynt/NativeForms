@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 
 namespace Hawkynt.NativeForms;
 
@@ -40,6 +41,7 @@ public abstract class ScrollBar : OwnerDrawnControl
             if (_maximum < _minimum)
                 _maximum = _minimum;
 
+            this.PushNativeRange();
             this.Value = _value;
             this.Invalidate();
         }
@@ -58,6 +60,7 @@ public abstract class ScrollBar : OwnerDrawnControl
             if (_minimum > _maximum)
                 _minimum = _maximum;
 
+            this.PushNativeRange();
             this.Value = _value;
             this.Invalidate();
         }
@@ -67,7 +70,11 @@ public abstract class ScrollBar : OwnerDrawnControl
     public int SmallChange
     {
         get => field;
-        set => field = Math.Max(1, value);
+        set
+        {
+            field = Math.Max(1, value);
+            this.PushNativeRange();
+        }
     } = 1;
 
     /// <summary>The page a channel click scrolls by; also the thumb's share of the range. At least 1.</summary>
@@ -81,6 +88,7 @@ public abstract class ScrollBar : OwnerDrawnControl
                 return;
 
             field = value;
+            this.PushNativeRange();
             this.Value = _value;
             this.Invalidate();
         }
@@ -98,6 +106,7 @@ public abstract class ScrollBar : OwnerDrawnControl
                 return;
 
             _value = clamped;
+            _native?.SetValue(clamped);
             this.Invalidate();
             this.OnValueChanged(EventArgs.Empty);
         }
@@ -108,6 +117,73 @@ public abstract class ScrollBar : OwnerDrawnControl
 
     /// <summary>Raised when <see cref="Value"/> changes, by user gesture or assignment.</summary>
     public event EventHandler? ValueChanged;
+
+    private IScrollBarPeer? _native;
+    private bool? _nativeOffered;
+
+    /// <summary>
+    /// Forces this bar onto the native widget (<see langword="true"/>) or the owner-drawn painter
+    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
+    /// <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether this bar is currently rendered by a real platform widget.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform scroll bar. Everything this
+    /// control models is: both platforms carry the same range/page/step quartet, and both report which
+    /// gesture moved the thumb.
+    /// </summary>
+    private static bool IsNativeEligible => true;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible && (_nativeOffered ?? true);
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible)
+        {
+            var offered = backend.CreateScrollBar(this.IsVertical);
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                peer.SetRange(_minimum, _maximum, this.LargeChange, this.SmallChange);
+                peer.SetValue(_value);
+                peer.Scrolled += this.OnNativeScrolled;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <summary>Pushes the whole range quartet, which the platforms take as one unit.</summary>
+    private void PushNativeRange() => _native?.SetRange(_minimum, _maximum, this.LargeChange, this.SmallChange);
+
+    /// <summary>
+    /// The widget scrolled. Reading the position back rather than stepping locally keeps the two paths
+    /// identical when the platform clamps differently at the ends, and routes through the same
+    /// user-gesture path the owner-drawn bar uses, so <see cref="Scroll"/> precedes
+    /// <see cref="ValueChanged"/> either way.
+    /// </summary>
+    private void OnNativeScrolled(object? sender, ScrollEventType type)
+    {
+        if (_native is not { } peer)
+            return;
+
+        if (type == ScrollEventType.EndScroll)
+        {
+            this.RaiseScroll(type);
+            return;
+        }
+
+        this.SetValue(peer.GetValue(), type);
+    }
 
     /// <summary>Raises <see cref="Scroll"/>.</summary>
     protected virtual void OnScroll(ScrollEventArgs e) => this.Scroll?.Invoke(this, e);
@@ -196,6 +272,12 @@ public abstract class ScrollBar : OwnerDrawnControl
     /// <inheritdoc/>
     private protected override void OnUnrealized()
     {
+        if (_native is { } peer)
+        {
+            peer.Scrolled -= this.OnNativeScrolled;
+            _native = null;
+        }
+
         base.OnUnrealized();
         _pressed = ScrollBarPart.None;
         _dragging = false;

@@ -141,6 +141,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITrackBarPeer? CreateTrackBar(bool vertical)
         => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
 
+    /// <summary>Whether this backend accepts the scroll-bar promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeScrollBar { get; set; }
+
+    /// <summary>The last scroll-bar peer handed out, so a test can drive it like the real widget.</summary>
+    public HeadlessScrollBarPeer? LastScrollBar { get; private set; }
+
+    public IScrollBarPeer? CreateScrollBar(bool vertical)
+        => !this.OfferNativeScrollBar ? null : this.LastScrollBar = this.Track(new HeadlessScrollBarPeer { Vertical = vertical });
+
     /// <summary>Whether this backend accepts the hyperlink promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeLinkLabel { get; set; }
 
@@ -1279,6 +1288,48 @@ internal sealed class HeadlessRadioButtonPeer : HeadlessPeer, IRadioButtonPeer
         _checked = true;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
+}
+
+
+/// <summary>A stand-in for a real platform scroll bar, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessScrollBarPeer : HeadlessPeer, IScrollBarPeer
+{
+    private int _value;
+
+    public event EventHandler<ScrollEventType>? Scrolled;
+
+    /// <summary>Whether the backend was asked for a vertical bar.</summary>
+    public bool Vertical { get; init; }
+
+    public int Minimum { get; private set; }
+
+    public int Maximum { get; private set; }
+
+    public int LargeChange { get; private set; }
+
+    public int SmallChange { get; private set; }
+
+    public void SetRange(int minimum, int maximum, int largeChange, int smallChange)
+    {
+        this.Minimum = minimum;
+        this.Maximum = maximum;
+        this.LargeChange = largeChange;
+        this.SmallChange = smallChange;
+    }
+
+    public void SetValue(int value) => _value = value;
+
+    public int GetValue() => _value;
+
+    /// <summary>Simulates the user scrolling the widget to a position with the given gesture.</summary>
+    public void RaiseUserScroll(int value, ScrollEventType type)
+    {
+        _value = value;
+        Scrolled?.Invoke(this, type);
+    }
+
+    /// <summary>Simulates the widget reporting the end of a gesture, which moves nothing.</summary>
+    public void RaiseEndScroll() => Scrolled?.Invoke(this, ScrollEventType.EndScroll);
 }
 
 

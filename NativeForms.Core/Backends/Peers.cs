@@ -488,8 +488,11 @@ public interface IRadioButtonPeer : ICheckBoxPeer;
 /// </summary>
 public interface IScrollBarPeer : IControlPeer
 {
-    /// <summary>Raised when the user scrolls. Programmatic <see cref="SetValue"/> must not raise it.</summary>
-    event EventHandler? ValueChanged;
+    /// <summary>
+    /// Raised when the user scrolls, carrying the gesture that did it — both platforms report one, and
+    /// <see cref="ScrollBar.Scroll"/> passes it on. Programmatic <see cref="SetValue"/> must not raise it.
+    /// </summary>
+    event EventHandler<ScrollEventType>? Scrolled;
 
     /// <summary>
     /// Sets the scrollable range and the size of the visible window within it, which is what gives the

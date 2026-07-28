@@ -172,6 +172,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real scrollbar, so this backend accepts the promotion (PRD §12).</remarks>
+    public IScrollBarPeer? CreateScrollBar(bool vertical)
+    {
+        EnsureInitialized();
+        return new GtkScrollBarPeer(vertical);
+    }
+
+    /// <inheritdoc />
     /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
     public IProgressBarPeer? CreateProgressBar()
     {

@@ -139,6 +139,91 @@ internal static partial class NativeMethods
         internal fixed char szUrl[2084];
     }
 
+    // --- Stand-alone scroll bars -------------------------------------------------------------------
+
+    /// <summary>Scroll bar: runs horizontally.</summary>
+    internal const uint SBS_HORZ = 0x0000;
+
+    /// <summary>Scroll bar: runs vertically.</summary>
+    internal const uint SBS_VERT = 0x0001;
+
+    /// <summary>Addresses the control itself rather than a window's built-in bars.</summary>
+    internal const int SB_CTL = 2;
+
+    /// <summary>One step toward the minimum.</summary>
+    internal const int SB_LINEUP = 0;
+
+    /// <summary>One step toward the maximum.</summary>
+    internal const int SB_LINEDOWN = 1;
+
+    /// <summary>One page toward the minimum.</summary>
+    internal const int SB_PAGEUP = 2;
+
+    /// <summary>One page toward the maximum.</summary>
+    internal const int SB_PAGEDOWN = 3;
+
+    /// <summary>The thumb was dropped.</summary>
+    internal const int SB_THUMBPOSITION = 4;
+
+    /// <summary>The thumb is being dragged.</summary>
+    internal const int SB_THUMBTRACK = 5;
+
+    /// <summary>Jump to the minimum.</summary>
+    internal const int SB_TOP = 6;
+
+    /// <summary>Jump to the maximum.</summary>
+    internal const int SB_BOTTOM = 7;
+
+    /// <summary>The gesture finished.</summary>
+    internal const int SB_ENDSCROLL = 8;
+
+    /// <summary><see cref="SCROLLINFO.nMin"/>/<see cref="SCROLLINFO.nMax"/> are meaningful.</summary>
+    internal const uint SIF_RANGE = 0x0001;
+
+    /// <summary><see cref="SCROLLINFO.nPage"/> is meaningful.</summary>
+    internal const uint SIF_PAGE = 0x0002;
+
+    /// <summary><see cref="SCROLLINFO.nPos"/> is meaningful.</summary>
+    internal const uint SIF_POS = 0x0004;
+
+    /// <summary><see cref="SCROLLINFO.nTrackPos"/> is meaningful (read only).</summary>
+    internal const uint SIF_TRACKPOS = 0x0010;
+
+    /// <summary>The range, page and position of a scroll bar.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SCROLLINFO
+    {
+        /// <summary>The size of this structure, in bytes.</summary>
+        internal uint cbSize;
+
+        /// <summary>Which members carry meaning (the <c>SIF_*</c> flags).</summary>
+        internal uint fMask;
+
+        /// <summary>The low end of the range.</summary>
+        internal int nMin;
+
+        /// <summary>The high end of the range.</summary>
+        internal int nMax;
+
+        /// <summary>The visible page, which sizes the thumb; the reachable maximum is <c>nMax - nPage + 1</c>.</summary>
+        internal uint nPage;
+
+        /// <summary>The current position.</summary>
+        internal int nPos;
+
+        /// <summary>The position under the thumb while it is being dragged.</summary>
+        internal int nTrackPos;
+    }
+
+    /// <summary>Writes a scroll bar's range, page or position.</summary>
+    [LibraryImport("user32.dll")]
+    internal static partial int SetScrollInfo(nint hwnd, int bar, ref SCROLLINFO info, [MarshalAs(UnmanagedType.Bool)] bool redraw);
+
+    /// <summary>Reads a scroll bar's range, page or position.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetScrollInfo(nint hwnd, int bar, ref SCROLLINFO info);
+
     /// <summary>Class block: progress bar.</summary>
     internal const uint ICC_PROGRESS_CLASS = 0x00000020;
 
