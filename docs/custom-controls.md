@@ -193,6 +193,13 @@ Input goes in through `RaiseMouseDown/Up/Move/Wheel` (with optional button and m
 | `MeasureText(string, Font)` | Pixel size of a string (also on `IPlatformBackend` for measuring between paints) |
 | `PushClip(Rectangle)` / `PopClip()` | Clip-region stack |
 
+`DrawText` and `MeasureText` handle colour emoji on both platforms without you doing anything: GTK's
+Pango draws colour glyphs natively, and on Win32 a string carrying one is diverted to Direct2D, because
+GDI can only rasterize a monochrome mask per glyph and would render your `🐣` in black. The check that
+decides is a single allocation-free pass over the string, so text without emoji — nearly all of it — is
+unaffected, and both paths measure with whichever renderer will paint them. See
+[PRD §13](../docs/PRD.md#13-colour-emoji-in-text-on-win32).
+
 `ITheme` — colors: `WindowBackground`, `ControlBackground`, `ControlText`, `DisabledText`, `FieldBackground`, `Accent`, `SelectionBackground`, `SelectionText`, `Border`, `GridLine`, `HeaderBackground`, `HeaderText`; plus `DefaultFont` (`Font` struct), `RowHeight`, `ScrollBarSize`.
 
 `IImage` — an opaque backend-owned bitmap (`Width`, `Height`, `IDisposable`), created decoder-free from 32-bit ARGB pixels via `IPlatformBackend.CreateImage(width, height, argb)`.

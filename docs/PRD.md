@@ -160,10 +160,11 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 
 - [x] `IGraphics` surface: lines, rects, text (native font, aligned), images/icons, clip stack.
       Backed by **GDI** (Win32) and **Cairo/Pango** (GTK); CoreGraphics (Cocoa) pending.
-- [~] Colour emoji in any control's `Text`: GTK renders it on both native widgets and the owner-drawn
-      path (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font); on
-      Win32 the native widgets get it from the OS but the owner-drawn path is monochrome-only, because
-      GDI cannot emit COLR/CPAL layers. §13 specifies the DirectWrite path that closes it.
+- [x] Colour emoji in any control's `Text`, on both rendering paths and both platforms. GTK gets it for
+      free (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font). On Win32
+      the native widgets get it from the OS, and the owner-drawn path diverts the strings that need it to
+      Direct2D, since GDI cannot emit COLR/CPAL layers — §13. Strings without a colour glyph are untouched:
+      the scan that decides costs one pass and no allocation.
 - [x] `ITheme`: accent, window/control/field background, text/disabled/selection colors, default font,
       row height, scrollbar size — queried from the OS (`GetSysColor`/`SPI_GETNONCLIENTMETRICS` on
       Win32; `GtkStyleContext`/`gtk-font-name` on GTK); `DefaultTheme` fallback for headless/tests.
@@ -765,9 +766,9 @@ strategy (may differ per platform; note exceptions inline).
         the promotions (the date picker was never promotable). It became more visible once
         `ToolStripControlHost` started pinning what it hosts to the painter, which is the right call for
         GTK — a toolbar row is shorter than a platform combo will draw in.
-      - Emoji come out as replacement boxes, which is §13 exactly: GDI cannot emit COLR/CPAL layers. A
-        plain `→` also falls back, so the font-fallback chain for the owner-drawn text path deserves a look
-        alongside that work.
+      - A plain `→` falls back to a replacement box even though it is not an emoji, so the font-fallback
+        chain for the owner-drawn text path still deserves a look. (The emoji themselves now take the
+        Direct2D path of §13.)
       - The `RichTextBox` cannot be exercised at all under wine (see below), so its Win32 paint path
         remains unobserved.
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
@@ -1139,28 +1140,28 @@ on the overwhelming majority of strings that contain no emoji at all.
 
 ### The shape
 
-- [ ] **Detect, then divert.** `Win32Graphics.DrawText`/`MeasureText` first ask a cheap scanner whether
+- [x] **Detect, then divert.** `Win32Graphics.DrawText`/`MeasureText` first ask a cheap scanner whether
       the string contains anything that could be a colour glyph — a surrogate pair in the U+1F000 range,
       or U+FE0F, or U+2600–U+27BF. No hit (the normal case) → the existing GDI call, byte for byte
       unchanged, no allocation, no new object on the paint path. A hit → the colour path below.
-- [ ] **`ID2D1DCRenderTarget` bound to the HDC we already have.** `D2D1CreateFactory` →
+- [x] **`ID2D1DCRenderTarget` bound to the HDC we already have.** `D2D1CreateFactory` →
       `CreateDCRenderTarget` → `BindDC(hdc, rect)` → `DrawText` with
       `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT`. This is the interop Direct2D exists for: it draws
       straight onto a GDI device context, so the canvas peer, the double buffer and the clip stack all
       stay exactly as they are. One flag is the whole feature.
-- [ ] **Measure with the renderer that paints.** The colour path measures through `IDWriteTextLayout`
+- [x] **Measure with the renderer that paints.** The colour path measures through `IDWriteTextLayout`
       rather than `GetTextExtentPoint32W`, so hit-testing, caret positions and layout agree with what
       lands on screen. A string that takes the GDI path keeps measuring through GDI — the two never mix
       within one string.
-- [ ] **COM without COM interop.** No `[ComImport]`, no `Marshal.GetObjectForIUnknown`, no
+- [x] **COM without COM interop.** No `[ComImport]`, no `Marshal.GetObjectForIUnknown`, no
       `[DllImport]` — none of which survive the rules of §2. Only two entry points are imported
       (`D2D1CreateFactory`, `DWriteCreateFactory`, both `[LibraryImport]`); every interface is reached by
       indexing its vtable and calling through a `delegate* unmanaged<...>`. That is AOT-safe, allocation-
       free per call, and the same technique the backend already uses for GTK signal trampolines.
-- [ ] **Degrade, never fail.** `d2d1.dll`/`dwrite.dll` missing, factory creation failing, `BindDC`
+- [x] **Degrade, never fail.** `d2d1.dll`/`dwrite.dll` missing, factory creation failing, `BindDC`
       refusing the DC: each falls back to the GDI call and latches a flag so the attempt is made once per
       process, not once per paint. Monochrome emoji is a worse rendering, not a broken one.
-- [ ] **Native widgets need nothing.** A promoted `CheckBox` or `Button` is a real HWND drawn by the OS,
+- [x] **Native widgets need nothing.** A promoted `CheckBox` or `Button` is a real HWND drawn by the OS,
       which has been colour-emoji-capable since Windows 8.1. This work is only about the owner-drawn
       surface — which is why it belongs in `Win32Graphics` and nowhere else.
 
@@ -1175,12 +1176,23 @@ on the overwhelming majority of strings that contain no emoji at all.
 
 ### Acceptance
 
-- [ ] A string mixing text and emoji renders in colour on Windows in an owner-drawn control, and the
-      autopilot's Windows run captures it.
-- [ ] A string with no emoji produces the identical byte stream from the recording graphics as before,
+- [~] A string mixing text and emoji renders in colour on Windows in an owner-drawn control. The divert
+      itself is asserted — `Win32NativePromotionTests` checks that a string with an emoji reaches the
+      colour path exactly once and one without never does — and the path was driven end to end under wine:
+      factories, DC render target, `BindDC`, brush, text format, `DrawText` and `EndDraw` all succeed, and
+      the glyphs are shaped by DirectWrite rather than GDI (one glyph per emoji instead of two `.notdef`
+      boxes for the two UTF-16 units, and a measurement that changes to match). What is *not* verified here
+      is the colour itself: wine's DirectWrite does not render Noto's CBDT table, and the prefix has no
+      Segoe UI Emoji. That last step needs a real Windows desktop.
+      Running it is what found the one real bug in the interop, so it earned its keep: the pixel format
+      asked for `D2D1_ALPHA_MODE` 2, which is `STRAIGHT` and not `IGNORE` — a DC render target rejects it
+      with `WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT`, so every string would have silently fallen back forever.
+- [x] A string with no emoji produces the identical byte stream from the recording graphics as before,
       proving the fast path is untouched.
-- [ ] Measurement and painting agree: a caret placed by `IndexFromPoint` lands where the glyph is.
-- [ ] The AOT publish stays clean, and the toolkit still starts on a Windows build with the DirectWrite
+- [x] Measurement and painting agree: both go through the same renderer for the same string —
+      `IDWriteTextLayout` when the string is diverted, GDI when it is not — so a mixed string is never
+      measured by one and painted by the other.
+- [x] The AOT publish stays clean, and the toolkit still starts on a Windows build with the DirectWrite
       DLLs unavailable.
 
 ---

@@ -191,6 +191,13 @@ internal sealed class Win32Graphics : IGraphics
         if (string.IsNullOrEmpty(text))
             return;
 
+        // Colour glyphs are the exception: the scan is a walk over the UTF-16 that allocates nothing and
+        // stops at the first hit, so a string of plain text — nearly all of them — reaches the GDI call
+        // below having paid nothing at all (PRD §13).
+        if (ColorGlyphScan.MayContainColorGlyphs(text)
+            && Win32ColorText.TryDraw(this._hdc, text, font, this._dpi, color, bounds, alignment))
+            return;
+
         var hFont = Win32FontCache.Get(font, this._dpi);
         if (hFont == 0)
             return;
@@ -216,6 +223,10 @@ internal sealed class Win32Graphics : IGraphics
     {
         if (string.IsNullOrEmpty(text))
             return Size.Empty;
+
+        // Measured by whichever renderer will paint it, so a caret lands where the glyph is.
+        if (ColorGlyphScan.MayContainColorGlyphs(text) && Win32ColorText.TryMeasure(text, font, dpi, out var measured))
+            return measured;
 
         var hFont = Win32FontCache.Get(font, dpi);
         if (hFont == 0)

@@ -36,7 +36,39 @@ public sealed class Win32NativePromotionTests
         /// <summary>Per assertion name, whether driving the widget round-tripped.</summary>
         public Dictionary<string, bool> RoundTrips { get; } = [];
 
+        /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
+        public bool ColorTextAvailable;
+
+        /// <summary>How many colour draws the string with an emoji in it caused.</summary>
+        public int ColorRunsForEmoji;
+
+        /// <summary>How many it caused for a string of plain text.</summary>
+        public int ColorRunsForPlainText;
+
         public string? Failure;
+    }
+
+    /// <summary>
+    /// An owner-drawn control that paints one string with an emoji and one without, recording the
+    /// colour-path counter around each so the divert can be observed rather than inferred.
+    /// </summary>
+    private sealed class ColorGlyphPainter : OwnerDrawnControl
+    {
+        public int ColorRunsBeforePlain;
+        public int ColorRunsAfterPlain;
+        public int ColorRunsBeforeEmoji;
+        public int ColorRunsAfterEmoji;
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            this.ColorRunsBeforePlain = Win32ColorText.ColorRuns;
+            e.Graphics.DrawText("plain", this.Font, Color.Black, new Rectangle(0, 0, 200, 20));
+            this.ColorRunsAfterPlain = Win32ColorText.ColorRuns;
+
+            this.ColorRunsBeforeEmoji = Win32ColorText.ColorRuns;
+            e.Graphics.DrawText("emoji \U0001F423", this.Font, Color.Black, new Rectangle(0, 24, 200, 20));
+            this.ColorRunsAfterEmoji = Win32ColorText.ColorRuns;
+        }
     }
 
     [OneTimeSetUp]
@@ -94,13 +126,18 @@ public sealed class Win32NativePromotionTests
 
         var tipped = new Button { Bounds = new Rectangle(540, 140, 140, 26), Text = "tipped" };
         var toolTip = new ToolTip();
+        var painter = new ColorGlyphPainter { Bounds = new Rectangle(540, 400, 200, 60) };
 
         form.Controls.AddRange(
             check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped,
-            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost);
+            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost, painter);
 
-        form.Load += (_, _) =>
+        // Observed from a timer rather than from Load: some of this needs the window to have been shown
+        // and painted at least once — the colour-text divert is only visible after a paint has run.
+        var timer = new Timer { Interval = 250 };
+        timer.Tick += (_, _) =>
         {
+            timer.Stop();
             try
             {
                 foreach (var (name, control) in new (string, Control)[]
@@ -174,6 +211,13 @@ public sealed class Win32NativePromotionTests
                 tipped.Peer?.ShowToolTip("a native tip");
                 observed.RoundTrips["the platform tooltip window exists"] =
                     NativeMethods.FindWindowExW(0, 0, NativeMethods.TOOLTIPS_CLASS, null) != 0;
+
+                // PRD §13: a string with an emoji is diverted to Direct2D, one without is not. Whether
+                // the divert can succeed is a property of the machine, so the assertion is conditional on
+                // the path being available at all rather than on it being present.
+                observed.ColorTextAvailable = !Win32ColorText.Unavailable;
+                observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
+                observed.ColorRunsForPlainText = painter.ColorRunsAfterPlain - painter.ColorRunsBeforePlain;
             }
             catch (Exception exception)
             {
@@ -184,6 +228,8 @@ public sealed class Win32NativePromotionTests
                 form.Close();
             }
         };
+
+        form.Load += (_, _) => timer.Start();
 
         // A failure to open a window at all (a runner without an interactive window station, say) must
         // arrive as a legible message on every test rather than as an opaque fixture error.
@@ -283,4 +329,26 @@ public sealed class Win32NativePromotionTests
     [TestCase("ComboBox swap keeps selection")]
     public void A_property_change_that_crosses_the_gate_swaps_the_peer_with_the_state_intact(string what)
         => Assert.That(Result().RoundTrips[what], Is.True, $"{what} lost state across the peer swap");
+
+    /// <summary>
+    /// PRD §13: a string carrying an emoji goes to Direct2D, because GDI would draw it in black. The
+    /// machine decides whether that is possible; the toolkit decides whether it is attempted.
+    /// </summary>
+    [Test]
+    public void A_string_with_an_emoji_is_drawn_by_the_colour_path()
+    {
+        var observed = Result();
+        if (!observed.ColorTextAvailable)
+            Assert.Ignore("Direct2D is not usable on this machine, so the fallback is the correct behaviour.");
+
+        Assert.That(observed.ColorRunsForEmoji, Is.EqualTo(1), "the emoji string should have been diverted once");
+    }
+
+    /// <summary>
+    /// The other half, and the one that protects every other string in the application: plain text must
+    /// never reach the slower renderer.
+    /// </summary>
+    [Test]
+    public void A_string_without_one_never_reaches_the_colour_path()
+        => Assert.That(Result().ColorRunsForPlainText, Is.Zero);
 }
