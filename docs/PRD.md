@@ -865,14 +865,23 @@ strategy (may differ per platform; note exceptions inline).
       so anything else opening a window on the same `DISPLAY` during the run fails it. Measured: 2 failures
       in 40 full-suite runs while wine apps were being launched on `:1`, and 0 in 20 with the display quiet.
       Not a defect; do not chase it. Run the suite without competing windows, or accept the retry.
-- [ ] **The demo cannot run end-to-end under wine**: `EM_STREAMIN` faults inside wine's
-      `riched20`/`msftedit`, so `RichTextBox.Rtf` takes the process down during realization. Established
-      by bisection — plain `Text` is fine, only the stream-in path faults, and it still faults with *all*
-      of our subclassing removed, so nothing of ours is on the hook; the `EDITSTREAM` layout and the
-      `EDITSTREAMCALLBACK` signature both match the SDK. Until wine fixes it, Win32 runtime coverage comes
-      from the test tier above rather than from the gallery walkthrough. Do not re-diagnose this as a
-      toolkit bug. Swapping that one `Rtf` for plain text locally does let the whole gallery come up under
-      wine, which is how the Win32 rendering was eyeballed and how the `SysLink` fallback below was found —
+- [ ] **`RichTextBox.Rtf` takes the process down during realization — on real Windows, not just wine.**
+      `EM_STREAMIN` faults while the control is being realized, so the gallery cannot start at all.
+      **This entry previously recorded it as a wine bug and that was wrong.** The `screenshots (windows)`
+      CI job put the demo on a real Windows Server 2025 runner for the first time and it died in exactly
+      the same place: `shoot.log` reaches "gallery constructed, waiting for the window" and stops, with no
+      managed exception — the process goes down inside `Application.Run`, before `Load`, which is where
+      realization runs. Nothing had ever exercised this path on Windows before: the unit tests use headless
+      fakes and never create a real `HWND`, and the wine reproduction was read as evidence about wine.
+      What the wine stack actually shows is our own subclass chain being re-entered —
+      `SendMessageW` → `TextBoxPeer.EditProc` → `Win32ChildPeer.PointerSubclassProc` — because RichEdit
+      sends itself messages while it processes the stream, and both subclasses sit on that window. A
+      malformed chain there recurses until the stack goes, which presents as an access violation with no
+      managed exception, matching what both platforms show. The `EDITSTREAM` layout and the
+      `EDITSTREAMCALLBACK` signature are still believed correct; the chain is the suspect. Reproduce it
+      cheaply now with the CI job rather than by bisecting under wine. Swapping that one `Rtf` for plain text locally does let the whole gallery come up, under
+      wine and presumably on Windows, which is how the Win32 rendering was eyeballed and how the
+      `SysLink` fallback below was found —
       worth repeating after Win32 work, since the autopilot itself cannot help there: its injection and
       capture are GTK calls, so `--autopilot` aborts on `libgtk-3.so.0` the moment it tries to settle.
 - [ ] **Autopilot capture must not touch the widget tree.** A capture is an *observation*; anything that
