@@ -120,6 +120,8 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
         sb.AppendLine("        }");
         sb.AppendLine();
         EmitColumns(spc, type, sb);
+        sb.AppendLine();
+        EmitListView(type, sb);
         sb.AppendLine("    }");
         if (hasNamespace)
             sb.AppendLine("}");
@@ -193,6 +195,75 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
             sb.Append("            grid.RowHeightSelector = r => ((").Append(self).Append(")r!).").Append(heightFrom).AppendLine(";");
 
         sb.AppendLine("        }");
+    }
+
+    /// <summary>
+    /// Emits the <see cref="Hawkynt.NativeForms.ListView"/> pair: <c>PopulateColumns(ListView)</c> for the
+    /// Details-view headers, and <c>ToListViewItem()</c> which turns one model into a row whose sub-item
+    /// order matches those headers. Together they make
+    /// <c>list.SetDataSource(models, m =&gt; m.ToListViewItem())</c> a one-liner.
+    /// </summary>
+    private static void EmitListView(INamedTypeSymbol type, StringBuilder sb)
+    {
+        var properties = new List<IPropertySymbol>();
+        foreach (var member in type.GetMembers())
+            if (member is IPropertySymbol prop
+                && !prop.IsStatic && !prop.IsIndexer
+                && prop.DeclaredAccessibility == Accessibility.Public
+                && prop.GetMethod is not null
+                && !HasAttribute(prop, "GridIgnoreAttribute"))
+                properties.Add(prop);
+
+        sb.AppendLine("        /// <summary>Adds a Details-view column per editable property to <paramref name=\"list\"/> (source-generated).</summary>");
+        sb.AppendLine("        public static void PopulateColumns(global::Hawkynt.NativeForms.ListView list)");
+        sb.AppendLine("        {");
+        foreach (var prop in properties)
+        {
+            var header = GetStringArgument(prop, "GridDisplayNameAttribute") ?? prop.Name;
+            sb.Append("            list.Columns.Add(new global::Hawkynt.NativeForms.ColumnHeader(").Append(Quote(header));
+            if (GetIntArgument(prop, "GridColumnWidthAttribute") is { } width)
+                sb.Append(", ").Append(width.ToString(CultureInfo.InvariantCulture));
+
+            sb.AppendLine("));");
+        }
+
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine("        /// <summary>This model as a <see cref=\"global::Hawkynt.NativeForms.ListViewItem\"/> whose");
+        sb.AppendLine("        /// sub-items line up with <c>PopulateColumns</c>'s headers (source-generated).</summary>");
+        sb.AppendLine("        public global::Hawkynt.NativeForms.ListViewItem ToListViewItem()");
+        sb.AppendLine("        {");
+
+        if (properties.Count == 0)
+        {
+            sb.AppendLine("            return new global::Hawkynt.NativeForms.ListViewItem(string.Empty);");
+            sb.AppendLine("        }");
+            return;
+        }
+
+        sb.Append("            var item = new global::Hawkynt.NativeForms.ListViewItem(")
+          .Append(TextOf(properties[0])).AppendLine(");");
+        for (var i = 1; i < properties.Count; ++i)
+            sb.Append("            item.SubItems.Add(").Append(TextOf(properties[i])).AppendLine(");");
+
+        sb.AppendLine("            return item;");
+        sb.AppendLine("        }");
+    }
+
+    /// <summary>A property rendered as row text: strings pass through, everything else goes via
+    /// <c>ToString()</c>, and a nullable renders empty rather than "null".</summary>
+    private static string TextOf(IPropertySymbol prop)
+    {
+        var access = "this." + prop.Name;
+        if (prop.Type.SpecialType == SpecialType.System_String)
+            return $"{access} ?? string.Empty";
+
+        // `?.` is only legal where a null can actually occur; a non-nullable value type must call
+        // ToString() directly or the generated file will not compile.
+        var nullable = prop.Type.IsReferenceType
+            || prop.Type is INamedTypeSymbol { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T };
+
+        return nullable ? $"{access}?.ToString() ?? string.Empty" : $"{access}.ToString()";
     }
 
     /// <summary>The column kind for a property type, unless <c>[GridColumnKind]</c> forces one.</summary>

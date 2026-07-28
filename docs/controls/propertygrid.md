@@ -114,6 +114,15 @@ public partial class Order
 Order.PopulateColumns(grid);   // generated — static, since columns describe the type
 ```
 
+The same marker also covers [`ListView`](listview.md): `PopulateColumns(ListView)` adds the Details-view
+headers and the instance method `ToListViewItem()` builds a row whose sub-items line up with them, so
+binding a list is one call.
+
+```csharp
+Order.PopulateColumns(list);
+list.SetDataSource(orders, o => o.ToListViewItem());
+```
+
 Only **public, settable, non-static, non-indexer properties** become rows. The member attributes also *compile* on fields (their `AttributeUsage` permits it), but **the generator only walks properties** — a field carrying `[GridCategory]` is silently skipped. Expose it as a property, or add the row by hand.
 
 ### Getting the generator

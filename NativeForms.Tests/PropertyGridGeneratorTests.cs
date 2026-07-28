@@ -166,4 +166,52 @@ internal sealed class PropertyGridGeneratorTests
             Assert.That(width.ReadOnlyCellSelector!(new GeneratedSettings { IsArchived = false }), Is.False);
         });
     }
+
+    [Test]
+    public void PopulateColumns_also_builds_a_ListView_from_the_same_model()
+    {
+        var list = new ListView { Bounds = new(0, 0, 400, 200), View = ListViewView.Details };
+
+        GeneratedSettings.PopulateColumns(list); // generated
+
+        var headers = list.Columns.Select(c => c.Text).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(headers, Is.EqualTo(new[] { "Name", "Enabled", "Width", "Dock" }), "columns follow declaration order");
+            Assert.That(list.Columns.Single(c => c.Text == "Width").Width, Is.EqualTo(90), "[GridColumnWidth] applies here too");
+        });
+    }
+
+    [Test]
+    public void ToListViewItem_lines_its_sub_items_up_with_the_generated_columns()
+    {
+        var list = new ListView { Bounds = new(0, 0, 400, 200), View = ListViewView.Details };
+        GeneratedSettings.PopulateColumns(list);
+        var model = new GeneratedSettings { Name = "Row", Enabled = false, Width = 42, Dock = GeneratedDock.Left };
+
+        var item = model.ToListViewItem(); // generated
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.Text, Is.EqualTo("Row"), "the first column is the item text");
+            Assert.That(item.SubItems, Is.EqualTo(new[] { "False", "42", "Left" }));
+            Assert.That(item.SubItems.Count, Is.EqualTo(list.Columns.Count - 1), "one sub-item per remaining column");
+        });
+    }
+
+    [Test]
+    public void A_generated_ListView_row_survives_SetDataSource()
+    {
+        var list = new ListView { Bounds = new(0, 0, 400, 200), View = ListViewView.Details };
+        GeneratedSettings.PopulateColumns(list);
+        var models = new[]
+        {
+            new GeneratedSettings { Name = "First" },
+            new GeneratedSettings { Name = "Second" },
+        };
+
+        list.SetDataSource(models, m => m.ToListViewItem());
+
+        Assert.That(list.Items.Select(i => i.Text), Is.EqualTo(new[] { "First", "Second" }));
+    }
 }

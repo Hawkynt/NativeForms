@@ -840,9 +840,10 @@ Every §7 box belongs to a milestone below, except items marked "later / optiona
   `TreeView`. `[~]` (`DataGridView` virtual mode shipped)
 - **M13 — Attribute-driven grids & lists (§14).** Extend the `[GridEditable]` source generator so one
   annotated model emits the `PropertyGrid` rows, the `DataGridView` columns and the `ListView` columns,
-  with every member reference resolved (and diagnosed) at compile time. `[~]` — columns, inferred kinds,
-  widths, sort modes and the per-row rules generate today, with `NFG002`/`NFG003` catching bad names;
-  the click/style/image attributes and the `ListView` populator remain.
+  with every member reference resolved (and diagnosed) at compile time. `[~]` — the `PropertyGrid`,
+  `DataGridView` and `ListView` populators all generate today (kinds, widths, sort modes, per-row rules,
+  and a `ToListViewItem()` row factory), with `NFG002`/`NFG003` catching bad names; the click, style and
+  image attributes remain.
 
 Each milestone: tests first (TDD, per house rule), green `dotnet build`/`dotnet test -c Release`
 before commit, semantic single-concern commits with the `+ - * # !` prefix, no AI traces anywhere.
@@ -926,6 +927,7 @@ same commit. `—` = not applicable.
 | `[GridEditable]` source generator (packed as an analyzer in Core) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#attributes) |
 | `DataGridView` virtual mode (known + unknown size) | ✔ | — | [controls/datagridview.md](controls/datagridview.md) |
 | Attribute-driven `DataGridView` columns (generator) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes) |
+| Attribute-driven `ListView` columns + row factory (generator) | ✔ | — | [controls/propertygrid.md](controls/propertygrid.md#grid-column-attributes) |
 | MVVM primitives + binding + `ICommand` wiring | ✔ | ✔ | [mvvm.md](mvvm.md) |
 | Owner-draw engine (`IGraphics`/`ITheme`/canvas/shared primitives) | ✔ | ✔ | [custom-controls.md](custom-controls.md) |
 
@@ -1153,8 +1155,8 @@ populator.
 
 ### 14.4 Design rules
 
-- [x] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)` and
-      `PopulateColumns(DataGridView)`; the `ListView` populator is still to come.
+- [x] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)`,
+      `PopulateColumns(DataGridView)`, `PopulateColumns(ListView)` and `ToListViewItem()`.
 - [x] **Member references are `nameof`-friendly strings, resolved at compile time.** An unresolved name
       is `NFG002` and a wrong-typed one is `NFG003` — both **build errors**. Handler-signature checking
       arrives with the click attributes.
