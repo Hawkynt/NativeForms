@@ -751,11 +751,25 @@ strategy (may differ per platform; note exceptions inline).
       container (`presses landed on: GtkFixed`). Any future capture work must resolve colours and settle
       *before* the walkthrough starts, never during it. The residual `gtk_widget_draw: alloc_needed`
       warning on a freshly mapped dialog is accepted as cosmetic until then.
-- [ ] **Make the injected double-click checks deterministic.** Independently of the above, the TimePicker
-      double-click and the hosted-editor click+typing checks fail at a low background rate (~2 in 8) under
-      load, because the interval between the two injected presses can exceed the theme's
-      `DoubleClickTime`. They should drive the double-click through one injected event pair with a
-      guaranteed interval rather than two script steps.
+- [ ] **Fix the TimePicker double-click check (~2 in 8 runs, X11).** Investigated at length; the cause is
+      **not** yet found, so the notes below exist to stop the next attempt repeating the dead ends.
+      Symptom: `the clock never opened` with `presses landed on: GtkFixed, GtkFixed` — the gesture misses
+      the picker's canvas entirely.
+      *Established:* an instrumented run showed the press going to screen Y **1220** while the field is
+      26 px tall; the offset implies `control.Height` read **186** inside the very call that converted it,
+      yet `time.Bounds` reports 26 immediately afterwards. The demo authors it as
+      `new(664, 356, 200, 26)` and never resizes it.
+      *Refuted (do not retry):* (a) the gap between the two injected presses exceeding `DoubleClickTime` —
+      driving press/release/press inside one pump did not help; (b) a stray popup mapped over the field —
+      `Popups().Count` is 0 before the gesture; (c) measuring the offset and converting it in two separate
+      marshalled reads — making that atomic did not help either.
+      *Next lead:* `control.PointToScreen` (through the peer) and `form.PointToScreen(control.Bounds)`
+      disagree by ~80 px here, which is what a **scrolled containing page** would produce. Check whether
+      the Input page sits in a scrolling panel and whether the picker's logical bounds and its peer
+      allocation diverge; a check that computes screen points from logical bounds while the peer is offset
+      would miss exactly like this.
+      *Method note:* this check has a high background variance — take **≥5 runs** before concluding a
+      change helped or hurt. Two single-run A/Bs during this investigation pointed at the wrong culprit.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
