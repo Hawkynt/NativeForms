@@ -325,6 +325,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
 
+    /// <summary>Creates a <c>GtkLinkButton</c> showing <paramref name="label"/> and pointing at <paramref name="uri"/>.</summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint gtk_link_button_new_with_label(string uri, string label);
+
+    /// <summary>Sets whether a <c>GtkLinkButton</c> paints in its visited colour.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_link_button_set_visited(nint linkButton, int visited);
+
     /// <summary>Creates a <c>GtkRadioButton</c> in the group given as a <c>GSList</c> (0 starts a new group).</summary>
     [LibraryImport(Gtk)]
     internal static partial nint gtk_radio_button_new(nint group);

@@ -38,7 +38,7 @@ internal abstract class Win32ControlPeer : IControlPeer
     }
 
     /// <inheritdoc/>
-    public void SetText(string text)
+    public virtual void SetText(string text)
     {
         _text = text ?? string.Empty;
         if (Handle != 0)

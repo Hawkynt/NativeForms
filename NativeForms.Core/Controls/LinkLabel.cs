@@ -1,4 +1,5 @@
 using System.Drawing;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms;
@@ -25,6 +26,7 @@ public class LinkLabel : OwnerDrawnControl
                 return;
 
             field = value;
+            _native?.SetVisited(value);
             this.Invalidate();
         }
     }
@@ -42,6 +44,73 @@ public class LinkLabel : OwnerDrawnControl
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
+
+    private ILinkLabelPeer? _native;
+    private bool? _nativeOffered;
+
+    /// <summary>
+    /// Forces this link onto the native widget (<see langword="true"/>) or the owner-drawn painter
+    /// (<see langword="false"/>); <see langword="null"/> — the default — follows
+    /// <see cref="Application.PreferNativeWidgets"/>.
+    /// </summary>
+    public bool? UseNativeWidget { get; set; }
+
+    /// <summary>Whether this link is currently rendered by a real platform widget.</summary>
+    public bool IsNativeWidget => _native is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform hyperlink. Everything this
+    /// control models — one link spanning the whole caption, a visited flag, activation by click or
+    /// Enter — is, so nothing gates it; the per-character link ranges that would not be expressible are
+    /// a documented non-goal.
+    /// </summary>
+    private static bool IsNativeEligible => true;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible && (_nativeOffered ?? true);
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+    {
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible)
+        {
+            var offered = backend.CreateLinkLabel();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                peer.SetVisited(this.LinkVisited);
+                peer.LinkActivated += this.OnNativeLinkActivated;
+                return peer;
+            }
+        }
+
+        return base.CreatePeer(backend);
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        if (_native is { } peer)
+        {
+            peer.LinkActivated -= this.OnNativeLinkActivated;
+            _native = null;
+        }
+
+        base.OnUnrealized();
+    }
+
+    /// <summary>
+    /// The widget reported an activation. Raises the same pair the owner-drawn mouse path does — the
+    /// generic <see cref="Control.Click"/> and then <see cref="LinkClicked"/> — because neither platform
+    /// distinguishes a clicked link from one opened with Enter.
+    /// </summary>
+    private void OnNativeLinkActivated(object? sender, EventArgs e)
+    {
+        this.OnClick(EventArgs.Empty);
+        this.OnLinkClicked(EventArgs.Empty);
+    }
 
     /// <summary>Enter activates the link, so it stays out of the form's AcceptButton routing.</summary>
     protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;

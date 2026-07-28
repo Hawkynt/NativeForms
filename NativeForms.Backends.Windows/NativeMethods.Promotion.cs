@@ -90,6 +90,55 @@ internal static partial class NativeMethods
     /// <summary>Vertical scroll notification, sent to the parent of a slider or scroll bar.</summary>
     internal const uint WM_VSCROLL = 0x0115;
 
+    /// <summary>The window class of the common-controls hyperlink.</summary>
+    internal const string WC_LINK = "SysLink";
+
+    /// <summary>Class block: hyperlink.</summary>
+    internal const uint ICC_LINK_CLASS = 0x00008000;
+
+    /// <summary>A link inside a <c>SysLink</c> was clicked.</summary>
+    internal const int NM_CLICK = -2;
+
+    /// <summary>A link inside a <c>SysLink</c> was activated with Enter.</summary>
+    internal const int NM_RETURN = -4;
+
+    /// <summary>Sets one of a <c>SysLink</c>'s items.</summary>
+    internal const uint LM_SETITEM = 0x0400 + 0x0302;
+
+    /// <summary><see cref="LITEM.iLink"/> is meaningful.</summary>
+    internal const uint LIF_ITEMINDEX = 0x00000001;
+
+    /// <summary><see cref="LITEM.state"/> and <see cref="LITEM.stateMask"/> are meaningful.</summary>
+    internal const uint LIF_STATE = 0x00000002;
+
+    /// <summary>The link has been followed.</summary>
+    internal const uint LIS_VISITED = 0x00000008;
+
+    /// <summary>Describes one link inside a <c>SysLink</c> control.</summary>
+    /// <remarks>The two trailing buffers are fixed-size by contract, so the struct is blittable and the
+    /// message can be sent without any marshalling.</remarks>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal unsafe struct LITEM
+    {
+        /// <summary>Which of the other members carry meaning (the <c>LIF_*</c> flags).</summary>
+        internal uint mask;
+
+        /// <summary>The zero-based index of the link within the control's caption.</summary>
+        internal int iLink;
+
+        /// <summary>The <c>LIS_*</c> state bits.</summary>
+        internal uint state;
+
+        /// <summary>Which bits of <see cref="state"/> to apply.</summary>
+        internal uint stateMask;
+
+        /// <summary>The link's <c>id</c> attribute; <c>MAX_LINKID_TEXT</c> characters.</summary>
+        internal fixed char szID[48];
+
+        /// <summary>The link's <c>href</c> attribute; <c>L_MAX_URL_LENGTH</c> characters.</summary>
+        internal fixed char szUrl[2084];
+    }
+
     /// <summary>Class block: progress bar.</summary>
     internal const uint ICC_PROGRESS_CLASS = 0x00000020;
 

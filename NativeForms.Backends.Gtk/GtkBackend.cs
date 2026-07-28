@@ -164,6 +164,14 @@ public sealed partial class GtkBackend : IPlatformBackend
     }
 
     /// <inheritdoc />
+    /// <remarks>GTK has a real link button, so this backend accepts the promotion (PRD §12).</remarks>
+    public ILinkLabelPeer? CreateLinkLabel()
+    {
+        EnsureInitialized();
+        return new GtkLinkLabelPeer();
+    }
+
+    /// <inheritdoc />
     /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
     public IProgressBarPeer? CreateProgressBar()
     {

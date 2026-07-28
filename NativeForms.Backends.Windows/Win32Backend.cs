@@ -81,6 +81,13 @@ public sealed partial class Win32Backend : IPlatformBackend
     public IRadioButtonPeer CreateRadioButton() => new RadioButtonPeer();
 
     /// <inheritdoc/>
+    public ILinkLabelPeer CreateLinkLabel()
+    {
+        EnsureCommonControls(NativeMethods.ICC_LINK_CLASS);
+        return new LinkLabelPeer();
+    }
+
+    /// <inheritdoc/>
     public IProgressBarPeer CreateProgressBar()
     {
         EnsureCommonControls(NativeMethods.ICC_PROGRESS_CLASS);

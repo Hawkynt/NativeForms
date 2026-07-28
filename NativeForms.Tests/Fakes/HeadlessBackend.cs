@@ -141,6 +141,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     public ITrackBarPeer? CreateTrackBar(bool vertical)
         => !this.OfferNativeTrackBar ? null : this.LastTrackBar = this.Track(new HeadlessTrackBarPeer { Vertical = vertical });
 
+    /// <summary>Whether this backend accepts the hyperlink promotion (PRD §12). Off by default.</summary>
+    public bool OfferNativeLinkLabel { get; set; }
+
+    /// <summary>The last hyperlink peer handed out, so a test can drive it like the real widget.</summary>
+    public HeadlessLinkLabelPeer? LastLinkLabel { get; private set; }
+
+    public ILinkLabelPeer? CreateLinkLabel()
+        => !this.OfferNativeLinkLabel ? null : this.LastLinkLabel = this.Track(new HeadlessLinkLabelPeer());
+
     /// <summary>Whether this backend accepts the progress-bar promotion (PRD §12). Off by default.</summary>
     public bool OfferNativeProgressBar { get; set; }
 
@@ -1270,6 +1279,20 @@ internal sealed class HeadlessRadioButtonPeer : HeadlessPeer, IRadioButtonPeer
         _checked = true;
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
+}
+
+
+/// <summary>A stand-in for a real platform hyperlink, so the promoted path is testable headlessly.</summary>
+internal sealed class HeadlessLinkLabelPeer : HeadlessPeer, ILinkLabelPeer
+{
+    public event EventHandler? LinkActivated;
+
+    public bool Visited { get; private set; }
+
+    public void SetVisited(bool visited) => this.Visited = visited;
+
+    /// <summary>Simulates the user activating the link.</summary>
+    public void RaiseUserActivate() => LinkActivated?.Invoke(this, EventArgs.Empty);
 }
 
 
