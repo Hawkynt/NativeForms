@@ -87,6 +87,13 @@ if (shooting)
     AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         File.AppendAllText(log, $"unhandled: {e.ExceptionObject}{Environment.NewLine}");
 
+    // Every page, not just the one that happens to be in front. Switching pages through the tab
+    // control's own property rather than by synthesizing clicks is what makes this work on every
+    // backend: the autopilot's input injection is GDK-only, so a walkthrough built on it can never
+    // photograph Windows.
+    var pages = (form as MainForm)?.Tabs;
+    var page = 0;
+
     form.Load += (_, _) =>
     {
         // One tick of the real loop first, so the shot is of a window the platform has finished
@@ -94,20 +101,30 @@ if (shooting)
         var shutter = new Hawkynt.NativeForms.Timer { Interval = 400 };
         shutter.Tick += (_, _) =>
         {
-            shutter.Stop();
-            var path = Path.Combine(directory, "gallery.png");
+            var name = pages is null
+                ? "gallery"
+                : $"{page:00}-{new string([.. pages.TabPages[page].Text.Where(char.IsLetterOrDigit)]).ToLowerInvariant()}";
+
+            var path = Path.Combine(directory, name + ".png");
             try
             {
                 var size = Shoot.Window(form, path);
                 Note(size is { } written
-                    ? $"shot: {path} ({written.Width}x{written.Height})"
-                    : $"shot failed: {path} - no capture route produced pixels");
+                    ? $"shot: {name} ({written.Width}x{written.Height})"
+                    : $"shot failed: {name} - no capture route produced pixels");
             }
             catch (Exception e)
             {
                 Note($"shot threw: {e}");
             }
 
+            if (pages is not null && ++page < pages.TabPages.Count)
+            {
+                pages.SelectedIndex = page;
+                return; // the next tick photographs the page this one just selected
+            }
+
+            shutter.Stop();
             form.Close();
         };
 

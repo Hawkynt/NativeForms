@@ -134,6 +134,9 @@ internal sealed partial class MainForm : Form
     /// </summary>
     private Dictionary<string, object>? _parts;
 
+    /// <summary>The page strip, so <c>--shoot</c> can photograph every page rather than only the first.</summary>
+    internal TabControl Tabs => _tabs;
+
     /// <summary>Publishes a control under a name <see cref="Autopilot"/> can look it up by.</summary>
     private T Publish<T>(string name, T part)
         where T : notnull
