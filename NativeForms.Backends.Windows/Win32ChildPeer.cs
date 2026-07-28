@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -20,8 +21,18 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
     /// <summary>The HMENU control id this peer was created with, for <see cref="RecreateHandle"/>.</summary>
     private int _controlId;
 
-    /// <summary>Pinning handle keeping this peer reachable from the subclass procedure.</summary>
-    private GCHandle _subclassHandle;
+    /// <summary>
+    /// The subclassed windows and the peers behind them, keyed by HWND.
+    /// </summary>
+    /// <remarks>
+    /// A map rather than a <see cref="GCHandle"/> in COMCTL32's reference data, which is what this used
+    /// to be, and which is the one operation in the subclass procedure that can fault: recovering a
+    /// handle that has been freed — or was never one — is undefined and takes the process down with no
+    /// managed exception to show for it. A dictionary lookup on a stale HWND simply misses. The sibling
+    /// subclass on this very window (<c>TextBoxPeer.EditProc</c>) already worked this way; the two agree
+    /// now.
+    /// </remarks>
+    private static readonly ConcurrentDictionary<nint, Win32ChildPeer> _pointerPeers = new();
 
     /// <summary>Whether leave tracking is currently armed, so it is re-armed once per crossing.</summary>
     private bool _leaveTracked;
@@ -80,25 +91,24 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
         if (Handle == 0 || !this.NeedsPointerSubclass)
             return;
 
-        if (!_subclassHandle.IsAllocated)
-            _subclassHandle = GCHandle.Alloc(this);
-
+        _pointerPeers[Handle] = this;
         NativeMethods.SetWindowSubclass(
             Handle,
             (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
             _PointerSubclassId,
-            GCHandle.ToIntPtr(_subclassHandle));
+            0);
     }
 
     /// <summary>
     /// The subclass procedure: observes the pointer messages, then always defers. Static and
     /// <see cref="UnmanagedCallersOnlyAttribute"/> so COMCTL32 can call it through a function
-    /// pointer, with the peer recovered from the reference data rather than a captured closure.
+    /// pointer, with the peer found by HWND rather than through a captured closure or a handle in the
+    /// reference data — a window the map does not know is simply passed straight on.
     /// </summary>
     [UnmanagedCallersOnly]
     private static nint PointerSubclassProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nint refData)
     {
-        if (refData != 0 && GCHandle.FromIntPtr(refData).Target is Win32ChildPeer peer)
+        if (_pointerPeers.TryGetValue(hwnd, out var peer))
             switch (msg)
             {
                 case NativeMethods.WM_MOUSEMOVE:
@@ -167,19 +177,14 @@ internal abstract class Win32ChildPeer : Win32ControlPeer
         this.RaisePointerMove((short)(lParam & 0xFFFF), (short)((lParam >> 16) & 0xFFFF));
     }
 
-    /// <summary>Removes the pointer subclass and releases its pinning handle before the window goes.</summary>
+    /// <summary>Removes the pointer subclass and forgets the window before it goes.</summary>
     public override unsafe void Dispose()
     {
-        if (_subclassHandle.IsAllocated)
-        {
-            if (Handle != 0)
-                NativeMethods.RemoveWindowSubclass(
-                    Handle,
-                    (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
-                    _PointerSubclassId);
-
-            _subclassHandle.Free();
-        }
+        if (Handle != 0 && _pointerPeers.TryRemove(Handle, out _))
+            NativeMethods.RemoveWindowSubclass(
+                Handle,
+                (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
+                _PointerSubclassId);
 
         base.Dispose();
     }
