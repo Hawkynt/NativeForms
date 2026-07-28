@@ -878,8 +878,22 @@ strategy (may differ per platform; note exceptions inline).
       sends itself messages while it processes the stream, and both subclasses sit on that window. A
       malformed chain there recurses until the stack goes, which presents as an access violation with no
       managed exception, matching what both platforms show. The `EDITSTREAM` layout and the
-      `EDITSTREAMCALLBACK` signature are still believed correct; the chain is the suspect. Reproduce it
-      cheaply now with the CI job rather than by bisecting under wine. Swapping that one `Rtf` for plain text locally does let the whole gallery come up, under
+      `EDITSTREAMCALLBACK` signature are still believed correct; the chain is the suspect.
+      **Reproduce it in about a minute**: publish the demo `win-x64` self-contained and run it under wine
+      with `--shoot`, which faults identically to the Windows runner — wine is the fast loop here, CI is
+      the confirmation.
+      Hypotheses already tested and refuted, so nobody spends the hour twice:
+      *the reference-data `GCHandle`* — `PointerSubclassProc` recovered a handle COMCTL32 held, which is
+      undefined once freed and is the only faulting operation in the crashing frame. It now finds its peer
+      by HWND and the fault is unchanged.
+      *Unbounded recursion through the two stacked subclasses* — the trace shows each frame once, so the
+      chain is not looping; this is a genuine access violation, not a stack overflow.
+      What is still unexamined: whether `DefSubclassProc` is safe to call at all from inside the
+      `SendMessageW` RichEdit issues while processing `EM_STREAMIN` (the trace shows *two* nested
+      `SendMessageW` frames, so the control is re-entering the window during the stream), and whether
+      installing both subclasses on one window is what makes that re-entry fault. The cheap next
+      experiment is to skip `InstallPointerSubclass` for `RichTextBoxPeer` alone and see whether the
+      gallery comes up. Swapping that one `Rtf` for plain text locally does let the whole gallery come up, under
       wine and presumably on Windows, which is how the Win32 rendering was eyeballed and how the
       `SysLink` fallback below was found —
       worth repeating after Win32 work, since the autopilot itself cannot help there: its injection and
