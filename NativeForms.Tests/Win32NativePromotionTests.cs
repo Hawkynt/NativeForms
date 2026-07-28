@@ -39,6 +39,12 @@ public sealed class Win32NativePromotionTests
         /// <summary>The window text MSAA would read as the owner-drawn control's name.</summary>
         public string? CanvasAccessibleName;
 
+        /// <summary>The role MSAA reports for the owner-drawn control, asked the way a screen reader asks.</summary>
+        public int CanvasAccessibleRole;
+
+        /// <summary>The role a bare stock check box reports, to tell a broken reply from a broken reader.</summary>
+        public int ShadowAccessibleRole;
+
         /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
         public bool ColorTextAvailable;
 
@@ -227,6 +233,8 @@ public sealed class Win32NativePromotionTests
                 // PRD §8: an owner-drawn control's canvas is a nameless window to MSAA unless the toolkit
                 // gives it a window text, which is what MSAA reads as the name.
                 observed.CanvasAccessibleName = WindowTextOf(described);
+                observed.CanvasAccessibleRole = MsaaRoleOf(described);
+                observed.ShadowAccessibleRole = ShadowRoleProbe(described);
 
                 observed.ColorTextAvailable = !Win32ColorText.Unavailable;
                 observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
@@ -286,6 +294,71 @@ public sealed class Win32NativePromotionTests
                 var copied = NativeMethods.GetWindowTextW(peer.Handle, text, buffer.Length);
                 return new string(buffer, 0, Math.Max(0, copied));
             }
+        }
+    }
+
+    /// <summary>
+    /// The MSAA role of a control's window, obtained exactly as assistive technology obtains it: ask
+    /// <c>oleacc</c> for the window's accessible object, then ask that object what it is.
+    /// </summary>
+    private static int MsaaRoleOf(Control control)
+    {
+        if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+            return 0;
+
+        return RoleOfWindow(peer.Handle);
+    }
+
+    /// <summary>
+    /// The role a plain stock check box reports, asked exactly as above. A control group for the test
+    /// beside it: if even this comes back generic, the reading is broken rather than the reply.
+    /// </summary>
+    private static int ShadowRoleProbe(Control host)
+    {
+        if (host.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+            return 0;
+
+        var probe = NativeMethods.CreateWindowExW(
+            0,
+            "BUTTON",
+            "probe",
+            NativeMethods.WS_CHILD | NativeMethods.BS_AUTOCHECKBOX,
+            0,
+            0,
+            10,
+            10,
+            peer.Handle,
+            0,
+            NativeMethods.GetModuleHandleW(null),
+            0);
+
+        if (probe == 0)
+            return 0;
+
+        try
+        {
+            return RoleOfWindow(probe);
+        }
+        finally
+        {
+            NativeMethods.DestroyWindow(probe);
+        }
+    }
+
+    /// <summary>The MSAA role of a window, asked the way assistive technology asks.</summary>
+    private static int RoleOfWindow(nint handle)
+    {
+        if (NativeMethods.AccessibleObjectFromWindow(handle, unchecked((uint)NativeMethods.OBJID_CLIENT), NativeMethods.IID_IAccessible, out var accessible) < 0
+            || accessible == 0)
+            return 0;
+
+        try
+        {
+            return NativeMethods.GetAccessibleRole(accessible, out var role) < 0 ? 0 : (int)role.value;
+        }
+        finally
+        {
+            NativeMethods.Release(accessible);
         }
     }
 
@@ -393,4 +466,31 @@ public sealed class Win32NativePromotionTests
     [Test]
     public void An_owner_drawn_controls_name_reaches_the_window_MSAA_will_read()
         => Assert.That(Result().CanvasAccessibleName, Is.EqualTo("Enable logging"));
+
+    /// <summary>
+    /// The role is the half a window text cannot carry: MSAA takes it from the window class, so an
+    /// owner-drawn check box would be announced as a pane. Asking <c>oleacc</c> the way a screen reader
+    /// does is the only way to know the borrowed identity actually arrived.
+    /// </summary>
+    /// <remarks>
+    /// Asserted against a real stock check box built alongside rather than against the literal
+    /// <c>ROLE_SYSTEM_CHECKBUTTON</c>, because the number is the platform's business: wine's <c>oleacc</c>
+    /// answers <c>ROLE_SYSTEM_CLIENT</c> for every window it is asked about, including a genuine check box,
+    /// so a hard-coded 44 would fail there for a reason that has nothing to do with this toolkit. What is
+    /// actually being claimed is that our canvas is announced as whatever <em>this</em> machine announces a
+    /// check box as — which is the contract, holds everywhere, and still fails if the borrowed object never
+    /// reaches <c>WM_GETOBJECT</c>.
+    /// </remarks>
+    [Test]
+    public void An_owner_drawn_control_is_announced_as_what_it_imitates()
+    {
+        var observed = Result();
+        if (observed.ShadowAccessibleRole == 0)
+            Assert.Ignore("oleacc did not answer on this machine, so there is nothing to compare against.");
+
+        Assert.That(
+            observed.CanvasAccessibleRole,
+            Is.EqualTo(observed.ShadowAccessibleRole),
+            "the canvas answered for itself — the borrowed accessible object did not reach WM_GETOBJECT");
+    }
 }

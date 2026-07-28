@@ -14,9 +14,6 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// </remarks>
 internal sealed class RadioButtonPeer : Win32ChildPeer, IRadioButtonPeer
 {
-    /// <summary>A radio button that reports clicks and leaves the state to its host.</summary>
-    private const uint _BS_RADIOBUTTON = 0x00000004;
-
     private bool _checked;
 
     /// <inheritdoc/>
@@ -26,7 +23,7 @@ internal sealed class RadioButtonPeer : Win32ChildPeer, IRadioButtonPeer
     protected override string WindowClass => "BUTTON";
 
     /// <inheritdoc/>
-    protected override uint ExtraStyle => _BS_RADIOBUTTON | NativeMethods.WS_TABSTOP;
+    protected override uint ExtraStyle => NativeMethods.BS_RADIOBUTTON | NativeMethods.WS_TABSTOP;
 
     /// <inheritdoc/>
     public void SetChecked(bool value)

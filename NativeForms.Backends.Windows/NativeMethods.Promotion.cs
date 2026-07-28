@@ -22,6 +22,9 @@ internal static partial class NativeMethods
     /// <summary>A radio button that checks itself and clears its group siblings on click.</summary>
     internal const uint BS_AUTORADIOBUTTON = 0x00000009;
 
+    /// <summary>A radio button that reports clicks and leaves the state to its host.</summary>
+    internal const uint BS_RADIOBUTTON = 0x00000004;
+
     /// <summary>A frame with a caption; the classic group box.</summary>
     internal const uint BS_GROUPBOX = 0x00000007;
 
@@ -291,6 +294,83 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetScrollInfo(nint hwnd, int bar, ref SCROLLINFO info);
+
+    /// <summary>Sent to work out which window the pointer is over.</summary>
+    internal const uint WM_NCHITTEST = 0x0084;
+
+    /// <summary>Removes a rectangle from a window's update region without painting it.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ValidateRect(nint hWnd, nint lpRect);
+
+    // --- MSAA (oleacc) -----------------------------------------------------------------------------
+
+    /// <summary>A window is being asked for an accessible object.</summary>
+    internal const uint WM_GETOBJECT = 0x003D;
+
+    /// <summary>The object identifier for a window's client area.</summary>
+    internal const int OBJID_CLIENT = unchecked((int)0xFFFFFFFC);
+
+    /// <summary><c>IID_IAccessible</c>.</summary>
+    internal static readonly Guid IID_IAccessible = new("618736e0-3c3d-11cf-810c-00aa00389b71");
+
+    /// <summary>
+    /// The accessible object the system itself provides for a window, derived from its class.
+    /// </summary>
+    /// <remarks>
+    /// The point of it here is that the object is <em>Windows'</em> implementation, not ours: a check box
+    /// window yields an <c>IAccessible</c> that already reports the check-box role, the caption as its
+    /// name and the checked state, with nothing for this toolkit to implement or keep correct.
+    /// </remarks>
+    [LibraryImport("oleacc.dll")]
+    internal static partial int CreateStdAccessibleObject(nint hwnd, int objectId, in Guid riid, out nint accessible);
+
+    /// <summary>
+    /// Retrieves the accessible object for a window — the client side of <c>WM_GETOBJECT</c>. Used by the
+    /// real-Win32 test tier to ask the same question a screen reader asks.
+    /// </summary>
+    [LibraryImport("oleacc.dll")]
+    internal static partial int AccessibleObjectFromWindow(nint hwnd, uint objectId, in Guid riid, out nint accessible);
+
+    /// <summary>
+    /// <c>IAccessible::get_accRole</c> — slot 13: 3 IUnknown, 4 IDispatch, then its seventh method. The
+    /// child argument is a <c>VARIANT</c> by value, which on x64 is passed by reference.
+    /// </summary>
+    internal static unsafe int GetAccessibleRole(nint accessible, out VARIANT role)
+    {
+        var self = VARIANT.Self;
+        fixed (VARIANT* r = &role)
+            return ((delegate* unmanaged<nint, VARIANT*, VARIANT*, int>)(((void**)*(void**)accessible)[13]))(
+                accessible, &self, r);
+    }
+
+    /// <summary>
+    /// The subset of <c>VARIANT</c> this needs: a 16-byte header and the value union. Only the integer
+    /// cases are read, which is all a role or a child identifier ever is.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct VARIANT
+    {
+        /// <summary>The <c>VARTYPE</c>; 3 is <c>VT_I4</c>.</summary>
+        internal ushort vt;
+
+        private readonly ushort _reserved1;
+        private readonly ushort _reserved2;
+        private readonly ushort _reserved3;
+
+        /// <summary>The value, read as a 32-bit integer for the cases here.</summary>
+        internal long value;
+
+        /// <summary>The rest of the union — a <c>VARIANT</c> is 24 bytes, and the callee writes all of it.</summary>
+        private readonly long _unionTail;
+
+        /// <summary><c>CHILDID_SELF</c> — the object itself rather than one of its children.</summary>
+        internal static VARIANT Self => new() { vt = 3, value = 0 };
+    }
+
+    /// <summary>Packs an accessible object into the <c>LRESULT</c> a <c>WM_GETOBJECT</c> reply carries.</summary>
+    [LibraryImport("oleacc.dll")]
+    internal static partial nint LresultFromObject(in Guid riid, nint wParam, nint unknown);
 
     /// <summary>Class block: progress bar.</summary>
     internal const uint ICC_PROGRESS_CLASS = 0x00000020;

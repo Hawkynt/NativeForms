@@ -694,14 +694,27 @@ strategy (may differ per platform; note exceptions inline).
       own role by default, so the common case needs no code at all.
   - [x] **GTK/ATK**: name, description and role onto the widget's `AtkObject`, asserted by reading them
         back out of ATK on live widgets (`GtkAccessibilityTests`) rather than trusting the call.
-  - [~] **Win32**: the name reaches the canvas window's text, which is what MSAA reads for a window it
-        knows nothing else about — verified under wine. The **role** is not expressible that way: MSAA
-        infers it from the window class, so overriding it needs a `WM_GETOBJECT`/`IAccessible` provider,
-        which is a COM *server* rather than the client-side vtable calls §13 established. That is the
-        remaining work, and it is what a UIA provider would build on.
+  - [x] **Win32/MSAA**: the name reaches the canvas window's text, which is what MSAA reads for a window
+        it knows nothing else about. The **role** needed more, because MSAA takes it from the window class
+        — but not a COM server. The owner-drawn control keeps a real instance of the stock control it
+        imitates beside it, and answers `WM_GETOBJECT` with *that* window's standard accessible object via
+        `CreateStdAccessibleObject` + `LresultFromObject`. The object is Windows' own implementation of
+        role, name and state throughout: this toolkit implements no interface and calls no method on one
+        but `Release`. The shadow is created on the **first** request, so an application no assistive
+        technology is reading never allocates one; it is subclassed to paint nothing and to report itself
+        transparent to hit-testing, so the pixels and the mouse still belong to the owner-drawn control,
+        and it is not a tab stop.
+        Asserted by asking `oleacc` for our canvas's role exactly as a screen reader would — compared
+        against a real stock check box built alongside rather than against the literal
+        `ROLE_SYSTEM_CHECKBUTTON`, since wine answers `ROLE_SYSTEM_CLIENT` for every window including a
+        genuine check box. That control group is what distinguishes "our reply did not take" from "this
+        machine cannot tell a check box from a pane"; without it the test would have looked like a defect
+        in the toolkit.
   - [ ] macOS/NSAccessibility, which waits on the backend itself.
   - [ ] A screen reader announces a promoted and an owner-drawn control on both platforms — verified by
-        hand, once, since no automation substitutes for hearing it.
+        hand, once, since no automation substitutes for hearing it. Note that wine cannot stand in for the
+        Windows half: its `oleacc` reports every window as a generic client, so only the plumbing is
+        observable there.
 - [x] Right-to-left: ambient `Control.RightToLeft`, mirrored owner-drawn painting, and container
       layout mirroring — a right-to-left container flips where its children's peers sit across the
       client width while their logical `Bounds` stay left-to-right (verified in pixels)

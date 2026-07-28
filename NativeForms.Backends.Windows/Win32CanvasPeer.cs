@@ -111,12 +111,56 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     public override void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
     {
         _accessibleName = name;
+        _accessibleRole = role;
         if (this.Handle != 0)
             NativeMethods.SetWindowTextW(this.Handle, name ?? string.Empty);
+
+        // A shadow already built for a different role is wrong now; the next request rebuilds it.
+        if (_accessibleShadow != 0)
+        {
+            Win32ShadowProc.Forget(_accessibleShadow);
+            NativeMethods.DestroyWindow(_accessibleShadow);
+            _accessibleShadow = 0;
+        }
     }
 
     /// <summary>The accessible name, buffered until the window exists.</summary>
     private string? _accessibleName;
+
+    /// <summary>The role the control asked to be announced as.</summary>
+    private AccessibleRole _accessibleRole;
+
+    /// <summary>
+    /// The stock control whose accessible identity this canvas borrows, created on the first request.
+    /// </summary>
+    private nint _accessibleShadow;
+
+    /// <summary>
+    /// Answers <c>WM_GETOBJECT</c> with the accessible object of a stock control matching the role the
+    /// owner-drawn control claims, so MSAA reports what the surface <em>is</em> rather than what its
+    /// window class says it is.
+    /// </summary>
+    /// <remarks>
+    /// Nothing exists until something asks: an application no assistive technology is reading never
+    /// creates a shadow window at all, which is what keeps this off the footprint budget of §4.
+    /// </remarks>
+    private nint OnGetObject(nint wParam, nint lParam)
+    {
+        if ((int)lParam != NativeMethods.OBJID_CLIENT || _accessibleRole == AccessibleRole.Default)
+            return 0;
+
+        if (_accessibleShadow == 0)
+        {
+            NativeMethods.GetClientRect(this.Handle, out var client);
+            _accessibleShadow = Win32AccessibleShadow.Create(
+                this.Handle,
+                _accessibleRole,
+                _accessibleName,
+                new Size(client.right - client.left, client.bottom - client.top));
+        }
+
+        return Win32AccessibleShadow.Reply(_accessibleShadow, wParam);
+    }
 
     /// <inheritdoc/>
     public void AddChild(IControlPeer child)
@@ -180,6 +224,13 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     public override void Dispose()
     {
         this.ReleaseBuffer();
+        if (_accessibleShadow != 0)
+        {
+            Win32ShadowProc.Forget(_accessibleShadow);
+            NativeMethods.DestroyWindow(_accessibleShadow);
+            _accessibleShadow = 0;
+        }
+
         if (this.Handle != 0)
             _canvases.TryRemove(this.Handle, out _);
 
@@ -437,6 +488,13 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                 case NativeMethods.WM_ERASEBKGND:
                     // Report the background as erased so Windows never paints it under us.
                     return 1;
+
+                case NativeMethods.WM_GETOBJECT:
+                    var accessible = peer.OnGetObject(wParam, lParam);
+                    if (accessible != 0)
+                        return accessible;
+
+                    break;
 
                 case NativeMethods.WM_COMMAND:
                     // A non-zero lParam means a hosted native child (its HWND) is notifying us.

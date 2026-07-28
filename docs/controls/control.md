@@ -84,7 +84,7 @@ A control with a caption is already named — set `AccessibleName` only where th
 
 This matters most for **owner-drawn** controls. A real platform widget answers for itself — a promoted [`CheckBox`](checkbox.md) tells the screen reader it is a check box with its caption, unprompted — but an owner-drawn control is a blank drawing surface to an accessibility client however carefully it is painted, so the toolkit publishes the name and role on its behalf. On GTK that goes to the widget's `AtkObject` (verified against ATK itself in `GtkAccessibilityTests`); on Win32 the name becomes the canvas window's text, which is what MSAA reads for a window it knows nothing else about.
 
-**Not yet:** the role is not published on Win32 — MSAA infers it from the window class, and overriding that needs a `WM_GETOBJECT` provider. A screen reader there announces the right name and a generic kind. See [PRD §8](../PRD.md#8-cross-cutting-features).
+On Win32 the role needs more than a name, because MSAA takes it from the window class — so an owner-drawn control keeps a real, invisible instance of the stock control it imitates beside it and hands out *that* window's accessible object. Windows supplies the role, name and state; the toolkit implements nothing. The shadow appears only when something first asks for accessibility information, paints nothing, and is transparent to the mouse and the keyboard, so an application nobody is reading with assistive technology never allocates one. Roles with no faithful stock control keep the generic one rather than being mapped onto an approximation. See [PRD §8](../PRD.md#8-cross-cutting-features).
 
 ### Keyboard navigation
 
