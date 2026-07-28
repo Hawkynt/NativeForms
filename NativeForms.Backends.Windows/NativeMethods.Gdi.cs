@@ -102,14 +102,17 @@ internal static unsafe partial class NativeMethods
 
     // --- System metrics (GetSystemMetrics indices) ---
 
-    /// <summary>Width of a vertical scroll bar, in pixels.</summary>
-    internal const int SM_CXVSCROLL = 0;
-
     /// <summary>Width of the primary screen, in pixels.</summary>
     internal const int SM_CXSCREEN = 0;
 
     /// <summary>Height of the primary screen, in pixels.</summary>
     internal const int SM_CYSCREEN = 1;
+
+    /// <summary>Width of a vertical scroll bar, in pixels.</summary>
+    internal const int SM_CXVSCROLL = 2;
+
+    /// <summary>Height of a horizontal scroll bar, in pixels.</summary>
+    internal const int SM_CYHSCROLL = 3;
 
     // --- Device caps (GetDeviceCaps indices) ---
 

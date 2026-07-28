@@ -45,6 +45,12 @@ public sealed class Win32NativePromotionTests
         /// <summary>The role a bare stock check box reports, to tell a broken reply from a broken reader.</summary>
         public int ShadowAccessibleRole;
 
+        /// <summary>The theme's scroll-bar thickness, which a wrong metric index turns into a screen dimension.</summary>
+        public int ScrollBarSize;
+
+        /// <summary>The theme's row height, guarded the same way.</summary>
+        public int RowHeight;
+
         /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
         public bool ColorTextAvailable;
 
@@ -235,6 +241,10 @@ public sealed class Win32NativePromotionTests
                 observed.CanvasAccessibleName = WindowTextOf(described);
                 observed.CanvasAccessibleRole = MsaaRoleOf(described);
                 observed.ShadowAccessibleRole = ShadowRoleProbe(described);
+
+                var theme = BackendRegistry.Resolve().Theme;
+                observed.ScrollBarSize = theme.ScrollBarSize;
+                observed.RowHeight = theme.RowHeight;
 
                 observed.ColorTextAvailable = !Win32ColorText.Unavailable;
                 observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
@@ -463,6 +473,24 @@ public sealed class Win32NativePromotionTests
     /// PRD §8: MSAA names a window it knows nothing else about by its window text, and our canvas class
     /// has none — so an owner-drawn control is announced as a bare pane until the toolkit supplies one.
     /// </summary>
+    /// <summary>
+    /// A theme metric read through the wrong <c>GetSystemMetrics</c> index does not fail — it returns
+    /// another metric, and the only sign is that everything sized by it is wrong. <c>SM_CXVSCROLL</c> was
+    /// declared as 0, which is <c>SM_CXSCREEN</c>, so every scroll bar was as wide as the display and every
+    /// control that reserves room for one had no room left for anything else.
+    /// </summary>
+    [TestCase("scroll bar thickness")]
+    [TestCase("row height")]
+    public void A_theme_metric_is_a_control_measurement_and_not_a_screen_one(string metric)
+    {
+        var value = metric == "scroll bar thickness" ? Result().ScrollBarSize : Result().RowHeight;
+
+        Assert.That(
+            value,
+            Is.InRange(1, 200),
+            $"{metric} came back as {value}, which is a display dimension rather than a control one");
+    }
+
     [Test]
     public void An_owner_drawn_controls_name_reaches_the_window_MSAA_will_read()
         => Assert.That(Result().CanvasAccessibleName, Is.EqualTo("Enable logging"));

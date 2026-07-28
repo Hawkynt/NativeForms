@@ -798,19 +798,18 @@ strategy (may differ per platform; note exceptions inline).
 
       Automating it needs the autopilot's injection and capture behind a backend seam — see the
       interactive-verification entry below, which is the same gap.
-- [ ] **Win32 rendering findings from the wine run**, none of them promotion-related, all reproducible by
-      bringing the gallery up as described above:
-      - Controls hosted in a `ToolStrip` through `ToolStripControlHost` paint **blank** — the date picker
-        and the zoom combo are empty boxes, while the colour swatch beside them draws. Owner-drawn controls
-        everywhere else on the page paint fine, so this is specific to the strip's hosting, and it predates
-        the promotions (the date picker was never promotable). It became more visible once
-        `ToolStripControlHost` started pinning what it hosts to the painter, which is the right call for
-        GTK — a toolbar row is shorter than a platform combo will draw in.
-      - A plain `→` falls back to a replacement box even though it is not an emoji, so the font-fallback
-        chain for the owner-drawn text path still deserves a look. (The emoji themselves now take the
-        Direct2D path of §13.)
-      - The `RichTextBox` cannot be exercised at all under wine (see below), so its Win32 paint path
-        remains unobserved.
+- [x] **The Win32 rendering findings from the wine run had one cause**, and it was not the `ToolStrip`.
+      `SM_CXVSCROLL` was declared as `0`, which is `SM_CXSCREEN`, so `ITheme.ScrollBarSize` answered the
+      width of the display — 3840 here. Everything that reserves room for a scroll bar therefore had none
+      left for content: a combo box's field was negative-width and drew nothing, and `Panel.AutoScroll`,
+      `DataGridView`, `ListBox`, `ListView`, `TreeView` and `CalendarView` would each have lost their whole
+      content area on Windows. The symptom that led there was narrow (two blank boxes in a toolbar) and the
+      cause was one wrong constant; the control group that found it was a *loose* combo box outside any
+      strip, which was blank too. `Win32NativePromotionTests` now asserts the theme metrics are control
+      measurements rather than display ones, since a wrong index does not fail — it returns another number.
+- [ ] Remaining Win32 rendering observations: a plain `→` falls back to a replacement box even though it
+      is not an emoji, so the font-fallback chain for the owner-drawn text path deserves a look; and the
+      `RichTextBox` cannot be exercised at all under wine, so its Win32 paint path remains unobserved.
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
       `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect
       `Panel` was fixed for.
