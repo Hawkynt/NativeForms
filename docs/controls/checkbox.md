@@ -43,10 +43,15 @@ either way; `IsNativeWidget` reports which path was taken.
 | `IsNativeWidget` | `bool` (get) | — | Whether the control is currently backed by a real platform check box. |
 | `UseNativeWidget` | `bool?` | `null` | Overrides [`Application.PreferNativeWidgets`](application.md) for this control. |
 
-The decision is made **once, at realization**, and only when the configured properties stay inside what the
-platform widget can express. An `Image` is the one thing neither `BS_AUTOCHECKBOX` nor `GtkCheckButton`
-renders beside the caption the way this control does, so a box with one stays owner-drawn. Changing
-`Image` or `UseNativeWidget` after the form is shown does not swap an existing peer. See
+Promotion happens only when the configured properties stay inside what the platform widget can express. An
+`Image` is the one thing neither `BS_AUTOCHECKBOX` nor `GtkCheckButton` renders beside the caption the way
+this control does, so a box with one stays owner-drawn.
+
+**Setting or clearing `Image` on a live control swaps the peer** rather than silently dropping the image:
+the box falls back to the canvas when it gains one and returns to the widget when it loses one, keeping
+`Checked` and the rest of its state. Keyboard focus does not survive the swap, because it belonged to the
+destroyed widget. `UseNativeWidget` itself is read at realization only — a form that is already showing
+should not change its rendering out from under the user. See
 [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
 
 ## Notes

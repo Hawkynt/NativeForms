@@ -52,7 +52,9 @@ identical either way; `IsNativeWidget` reports which path was taken, and `UseNat
 [`Application.PreferNativeWidgets`](application.md) per control.
 
 A **vertical** bar stays owner-drawn: GTK needs the orientation fixed at construction and Win32 needs a
-distinct window style, so that case waits until the peers carry it. `MarqueeAnimationSpeed` still drives
+distinct window style, so that case waits until the peers carry it. Turning a live bar vertical therefore
+**swaps the peer back to the canvas** (and turning it horizontal again promotes it, re-seeded with the
+current `Value`) rather than leaving a horizontal widget drawn sideways. `MarqueeAnimationSpeed` still drives
 the animation on both paths — the same timer either advances our phase or pulses the widget. See
 [PRD §12](../PRD.md#12-native-peer-promotion-opt-into-real-widgets-where-the-platform-has-one).
 

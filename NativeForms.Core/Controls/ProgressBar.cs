@@ -19,6 +19,10 @@ public class ProgressBar : OwnerDrawnControl
 {
     private IProgressBarPeer? _native;
 
+    /// <summary>Whether the backend offered a widget the last time we asked; <see langword="null"/> until
+    /// we have. See <see cref="WouldBeNative"/>.</summary>
+    private bool? _nativeOffered;
+
     /// <summary>
     /// Whether this bar realizes onto a real platform progress indicator rather than the owner-drawn
     /// surface. <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
@@ -34,6 +38,11 @@ public class ProgressBar : OwnerDrawnControl
     /// the owner-drawn path keeps that case until the peers carry it.
     /// </summary>
     private bool IsNativeEligible => this.Orientation == Orientation.Horizontal;
+
+    /// <summary>Which path this control would take if it were realized right now, so a property change
+    /// only rebuilds the peer when that would actually change the rendering.</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
 
     private int _minimum;
     private int _maximum = 100;
@@ -141,6 +150,12 @@ public class ProgressBar : OwnerDrawnControl
                 return;
 
             field = value;
+
+            // A platform progress bar fixes its orientation at construction, so turning the bar moves it
+            // between the widget and the canvas rather than leaving a horizontal widget drawn sideways.
+            if (this.IsNativeWidget != this.WouldBeNative)
+                this.RerealizePeer();
+
             this.Invalidate();
         }
     }
@@ -162,14 +177,17 @@ public class ProgressBar : OwnerDrawnControl
     /// </remarks>
     private protected override IControlPeer CreatePeer(IPlatformBackend backend)
     {
-        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets)
-            && this.IsNativeEligible
-            && backend.CreateProgressBar() is { } peer)
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
         {
-            _native = peer;
-            peer.SetMarquee(this.Style == ProgressBarStyle.Marquee);
-            peer.SetFraction(this.Fraction);
-            return peer;
+            var offered = backend.CreateProgressBar();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                peer.SetMarquee(this.Style == ProgressBarStyle.Marquee);
+                peer.SetFraction(this.Fraction);
+                return peer;
+            }
         }
 
         return base.CreatePeer(backend);

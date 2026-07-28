@@ -14,14 +14,20 @@ public class CheckBox : OwnerDrawnControl
 
     private ICheckBoxPeer? _native;
 
+    /// <summary>Whether the backend offered a widget the last time we asked; <see langword="null"/> until
+    /// we have. Cached so a property change can tell whether it would actually flip the rendering path,
+    /// instead of rebuilding a canvas peer that was never going to be promoted anyway.</summary>
+    private bool? _nativeOffered;
+
     /// <summary>
     /// Whether this box realizes onto a real platform check box rather than the owner-drawn surface.
     /// <see langword="null"/> (the default) follows <see cref="Application.PreferNativeWidgets"/>.
     /// </summary>
     /// <remarks>
     /// Only honoured while the control stays inside what the platform widget can express — see
-    /// <see cref="IsNativeEligible"/>. The decision is made once, at realization; changing this or the
-    /// properties the gate looks at afterwards does not swap an existing peer.
+    /// <see cref="IsNativeEligible"/>. Setting <see cref="Image"/> on a realized control re-runs that
+    /// decision and swaps the peer; assigning this property itself does not, because a control that is
+    /// already showing should not change its rendering out from under a running form.
     /// </remarks>
     public bool? UseNativeWidget { get; set; }
 
@@ -35,6 +41,11 @@ public class CheckBox : OwnerDrawnControl
     /// stays owner-drawn.
     /// </summary>
     private bool IsNativeEligible => this.Image is null;
+
+    /// <summary>Which path this control would take if it were realized right now — the gate, the
+    /// preference, and whether the backend has ever offered us a widget (optimistic until it is asked).</summary>
+    private bool WouldBeNative
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
 
     /// <summary>Whether the box is checked.</summary>
     public bool Checked
@@ -66,6 +77,12 @@ public class CheckBox : OwnerDrawnControl
 
             field = value;
             this.UpdateImageAnimation();
+
+            // An image is outside what a platform check box can draw, so gaining or losing one moves the
+            // control between the native widget and the canvas rather than silently dropping the image.
+            if (this.IsNativeWidget != this.WouldBeNative)
+                this.RerealizePeer();
+
             this.Invalidate();
         }
     }
@@ -82,14 +99,17 @@ public class CheckBox : OwnerDrawnControl
     /// </remarks>
     private protected override IControlPeer CreatePeer(IPlatformBackend backend)
     {
-        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets)
-            && this.IsNativeEligible
-            && backend.CreateCheckBox() is { } peer)
+        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
         {
-            _native = peer;
-            peer.SetChecked(this.Checked);
-            peer.CheckedChanged += this.OnNativeCheckedChanged;
-            return peer;
+            var offered = backend.CreateCheckBox();
+            _nativeOffered = offered is not null;
+            if (offered is { } peer)
+            {
+                _native = peer;
+                peer.SetChecked(this.Checked);
+                peer.CheckedChanged += this.OnNativeCheckedChanged;
+                return peer;
+            }
         }
 
         return base.CreatePeer(backend);

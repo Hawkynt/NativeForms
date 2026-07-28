@@ -1677,6 +1677,28 @@ public abstract class Control
     }
 
     /// <summary>
+    /// Rebuilds this control's peer in place, re-running its <see cref="CreatePeer"/> decision. A control
+    /// whose native-widget gate depends on a property (PRD §12) calls this when that property changes, so
+    /// it can move between the platform widget and the owner-drawn canvas mid-use instead of silently
+    /// ignoring the change.
+    /// </summary>
+    /// <remarks>
+    /// A no-op before realization — the gate is simply evaluated on the first realize — and for a control
+    /// with no parent to re-parent into. The managed state is untouched, so the rebuilt peer is flushed
+    /// with the same bounds, text, colours and enabled/visible flags the old one had; keyboard focus,
+    /// which belongs to the destroyed widget, is not carried over.
+    /// </remarks>
+    private protected void RerealizePeer()
+    {
+        if (_peer is null || this.Parent is not { } parent)
+            return;
+
+        parent.UnrealizeChildPeer(this);
+        this.DisposePeerTree();
+        parent.RealizeAddedChild(this);
+    }
+
+    /// <summary>
     /// Disposes this control's peer and every descendant peer, children first. The managed state
     /// (text, bounds, children …) stays intact, so the control is back to its unrealized shape and
     /// can be realized again — for example after being re-added to a live container.

@@ -169,4 +169,84 @@ internal sealed class NativePeerPromotionTests
 
         Assert.That(backend.LastProgressBar!.Marquee, Is.True);
     }
+
+    // --- Leaving the gate mid-use ----------------------------------------------------------------
+
+    [Test]
+    public void Setting_an_image_on_a_promoted_box_falls_back_to_owner_drawing()
+    {
+        var backend = Promoting();
+        var box = Realize(new CheckBox { Bounds = new(0, 0, 120, 20), Checked = true }, backend);
+        Assume.That(box.IsNativeWidget, Is.True, "precondition: it started native");
+
+        box.Image = new HeadlessImage(8, 8); // no platform check box can render this beside the caption
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.IsNativeWidget, Is.False, "leaving the gate must hand the control back to the canvas");
+            Assert.That(box.Checked, Is.True, "and must not lose the state it already had");
+        });
+    }
+
+    [Test]
+    public void Clearing_the_image_promotes_the_box_back_to_a_widget()
+    {
+        var backend = Promoting();
+        var box = Realize(new CheckBox { Bounds = new(0, 0, 120, 20), Image = new HeadlessImage(8, 8) }, backend);
+        Assume.That(box.IsNativeWidget, Is.False, "precondition: it started owner-drawn");
+
+        box.Image = null;
+
+        Assert.That(box.IsNativeWidget, Is.True, "re-entering the gate takes the widget back");
+    }
+
+    [Test]
+    public void A_re_realized_box_still_reports_toggles_through_the_new_peer()
+    {
+        var backend = Promoting();
+        var box = Realize(new CheckBox { Bounds = new(0, 0, 120, 20), Image = new HeadlessImage(8, 8) }, backend);
+        var raised = 0;
+        box.CheckedChanged += (_, _) => ++raised;
+
+        box.Image = null; // promotes; a fresh peer is created and must be the one that is wired
+        backend.LastCheckBox!.RaiseUserToggle();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(box.Checked, Is.True);
+            Assert.That(raised, Is.EqualTo(1), "the new peer is wired, and the old one is not still firing");
+        });
+    }
+
+    [Test]
+    public void Turning_a_promoted_bar_vertical_falls_back_to_owner_drawing()
+    {
+        var backend = new HeadlessBackend { OfferNativeProgressBar = true };
+        var bar = RealizeBar(new ProgressBar { Bounds = new(0, 0, 200, 20), Maximum = 100, Value = 40 }, backend);
+        Assume.That(bar.IsNativeWidget, Is.True, "precondition: horizontal starts native");
+
+        bar.Orientation = Orientation.Vertical;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.False, "a platform bar fixes its orientation at construction");
+            Assert.That(bar.Value, Is.EqualTo(40), "and the value survives the swap");
+        });
+    }
+
+    [Test]
+    public void Turning_it_back_horizontal_promotes_it_again_with_its_fraction_intact()
+    {
+        var backend = new HeadlessBackend { OfferNativeProgressBar = true };
+        var bar = RealizeBar(new ProgressBar { Bounds = new(0, 0, 20, 200), Orientation = Orientation.Vertical, Maximum = 100, Value = 40 }, backend);
+        Assume.That(bar.IsNativeWidget, Is.False);
+
+        bar.Orientation = Orientation.Horizontal;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.True);
+            Assert.That(backend.LastProgressBar!.Fraction, Is.EqualTo(0.4).Within(0.001), "the fresh peer is seeded with the current value");
+        });
+    }
 }

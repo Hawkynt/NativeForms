@@ -959,9 +959,13 @@ backend without the widget, and what runs the moment an app asks for something t
       it native (`CheckBox`: no `Image`, since no platform box renders one beside the caption the way we
       do). Inside the gate → native peer; outside → canvas. Evaluated **at realization**, in the control's
       `CreatePeer` override, so the decision is made once, before a peer exists.
-- [ ] **Escaping the gate after realization.** Setting a property that leaves the gate must either
-      re-realize the control onto a canvas peer or be documented as ignored. Pick one rule and apply
-      it everywhere; silent divergence between backends is the failure mode to avoid.
+- [x] **Escaping the gate after realization.** The rule is **re-realize**, not ignore: setting a property
+      that leaves the gate rebuilds the peer onto the canvas (and re-entering it takes the widget back),
+      via `Control.RerealizePeer()` — `RemoveChild` → `DisposePeerTree` → `RealizeAddedChild`. Managed
+      state survives; keyboard focus, which belonged to the destroyed widget, does not. The rebuild is
+      driven by whether the *outcome* would differ (`IsNativeWidget != WouldBeNative`), not by the gate
+      alone, so a control on a declining backend never churns its canvas for nothing — each control caches
+      whether the backend has ever offered it a widget.
 - [x] **No behavioral fork in the public API.** `Checked`/`CheckedChanged` behave identically either way;
       `NativePeerPromotionTests` asserts the *same* observable behaviour against both paths, including that
       a widget-originated toggle raises the public event exactly once.
