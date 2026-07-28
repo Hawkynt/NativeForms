@@ -26,6 +26,30 @@ internal static partial class NativeMethods
     /// <summary>Applies a <see cref="PARAFORMAT2"/> to the paragraphs the selection touches.</summary>
     internal const uint EM_SETPARAFORMAT = 0x0447;
 
+    /// <summary>
+    /// Replaces the text through a <see cref="SETTEXTEX"/>, which recognizes an RTF payload by its
+    /// <c>{\rtf</c> opening and parses it — the same result <see cref="EM_STREAMIN"/> gives without a
+    /// callback for the control to invoke.
+    /// </summary>
+    internal const uint EM_SETTEXTEX = 0x0461;
+
+    /// <summary>Replace everything, discarding the undo stack.</summary>
+    internal const uint ST_DEFAULT = 0;
+
+    /// <summary>Interpret the bytes in the system ANSI code page, which is what an RTF payload is.</summary>
+    internal const uint CP_ACP = 0;
+
+    /// <summary>Parameters for <see cref="EM_SETTEXTEX"/>.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SETTEXTEX
+    {
+        /// <summary>One of the <c>ST_*</c> options.</summary>
+        public uint flags;
+
+        /// <summary>The code page of the text, or 1200 for UTF-16.</summary>
+        public uint codepage;
+    }
+
     /// <summary>Streams text into the control through an <see cref="EDITSTREAM"/> callback (wParam: <c>SF_*</c> format).</summary>
     internal const uint EM_STREAMIN = 0x0449;
 

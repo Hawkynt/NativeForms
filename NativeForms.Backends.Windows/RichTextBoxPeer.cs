@@ -185,21 +185,23 @@ internal sealed unsafe class RichTextBoxPeer : TextBoxPeer, IRichTextBoxPeer
         if (Handle == 0)
             return;
 
-        var state = new StreamInState(Encoding.Latin1.GetBytes(rtf));
-        var cookie = GCHandle.Alloc(state);
-        try
+        // EM_SETTEXTEX rather than EM_STREAMIN. The stream faults on both wine and real Windows while
+        // RichEdit invokes the callback — established by elimination: it faults with every subclass of
+        // ours removed, and with a callback whose whole body is "return 1", so nothing of ours is on the
+        // stack when it goes. EM_SETTEXTEX reaches the same parser by handing the payload over directly:
+        // the control recognizes an RTF document by its opening and parses it, with no function pointer
+        // for it to call.
+        var options = new NativeMethods.SETTEXTEX
         {
-            var stream = new NativeMethods.EDITSTREAM
-            {
-                dwCookie = GCHandle.ToIntPtr(cookie),
-                pfnCallback = (nint)(delegate* unmanaged<nint, nint, int, int*, uint>)&StreamInCallback,
-            };
-            NativeMethods.SendMessageW(Handle, NativeMethods.EM_STREAMIN, NativeMethods.SF_RTF, (nint)(&stream));
-        }
-        finally
-        {
-            cookie.Free();
-        }
+            flags = NativeMethods.ST_DEFAULT,
+            codepage = NativeMethods.CP_ACP,
+        };
+
+        // RTF is ASCII by construction — anything outside it is already escaped in the document — so the
+        // ANSI code page round-trips it exactly, and the buffer needs the terminator the control reads to.
+        var payload = Encoding.Latin1.GetBytes(rtf + '\0');
+        fixed (byte* text = payload)
+            NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETTEXTEX, (nint)(&options), (nint)text);
     }
 
     /// <inheritdoc/>
