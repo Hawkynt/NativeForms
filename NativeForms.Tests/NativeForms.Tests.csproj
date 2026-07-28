@@ -24,6 +24,9 @@
     <!-- For GtkNativeSizingTests, which asserts against real GTK widgets; the fixture skips itself
          on any machine without a display, so the reference costs nothing elsewhere. -->
     <ProjectReference Include="..\NativeForms.Backends.Gtk\NativeForms.Backends.Gtk.csproj" />
+    <!-- Pure [LibraryImport] declarations, so it builds and loads anywhere; the fixture that uses it
+         self-skips off Windows, which is what keeps the suite green on every runner. -->
+    <ProjectReference Include="..\NativeForms.Backends.Windows\NativeForms.Backends.Windows.csproj" />
     <!-- The property-grid populator source generator (compile-time only; no runtime assembly). -->
     <ProjectReference Include="..\NativeForms.Generators\NativeForms.Generators.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />

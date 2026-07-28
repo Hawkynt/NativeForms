@@ -749,7 +749,9 @@ strategy (may differ per platform; note exceptions inline).
       `LinkVisited`, `Value`, `SelectedIndex`, items added after realization, `TopIndex`,
       `IndexFromPoint`, a group box child's bounds), and that a mid-use property change swaps the peer
       with the state intact. 32 checks, all passing. This is what turned "compile-verified" into
-      "verified" for §12.
+      "verified" for §12. `Win32NativePromotionTests` is the same sweep as a fixture, self-skipping off
+      Windows like the real-GTK tier does, so CI's `windows-latest` job runs it against a real desktop on
+      every push.
 - [ ] **The demo cannot run end-to-end under wine**: `EM_STREAMIN` faults inside wine's
       `riched20`/`msftedit`, so `RichTextBox.Rtf` takes the process down during realization. Established
       by bisection — plain `Text` is fine, only the stream-in path faults, and it still faults with *all*
