@@ -40,6 +40,45 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: '**/TestResults/*.trx'
 
+  autopilot:
+    name: autopilot (linux/gtk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # The demo needs GTK itself, and a display to put windows on. Xvfb is enough: the walkthrough
+      # injects its input in-process rather than through the X server, so no compositor is involved.
+      - name: Install GTK and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-0 xvfb
+      - name: Build
+        run: dotnet build NativeForms.sln --configuration Release
+      # The pass/fail gate for "the demo works and looks right": every page driven with real input,
+      # real control state asserted, and a layout audit per page. This is the tier the headless fakes
+      # cannot reach — a control sized from a wrong system metric passes every unit test and fails
+      # here on the first frame.
+      # Advisory, not a gate, until the focus flake below is fixed: Xvfb runs without a window manager,
+      # so nothing assigns the toplevel X focus and the text-entry checks fail about one run in four
+      # (measured: 1 of 4 locally, 9 checks each time, all of the form "a click focuses X and typing
+      # lands in it"). Blocking merges on that would train people to ignore it.
+      - name: Autopilot
+        continue-on-error: true
+        run: >
+          xvfb-run -a --server-args="-screen 0 1600x1000x24"
+          dotnet run --project NativeForms.Demo --configuration Release --no-build -- --autopilot
+      - name: Upload captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autopilot-captures
+          path: /tmp/nativeforms-autopilot/*.png
+          if-no-files-found: warn
+
   aot:
     name: aot ${{ matrix.rid }}
     strategy:

@@ -557,7 +557,7 @@ strategy (may differ per platform; note exceptions inline).
       GTK throws (GtkStatusIcon deprecated; StatusNotifier/D-Bus is the tracked follow-up)
 - [ ] `WebBrowser/WebView` (native host) — likely later / optional
 - [x] `PropertyGrid` (owner) — category grouping, per-type editors reusing the real pickers, and the
-      source-generated `PopulateGrid` of §15; see [controls/propertygrid.md](controls/propertygrid.md)
+      source-generated `PopulateGrid` of §16; see [controls/propertygrid.md](controls/propertygrid.md)
 
 ### 7.8 Dialogs (native common dialogs)
 - [x] `MessageBox.Show` (buttons/icons mapped; `MessageBoxW` / `GtkMessageDialog`)
@@ -896,6 +896,13 @@ strategy (may differ per platform; note exceptions inline).
       `TimePickerTests` against the headless backend.
       *Method note:* this check has high run-to-run variance; take **≥5 runs** before concluding a change
       helped. Two single-run A/Bs during the investigation pointed at the wrong culprit.
+- [~] **The autopilot runs in CI on Linux** (`ubuntu-latest`, GTK plus Xvfb), uploading its captures —
+      advisory rather than blocking for now, because Xvfb has no window manager and nothing assigns the
+      toplevel X focus, so the text-entry checks fail about one run in four (measured 1 of 4 locally, 9
+      checks each time, all "a click focuses X and typing lands in it"). Fixing that — a lightweight WM in
+      the job, or focusing the toplevel explicitly rather than relying on one — is what turns it into the
+      gate it should be. Worth the effort: the 3840-pixel scroll bar above would have failed the layout
+      audit on the first frame, and it was found by eye instead.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
       clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
       input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
@@ -1255,7 +1262,28 @@ on the overwhelming majority of strings that contain no emoji at all.
 
 ---
 
-## 14. What's next — candidate workstreams
+## 14. Reported by ports — gaps found by putting a real application on this
+
+Feedback from porting an existing application, kept separate from the roadmap above because it is
+evidence rather than intent: each line is something a real program wanted and did not find.
+
+- [ ] **JPEG decoding.** The decoder covers PNG/BMP/GIF/ICO/PCX/CUR/ANI, so an image preview shows a note
+      instead of pixels for the single most common photographic format. The most concrete item here, and
+      self-contained: baseline JPEG is a decoder, testable headlessly against known images, and it fits the
+      decoder-free-of-dependencies rule the others already follow.
+- [ ] **Marquee (rubber-band) selection.** Dragging a selection rectangle across a `ListView`/`DataGridView`
+      or a custom surface. Dropped outright in the port because there is nothing to map it onto.
+- [ ] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
+      move from drag gestures onto context menus. The gestures are the affordance users know; the menus are
+      a workaround. `DockPanel` already has drag-to-dock, so the pattern exists to build on.
+- [ ] **Type-to-filter menus.** A menu that narrows as you type, rather than only mnemonics and arrows.
+- [ ] **An application-level accent/theme override.** Deliberate today — colours come from the desktop, so
+      an app's own theme-variant, accent and skin settings stop meaning anything. That is the right default
+      and the right reason, but an application that *offers* those settings currently cannot honour them.
+      Worth deciding explicitly rather than leaving as a side effect: an override on `ITheme` would keep
+      the default intact while letting an app that wants a skin have one.
+
+## 15. What's next — candidate workstreams
 
 Ranked by how much they unblock, not by effort. Nothing here is committed; this section exists so the
 next change starts from a considered list instead of an inbox.
@@ -1299,7 +1327,7 @@ next change starts from a considered list instead of an inbox.
 
 
 
-## 15. Attribute-driven grids & lists — extend the generator to `DataGridView`
+## 16. Attribute-driven grids & lists — extend the generator to `DataGridView`
 
 **The reference.** `Hawkynt/C--FrameworkExtensions` (`System.Windows.Forms.Extensions`) drives a
 `DataGridView` entirely from attributes on the bound row type: annotate the model, call
@@ -1322,7 +1350,7 @@ strictly better failure mode, AOT-clean.
 `ImagesSelector`, `TooltipSelector`, `CellStyleSelector`, `EnabledSelector`, `ReadOnlyCellSelector`,
 `ItemsSelector`, `SortComparison` — from generated, strongly-typed lambdas.
 
-### 15.1 Column types
+### 16.1 Column types
 
 The reference ships custom column types plus attributes that select them. Ours already has 15 kinds, so
 this is mostly a mapping exercise — and we cover more kinds than the reference does.
@@ -1348,7 +1376,7 @@ this is mostly a mapping exercise — and we cover more kinds than the reference
       numeric → `NumericUpDown`, `DateTime`/`DateOnly` → `DateTime`, `TimeOnly` → `TimePicker`,
       `Color` → `Color`, `enum` → `ComboBox`, `[Flags]` enum → `CheckedListBox`, else `Text`.
 
-### 15.2 Images
+### 16.2 Images
 
 The reference has a richer image model than a single selector, and this is the part of the parity map
 that needs new grid capability rather than new plumbing:
@@ -1380,7 +1408,7 @@ that needs new grid capability rather than new plumbing:
       an image property that does not exist, or is not an `IImage`, is `NFG002`/`NFG003` rather than a
       column that silently shows nothing.
 
-### 15.3 The rest of the parity map
+### 16.3 The rest of the parity map
 
 | Reference attribute                         | Capability                                                                                                                         | Our target                                       |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -1403,7 +1431,7 @@ Beyond the grid the same library annotates `ListView` — `ListViewColumnAttribu
 the matching surface, so it is a cheap follow-on from the same symbol walk: same generator, different
 populator.
 
-### 15.4 Design rules
+### 16.4 Design rules
 
 - [x] **One marker, several populators.** `[GridEditable]` emits `PopulateGrid(PropertyGrid)`,
       `PopulateColumns(DataGridView)`, `PopulateColumns(ListView)` and `ToListViewItem()`.
@@ -1428,7 +1456,7 @@ populator.
 - [x] **Degrades like the inspector path.** Without the analyzer the attributes still compile and
       hand-built columns still work; only the generated method is absent.
 
-### 15.5 Acceptance
+### 16.5 Acceptance
 
 - [x] An annotated model generates a grid whose column kinds, headers, widths, order, images and
       per-row styling match the annotations, asserted headlessly.
