@@ -322,7 +322,14 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     /// </summary>
     private nint _textView;
 
+    /// <summary>The object AppKit sends the text view's delegate messages to, or zero.</summary>
+    private nint _editorDelegate;
+
+    /// <summary>The formatter holding a single-line box to its length, or zero.</summary>
+    private nint _formatter;
+
     // Remembered because a swap has to put them back, and nothing re-flushes them from the core.
+    private int _maxLength;
     private bool _readOnly;
     private bool _hasFrame = true;
     private bool _enabled = true;
@@ -538,10 +545,35 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     }
 
     /// <summary>
-    /// Called after a swap has settled, so a subclass can re-attach whatever it hung off the editing
-    /// view — which is a different object than it was a moment ago.
+    /// Called after a swap has settled, so whatever was hung off the editing view is re-attached —
+    /// it is a different object than it was a moment ago.
     /// </summary>
-    private protected virtual void OnEditorChanged() { }
+    private protected virtual void OnEditorChanged()
+    {
+        if (_editorDelegate != 0 && _textView != 0)
+            CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setDelegate:"), _editorDelegate);
+
+        this.ApplyMaxLength();
+    }
+
+    /// <summary>The text view's delegate, built and attached on the first thing that needs one.</summary>
+    /// <remarks>
+    /// One object for both the jobs AppKit routes through a text view's delegate, because a text view
+    /// has one delegate: a second one attached would silently unhook the first.
+    /// </remarks>
+    private protected nint EnsureEditorDelegate()
+    {
+        if (_textView == 0)
+            return 0;
+
+        if (_editorDelegate == 0)
+            _editorDelegate = CocoaTextViewDelegate.Create();
+
+        if (_editorDelegate != 0)
+            CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setDelegate:"), _editorDelegate);
+
+        return _editorDelegate;
+    }
 
     /// <summary>
     /// Builds the multiline editor: a text view inside a scroll view, which is the pair AppKit uses for
@@ -633,7 +665,62 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
         return editor == 0 ? null : editor;
     }
 
-    public void SetMaxLength(int maxLength) { }
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The two halves of this box have nothing in common here, so the limit is served twice. A field
+    /// has no length of its own and is held to one by a formatter, which its field editor consults
+    /// before a keystroke is committed; a text view has no formatter and is held to one by its
+    /// delegate, which AppKit asks whether an edit may go ahead. Both are re-applied after a swap,
+    /// since the object that carried the limit a moment ago is not the object there now.
+    /// </remarks>
+    public void SetMaxLength(int maxLength)
+    {
+        _maxLength = maxLength;
+        this.ApplyMaxLength();
+    }
+
+    /// <summary>Puts the remembered limit onto whichever of the two objects is currently editing.</summary>
+    private void ApplyMaxLength()
+    {
+        if (_textView != 0)
+        {
+            // Nothing is built for "no limit": a box that never had one needs no delegate at all.
+            if (_maxLength > 0)
+                CocoaTextViewDelegate.Limit(this.EnsureEditorDelegate(), _maxLength);
+            else
+                CocoaTextViewDelegate.Limit(_editorDelegate, 0);
+
+            return;
+        }
+
+        if (this.Handle == 0)
+            return;
+
+        if (_maxLength > 0 && _formatter == 0)
+            _formatter = CocoaLengthFormatter.Create(_maxLength);
+        else
+            CocoaLengthFormatter.Limit(_formatter, _maxLength);
+
+        // The formatter stays on the field even at no limit, because one that lets everything through
+        // is the same object doing nothing — and taking it off and putting it back is a chance for the
+        // field's object value to round-trip through a formatter that is not there.
+        if (_formatter != 0)
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setFormatter:"), _formatter);
+    }
+
+    /// <inheritdoc/>
+    public override void Dispose()
+    {
+        CocoaTextViewDelegate.Forget(_editorDelegate);
+        CocoaLengthFormatter.Forget(_formatter);
+        if (_formatter != 0)
+        {
+            CocoaRuntime.SendVoid(_formatter, CocoaRuntime.sel_registerName("release"));
+            _formatter = 0;
+        }
+
+        base.Dispose();
+    }
 
     /// <summary>Raises the input events once AppKit's delegate routing is wired.</summary>
     private void Unused3()

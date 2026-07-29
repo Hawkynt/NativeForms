@@ -303,7 +303,7 @@ internal static unsafe partial class ShootMacOS
 
         var wired = 0;
         CountLinkDelegates(Send(window, sel_registerName("contentView")), ref wired);
-        return $"link activation: {wired} view(s) carry the toolkit's link delegate";
+        return $"link activation: {wired} view(s) carry the toolkit's text-view delegate";
     }
 
     /// <summary>
@@ -389,7 +389,7 @@ internal static unsafe partial class ShootMacOS
         if (SendBool(view, sel_registerName("respondsToSelector:"), ask)
             && Send(view, ask) is var target && target != 0
             && class_getName(object_getClass(target)) is var raw && raw != 0
-            && Marshal.PtrToStringUTF8(raw) == "NativeFormsLinkTarget")
+            && Marshal.PtrToStringUTF8(raw) == "NativeFormsTextViewDelegate")
             ++wired;
 
         var children = Send(view, sel_registerName("subviews"));

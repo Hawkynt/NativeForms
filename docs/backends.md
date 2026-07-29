@@ -349,6 +349,22 @@ kept and the core never learns that the widget it holds is a different one. The 
 no class behind it is a masked multiline box: AppKit's secure editing lives in the field rather than
 in the text view, so the wish is kept and applied if the box ever goes back to a single line.
 
+A maximum length is held twice over, because the two halves of that box have nothing in common here.
+Neither object has a length of its own — there is no `EM_LIMITTEXT` on this platform and no
+`gtk_entry_set_max_length` either — so the field is held to one by an `NSFormatter` subclass, which
+its field editor consults before a keystroke is committed, and the text view by its delegate, which
+AppKit asks whether an edit may go ahead and hands the range being replaced and the string replacing
+it. Both refuse before the character exists rather than measuring afterwards and undoing, which would
+be visible. Too-long text is truncated rather than refused outright, which is what a paste does on the
+other two backends; a formatter says that by substituting the shortened string and answering no, where
+no means "not as you proposed" rather than "nothing happens". `NSFormatter` is abstract, so the two
+conversion methods come with it and both are the identity — a text field's object value is its string,
+and a formatter that answered nothing for it would display an empty box.
+
+That delegate is the one the link clicks arrive at as well, because a text view has one delegate and a
+second one attached would silently unhook the first. It is therefore named for the text view rather
+than for either job, and the probe counts it as what it is.
+
 ## How the screenshots are produced
 
 `--shoot` walks the tab strip through the tab control's own `SelectedIndex` rather than by

@@ -36,37 +36,26 @@ internal sealed unsafe class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextB
 
     private string _rtf = string.Empty;
 
-    /// <summary>The delegate object AppKit reports link clicks to, built when the text view appears.</summary>
-    private nint _linkTarget;
-
     /// <inheritdoc/>
     public event EventHandler<string>? LinkClicked;
 
     /// <inheritdoc/>
     /// <remarks>
     /// The text view is not this peer's own object — the plain box builds it when it is told it is
-    /// multiline, and builds another one if it is ever told again — so the delegate is attached here
-    /// rather than in a constructor that runs before there is anything to attach it to.
+    /// multiline, and builds another one if it is ever told again — so the link handler is pointed at
+    /// the delegate here rather than in a constructor that runs before there is anything to attach it
+    /// to. The delegate itself belongs to the plain box, since a maximum length arrives through the
+    /// same object and a text view has only one.
     /// </remarks>
     private protected override void OnEditorChanged()
     {
-        if (this.TextView == 0)
-            return;
-
-        _linkTarget = _linkTarget != 0 ? _linkTarget : CocoaLinkTarget.Create(this.OnLinkClicked);
-        if (_linkTarget != 0)
-            CocoaRuntime.SendVoid(this.TextView, CocoaRuntime.sel_registerName("setDelegate:"), _linkTarget);
+        base.OnEditorChanged();
+        if (this.EnsureEditorDelegate() is var target and not 0)
+            CocoaTextViewDelegate.Report(target, this.OnLinkClicked);
     }
 
     /// <summary>AppKit reporting that the user clicked a link, with the link it was.</summary>
     private void OnLinkClicked(string url) => LinkClicked?.Invoke(this, url);
-
-    /// <inheritdoc/>
-    public override void Dispose()
-    {
-        CocoaLinkTarget.Forget(_linkTarget);
-        base.Dispose();
-    }
 
     /// <summary>The document being edited, or zero before the text view exists.</summary>
     private nint Storage
