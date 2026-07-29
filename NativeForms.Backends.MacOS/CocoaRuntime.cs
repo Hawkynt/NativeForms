@@ -184,6 +184,54 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendIndex(nint receiver, nint selector, nint index);
 
+    /// <summary>Sends a two-object message that answers an object.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendPointer(nint receiver, nint selector, nint first, nint second);
+
+    /// <summary>Sends a three-object message that answers an object.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendPointer(nint receiver, nint selector, nint first, nint second, nint third);
+
+    /// <summary>Sends an object-and-measure message that answers an object, such as resizing a font.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendPointer(nint receiver, nint selector, nint first, double second);
+
+    /// <summary>Builds a colour from its four components.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendColor(nint receiver, nint selector, double red, double green, double blue, double alpha);
+
+    /// <summary>Applies one attribute over a range of an attributed string.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendAttribute(nint receiver, nint selector, nint name, nint value, NSRange range);
+
+    /// <summary>Removes one attribute over a range of an attributed string.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, nint name, NSRange range);
+
+    /// <summary>Reads one attribute at a character index; the effective range is not asked for.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendAttributeAt(nint receiver, nint selector, nint name, nint index, nint effectiveRange);
+
+    /// <summary>Sends a message taking a range and answering one, such as widening to paragraphs.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial NSRange SendRange(nint receiver, nint selector, NSRange range);
+
+    /// <summary>Sends a message taking a range and an object, such as writing a range out as RTF.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendRangeObject(nint receiver, nint selector, NSRange range, nint argument);
+
+    /// <summary>The address a framework's exported data symbol points at — how a named constant is read.</summary>
+    /// <remarks>
+    /// The attribute keys AppKit applies to an attributed string are <c>NSString</c> globals, not
+    /// values a header could inline. The symbol is the variable, so the string is one dereference past
+    /// it — the same shape CoreText's font-attribute key is read with.
+    /// </remarks>
+    internal static nint Constant(string name)
+        => NativeLibrary.TryLoad("/System/Library/Frameworks/AppKit.framework/AppKit", out var library)
+            && NativeLibrary.TryGetExport(library, name, out var symbol)
+            ? Marshal.ReadIntPtr(symbol)
+            : 0;
+
     /// <summary>Allocates an instance of a class, ready for an <c>init…</c> message.</summary>
     internal static nint Allocate(string className)
     {

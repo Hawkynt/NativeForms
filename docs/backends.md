@@ -69,7 +69,7 @@ round-trip and layout audit.
 
 Not working yet: no native-widget promotion, no accessibility, the colour and font choosers answer as
 if cancelled (both are shared modeless panels on macOS, which is a different shape from this seam's
-blocking call), rich text shows its plain text, and while mouse and
+blocking call), and while mouse and
 keyboard events are routed into the toolkit they are not yet verified end to end the way the Win32
 backend's are. Hovering is the gap inside that gap: presses, drags and the wheel arrive, but neither
 the window nor a popup asks AppKit for mouse-moved events, so nothing highlights under the pointer.
@@ -80,6 +80,15 @@ loop makes the decision instead, offering every press to the deepest open surfac
 outside it is offered to the owner (which is how a menu cascade routes a click on a shallower level of
 itself) and otherwise closes it, and either way it is swallowed rather than also landing on whatever
 was underneath.
+
+`RichTextBox` reads and writes real RTF, through AppKit's own parser and writer rather than the
+toolkit's subset — a document arrives as attributes on the text storage instead of as the readable
+text with its formatting thrown away. Bold, italic, underline, strikethrough, colour, size, alignment
+and bullets all reach that storage. Two limits are worth stating rather than discovering: a style
+applied with nothing selected does nothing (Windows Forms would hold it for the next characters
+typed), and a selection spanning two typefaces takes the one it starts in, because walking the runs
+means `enumerateAttribute:…usingBlock:` and a block is exactly the Objective-C object this backend's
+interop rules keep out. Zoom and the link-activation event are still unwired.
 
 A password `TextBox` is the one place the class-at-construction rule still shows: AppKit picks between
 `NSTextField` and `NSSecureTextField` when the object is made, and the toolkit sets the mask before
