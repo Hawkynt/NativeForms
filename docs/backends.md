@@ -393,6 +393,15 @@ carrying an attributed link, `ComboBox` an `NSPopUpButton`, `HScrollBar`/`VScrol
 and `TrackBar` an `NSSlider`. Grouping for radios stays in the core; AppKit's own rule is the same one
 (buttons sharing a superview), so the two cannot reach different answers.
 
+An `NSButton` in its switch and radio types is sensitive over its box and its title and nowhere else
+in the frame it was given, which is this desktop's rule and not one worth standing in front of. Both
+other platforms differ: a `BS_AUTOCHECKBOX` and a `GtkCheckButton` take a press anywhere in the
+rectangle, and so does the owner-drawn twin, whose hit test is the client area. So a check box laid
+out wider than its caption is the one place where the promoted control and the painted one answer the
+same click differently — which is a real hole in "the public surface is identical either way", stated
+here rather than closed by intercepting the cell's own hit test and making the widget stop behaving
+like one. It is also what three of the probe's five posted clicks were falling into.
+
 The last three each needed a decision the obvious reading gets wrong, and each keeps something back
 rather than approximating it.
 
@@ -624,11 +633,15 @@ anything about the one that was missing. The two editor figures are counted apar
 two different objects with two different change messages, and either of them at zero is the
 regression this line exists to catch. Delivery is no longer only wiring here: the closing line of the
 same log counts the posted clicks that toggled a control and the posted keys that reached a focused
-editor, and both are above zero. Not every one lands: on the last run two of the five check boxes the
-walkthrough aimed at toggled, and all seven of the keystrokes arrived. Why those three presses
-produced nothing is not yet known and is not guessed at here — the probe names the control and the
-coordinate it aimed at, which is where finding out starts. It is reported rather than hidden, because
-two is a path that works and misses and zero would have been a path that does not work at all.
+editor. All five of the check boxes the walkthrough aims at now toggle, and all seven keystrokes
+arrive. Three of the five used to report nothing, and the three were exactly the three given more
+width than their captions need: the press was aimed at the geometric centre of the control, which on
+those three is empty space to the right of the caption, and the paragraph above says why an
+`NSButton` treats that space as none of its own. Nothing about the coordinate was wrong — the probe
+now also names the view AppKit hit-tests at the point, and on all three it was the button itself, so
+a wrong screen point, a wrong window number and an overlapping sibling were ruled out rather than
+argued away. The press is aimed at the box glyph instead, which is where a person clicks and the one
+point all three backends accept.
 
 `Form.ShowDialog` blocks. It did not: `RunModal` showed the window and returned, so a caller had
 `DialogResult.Cancel` before the user had seen the dialog and the core disposed the peer tree

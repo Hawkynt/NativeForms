@@ -139,40 +139,31 @@ internal static partial class Shoot
         if (target is not null)
         {
             var before = target.Checked;
-            var centre = target.PointToScreen(new(target.Width / 2, target.Height / 2));
-            if (InjectClick(centre))
+
+            // Over the box glyph, not over the middle of the control. A check box laid out wider than
+            // its caption needs carries empty space to the right of it, and an NSButton in its switch
+            // type is sensitive over the box and the title and nowhere else in the frame — so the three
+            // wide boxes in this walkthrough reported nothing arriving on every run while the two sized
+            // to their captions worked. A BS_AUTOCHECKBOX and a GtkCheckButton take a press anywhere in
+            // the rectangle, and so does the owner-drawn twin, so the box glyph is the one point all
+            // four agree on, and it is where a person clicks anyway.
+            var at = target.PointToScreen(new(Math.Min(8, target.Width / 2), target.Height / 2));
+            if (InjectClick(at))
             {
                 InjectDrain();
                 if (target.Checked != before)
                     ++Clicks;
                 else
                 {
-                    // The centre of a check box need not be on the check box. A control given more width
-                    // than its caption needs carries empty space to the right of it, and whether that
-                    // space belongs to the widget is the platform's answer rather than the toolkit's — so
-                    // the same gesture is aimed at the box glyph before anything is called a failure.
-                    // The two readings separate an input path that does not work from an aim that was
-                    // never over anything, which the old single line could not tell apart.
-                    var onBox = target.PointToScreen(new(Math.Min(8, target.Width / 2), target.Height / 2));
-                    if (InjectClick(onBox))
-                        InjectDrain();
-
-                    var described = $"{target.Width}x{target.Height}, "
+                    // What is under the point, said rather than guessed at: a control that does not
+                    // toggle reads the same whether the press landed on another widget, on no widget, or
+                    // on the right one somewhere it declines to answer.
+                    note($"    input: a real click at {at.X},{at.Y} never reached CheckBox \"{target.Text}\" "
+                        + $"({target.Width}x{target.Height}, "
                         + (target.IsNativeWidget ? "a platform widget" : "owner-drawn")
-                        + (InjectAt(centre) is { Length: > 0 } under ? $", {under} under the centre" : string.Empty);
-
-                    if (target.Checked != before)
-                    {
-                        ++Clicks;
-                        note($"    input: CheckBox \"{target.Text}\" ({described}) took a click at "
-                            + $"{onBox.X},{onBox.Y} over its box and ignored one at {centre.X},{centre.Y}");
-                    }
-                    else
-                    {
-                        note($"    input: a real click at {centre.X},{centre.Y} never reached CheckBox "
-                            + $"\"{target.Text}\" ({described}), nor did one at {onBox.X},{onBox.Y} over its box");
-                        failed += Fatal;
-                    }
+                        + (InjectAt(at) is { Length: > 0 } under ? $", {under} under the point" : string.Empty)
+                        + ")");
+                    failed += Fatal;
                 }
 
                 target.Checked = before;
