@@ -521,8 +521,12 @@ An `NSSlider` has no small or large change, and an `NSTextField` no title colour
 where they arise, as is the pair of `RichTextBox` limits that come down to Objective-C blocks.
 
 **Written down rather than written.** A `Label` shows no image and underlines no mnemonic. An
-`NSTextField` has neither, and both mean an attributed string carrying a text attachment, which then
-owns the font and the colour as well — one piece of work serving both, and not done. A toolkit popup
+`NSTextField` has neither: a mnemonic means an attributed string, which then owns the font and the
+colour as well, and an image means swapping the field for an `NSImageView` — which is what the GTK
+peer does with a `GtkImage`, and on the same terms, since neither backend draws an icon beside a
+caption. So the gap against the other two is an image-only label and an underlined letter, not every
+label with a picture in it, and nothing in the gallery asks for either — which is also why this is
+still written down: there would be nothing in a shot to say it had worked. A toolkit popup
 opened inside a modal dialog is not light-dismissed, because AppKit's session dispatches the events
 the loop would otherwise have offered it (above). These are named here so that a screenshot that looks
 finished is not read as one.
