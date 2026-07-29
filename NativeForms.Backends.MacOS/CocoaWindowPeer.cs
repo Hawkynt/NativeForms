@@ -42,6 +42,20 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     private bool _quitsOnClose;
 
+    /// <summary>NSWindowButton: the miniaturize button is 1 and the zoom button 2.</summary>
+    private const nint _MiniaturizeButton = 1;
+    private const nint _ZoomButton = 2;
+
+    /// <summary>
+    /// What AppKit's own <c>maxSize</c> starts as, and therefore what "no limit on this axis" is.
+    /// </summary>
+    private const double _Unbounded = double.MaxValue;
+
+    // Buffered, because a border-style change rewrites the whole style mask and AppKit rebuilds the
+    // caption's buttons from it — so whatever was said about them has to be said again afterwards.
+    private bool _minimizeBox = true;
+    private bool _maximizeBox = true;
+
     public CocoaWindowPeer(CocoaBackend backend)
     {
         _backend = backend;
@@ -147,8 +161,11 @@ internal sealed class CocoaWindowPeer : IWindowPeer
             _ => _Titled | _Closable | _Miniaturizable | _Resizable,
         };
 
-        if (_window != 0)
-            CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setStyleMask:"), _style);
+        if (_window == 0)
+            return;
+
+        CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setStyleMask:"), _style);
+        this.ApplyCaptionButtons();
     }
 
     public void SetWindowState(FormWindowState state)
@@ -229,12 +246,80 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     public void RunModal(IWindowPeer? owner) => this.Show();
 
-    public void SetMinimizeBox(bool visible) { }
+    /// <inheritdoc/>
+    /// <remarks>Greyed rather than removed, which is what this desktop does: the traffic lights are
+    /// three, always in that order, and a window missing one of them reads as broken rather than as
+    /// restricted.</remarks>
+    public void SetMinimizeBox(bool visible)
+    {
+        _minimizeBox = visible;
+        this.ApplyCaptionButtons();
+    }
 
-    public void SetMaximizeBox(bool visible) { }
+    /// <inheritdoc cref="SetMinimizeBox"/>
+    public void SetMaximizeBox(bool visible)
+    {
+        _maximizeBox = visible;
+        this.ApplyCaptionButtons();
+    }
 
-    public void SetSizeLimits(Size minimum, Size maximum) { }
+    /// <summary>Pushes both caption flags onto the window's own buttons.</summary>
+    private void ApplyCaptionButtons()
+    {
+        SetButtonEnabled(_window, _MiniaturizeButton, _minimizeBox);
+        SetButtonEnabled(_window, _ZoomButton, _maximizeBox);
+    }
 
+    /// <summary>
+    /// Enables or greys one of the caption's standard buttons, if the window has one to give.
+    /// </summary>
+    /// <remarks>A borderless window answers nothing for any of them, so the absence is expected rather
+    /// than a failure.</remarks>
+    private static void SetButtonEnabled(nint window, nint which, bool enabled)
+    {
+        var button = window == 0
+            ? 0
+            : CocoaRuntime.SendPointer(window, CocoaRuntime.sel_registerName("standardWindowButton:"), which);
+
+        if (button != 0)
+            CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setEnabled:"), enabled);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// AppKit's limits are on the window's frame rather than on its content, which is the measurement
+    /// the toolkit states its bounds in here too — so the number a caller gives is the number the user
+    /// drags against, chrome included, exactly as on the other two platforms. A zero component lifts
+    /// the limit on that axis: zero is already AppKit's own minimum, and the maximum goes back to the
+    /// enormous value it starts at rather than to zero, which would pin the window shut.
+    /// </remarks>
+    public void SetSizeLimits(Size minimum, Size maximum)
+    {
+        if (_window == 0)
+            return;
+
+        CocoaRuntime.SendVoid(
+            _window,
+            CocoaRuntime.sel_registerName("setMinSize:"),
+            new CocoaRuntime.CGSize(Math.Max(0, minimum.Width), Math.Max(0, minimum.Height)));
+
+        CocoaRuntime.SendVoid(
+            _window,
+            CocoaRuntime.sel_registerName("setMaxSize:"),
+            new CocoaRuntime.CGSize(
+                maximum.Width > 0 ? maximum.Width : _Unbounded,
+                maximum.Height > 0 ? maximum.Height : _Unbounded));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Refused rather than approximated. A window has no icon on this desktop: the caption shows a
+    /// proxy icon only for a window that stands for a file on disk, and the only icon a running process
+    /// can set is the application's own in the Dock — one per process, where this property is one per
+    /// window, so a second form would silently replace the first form's. An application that set a
+    /// per-window icon and got a per-process one would be worse off than one that got nothing, because
+    /// nothing is visible in this page and a wrong Dock icon is not.
+    /// </remarks>
     public void SetIcon(int width, int height, ReadOnlySpan<int> argb) { }
 
     public void SetQuitsOnClose(bool quits) => _quitsOnClose = quits;

@@ -76,6 +76,19 @@ internal static unsafe partial class ShootMacOS
         public double X, Y, Width, Height;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SizeD
+    {
+        public double Width, Height;
+    }
+
+    /// <summary>
+    /// Asks for a size, which two doubles come back in registers on both architectures — so unlike a
+    /// rectangle this needs no <c>objc_msgSend_stret</c> sibling for Intel.
+    /// </summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    private static partial SizeD SendSize(nint receiver, nint selector);
+
     /// <summary>
     /// Why the last capture produced nothing, so a failure in the artifact names the step that gave
     /// up rather than only the fact that one did.
@@ -181,6 +194,51 @@ internal static unsafe partial class ShootMacOS
 
         return $"hover: the window {(accepts ? "accepts" : "DROPS")} moved events, "
             + $"{tracked} of {views} view(s) carry a tracking area";
+    }
+
+    /// <summary>
+    /// What the running window says about the chrome the application asked for: the resize limits and
+    /// whether the caption's minimize and zoom buttons are live.
+    /// </summary>
+    /// <remarks>
+    /// None of this is in a screenshot. A minimum size shows only when someone drags the window
+    /// smaller, and a greyed traffic light is three pixels of a caption the capture does not even
+    /// include, since the shot is the content view. But every one of them is a property AppKit will
+    /// read back, so the window can simply be asked — and the gallery sets a minimum size of its own,
+    /// which turns this from wiring into an actual round trip: what the form asked for is what the
+    /// platform is holding.
+    /// </remarks>
+    public static string WindowChrome()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "window chrome: no window to ask";
+
+        var minimum = SendSize(window, sel_registerName("minSize"));
+        var maximum = SendSize(window, sel_registerName("maxSize"));
+
+        return $"window chrome: min {minimum.Width:0}x{minimum.Height:0}, "
+            + $"max {Measure(maximum.Width)}x{Measure(maximum.Height)}, "
+            + $"minimize button {ButtonState(window, _MiniaturizeButton)}, "
+            + $"zoom button {ButtonState(window, _ZoomButton)}";
+    }
+
+    /// <summary>NSWindowButton: the miniaturize button is 1 and the zoom button 2.</summary>
+    private const nint _MiniaturizeButton = 1;
+    private const nint _ZoomButton = 2;
+
+    /// <summary>A limit as a number, or the word for the value AppKit uses to mean there is none.</summary>
+    private static string Measure(double value)
+        => value >= double.MaxValue / 2 ? "unbounded" : value.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Whether one of the caption's standard buttons is live, or absent from this window.</summary>
+    private static string ButtonState(nint window, nint which)
+    {
+        var button = Send(window, sel_registerName("standardWindowButton:"), which);
+        return button == 0 ? "absent" : SendBool(button, sel_registerName("isEnabled")) ? "enabled" : "greyed";
     }
 
     /// <summary>

@@ -35,6 +35,17 @@ internal static partial class Shoot
     public static string? NativeWidgets => OperatingSystem.IsMacOS() ? ShootMacOS.NativeWidgets() : null;
 
     /// <summary>
+    /// What the window is holding of the chrome the form asked for, where the platform can be asked.
+    /// </summary>
+    /// <remarks>
+    /// A round trip rather than wiring, and the only one on this list that is: the gallery sets a
+    /// minimum size, so the number read back off the live window either is the one the form gave or
+    /// the property did nothing. The caption buttons ride along because they are read the same way and
+    /// are equally invisible in a capture of the content view.
+    /// </remarks>
+    public static string? WindowChrome => OperatingSystem.IsMacOS() ? ShootMacOS.WindowChrome() : null;
+
+    /// <summary>
     /// Whether the rich text box's link activation reaches the toolkit, where the platform can be asked.
     /// </summary>
     /// <remarks>Wiring, not delivery — for the reason <see cref="HoverWiring"/> gives.</remarks>

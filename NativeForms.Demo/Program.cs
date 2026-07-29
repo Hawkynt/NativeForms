@@ -177,6 +177,9 @@ if (shooting)
             if (Shoot.NativeWidgets is { } widgets)
                 Note("  " + widgets);
 
+            if (Shoot.WindowChrome is { } chrome)
+                Note("  " + chrome);
+
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 

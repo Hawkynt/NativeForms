@@ -85,6 +85,21 @@ is right in CoreGraphics' coordinates and upside down in this one, so the painte
 about the destination rectangle inside a saved state rather than flipping the context, which would
 put every string on its head as well.
 
+The window holds the chrome the form asked for, with one refusal. Resize limits go to `setMinSize:`
+and `setMaxSize:`, which constrain the frame rather than the content — the same measurement the
+toolkit states its bounds in here, so the number a caller gives is the number the user drags against,
+chrome included, exactly as on the other two platforms. A zero component lifts the limit: zero is
+already AppKit's own minimum, and the maximum goes back to the enormous value it starts at rather than
+to zero, which would pin the window shut. The minimize and maximize boxes grey their traffic lights
+rather than removing them, because the lights are three and always in that order and a window missing
+one reads as broken instead of as restricted; both flags are buffered, since a border-style change
+rewrites the style mask and AppKit rebuilds the caption from it. `SetIcon` is refused: a window has no
+icon on this desktop — the caption shows a proxy icon only for a window standing for a file on disk,
+and the only icon a running process can set is the application's own in the Dock, which is one per
+process where the property is one per window, so a second form would silently replace the first
+form's. The probe reads all of it back off the live window, and because the gallery sets a minimum
+size of its own that line is a round trip rather than a statement of wiring.
+
 A native widget wears the font and the colours the application gave it. Those two calls did nothing
 before, so a `Label` told to be red and bold on macOS was neither. Both are offered with
 `respondsToSelector:` rather than sent, because they are `NSControl`'s and a peer whose handle is a
