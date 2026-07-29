@@ -127,6 +127,29 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial void SendRectVoidOnly(nint receiver, nint selector, CGRect frame);
 
+    /// <summary>A point in Cocoa's coordinates.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CGPoint
+    {
+        public double X, Y;
+    }
+
+    /// <summary>Reads a point-valued property — two doubles, which AArch64 returns in registers.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial CGPoint SendPoint(nint receiver, nint selector);
+
+    /// <summary>Converts a point between views.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial CGPoint SendConvert(nint receiver, nint selector, CGPoint point, nint fromView);
+
+    /// <summary>Reads an integer-valued property.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendInteger(nint receiver, nint selector);
+
+    /// <summary>Reads a short-valued property, such as a key code.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial ushort SendUShort(nint receiver, nint selector);
+
     /// <summary>Allocates an instance of a class, ready for an <c>init…</c> message.</summary>
     internal static nint Allocate(string className)
     {

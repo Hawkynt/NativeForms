@@ -93,9 +93,166 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             (nint)(delegate* unmanaged<nint, nint, byte>)&IsFlipped,
             "c@:");
 
+        // The input selectors. AppKit delivers each as a method on the view, so each is a function
+        // pointer on the runtime class exactly as drawRect: is — the pattern, repeated, rather than a
+        // second mechanism.
+        Add(created, "mouseDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseDown);
+        Add(created, "mouseUp:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseUp);
+        Add(created, "mouseDragged:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
+        Add(created, "mouseMoved:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
+        Add(created, "rightMouseDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnRightMouseDown);
+        Add(created, "scrollWheel:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnScrollWheel);
+        Add(created, "keyDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyDownEvent);
+        Add(created, "keyUp:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyUpEvent);
+
+        // Without this the view never becomes first responder and no key ever arrives.
+        CocoaRuntime.class_addMethod(
+            created,
+            CocoaRuntime.sel_registerName("acceptsFirstResponder"),
+            (nint)(delegate* unmanaged<nint, nint, byte>)&AcceptsFirstResponder,
+            "c@:");
+
         CocoaRuntime.objc_registerClassPair(created);
         _viewClass = created;
     }
+
+    /// <summary>Attaches one event method, whose encoded signature is "void, self, _cmd, object".</summary>
+    private static void Add(nint cls, string selector, nint implementation)
+        => CocoaRuntime.class_addMethod(cls, CocoaRuntime.sel_registerName(selector), implementation, "v@:@");
+
+    /// <summary>Answers YES, so the view can take the keyboard.</summary>
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static byte AcceptsFirstResponder(nint self, nint selector) => 1;
+
+    /// <summary>Where an event landed, in the view's own (flipped) coordinates.</summary>
+    private static Point LocationOf(nint view, nint theEvent)
+    {
+        var inWindow = CocoaRuntime.SendPoint(theEvent, CocoaRuntime.sel_registerName("locationInWindow"));
+        var local = CocoaRuntime.SendConvert(view, CocoaRuntime.sel_registerName("convertPoint:fromView:"), inWindow, 0);
+        return new((int)local.X, (int)local.Y);
+    }
+
+    /// <summary>The toolkit's modifier set for an event's AppKit flags.</summary>
+    private static KeyModifiers ModifiersOf(nint theEvent)
+    {
+        var flags = CocoaRuntime.SendInteger(theEvent, CocoaRuntime.sel_registerName("modifierFlags"));
+        var modifiers = KeyModifiers.None;
+        if ((flags & (1 << 17)) != 0)
+            modifiers |= KeyModifiers.Shift;
+
+        // Command is mapped to Control, because it is the platform's own accelerator key and every
+        // shortcut the toolkit defines reads as Control — mapping it to anything else would leave a
+        // Mac user pressing the key that says Control on a keyboard that never uses it.
+        if ((flags & ((1 << 18) | (1 << 20))) != 0)
+            modifiers |= KeyModifiers.Control;
+        if ((flags & (1 << 19)) != 0)
+            modifiers |= KeyModifiers.Alt;
+
+        return modifiers;
+    }
+
+    private static CocoaCanvasPeer? CanvasOf(nint self) => _canvases.TryGetValue(self, out var canvas) ? canvas : null;
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnMouseDown(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        canvas.MouseDown?.Invoke(canvas, new(MouseButtons.Left, at.X, at.Y, 0, ModifiersOf(theEvent)));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnMouseUp(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        canvas.MouseUp?.Invoke(canvas, new(MouseButtons.Left, at.X, at.Y, 0, ModifiersOf(theEvent)));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnMouseMoved(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        canvas.MouseMove?.Invoke(canvas, new(MouseButtons.None, at.X, at.Y, 0, ModifiersOf(theEvent)));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnRightMouseDown(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        canvas.MouseDown?.Invoke(canvas, new(MouseButtons.Right, at.X, at.Y, 0, ModifiersOf(theEvent)));
+        canvas.ContextMenuRequested?.Invoke(canvas, new(at));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnScrollWheel(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        // AppKit reports the wheel in points; the toolkit counts notches of 120 like every other backend.
+        var delta = (int)(CocoaRuntime.SendDouble(theEvent, CocoaRuntime.sel_registerName("scrollingDeltaY")) * 120);
+        canvas.MouseWheel?.Invoke(canvas, new(MouseButtons.None, at.X, at.Y, delta, ModifiersOf(theEvent)));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void KeyDownEvent(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var modifiers = ModifiersOf(theEvent);
+        canvas.KeyDown?.Invoke(canvas, new(KeyOf(theEvent), modifiers));
+
+        // The typed characters come separately from the key, because a keystroke and the text it
+        // produces are different things — dead keys and IME make one keystroke none or several.
+        var characters = CocoaRuntime.SendPointer(theEvent, CocoaRuntime.sel_registerName("characters"));
+        if (characters == 0)
+            return;
+
+        foreach (var c in CocoaNative.ReadString(characters))
+            if (!char.IsControl(c))
+                canvas.KeyPress?.Invoke(canvas, new(c));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void KeyUpEvent(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is { } canvas)
+            canvas.KeyUp?.Invoke(canvas, new(KeyOf(theEvent), ModifiersOf(theEvent)));
+    }
+
+    /// <summary>The toolkit key for an event's virtual key code.</summary>
+    private static Keys KeyOf(nint theEvent)
+        => CocoaRuntime.SendUShort(theEvent, CocoaRuntime.sel_registerName("keyCode")) switch
+        {
+            0x24 => Keys.Enter,
+            0x30 => Keys.Tab,
+            0x31 => Keys.Space,
+            0x33 => Keys.Back,
+            0x35 => Keys.Escape,
+            0x75 => Keys.Delete,
+            0x73 => Keys.Home,
+            0x77 => Keys.End,
+            0x74 => Keys.PageUp,
+            0x79 => Keys.PageDown,
+            0x7B => Keys.Left,
+            0x7C => Keys.Right,
+            0x7D => Keys.Down,
+            0x7E => Keys.Up,
+            _ => Keys.None,
+        };
 
     /// <summary>Answers YES, so this view's coordinates run top-left down like the toolkit's.</summary>
     [System.Runtime.InteropServices.UnmanagedCallersOnly]
