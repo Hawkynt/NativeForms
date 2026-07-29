@@ -52,6 +52,34 @@ internal static partial class CocoaNative
     [LibraryImport(_CoreGraphics)]
     internal static partial nint CGDisplayPixelsHigh(uint display);
 
+    // --- CoreGraphics drawing -------------------------------------------------------------------
+
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextSaveGState(nint context);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextRestoreGState(nint context);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextTranslateCTM(nint context, double tx, double ty);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextScaleCTM(nint context, double sx, double sy);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextSetRGBFillColor(nint context, double r, double g, double b, double a);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextSetRGBStrokeColor(nint context, double r, double g, double b, double a);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextSetLineWidth(nint context, double width);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextFillRect(nint context, CocoaRuntime.CGRect rect);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextStrokeRect(nint context, CocoaRuntime.CGRect rect);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextFillEllipseInRect(nint context, CocoaRuntime.CGRect rect);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextStrokeEllipseInRect(nint context, CocoaRuntime.CGRect rect);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextClipToRect(nint context, CocoaRuntime.CGRect rect);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextBeginPath(nint context);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextMoveToPoint(nint context, double x, double y);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextAddLineToPoint(nint context, double x, double y);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextStrokePath(nint context);
+
+    /// <summary>The context AppKit has made current for the view being drawn.</summary>
+    internal static nint CurrentContext()
+    {
+        var graphicsContext = CocoaRuntime.SendToClass("NSGraphicsContext", "currentContext");
+        return graphicsContext == 0
+            ? 0
+            : CocoaRuntime.SendPointer(graphicsContext, CocoaRuntime.sel_registerName("CGContext"));
+    }
+
     // --- CoreText -------------------------------------------------------------------------------
 
     [LibraryImport(_CoreText)]

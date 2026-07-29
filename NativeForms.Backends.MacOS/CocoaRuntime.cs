@@ -110,6 +110,12 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendEvent(nint receiver, nint selector, nint mask, nint until, nint mode, [MarshalAs(UnmanagedType.U1)] bool dequeue);
 
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendRectInit(nint receiver, nint selector, CGRect frame);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendRectVoidOnly(nint receiver, nint selector, CGRect frame);
+
     /// <summary>Allocates an instance of a class, ready for an <c>init…</c> message.</summary>
     internal static nint Allocate(string className)
     {
@@ -123,6 +129,18 @@ internal static partial class CocoaRuntime
         var core = CocoaNative.CreateString(text);
         return core; // an NSString and a CFStringRef are the same object, bridged for free
     }
+
+    /// <summary>Builds a class at run time, which is how a view gets a <c>drawRect:</c> to call back into.</summary>
+    [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint objc_allocateClassPair(nint superclass, string name, nint extraBytes);
+
+    [LibraryImport(_ObjC)]
+    internal static partial void objc_registerClassPair(nint cls);
+
+    /// <summary>Attaches a method to a runtime class; <paramref name="types"/> is the encoded signature.</summary>
+    [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool class_addMethod(nint cls, nint selector, nint implementation, string types);
 
     /// <summary>Whether Objective-C messaging is usable at all — the answer is no off macOS.</summary>
     internal static bool Available => OperatingSystem.IsMacOS() && objc_getClass("NSObject") != 0;

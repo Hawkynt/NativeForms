@@ -54,7 +54,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public IWindowPeer CreateWindow() => new CocoaWindowPeer();
 
     /// <inheritdoc/>
-    public ICanvasPeer CreateCanvas() => throw new PlatformNotSupportedException(_NotImplemented);
+    public ICanvasPeer CreateCanvas() => new CocoaCanvasPeer();
 
     /// <inheritdoc/>
     public IPopupPeer CreatePopup(IWindowPeer? owner) => throw new PlatformNotSupportedException(_NotImplemented);
