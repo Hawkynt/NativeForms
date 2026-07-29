@@ -20,7 +20,7 @@ namespace Hawkynt.NativeForms.Demo;
 /// rather than a pass; a check that silently tests nothing is worse than one that is absent.
 /// </para>
 /// </remarks>
-internal static partial class ShootInputMac
+internal static unsafe partial class ShootInputMac
 {
     private const string _CoreGraphics = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics";
     private const string _CoreFoundation = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
@@ -45,8 +45,10 @@ internal static partial class ShootInputMac
     [LibraryImport(_CoreGraphics)]
     private static partial nint CGEventCreateKeyboardEvent(nint source, ushort keyCode, [MarshalAs(UnmanagedType.U1)] bool keyDown);
 
+    // A UTF-16 buffer by pointer: a span would need runtime marshalling this assembly does not enable,
+    // and the API wants nothing more than the address of the characters anyway.
     [LibraryImport(_CoreGraphics)]
-    private static partial void CGEventKeyboardSetUnicodeString(nint theEvent, nint length, ReadOnlySpan<char> text);
+    private static partial void CGEventKeyboardSetUnicodeString(nint theEvent, nint length, char* text);
 
     [LibraryImport(_CoreGraphics)]
     private static partial void CGEventPost(uint tap, nint theEvent);
@@ -57,7 +59,7 @@ internal static partial class ShootInputMac
     [LibraryImport(_CoreFoundation)]
     private static partial int CFRunLoopRunInMode(nint mode, double seconds, [MarshalAs(UnmanagedType.U1)] bool returnAfterSourceHandled);
 
-    [LibraryImport(_CoreFoundation)]
+    [LibraryImport(_CoreFoundation, StringMarshalling = StringMarshalling.Utf8)]
     private static partial nint CFStringCreateWithCString(nint allocator, string name, uint encoding);
 
     /// <summary>Whether injected input can be delivered here at all.</summary>
@@ -85,7 +87,8 @@ internal static partial class ShootInputMac
 
         // The key code is nothing in particular; the character is carried as a Unicode payload, which
         // is what lets one path type anything without a keyboard-layout table.
-        ReadOnlySpan<char> text = stackalloc char[1] { character };
+        var text = stackalloc char[1];
+        text[0] = character;
         CGEventKeyboardSetUnicodeString(down, 1, text);
         CGEventKeyboardSetUnicodeString(up, 1, text);
         return Post(down) && Post(up);
