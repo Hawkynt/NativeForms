@@ -220,19 +220,27 @@ internal static unsafe partial class ShootMacOS
         var minimum = SendSize(window, sel_registerName("minSize"));
         var maximum = SendSize(window, sel_registerName("maxSize"));
 
-        return $"window chrome: min {minimum.Width:0}x{minimum.Height:0}, "
-            + $"max {Measure(maximum.Width)}x{Measure(maximum.Height)}, "
+        return $"window chrome: min {minimum.Width:0}x{minimum.Height:0}, max {Limits(maximum)}, "
             + $"minimize button {ButtonState(window, _MiniaturizeButton)}, "
             + $"zoom button {ButtonState(window, _ZoomButton)}";
     }
+
+    /// <summary>A maximum as a size, or as the word for having none — on one axis or on both.</summary>
+    private static string Limits(SizeD maximum)
+        => Unlimited(maximum.Width) && Unlimited(maximum.Height)
+            ? "unbounded"
+            : $"{Measure(maximum.Width)}x{Measure(maximum.Height)}";
 
     /// <summary>NSWindowButton: the miniaturize button is 1 and the zoom button 2.</summary>
     private const nint _MiniaturizeButton = 1;
     private const nint _ZoomButton = 2;
 
-    /// <summary>A limit as a number, or the word for the value AppKit uses to mean there is none.</summary>
+    /// <summary>Whether a limit is the enormous value AppKit uses to mean there is none.</summary>
+    private static bool Unlimited(double value) => value >= double.MaxValue / 2;
+
+    /// <summary>A limit as a number, or the word for having none on that axis.</summary>
     private static string Measure(double value)
-        => value >= double.MaxValue / 2 ? "unbounded" : value.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        => Unlimited(value) ? "unbounded" : value.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>Whether one of the caption's standard buttons is live, or absent from this window.</summary>
     private static string ButtonState(nint window, nint which)
