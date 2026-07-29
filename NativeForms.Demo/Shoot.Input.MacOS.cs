@@ -303,6 +303,19 @@ internal static partial class ShootInputMac
             && Post(MouseEvent(_LeftMouseUp, at, number));
     }
 
+    /// <summary>Moves the pointer to a screen point, reporting whether the event was built and posted.</summary>
+    /// <remarks>
+    /// The half of the gesture <see cref="Click"/> already sends ahead of a press, on its own — because
+    /// hover is the one input route on this backend that was wired and never witnessed, and what a
+    /// press proves about it is nothing: a press carries its own location and the view under it gets
+    /// the event whatever the tracking areas think.
+    /// </remarks>
+    public static bool Move(Point screen)
+    {
+        var window = TargetWindow();
+        return window != 0 && Post(MouseEvent(_MouseMoved, InWindow(window, screen), WindowNumber()));
+    }
+
     /// <summary>Types one character, reporting whether the events were built and posted.</summary>
     public static bool Type(char character)
     {

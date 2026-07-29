@@ -232,7 +232,9 @@ if (shooting)
             // Say what was actually exercised, not just that nothing complained: a run that injected
             // nothing and reported a pass would be the same lie as a blank screenshot reporting success.
             var injected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-                ? $", {Shoot.Clicks} real click(s) and {Shoot.Keystrokes} real keystroke(s) delivered through the OS input queue"
+                ? $", {Shoot.Clicks} real click(s) and {Shoot.Keystrokes} real keystroke(s)"
+                    + (OperatingSystem.IsMacOS() ? $" and {Shoot.Hovers} real move(s)" : string.Empty)
+                    + " delivered through the OS input queue"
                 : string.Empty;
 
             Note(shootFailures == 0

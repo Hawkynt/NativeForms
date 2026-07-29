@@ -80,6 +80,9 @@ internal static partial class Shoot
     /// <summary>Keystrokes that were injected through the OS and observed arriving.</summary>
     public static int Keystrokes { get; private set; }
 
+    /// <summary>Pointer moves that were injected through the OS and observed arriving.</summary>
+    public static int Hovers { get; private set; }
+
     /// <summary>Every control in the tree rooted at <paramref name="control"/>, itself included.</summary>
     private static IEnumerable<Control> Walk(Control control)
     {
@@ -215,6 +218,38 @@ internal static partial class Shoot
             }
 
             box.Text = original;
+        }
+
+        // Hover, which on macOS is the one input route this backend wires and nothing has ever shown
+        // arriving — the window is asked to generate moved events and every canvas carries a tracking
+        // area, and both of those are read back off the live window rather than exercised. A press says
+        // nothing about it: a press carries its own location and the view under it is handed the event
+        // whatever the tracking areas think. So a move is posted on its own, at an owner-drawn control,
+        // whose canvas is the surface that carries the area. macOS only, because this is the gap that
+        // is macOS's; Win32's pointer is already driven end to end by the autopilot's SendInput.
+        if (OperatingSystem.IsMacOS()
+            && Walk(page).OfType<OwnerDrawnControl>().FirstOrDefault(c => !c.IsNativeWidget && OnScreen(c)) is { } hovered)
+        {
+            var moved = 0;
+            EventHandler<MouseEventArgs> seen = (_, _) => ++moved;
+            hovered.MouseMove += seen;
+            try
+            {
+                var centre = hovered.PointToScreen(new(hovered.Width / 2, hovered.Height / 2));
+                if (ShootInputMac.Move(centre))
+                {
+                    InjectDrain();
+                    if (moved > 0)
+                        ++Hovers;
+                    else
+                        note($"    input: a real move to {centre.X},{centre.Y} never reached "
+                            + $"{hovered.GetType().Name} ({InjectAt(centre)} is under the point)");
+                }
+            }
+            finally
+            {
+                hovered.MouseMove -= seen;
+            }
         }
 
         return failed;
