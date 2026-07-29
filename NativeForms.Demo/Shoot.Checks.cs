@@ -227,8 +227,14 @@ internal static partial class Shoot
         // whatever the tracking areas think. So a move is posted on its own, at an owner-drawn control,
         // whose canvas is the surface that carries the area. macOS only, because this is the gap that
         // is macOS's; Win32's pointer is already driven end to end by the autopilot's SendInput.
+        // A leaf, and that matters: the first owner-drawn control in the walk is the page itself, whose
+        // canvas is underneath every other one on it. AppKit delivers a move to the deepest view at the
+        // point, so aiming at the middle of the page tests whichever control happens to sit there and
+        // reports the page hearing nothing — which is correct behaviour read as a failure. A control
+        // with no children of its own is the deepest thing at its own centre.
         if (OperatingSystem.IsMacOS()
-            && Walk(page).OfType<OwnerDrawnControl>().FirstOrDefault(c => !c.IsNativeWidget && OnScreen(c)) is { } hovered)
+            && Walk(page).OfType<OwnerDrawnControl>()
+                .FirstOrDefault(c => !c.IsNativeWidget && c.Controls.Count == 0 && OnScreen(c)) is { } hovered)
         {
             var moved = 0;
             EventHandler<MouseEventArgs> seen = (_, _) => ++moved;
