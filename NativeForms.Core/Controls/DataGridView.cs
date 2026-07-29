@@ -2477,8 +2477,6 @@ public class DataGridView : OwnerDrawnControl
                 var text = this.GetDisplayText(column, item, modelIndex);
                 var linkColor = style.ForeColor ?? (selected ? theme.SelectionText : theme.Accent);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding), cellRect.Height);
-                // The underline has to run under what was drawn, so it measures the shortened text.
-                text = TextTrim.ToWidth(g, text, theme.DefaultFont, textRect.Width);
                 g.DrawText(text, theme.DefaultFont, linkColor, textRect, alignment);
 
                 var size = g.MeasureText(text, theme.DefaultFont);
@@ -2538,12 +2536,7 @@ public class DataGridView : OwnerDrawnControl
             {
                 var arrowZone = Math.Min(_ComboArrowZone, cellRect.Width);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding - arrowZone), cellRect.Height);
-                g.DrawText(
-                    TextTrim.ToWidth(g, this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, textRect.Width),
-                    theme.DefaultFont,
-                    foreColor,
-                    textRect,
-                    alignment);
+                g.DrawText(this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, foreColor, textRect, alignment);
 
                 // The drop arrow: a themed triangle of stacked lines, like the ComboBox field's.
                 var centerX = cellRect.Right - arrowZone + (arrowZone / 2);
@@ -2564,7 +2557,7 @@ public class DataGridView : OwnerDrawnControl
                 if (icon is null)
                 {
                     var plain = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - (2 * _CellPadding)), cellRect.Height);
-                    g.DrawText(TextTrim.ToWidth(g, text, theme.DefaultFont, plain.Width), theme.DefaultFont, foreColor, plain, alignment);
+                    g.DrawText(text, theme.DefaultFont, foreColor, plain, alignment);
                     break;
                 }
 
@@ -2603,7 +2596,7 @@ public class DataGridView : OwnerDrawnControl
                         _ => (textRect, ContentAlignment.MiddleLeft),
                     };
 
-                    g.DrawText(TextTrim.ToWidth(g, text, theme.DefaultFont, band.Width), theme.DefaultFont, foreColor, band, bandAlignment);
+                    g.DrawText(text, theme.DefaultFont, foreColor, band, bandAlignment);
                 }
 
                 break;

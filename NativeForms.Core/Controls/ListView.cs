@@ -1885,7 +1885,7 @@ public class ListView : OwnerDrawnControl
                 var subIndex = c - 1;
                 var text = subIndex < item.SubItems.Count ? item.SubItems[subIndex] : string.Empty;
                 var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
-                g.DrawText(TextTrim.ToWidth(g, text, this.Font, textRect.Width), this.Font, textColor, textRect, col.TextAlign);
+                g.DrawText(text, this.Font, textColor, textRect, col.TextAlign);
             }
 
             g.PopClip();
@@ -1921,7 +1921,7 @@ public class ListView : OwnerDrawnControl
         }
 
         var textRect = new Rectangle(left, y, x + width - left - _CellPad, rowHeight);
-        g.DrawText(TextTrim.ToWidth(g, item.Text, this.Font, textRect.Width), this.Font, textColor, textRect, alignment);
+        g.DrawText(item.Text, this.Font, textColor, textRect, alignment);
     }
 
     /// <summary>Paints a List or SmallIcon cell: selection fill, check glyph, icon and label.</summary>
@@ -1968,12 +1968,9 @@ public class ListView : OwnerDrawnControl
         if (this.GetIcon(item) is { } icon)
             g.DrawImage(icon, new Rectangle(cellX + ((cellWidth - iconSize.Width) / 2), y + 2, iconSize.Width, iconSize.Height));
 
-        // Centred, so clipping alone would eat the start of the name as well as the end and say
-        // nothing about either. Shortened to fit, the name keeps the part that identifies it.
         var labelRect = new Rectangle(cellX + _CellPad, y + iconSize.Height + _LargeIconLabelGap, cellWidth - (2 * _CellPad), this.ItemHeight);
-        var label = TextTrim.ToWidth(g, item.Text, this.Font, labelRect.Width);
         g.PushClip(labelRect);
-        g.DrawText(label, this.Font, selected ? theme.SelectionText : this.ForeColor, labelRect, ContentAlignment.MiddleCenter);
+        g.DrawText(item.Text, this.Font, selected ? theme.SelectionText : this.ForeColor, labelRect, ContentAlignment.MiddleCenter);
         g.PopClip();
 
         if (this.CheckBoxes)
@@ -1994,10 +1991,9 @@ public class ListView : OwnerDrawnControl
         var labelWidth = Math.Max(0, cellX + cellWidth - left - _CellPad);
         var lineHeight = rowHeight / 2;
         g.PushClip(new Rectangle(left, y, labelWidth, rowHeight));
-        var label = TextTrim.ToWidth(g, item.Text, this.Font, labelWidth);
-        g.DrawText(label, this.Font, selected ? theme.SelectionText : this.ForeColor, new Rectangle(left, y, labelWidth, lineHeight), ContentAlignment.MiddleLeft);
+        g.DrawText(item.Text, this.Font, selected ? theme.SelectionText : this.ForeColor, new Rectangle(left, y, labelWidth, lineHeight), ContentAlignment.MiddleLeft);
         if (item.SubItems.Count > 0)
-            g.DrawText(TextTrim.ToWidth(g, item.SubItems[0], this.Font, labelWidth), this.Font, selected ? theme.SelectionText : theme.DisabledText, new Rectangle(left, y + lineHeight, labelWidth, rowHeight - lineHeight), ContentAlignment.MiddleLeft);
+            g.DrawText(item.SubItems[0], this.Font, selected ? theme.SelectionText : theme.DisabledText, new Rectangle(left, y + lineHeight, labelWidth, rowHeight - lineHeight), ContentAlignment.MiddleLeft);
 
         g.PopClip();
 
