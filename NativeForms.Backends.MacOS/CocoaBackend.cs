@@ -97,7 +97,7 @@ public sealed class CocoaBackend : IPlatformBackend
         if (text.Length == 0)
             return Size.Empty;
 
-        return CocoaNative.TryMeasure(text, font.Family, font.SizeInPoints, out var width, out var height)
+        return CocoaNative.TryMeasure(text, font, out var width, out var height)
             ? new((int)Math.Ceiling(width), (int)Math.Ceiling(height))
             : new((int)Math.Ceiling(text.Length * font.SizeInPoints * 0.6), (int)Math.Ceiling(font.SizeInPoints * 1.3));
     }

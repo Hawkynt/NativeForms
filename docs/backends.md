@@ -153,6 +153,36 @@ and eight angles worked out by hand. The radius is clamped to half the shorter s
 Cairo backend clamps it, so a pill asked for more radius than it can hold is a capsule on both rather
 than whatever each renderer would invent.
 
+Owner-drawn text is the colour and the weight it was asked for. Until now it was black and regular on
+every page of every shot, from two independent causes that look like one. CoreText does not fill
+glyphs with the context's fill colour: it uses the string's own foreground attribute, which defaults
+to black, so setting the fill colour before `CTLineDraw` — which is what every other primitive here
+does and what GDI and Cairo both honour — changed nothing. The syntax colouring in the gallery's code
+box, the grid's coloured cells and every caption drawn in anything but the text colour arrived black.
+The attributes now carry `kCTForegroundColorFromContextAttributeName`, which is the instruction to
+honour the context after all. The other way round is a `CGColorRef` under
+`kCTForegroundColorAttributeName`; it was not taken because it would make the attribute dictionary
+vary by colour as well as by font, and would state the colour through a second colour space while
+everything else on this backend states it in device RGB. And a trait is not part of a name here:
+`CTFontCreateWithName` takes a family and a size, so bold and italic never reached the font at all and
+a heading photographed at the weight of its body text. The face is copied with symbolic traits
+instead, which asks the family for the face rather than hoping it ships one called "… Bold"; a family
+that has none answers null and keeps the plain face, which is what the native-widget path does through
+`NSFontManager` for the same reason.
+
+Underline and strikeout are drawn rather than attributed. CoreText has an attribute for the first and
+none at all for the second — strikethrough is AppKit's — so one of the two had to be a rule drawn by
+hand and both are, which is what makes them share a thickness, a colour and a length. The metrics come
+off the family, so the underline sits where that family's designer put it. This is more than the Cairo
+backend does, which carries only weight and slant into Pango, and matches GDI, which gets all four out
+of one `HFONT`.
+
+Fonts and their attribute dictionaries are cached for the process lifetime, one per face, because §4
+forbids per-frame allocation on the paint path and a repaint asks for the font it asked for last time.
+What is still built per call is the string, the attributed string and the line, all three of which
+depend on the text. The cache never releases, which is also what lets the attribute dictionaries hold
+their font without retaining it.
+
 The colour and font choosers now answer, and the shape of the answer is worth reading before relying
 on it. Both are shared modeless panels here — the platform keeps exactly one of each and shows it —
 so neither has an OK, a Cancel, or any notion of being dismissed with a result. What makes them fit a

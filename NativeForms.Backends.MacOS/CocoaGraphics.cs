@@ -179,11 +179,11 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
 
         // CoreText draws from the baseline, not the top of the line box; the ascent is most of the
         // height, and using the top directly puts every string one line too high.
-        CocoaNative.TryDrawText(_context, text, font.Family, font.SizeInPoints, x, top + (size.Height * 0.8), color);
+        CocoaNative.TryDrawText(_context, text, font, x, top + (size.Height * 0.8), color);
     }
 
     public Size MeasureText(string text, Font font)
-        => CocoaNative.TryMeasure(text, font.Family, font.SizeInPoints, out var width, out var height)
+        => CocoaNative.TryMeasure(text, font, out var width, out var height)
             ? new((int)Math.Ceiling(width), (int)Math.Ceiling(height))
             : Size.Empty;
 

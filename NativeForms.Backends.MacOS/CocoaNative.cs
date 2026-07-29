@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
@@ -37,6 +38,18 @@ internal static partial class CocoaNative
 
     [LibraryImport(_CoreFoundation)]
     private static partial nint CFDictionaryCreate(nint allocator, nint[] keys, nint[] values, nint count, nint keyCallbacks, nint valueCallbacks);
+
+    /// <summary>
+    /// A dictionary over constants and cached objects, with no key or value callbacks.
+    /// </summary>
+    /// <remarks>
+    /// Null callbacks mean the dictionary neither retains nor releases what it holds and compares keys
+    /// by pointer — which is exactly right for framework constants and for the fonts
+    /// <see cref="CocoaFontCache"/> keeps for the process lifetime, and would be wrong for anything
+    /// with a shorter life than the dictionary.
+    /// </remarks>
+    internal static nint CreateDictionary(nint[] keys, nint[] values)
+        => CFDictionaryCreate(0, keys, values, keys.Length, 0, 0);
 
     [LibraryImport(_CoreFoundation)]
     private static partial nint CFAttributedStringCreate(nint allocator, nint text, nint attributes);
@@ -121,7 +134,24 @@ internal static partial class CocoaNative
     // --- CoreText -------------------------------------------------------------------------------
 
     [LibraryImport(_CoreText)]
-    private static partial nint CTFontCreateWithName(nint name, double size, nint matrix);
+    internal static partial nint CTFontCreateWithName(nint name, double size, nint matrix);
+
+    /// <summary>
+    /// Copies a font with symbolic traits — bold, italic — applied, or null when the family ships no
+    /// such face. A size of zero keeps the one the font already has.
+    /// </summary>
+    [LibraryImport(_CoreText)]
+    internal static partial nint CTFontCreateCopyWithSymbolicTraits(nint font, double size, nint matrix, uint traits, uint mask);
+
+    /// <summary>Where the family puts an underline, measured up from the baseline, so normally negative.</summary>
+    [LibraryImport(_CoreText)]
+    internal static partial double CTFontGetUnderlinePosition(nint font);
+
+    [LibraryImport(_CoreText)]
+    internal static partial double CTFontGetUnderlineThickness(nint font);
+
+    [LibraryImport(_CoreText)]
+    internal static partial double CTFontGetXHeight(nint font);
 
     [LibraryImport(_CoreText)]
     private static partial nint CTLineCreateWithAttributedString(nint attributedString);
@@ -129,14 +159,15 @@ internal static partial class CocoaNative
     [LibraryImport(_CoreText)]
     private static partial double CTLineGetTypographicBounds(nint line, out double ascent, out double descent, out double leading);
 
-    /// <summary>The <c>kCTFontAttributeName</c> key, resolved once from the framework's data symbol.</summary>
-    private static readonly nint _FontAttributeName = ResolveFontAttributeName();
+    internal const string CoreTextFramework = _CoreText;
+    internal const string CoreFoundationFramework = _CoreFoundation;
 
-    private static nint ResolveFontAttributeName()
+    /// <summary>Reads one of a framework's exported constants — the symbol is the variable, not its value.</summary>
+    internal static nint ResolveConstant(string framework, string name)
     {
-        var library = NativeLibrary.Load(_CoreText);
-        return NativeLibrary.TryGetExport(library, "kCTFontAttributeName", out var symbol)
-            ? Marshal.ReadIntPtr(symbol)   // the symbol is the CFStringRef variable, not the string
+        var library = NativeLibrary.Load(framework);
+        return NativeLibrary.TryGetExport(library, name, out var symbol)
+            ? Marshal.ReadIntPtr(symbol)
             : 0;
     }
 
@@ -198,28 +229,34 @@ internal static partial class CocoaNative
     internal static partial void CGContextSetTextMatrix(nint context, CGAffineTransform matrix);
 
     /// <summary>
-    /// Draws one line of text at a baseline, returning whether it could. The line is built and thrown
-    /// away per call for now; a cache belongs here once anything measures how much it costs.
+    /// Draws one line of text at a baseline, returning whether it could.
     /// </summary>
-    internal static bool TryDrawText(nint context, string text, string family, double size, double x, double baseline, System.Drawing.Color color)
+    /// <remarks>
+    /// The font and its attribute dictionary come from <see cref="CocoaFontCache"/>, so what this
+    /// builds per call is only what depends on the text: the string, the attributed string and the
+    /// line. The colour rides on the context's fill colour rather than on the string, which is what
+    /// <c>kCTForegroundColorFromContextAttributeName</c> asks CoreText to honour — the alternative,
+    /// a <c>CGColorRef</c> under <c>kCTForegroundColorAttributeName</c>, would make the cached
+    /// dictionary vary by colour as well as by font, and would state the colour in a second colour
+    /// space while every other primitive here states it with <c>CGContextSetRGBFillColor</c>.
+    /// </remarks>
+    internal static bool TryDrawText(nint context, string text, Font font, double x, double baseline, System.Drawing.Color color)
     {
-        if (_FontAttributeName == 0 || text.Length == 0)
+        if (text.Length == 0)
             return false;
 
-        var name = CreateString(family);
+        var typeface = CocoaFontCache.FontFor(font);
+        var attributes = CocoaFontCache.AttributesFor(typeface);
+        if (attributes == 0)
+            return false;
+
         var content = CreateString(text);
-        var font = name == 0 ? 0 : CTFontCreateWithName(name, size, 0);
-        nint attributes = 0;
         nint attributed = 0;
         nint line = 0;
 
         try
         {
-            if (font == 0 || content == 0)
-                return false;
-
-            attributes = CFDictionaryCreate(0, [_FontAttributeName], [font], 1, 0, 0);
-            if (attributes == 0)
+            if (content == 0)
                 return false;
 
             attributed = CFAttributedStringCreate(0, content, attributes);
@@ -238,17 +275,43 @@ internal static partial class CocoaNative
             CGContextSetTextMatrix(context, new() { A = 1, D = -1 });
             CGContextSetTextPosition(context, x, baseline);
             CTLineDraw(line, context);
+
+            if ((font.Style & (FontStyle.Underline | FontStyle.Strikeout)) != 0)
+                DrawRules(context, line, typeface, font.Style, x, baseline);
+
             return true;
         }
         finally
         {
             Release(line);
             Release(attributed);
-            Release(attributes);
-            Release(font);
             Release(content);
-            Release(name);
         }
+    }
+
+    /// <summary>Draws the underline and the strikeout, which are rules rather than glyphs.</summary>
+    /// <remarks>
+    /// CoreText has a font attribute for the first and none at all for the second — strikethrough is
+    /// AppKit's, not CoreText's, and <c>CTLineDraw</c> would ignore it. One of the two has to be drawn
+    /// by hand, so both are: they then share a thickness, a colour and a length instead of the engine
+    /// drawing one and this drawing the other slightly differently. The rules use the fill colour the
+    /// glyphs were just drawn in, and the metrics come from the family so a rule sits where that
+    /// family's designer put it.
+    /// </remarks>
+    private static void DrawRules(nint context, nint line, nint typeface, FontStyle style, double x, double baseline)
+    {
+        var width = CTLineGetTypographicBounds(line, out _, out _, out _);
+        if (width <= 0)
+            return;
+
+        var thickness = Math.Max(1, CTFontGetUnderlineThickness(typeface));
+
+        // Both offsets are measured up from the baseline and y grows downward here, hence the subtraction.
+        if ((style & FontStyle.Underline) != 0)
+            CGContextFillRect(context, new(x, baseline - CTFontGetUnderlinePosition(typeface), width, thickness));
+
+        if ((style & FontStyle.Strikeout) != 0)
+            CGContextFillRect(context, new(x, baseline - (CTFontGetXHeight(typeface) / 2), width, thickness));
     }
 
     /// <summary>Wraps a managed string as a CoreFoundation string the caller must release.</summary>
@@ -262,27 +325,22 @@ internal static partial class CocoaNative
     /// Measures one line of text in a font, in points. Returns <see langword="false"/> when CoreText
     /// declines, so the caller can fall back rather than report a size of zero as a measurement.
     /// </summary>
-    internal static bool TryMeasure(string text, string family, double size, out double width, out double height)
+    internal static bool TryMeasure(string text, Font font, out double width, out double height)
     {
         width = 0;
         height = 0;
-        if (_FontAttributeName == 0)
+
+        var attributes = CocoaFontCache.AttributesFor(CocoaFontCache.FontFor(font));
+        if (attributes == 0)
             return false;
 
-        var name = CreateString(family);
         var content = CreateString(text);
-        var font = name == 0 ? 0 : CTFontCreateWithName(name, size, 0);
-        nint attributes = 0;
         nint attributed = 0;
         nint line = 0;
 
         try
         {
-            if (font == 0 || content == 0)
-                return false;
-
-            attributes = CFDictionaryCreate(0, [_FontAttributeName], [font], 1, 0, 0);
-            if (attributes == 0)
+            if (content == 0)
                 return false;
 
             attributed = CFAttributedStringCreate(0, content, attributes);
@@ -301,10 +359,7 @@ internal static partial class CocoaNative
         {
             Release(line);
             Release(attributed);
-            Release(attributes);
-            Release(font);
             Release(content);
-            Release(name);
         }
     }
 }
