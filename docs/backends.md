@@ -448,6 +448,47 @@ regression this line exists to catch. What it still cannot show is delivery, for
 other wiring line here gives: the window server drops this job's injected pointer and keyboard for
 want of an Accessibility grant.
 
+`Form.ShowDialog` blocks. It did not: `RunModal` showed the window and returned, so a caller had
+`DialogResult.Cancel` before the user had seen the dialog and the core disposed the peer tree
+underneath them — a defect no capture could show, because the window it photographs is the one that
+was never waited for. What serves it is the same modal *session* the colour and font panels are run
+with, and for a sharper reason here. `runModalForWindow:` is the obvious call and wrong twice: it does
+not come back until something calls `stopModal`, and a form closing does not stop a modal it knows
+nothing about — and while it is inside, this application's loop is not, so the queue that carries
+timer ticks and cross-thread work would stop being drained for as long as the dialog was open. The
+session is the shape that lets the pumping stay in the toolkit's own loop, and that loop drains the
+queue on every turn, which is what a dialog with a timer in it needs.
+
+Three things end it, and the order they are asked in is the design. A window closed by the core sets a
+flag; a window closed by its own red button sets nothing, because there is no window delegate on this
+backend, so `isVisible` is asked as well — a dialog dismissed by the user would otherwise hang the
+application. Quitting ends it too, so a session cannot outlive what owns it. There is no timer bound
+on top of that: a dialog that waits a long time is a dialog working, and a modal that cancelled itself
+after some invented interval would be a far stranger bug than the one being fixed.
+
+Two things come with it. A window is no longer released when it is closed — a window built this way
+frees itself on `close`, which is right for one AppKit owns and wrong for one a peer holds a pointer
+to, since the core closes a modal form and *then* disposes its peer tree — and `Close` runs once, for
+the same reason. And the owner is not disabled, which is not a gap: Windows greys the owner out, where
+AppKit withholds events from every other window through the session itself, without any of them being
+told.
+
+What the session does not do is let the loop see the events. `runModalSession:` fetches and dispatches
+them itself, restricted to the modal window, so the two interceptions the loop makes — a popup's light
+dismiss and the text box's key seam — do not run inside a dialog, and a menu opened from one is not
+offered the press that should close it. The ways around that are re-implementing modality by hand or
+making every popup a child window of the dialog, and neither is worth doing on a platform nobody here
+can watch it on. It is stated rather than approximated.
+
+This one is witnessed. The probe puts a real form up modally at the end of its run, with a `Timer` set
+to close it, and reports how long `ShowDialog` took and what it answered. That is two claims in one
+line, and the second is the interesting one: the tick comes home through the queue the loop drains, so
+a modal that pumped only AppKit's own session would never see it and the dialog would never come
+down — which is the failure an application would hit the first time anything ticked while a dialog was
+open. It runs on macOS alone, because a check whose failure mode is a wait belongs in the job that is
+bounded at three minutes and advisory rather than in the gating Windows one, which has no step timeout
+at all.
+
 ### What this backend still refuses, and why
 
 Nothing on it does nothing without appearing here. The list is in two halves, because "this platform
@@ -466,15 +507,13 @@ where they arise, as is the pair of `RichTextBox` limits that come down to Objec
 
 **Written down rather than written.** A `Label` shows no image and underlines no mnemonic. An
 `NSTextField` has neither, and both mean an attributed string carrying a text attachment, which then
-owns the font and the colour as well — one piece of work serving both, and not done. `Form.ShowDialog`
-does not block here: `RunModal` shows the window and returns, so a caller gets `DialogResult.Cancel`
-back immediately and the form is disposed underneath them. The native dialogs do not go through it —
-`NSAlert` and the four panels each run a session of their own — so the message box and the file,
-colour and font pickers are unaffected, and it is a `Form` shown modally that is missing. And a
-keystroke reaches a native editor as one of the keys the canvas translates, which is the navigation
-and editing set: a letter arrives as `Keys.None`, so a mnemonic or a shortcut typed inside a text box
-is not routed on this backend. That is the canvas's table rather than the text box's, and widening it
-would serve both. These are named here so that a screenshot that looks finished is not read as one.
+owns the font and the colour as well — one piece of work serving both, and not done. A toolkit popup
+opened inside a modal dialog is not light-dismissed, because AppKit's session dispatches the events
+the loop would otherwise have offered it (above). And a keystroke reaches a native editor as one of
+the keys the canvas translates, which is the navigation and editing set: a letter arrives as
+`Keys.None`, so a mnemonic or a shortcut typed inside a text box is not routed on this backend. That
+is the canvas's table rather than the text box's, and widening it would serve both. These are named
+here so that a screenshot that looks finished is not read as one.
 
 ## How the screenshots are produced
 

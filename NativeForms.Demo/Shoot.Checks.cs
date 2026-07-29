@@ -209,6 +209,72 @@ internal static partial class Shoot
     }
 
     /// <summary>
+    /// Shows a form modally and reports whether the call actually blocked, or <see langword="null"/>
+    /// where this is not the platform that needed asking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one claim on macOS that neither a screenshot nor a wiring census can settle: whether
+    /// <c>Form.ShowDialog</c> comes back when the dialog closes rather than the moment it opens. It
+    /// used to do the latter, so a caller got <c>DialogResult.Cancel</c> before the window was on
+    /// screen and the peer tree was disposed underneath them — invisible in a capture, and exactly the
+    /// sort of thing that only shows up in an application.
+    /// </para>
+    /// <para>
+    /// What closes the dialog is a <see cref="Timer"/>, and that is the point rather than a
+    /// convenience. On this backend a tick comes home through the queue the event loop drains, so a
+    /// modal that pumped only AppKit's own session would never see it: the dialog would stay up, this
+    /// probe would hang, and the failure would be the same one an application hits the first time
+    /// something ticks while a dialog is open. Blocking and closing on time is therefore two claims in
+    /// one line.
+    /// </para>
+    /// <para>
+    /// macOS only, and deliberately. The Windows shoot is a gating job with no step timeout, so a
+    /// regression in its modal loop would hold that job for the runner's whole budget rather than fail
+    /// it; the macOS probe is bounded at three minutes and advisory, which is where a check whose
+    /// failure mode is a hang belongs.
+    /// </para>
+    /// </remarks>
+    public static string? Modal()
+    {
+        if (!OperatingSystem.IsMacOS())
+            return null;
+
+        var dialog = new Form
+        {
+            Text = "NativeForms — modal probe",
+            Bounds = new(160, 160, 320, 140),
+            Controls = { new Label { Bounds = new(20, 20, 280, 24), Text = "Closing itself in a moment." } },
+        };
+
+        // Started before the dialog goes up, because ShowDialog does not come back until it comes
+        // down: there is no later moment to arm anything from.
+        var closer = new Timer { Interval = 200 };
+        closer.Tick += (_, _) =>
+        {
+            closer.Stop();
+
+            // A verdict on a modal form closes it, which is what makes this a round trip: the answer
+            // the caller reads back is the one set here rather than the Cancel a form gets for being
+            // closed without one.
+            dialog.DialogResult = DialogResult.OK;
+        };
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        closer.Start();
+        var result = dialog.ShowDialog();
+        clock.Stop();
+        closer.Stop();
+
+        var elapsed = clock.ElapsedMilliseconds;
+        return elapsed >= 150 && result == DialogResult.OK
+            ? $"modal dialog: ShowDialog blocked {elapsed} ms and answered {result} "
+                + "(so the session ran, and the timer that ended it was drained inside it)"
+            : $"modal dialog: ShowDialog returned after {elapsed} ms with {result} — it did NOT block, "
+                + "so a caller would have its answer before the user saw the window";
+    }
+
+    /// <summary>
     /// Runs the checks over one page, appending a line per failure and returning how many failed.
     /// </summary>
     public static int Check(Control page, Size host, Action<string> note)

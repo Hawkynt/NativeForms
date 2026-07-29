@@ -204,6 +204,20 @@ if (shooting)
             if (Shoot.Choosers is { } choosers)
                 Note("  " + choosers);
 
+            // Last of the lot, and after the shutter has stopped. It is the only check here that
+            // nests a message loop inside this one — a second shutter tick arriving mid-dialog would
+            // photograph the wrong window — and the only one whose failure mode is a wait rather than
+            // a wrong answer, so everything else has already been written to the log by the time it
+            // runs.
+            if (OperatingSystem.IsMacOS())
+            {
+                // Said before the call, so a run that never came back is legible in the artifact as a
+                // dialog that would not close rather than as a log that simply stops.
+                Note("  modal dialog: showing one, which blocks until it closes itself");
+                if (Shoot.Modal() is { } modal)
+                    Note("  " + modal);
+            }
+
             // Say what was actually exercised, not just that nothing complained: a run that injected
             // nothing and reported a pass would be the same lie as a blank screenshot reporting success.
             var injected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()

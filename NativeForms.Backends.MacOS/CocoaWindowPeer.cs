@@ -42,6 +42,9 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     private bool _quitsOnClose;
 
+    /// <summary>Whether <see cref="Close"/> has already run, which is also what ends a modal loop.</summary>
+    private volatile bool _closed;
+
     /// <summary>NSWindowButton: the miniaturize button is 1 and the zoom button 2.</summary>
     private const nint _MiniaturizeButton = 1;
     private const nint _ZoomButton = 2;
@@ -75,6 +78,13 @@ internal sealed class CocoaWindowPeer : IWindowPeer
         // not. Nothing under the pointer highlighted and a menu could not be read at all.
         if (_window != 0)
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setAcceptsMouseMovedEvents:"), true);
+
+        // A window built this way frees itself when it is closed, which is right for a document window
+        // AppKit owns and wrong for one a peer holds a pointer to: the core closes a modal form and
+        // then disposes its peer tree, so the second message would go to memory that is no longer a
+        // window. Held instead, and the peer is the only owner there is.
+        if (_window != 0)
+            CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setReleasedWhenClosed:"), false);
 
         // A window's content view is a plain NSView, so its origin is the bottom left and every direct
         // child lands mirrored — the menu bar at the foot of the window, the tab strip off the top.
@@ -139,6 +149,13 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     public void Close()
     {
+        // Once. The core closes a form and then disposes its peer tree, and disposal closes too, so a
+        // form shown modally would otherwise report itself closed twice and end a session that had
+        // already ended.
+        if (_closed)
+            return;
+
+        _closed = true;
         if (_window != 0)
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("close"));
 
@@ -288,7 +305,30 @@ internal sealed class CocoaWindowPeer : IWindowPeer
             _ => null,
         };
 
-    public void RunModal(IWindowPeer? owner) => this.Show();
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// The owner is not disabled, and there is nothing missing in that: Windows greys the owner out
+    /// while a dialog is up, where AppKit withholds events from every other window of the application
+    /// through the modal session itself, without any of them being told. Passing the owner in would
+    /// buy nothing here — the session is against this window, and every other one is behind it by
+    /// consequence rather than by instruction.
+    /// </para>
+    /// <para>
+    /// The window is shown first and the session only entered if it is still open, because a form
+    /// whose <c>Load</c> closed it again has nothing to block on: entering a session for a window that
+    /// is already gone is how a dialog turns into a hang.
+    /// </para>
+    /// </remarks>
+    public void RunModal(IWindowPeer? owner)
+    {
+        this.Show();
+        if (!_closed)
+            _backend.RunModal(this);
+    }
+
+    /// <summary>Whether the window has been closed, which is one of the things that ends a modal loop.</summary>
+    internal bool IsClosed => _closed;
 
     /// <inheritdoc/>
     /// <remarks>Greyed rather than removed, which is what this desktop does: the traffic lights are

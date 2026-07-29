@@ -554,7 +554,89 @@ public sealed class CocoaBackend : IPlatformBackend
 
     private volatile bool _running;
 
+    /// <summary>Whether something has asked the application to stop, which also ends any modal.</summary>
+    /// <remarks>
+    /// Separate from <see cref="_running"/> on purpose. That flag says the loop is turning, and it is
+    /// false both before <see cref="Run"/> starts and after it ends — so a modal dialog reading it
+    /// would close itself instantly when one is shown from an application that never called
+    /// <see cref="Run"/> at all. This one only ever goes true, and only because somebody said so.
+    /// </remarks>
+    private volatile bool _quitting;
+
     /// <inheritdoc/>
     /// <inheritdoc/>
-    public void Quit() => _running = false;
+    public void Quit()
+    {
+        _quitting = true;
+        _running = false;
+    }
+
+    /// <summary>
+    /// Blocks on a window until it closes, withholding events from the rest of the application while
+    /// it is up. This is what <see cref="IWindowPeer.RunModal"/> is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A modal <em>session</em> rather than <c>runModalForWindow:</c>, which is the obvious call and
+    /// the wrong one twice over. It does not come back until something calls <c>stopModal</c>, and
+    /// nothing here does — a form closes, it does not stop a modal it knows nothing about — and while
+    /// it is inside, this loop is not: the queue <see cref="Post"/> fills would stop being drained, so
+    /// every timer tick and every piece of cross-thread work an application does would stall for as
+    /// long as the dialog was open. The session is the shape that lets the pumping stay here, which is
+    /// the same reason the colour and font panels are run this way.
+    /// </para>
+    /// <para>
+    /// Three things end it, and the first is the one that matters: the window is gone. A dialog closed
+    /// with its own close box tells the toolkit nothing — there is no window delegate on this backend —
+    /// so the flag the peer sets when the core closes it cannot be the only exit, or a user dismissing
+    /// a dialog by its red button would hang the application. <c>isVisible</c> is asked as well, which
+    /// covers both. Quitting ends it too, so a session cannot outlive the application that owns it.
+    /// </para>
+    /// <para>
+    /// What a session does not do is let this loop see the events: <c>runModalSession:</c> fetches and
+    /// dispatches them itself, restricted to the modal window. So the two interceptions
+    /// <see cref="Run"/> makes — light dismiss and the text box's key seam — do not run inside a
+    /// dialog, and a toolkit popup opened from one is not offered the press that should close it. That
+    /// is written down in <c>docs/backends.md</c> rather than worked around here, because the ways
+    /// around it are re-implementing modality by hand or making every popup a child window of the
+    /// dialog, and neither is worth doing blind.
+    /// </para>
+    /// </remarks>
+    internal void RunModal(CocoaWindowPeer peer)
+    {
+        var app = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        var visible = CocoaRuntime.sel_registerName("isVisible");
+        var window = peer.Handle;
+        if (app == 0 || window == 0 || !CocoaRuntime.SendBool(window, visible))
+            return; // a window nobody can see is not something to block on
+
+        var session = CocoaRuntime.SendPointer(app, CocoaRuntime.sel_registerName("beginModalSessionForWindow:"), window);
+        if (session == 0)
+            return;
+
+        try
+        {
+            // NSModalResponseContinue
+            const nint running = -1002;
+            var run = CocoaRuntime.sel_registerName("runModalSession:");
+
+            while (!_quitting
+                && !peer.IsClosed
+                && CocoaRuntime.SendInteger(app, run, session) == running
+                && CocoaRuntime.SendBool(window, visible))
+            {
+                // The reason this is a session at all. A dialog is not a pause in the application:
+                // its timers still tick and its background work still comes home, and both arrive
+                // through this queue.
+                while (_posted.TryDequeue(out var action))
+                    action();
+
+                System.Threading.Thread.Sleep(5); // the session returns at once when the queue is empty
+            }
+        }
+        finally
+        {
+            CocoaRuntime.SendVoid(app, CocoaRuntime.sel_registerName("endModalSession:"), session);
+        }
+    }
 }
