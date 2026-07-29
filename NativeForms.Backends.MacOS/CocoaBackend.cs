@@ -31,12 +31,24 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     /// <remarks>
-    /// One for now. AppKit measures in points and reports the backing scale per screen, so a Retina
-    /// display is 2.0 — but reading it needs <c>NSScreen</c>, which needs Objective-C messaging that
-    /// this half of the backend deliberately does without. Returning the point scale is honest until
-    /// then; it is wrong only on the axis nothing yet draws on.
+    /// <c>[[NSScreen mainScreen] backingScaleFactor]</c>: 2.0 on a Retina display, 1.0 otherwise. Also
+    /// the first thing in this backend to go through Objective-C messaging, which makes it the check
+    /// that the messaging layer works on a real machine — a wrong <c>objc_msgSend</c> signature does not
+    /// fail, it returns plausible nonsense, so the first use of it wants to be something whose right
+    /// answer is known.
     /// </remarks>
-    public double GetDpiScale() => 1.0;
+    public double GetDpiScale()
+    {
+        if (!CocoaRuntime.Available)
+            return 1.0;
+
+        var screen = CocoaRuntime.SendToClass("NSScreen", "mainScreen");
+        if (screen == 0)
+            return 1.0;
+
+        var scale = CocoaRuntime.SendDouble(screen, CocoaRuntime.sel_registerName("backingScaleFactor"));
+        return scale is > 0 and < 16 ? scale : 1.0;
+    }
 
     /// <inheritdoc/>
     public IWindowPeer CreateWindow() => throw new PlatformNotSupportedException(_NotImplemented);

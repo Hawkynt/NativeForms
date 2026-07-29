@@ -55,6 +55,11 @@ if (shooting)
     AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         File.AppendAllText(shootLog, $"unhandled: {e.ExceptionObject}{Environment.NewLine}");
 
+    // Names the backend that will actually serve, and what it says about the display. On a platform
+    // under construction this is the difference between "it failed" and "it failed here, with this
+    // much working" — and a DPI scale that comes back sane is the messaging layer reporting for duty.
+    var resolved = BackendRegistry.Resolve();
+    Note($"backend: {resolved.Name}, dpi scale {resolved.GetDpiScale():0.##}, screen {resolved.GetScreenSize().Width}x{resolved.GetScreenSize().Height}");
     Note("backends registered, building the gallery");
 }
 if (measureStartup)
