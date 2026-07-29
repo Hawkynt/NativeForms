@@ -65,8 +65,8 @@ It is genuinely incomplete, and the table above says so rather than leaving you 
 Working: AppKit loads, windows open, the view hierarchy builds with the toolkit's coordinates,
 the event loop runs, owner-drawn painting and text render through CoreGraphics and CoreText, images
 and text measurement work, the clipboard works both ways, a multiline `TextBox` is a real
-`NSTextView` in an `NSScrollView`, and the gallery's sixteen pages all pass the walkthrough's state
-round-trip and layout audit.
+`NSTextView` in an `NSScrollView`, a `NotifyIcon` is a real `NSStatusItem` in the menu bar, and the
+gallery's sixteen pages all pass the walkthrough's state round-trip and layout audit.
 
 Not working yet: the colour and font choosers answer as if cancelled — both are shared modeless
 panels on macOS, which is a different shape from this seam's blocking call. Mouse and keyboard events
@@ -105,6 +105,22 @@ discovering. A programmatic selection produces the same `tableViewSelectionDidCh
 does, unlike AppKit's target/action, so the peer suppresses its own echo; and activation is the double
 click alone, because Return does not activate a row on this desktop — Finder spends it on renaming —
 and inventing the gesture would be less native rather than more.
+
+The tray icon is an `NSStatusItem`, because the menu bar is where this desktop puts what Windows puts
+in a notification area. The item is taken from the shared status bar when the component is built
+rather than when it is first shown — the button behind it carries the icon, the tooltip and the
+target, so there is nothing to buffer state into until it exists — and it starts hidden, so a
+component built and never shown does not leave an icon in the user's menu bar. One press produces one
+action, so a click and a double click are told apart by the click count on the event that caused it,
+which is what the shell does on Windows too: both arrive, in that order. The icon is not marked as a
+template image; a template is drawn as a monochrome stencil so it follows the menu bar, which is right
+for a system icon and wrong for an application's own colours, and reducing them to a silhouette would
+throw away what the caller chose without being asked. That icon is also the first thing this backend
+turns pixels into a `CGImage` for, through a bitmap context rather than `CGImageCreate` — twelve
+arguments, half of them on the stack, and Apple's AArch64 ABI packs stack arguments to their natural
+size rather than a slot each, so a merely plausible signature reads the wrong bytes and answers
+something that looks like an image. Owner-drawn `DrawImage` is still a no-op and is not part of this;
+the conversion is where a later change would start.
 
 The hyperlink has no control behind it on this desktop, only a convention: a selectable, non-editable
 `NSTextField` whose string carries `NSLinkAttributeName`. That is what is served, and it buys the

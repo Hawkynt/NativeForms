@@ -180,6 +180,9 @@ if (shooting)
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 
+            if (Shoot.StatusItem is { } tray)
+                Note("  " + tray);
+
             // Say what was actually exercised, not just that nothing complained: a run that injected
             // nothing and reported a pass would be the same lie as a blank screenshot reporting success.
             var injected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()

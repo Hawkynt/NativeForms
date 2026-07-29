@@ -73,8 +73,10 @@ public sealed class CocoaBackend : IPlatformBackend
     public ITimerPeer CreateTimer() => new CocoaTimerPeer(this);
 
     /// <inheritdoc/>
-    /// <remarks>An <c>NSStatusItem</c> eventually; inert for now so a tray icon nobody can see does not
-    /// take the application down.</remarks>
+    /// <remarks>
+    /// An <c>NSStatusItem</c> in the shared status bar — this desktop's menu bar is where Windows has a
+    /// notification area, and it is the only tray surface macOS has.
+    /// </remarks>
     public INotifyIconPeer CreateNotifyIcon() => new CocoaNotifyIconPeer();
 
     /// <inheritdoc/>

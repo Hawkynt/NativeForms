@@ -277,23 +277,152 @@ internal sealed class CocoaPopupPeer : IPopupPeer
     }
 }
 
-/// <summary>A status-bar item. Inert until <c>NSStatusItem</c> is wired.</summary>
+/// <summary>
+/// A menu-bar item: a real <c>NSStatusItem</c> in the system status bar, which is what macOS has where
+/// Windows has a notification-area icon.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The item is taken from the shared status bar at construction rather than when it is first shown,
+/// because the button behind it is what carries the icon, the tooltip and the target, and there is
+/// nothing to buffer state into until it exists. Visibility is then the item's own flag — which is
+/// also the only honest way to hide one: an item removed from the bar cannot be put back in the place
+/// it had.
+/// </para>
+/// <para>
+/// One press produces one action, so the two events are told apart by the click count on the event
+/// that caused it. That is the same thing the shell does on Windows: a double click arrives as a
+/// click and then a double click, and an application that listens to both hears both.
+/// </para>
+/// </remarks>
 internal sealed class CocoaNotifyIconPeer : INotifyIconPeer
 {
+    /// <summary>NSVariableStatusItemLength: the item is as wide as what it shows.</summary>
+    private const double _Variable = -1;
+
+    private readonly nint _item;
+    private readonly nint _target;
+    private nint _image;
+
+    public CocoaNotifyIconPeer()
+    {
+        var bar = CocoaRuntime.SendToClass("NSStatusBar", "systemStatusBar");
+        _item = bar == 0
+            ? 0
+            : CocoaRuntime.SendLength(bar, CocoaRuntime.sel_registerName("statusItemWithLength:"), _Variable);
+
+        if (_item == 0)
+            return;
+
+        // Retained: the status bar hands back an autoreleased item, and this one has to survive the
+        // pool that is drained at the end of whatever created it.
+        CocoaRuntime.SendPointer(_item, CocoaRuntime.sel_registerName("retain"));
+
+        // Hidden until the core says otherwise, so a component that is built and never shown does not
+        // put an icon in the user's menu bar.
+        CocoaRuntime.SendVoid(_item, CocoaRuntime.sel_registerName("setVisible:"), false);
+
+        if (this.Button() is not { } button)
+            return;
+
+        _target = CocoaAction.Create(this.OnPressed);
+        if (_target == 0)
+            return;
+
+        CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setTarget:"), _target);
+        CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setAction:"), CocoaAction.Selector);
+    }
+
+    /// <inheritdoc/>
     public event EventHandler? Click;
+
+    /// <inheritdoc/>
     public event EventHandler? DoubleClick;
 
-    public void SetIcon(int width, int height, ReadOnlySpan<int> argb) { }
-
-    public void SetToolTip(string text) { }
-
-    public void SetVisible(bool visible) { }
-
-    public void Dispose() { }
-
-    private void Unused()
+    /// <summary>The item's button, which is where everything visible about it lives.</summary>
+    private nint? Button()
     {
-        Click?.Invoke(this, EventArgs.Empty);
-        DoubleClick?.Invoke(this, EventArgs.Empty);
+        if (_item == 0)
+            return null;
+
+        var button = CocoaRuntime.SendPointer(_item, CocoaRuntime.sel_registerName("button"));
+        return button == 0 ? null : button;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Not marked as a template image. A template is drawn as a monochrome stencil so it follows the
+    /// menu bar's appearance, which is what a system icon wants — but the core hands over an
+    /// application's own colours, and reducing them to a silhouette would throw away what the caller
+    /// chose without being asked.
+    /// </remarks>
+    public void SetIcon(int width, int height, ReadOnlySpan<int> argb)
+    {
+        if (this.Button() is not { } button)
+            return;
+
+        var image = CocoaImage.CreateNSImage(width, height, argb);
+        if (image == 0)
+            return;
+
+        CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setImage:"), image);
+
+        // The button retains what it is given, so the previous one is released only once it is no
+        // longer the one on screen.
+        if (_image != 0)
+            CocoaRuntime.SendVoid(_image, CocoaRuntime.sel_registerName("release"));
+
+        _image = image;
+    }
+
+    /// <inheritdoc/>
+    public void SetToolTip(string text)
+    {
+        if (this.Button() is not { } button)
+            return;
+
+        var value = CocoaRuntime.NSString(text);
+        if (value == 0)
+            return;
+
+        CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setToolTip:"), value);
+        CocoaNative.CFRelease(value);
+    }
+
+    /// <inheritdoc/>
+    public void SetVisible(bool visible)
+    {
+        if (_item != 0)
+            CocoaRuntime.SendVoid(_item, CocoaRuntime.sel_registerName("setVisible:"), visible);
+    }
+
+    /// <summary>The button was pressed; which event that is depends on how many clicks it took.</summary>
+    private void OnPressed()
+    {
+        var app = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        var current = app == 0 ? 0 : CocoaRuntime.SendPointer(app, CocoaRuntime.sel_registerName("currentEvent"));
+        var clicks = current == 0 ? 1 : (int)CocoaRuntime.SendInteger(current, CocoaRuntime.sel_registerName("clickCount"));
+
+        if (clicks >= 2)
+            DoubleClick?.Invoke(this, EventArgs.Empty);
+        else
+            Click?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        CocoaAction.Forget(_target);
+        if (_image != 0)
+            CocoaRuntime.SendVoid(_image, CocoaRuntime.sel_registerName("release"));
+
+        if (_item == 0)
+            return;
+
+        var bar = CocoaRuntime.SendToClass("NSStatusBar", "systemStatusBar");
+        if (bar != 0)
+            CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("removeStatusItem:"), _item);
+
+        CocoaRuntime.SendVoid(_item, CocoaRuntime.sel_registerName("release"));
     }
 }

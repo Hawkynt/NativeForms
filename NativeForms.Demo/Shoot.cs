@@ -40,6 +40,15 @@ internal static partial class Shoot
     /// <remarks>Wiring, not delivery — for the reason <see cref="HoverWiring"/> gives.</remarks>
     public static string? LinkWiring => OperatingSystem.IsMacOS() ? ShootMacOS.LinkWiring() : null;
 
+    /// <summary>
+    /// What the tray icon reports about itself, where the platform keeps one somewhere askable.
+    /// </summary>
+    /// <remarks>
+    /// It is nowhere in the gallery's window — the item lives in the menu bar, in a window of its own —
+    /// so nothing about it shows in a screenshot and only the platform can be asked.
+    /// </remarks>
+    public static string? StatusItem => OperatingSystem.IsMacOS() ? ShootMacOS.StatusItem() : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

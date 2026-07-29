@@ -255,6 +255,57 @@ internal static unsafe partial class ShootMacOS
             CountLinkDelegates(Send(children, sel_registerName("objectAtIndex:"), i), ref wired);
     }
 
+    /// <summary>
+    /// What the menu-bar item reports about itself, found among the application's own windows.
+    /// </summary>
+    /// <remarks>
+    /// A status item is not in the gallery's window and cannot be — it lives in a window of its own
+    /// that the system status bar puts in the menu bar — so it is looked for across everything the
+    /// application owns rather than under the content view. What can be read back is that the button
+    /// exists, that it was given an image, and that it was given a tooltip; a press on it is the same
+    /// undeliverable gesture every other injected click is on this job.
+    /// </remarks>
+    public static string StatusItem()
+    {
+        var application = objc_getClass("NSApplication");
+        var app = application == 0 ? 0 : Send(application, sel_registerName("sharedApplication"));
+        var windows = app == 0 ? 0 : Send(app, sel_registerName("windows"));
+        var count = windows == 0 ? 0 : (int)Send(windows, sel_registerName("count"));
+
+        for (var i = 0; i < count; ++i)
+        {
+            var window = Send(windows, sel_registerName("objectAtIndex:"), i);
+            var button = window == 0 ? 0 : FindStatusButton(Send(window, sel_registerName("contentView")));
+            if (button == 0)
+                continue;
+
+            var image = Send(button, sel_registerName("image"));
+            var tip = Send(button, sel_registerName("toolTip"));
+            return $"status item: present, image {(image != 0 ? "set" : "MISSING")}, tooltip {(tip != 0 ? "set" : "MISSING")}";
+        }
+
+        return "status item: no NSStatusBarButton among the application's windows";
+    }
+
+    /// <summary>The first status-bar button at or under a view, or zero.</summary>
+    private static nint FindStatusButton(nint view)
+    {
+        if (view == 0)
+            return 0;
+
+        var name = class_getName(object_getClass(view)) is var raw && raw != 0 ? Marshal.PtrToStringUTF8(raw) : null;
+        if (name is not null && name.Contains("StatusBarButton", StringComparison.Ordinal))
+            return view;
+
+        var children = Send(view, sel_registerName("subviews"));
+        var count = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+            if (FindStatusButton(Send(children, sel_registerName("objectAtIndex:"), i)) is var found && found != 0)
+                return found;
+
+        return 0;
+    }
+
     /// <summary>Tallies the class of every view under one, itself included.</summary>
     private static void CountClasses(nint view, Dictionary<string, int> counts)
     {

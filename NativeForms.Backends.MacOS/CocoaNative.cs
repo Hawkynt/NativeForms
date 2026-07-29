@@ -44,6 +44,32 @@ internal static partial class CocoaNative
     // --- CoreGraphics ---------------------------------------------------------------------------
 
     [LibraryImport(_CoreGraphics)]
+    internal static partial nint CGColorSpaceCreateDeviceRGB();
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial void CGColorSpaceRelease(nint space);
+
+    /// <summary>
+    /// A bitmap to draw into, or with a null <paramref name="data"/> one that allocates and owns its
+    /// own pixels — which is what this backend wants, because then nothing managed has to stay pinned
+    /// for as long as CoreGraphics might read it.
+    /// </summary>
+    [LibraryImport(_CoreGraphics)]
+    internal static partial nint CGBitmapContextCreate(nint data, nint width, nint height, nint bitsPerComponent, nint bytesPerRow, nint space, uint bitmapInfo);
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial nint CGBitmapContextGetData(nint context);
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial nint CGBitmapContextCreateImage(nint context);
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial void CGContextRelease(nint context);
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial void CGImageRelease(nint image);
+
+    [LibraryImport(_CoreGraphics)]
     internal static partial uint CGMainDisplayID();
 
     [LibraryImport(_CoreGraphics)]
