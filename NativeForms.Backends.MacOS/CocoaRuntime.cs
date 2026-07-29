@@ -175,6 +175,39 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendInteger(nint receiver, nint selector);
 
+    /// <summary>Asks an integer question about a point, such as which row a table has there.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendInteger(nint receiver, nint selector, CGPoint point);
+
+    /// <summary>Sends a message taking an object and a flag, such as a selection that does not extend.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, nint first, [MarshalAs(UnmanagedType.U1)] bool second);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    private static partial CGRect SendRectArm(nint receiver, nint selector);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend_stret")]
+    private static partial void SendRectIntel(out CGRect result, nint receiver, nint selector);
+
+    /// <summary>
+    /// Reads a rectangle-valued property, through whichever entry point this architecture requires.
+    /// </summary>
+    /// <remarks>
+    /// A <c>CGRect</c> is four doubles and therefore a homogeneous float aggregate of exactly four
+    /// members, which AArch64 hands back in the floating registers — so the ordinary send is correct
+    /// there. The System V ABI has no such rule for a 32-byte struct and returns it through hidden
+    /// storage, which is what <c>objc_msgSend_stret</c> exists for. Choosing by architecture rather
+    /// than assuming is the same care the <c>double</c> return already takes.
+    /// </remarks>
+    internal static CGRect SendRect(nint receiver, nint selector)
+    {
+        if (RuntimeInformation.ProcessArchitecture != Architecture.X64)
+            return SendRectArm(receiver, selector);
+
+        SendRectIntel(out var wide, receiver, selector);
+        return wide;
+    }
+
     /// <summary>Reads a short-valued property, such as a key code.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial ushort SendUShort(nint receiver, nint selector);
