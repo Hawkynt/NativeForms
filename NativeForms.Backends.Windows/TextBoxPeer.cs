@@ -397,10 +397,21 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     }
 
     /// <summary>Pushes the edit-specific buffered state onto a freshly created HWND.</summary>
+    /// <remarks>
+    /// The text is written a second time here, and it has to be. The base flush puts the buffered
+    /// string on the window verbatim, which is the toolkit's spelling of a line break rather than the
+    /// widget's — so a box whose text was set before it was realized, which is every box built
+    /// declaratively, arrived carrying bare newlines the EDIT draws as nothing. Only a string that
+    /// actually holds a break is re-sent; the two spellings are the same string for every other one.
+    /// The selection follows for the same reason: the buffered indices are in the core's numbering.
+    /// </remarks>
     private void FlushEditState()
     {
         if (Handle == 0)
             return;
+
+        if (_text.IndexOfAny(_LineBreakChars) >= 0)
+            NativeMethods.SetWindowTextW(Handle, ToNativeLineEndings(_text));
 
         if (_passwordChar != '\0')
             NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETPASSWORDCHAR, _passwordChar, 0);
@@ -410,6 +421,12 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
 
         NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETREADONLY, _readOnly ? 1 : 0, 0);
         NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETLIMITTEXT, _maxLength, 0);
-        NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETSEL, _selectionStart, _selectionStart + _selectionLength);
+
+        var end = _selectionStart + _selectionLength;
+        NativeMethods.SendMessageW(
+            Handle,
+            NativeMethods.EM_SETSEL,
+            _multiline ? NativeIndexOf(_text, _selectionStart) : _selectionStart,
+            _multiline ? NativeIndexOf(_text, end) : end);
     }
 }
