@@ -54,6 +54,10 @@ internal static unsafe partial class ShootMacOS
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial nint SendRect(nint receiver, nint selector, Rect frame);
 
+    /// <summary>Sends a message taking one measure and answering an object, such as an item of a length.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    private static partial nint SendLength(nint receiver, nint selector, double length);
+
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial void SendRect(nint receiver, nint selector, Rect frame, nint rep);
 
@@ -302,17 +306,27 @@ internal static unsafe partial class ShootMacOS
                 + "(its button is a remote view, so the image and tooltip cannot be read back here)";
         }
 
+        // Nothing found in the window list settles nothing on its own, because a modern status item
+        // may simply not put a window there. So the platform is asked the question directly: take one
+        // more item and see whether it comes with a button. A button means status items work in this
+        // session and the toolkit's is somewhere the window list does not reach; no button means this
+        // session has no menu bar to put one in, and the difference is the whole answer.
         var bar = objc_getClass("NSStatusBar") is var barClass && barClass != 0
             ? Send(barClass, sel_registerName("systemStatusBar"))
             : 0;
 
-        // The activation policy comes with it, because it is the one thing that makes a status item
-        // silently amount to nothing: a Prohibited process owns no part of the menu bar, so the item is
-        // handed over and has nowhere to be.
+        var probe = bar == 0 ? 0 : SendLength(bar, sel_registerName("statusItemWithLength:"), -1);
+        var button = probe == 0 ? 0 : Send(probe, sel_registerName("button"));
+        if (bar != 0 && probe != 0)
+            Send(bar, sel_registerName("removeStatusItem:"), probe);
+
+        // The activation policy comes with it: a Prohibited process owns no part of the menu bar, so
+        // an item handed to one has nowhere to be.
         var policy = app == 0 ? -1 : (int)Send(app, sel_registerName("activationPolicy"));
 
-        return $"status item: MISSING - no button and no status-level window among {count} app window(s); "
-            + $"NSStatusBar {(bar != 0 ? "resolves" : "does not resolve")}, activation policy {policy}";
+        return $"status item: not among the application's {count} window(s); a fresh NSStatusItem "
+            + $"{(button != 0 ? "does" : "does NOT")} come with a button here "
+            + $"(NSStatusBar {(bar != 0 ? "resolves" : "does not resolve")}, activation policy {policy})";
     }
 
     /// <summary>NSStatusWindowLevel — where the menu bar's extras sit, and nothing else here does.</summary>
