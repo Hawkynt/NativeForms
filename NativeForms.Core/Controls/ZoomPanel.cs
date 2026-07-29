@@ -286,7 +286,11 @@ public class ZoomPanel : OwnerDrawnControl
         }
 
         // Left ruler: content y = k·step maps to view y; the number is drawn stacked one digit per line
-        // (there is no rotated text) so the vertical ruler carries values too.
+        // (there is no rotated text) so the vertical ruler carries values too. The line is what the font
+        // measures rather than a fixed guess, because the three text engines disagree about a box the
+        // glyph does not fit in: GDI clips it, Cairo and CoreText let it spill over the digit below, and
+        // the desktop's own UI font is taller than any guess on at least one of them.
+        var lineHeight = Math.Max(1, g.MeasureText("0", this.Font).Height);
         var firstY = (int)Math.Floor((-_offY / _zoom) / step) * (int)step;
         for (var cy = firstY; ; cy += (int)step)
         {
@@ -299,7 +303,7 @@ public class ZoomPanel : OwnerDrawnControl
             g.DrawLine(tick, _RulerSize - 5, vy, _RulerSize, vy);
             var digits = cy.ToString();
             for (var d = 0; d < digits.Length; ++d)
-                g.DrawText(digits[d].ToString(), this.Font, label, new Rectangle(1, vy + 1 + (d * 9), _RulerSize, 9), ContentAlignment.TopCenter);
+                g.DrawText(digits[d].ToString(), this.Font, label, new Rectangle(1, vy + 1 + (d * lineHeight), _RulerSize, lineHeight), ContentAlignment.TopCenter);
         }
     }
 

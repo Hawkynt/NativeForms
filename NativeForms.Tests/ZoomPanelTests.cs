@@ -167,6 +167,40 @@ internal sealed class ZoomPanelTests
         Assert.That(g.Operations.Exists(o => o.StartsWith("line")), Is.True, "grid lines are drawn");
     }
 
+    [Test]
+    public void The_vertical_ruler_gives_every_stacked_digit_a_whole_text_line()
+    {
+        var panel = new ZoomPanel { Bounds = new(0, 0, 400, 300), ShowRulers = true, ShowZoomControl = false };
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(panel);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+        panel.ContentSize = new Size(400, 400);
+        panel.ActualSize();
+
+        var g = canvas.RaisePaint();
+        var line = g.MeasureText("0", panel.Font).Height;
+
+        // The left ruler is the only text drawn into the 16-px band at x = 1; the top ruler's labels start
+        // at the tick they belong to and are 40 px wide.
+        var stacked = g.TextRects.FindAll(t => t.Bounds.X == 1).ConvertAll(t => t.Bounds);
+        stacked.Sort((a, b) => a.Y.CompareTo(b.Y));
+
+        Assert.That(stacked, Is.Not.Empty, "the vertical ruler carries labels");
+        Assert.Multiple(() =>
+        {
+            foreach (var box in stacked)
+                Assert.That(box.Height, Is.EqualTo(line), "a digit gets the height the font actually needs");
+
+            for (var i = 1; i < stacked.Count; ++i)
+                Assert.That(
+                    stacked[i].Y,
+                    Is.GreaterThanOrEqualTo(stacked[i - 1].Bottom),
+                    "no digit box overlaps the one above it, so a stacked number reads as itself");
+        });
+    }
+
     private static Rectangle FirstImageRect(HeadlessCanvasPeer canvas)
     {
         var g = canvas.RaisePaint();
