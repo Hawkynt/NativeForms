@@ -131,6 +131,12 @@ if (shooting)
             if (page == 0 && Shoot.HoverWiring is { } wiring)
                 Note("  " + wiring);
 
+            // Also once, and before the first check that leans on it: the events this platform's
+            // injector builds are read back to prove the selector was declared right, since a wrong
+            // declaration answers plausible nonsense rather than failing.
+            if (page == 0 && Shoot.InputRoute is { } route)
+                Note("  " + route);
+
             try
             {
                 var size = Shoot.Window(form, path);

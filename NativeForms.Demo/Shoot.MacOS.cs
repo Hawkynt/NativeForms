@@ -717,6 +717,22 @@ internal static unsafe partial class ShootMacOS
         return main != 0 ? main : Send(app, sel_registerName("keyWindow"));
     }
 
+    /// <summary>
+    /// The window the probe photographs, for the parts of it that have to aim at that window rather
+    /// than at it.
+    /// </summary>
+    /// <remarks>
+    /// An injected event carries the number of the window it is going to, and a point in that window's
+    /// own coordinates. Both come from here, so the shutter and the injector cannot end up disagreeing
+    /// about which window the run is about.
+    /// </remarks>
+    internal static nint GalleryWindow()
+    {
+        var application = objc_getClass("NSApplication");
+        var app = application == 0 ? 0 : Send(application, sel_registerName("sharedApplication"));
+        return app == 0 ? 0 : Gallery(app);
+    }
+
     /// <summary>An empty <c>NSDictionary</c> for the encoder's options.</summary>
     private static nint EmptyDictionary()
     {

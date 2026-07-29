@@ -32,11 +32,11 @@ internal static partial class Shoot
     /// </summary>
     /// <remarks>
     /// It does on Windows, where SendInput reports refusal and a delivered event that changes nothing
-    /// is a real defect. It does not on macOS: AXIsProcessTrusted answers yes on a hosted runner while
-    /// the window server still drops the event, so "posted and nothing happened" cannot be told apart
-    /// from "not permitted". The observation is still logged — it is worth reading — but a check that
-    /// cannot distinguish a skip from a failure must not fail the build, or it teaches people to
-    /// ignore the one job that watches this platform.
+    /// is a real defect. It still does not on macOS, but for a smaller reason than before: the probe
+    /// there now posts into the application's own queue rather than through the window server, so an
+    /// event is always accepted and always dispatched — what remains uncertain is the runner, which
+    /// gives the process no session of its own to be activated in. The observation is logged either
+    /// way, and the click and keystroke counts in the closing line are what say whether it worked.
     /// </remarks>
     private static int Fatal => OperatingSystem.IsWindows() ? 1 : 0;
 
@@ -59,7 +59,7 @@ internal static partial class Shoot
         if (OperatingSystem.IsWindows())
             ShootInput.Drain();
         else
-            ShootInputMac.Drain();
+            ShootInputMac.Deliver();
     }
 
     /// <summary>Clicks that were injected through the OS and observed arriving.</summary>
@@ -115,8 +115,12 @@ internal static partial class Shoot
         if (target is null && box is null)
             return 0;
 
+        // A key event goes to the key window, and neither platform hands one out unasked: Windows
+        // wants the window brought to the foreground, macOS wants the application activated.
         if (OperatingSystem.IsWindows())
             ShootInput.Activate(windowTitle);
+        else
+            ShootInputMac.Activate();
 
         var failed = 0;
 
@@ -152,16 +156,32 @@ internal static partial class Shoot
                 // composite — a search field, a token box — may hand focus to its shell instead, and
                 // asserting a keystroke into something that never took focus invents a failure rather
                 // than finding one. Said out loud so a skip is visible rather than silent.
-                if (!box.Focused)
+                //
+                // Except on macOS, where nothing raises the peer's focus events at all — so the gate
+                // would skip every keystroke on the one platform the injector was rewritten for. The
+                // key is posted there regardless and the box is asked afterwards, which is the same
+                // evidence by a different route: a character that arrived is a character the first
+                // responder took.
+                if (!box.Focused && !OperatingSystem.IsMacOS())
                     note($"    input: the click did not focus this {box.GetType().Name}, so the keystroke was skipped");
                 else if (InjectType('Z'))
                 {
                     InjectDrain();
+
+                    // Anything at all in a box the probe emptied first is a keystroke that landed. The
+                    // character is named when it is not the one asked for, because a wrong letter is a
+                    // key code mapped against the wrong layout rather than a dead input path, and the
+                    // two want telling apart.
                     if (box.Text.Contains('Z'))
                         ++Keystrokes;
+                    else if (box.Text.Length > 0)
+                    {
+                        ++Keystrokes;
+                        note($"    input: a real keystroke reached the TextBox as \"{box.Text}\" rather than as Z");
+                    }
                     else
                     {
-                        note("    input: a real keystroke never reached the focused TextBox");
+                        note("    input: a real keystroke never reached the TextBox");
                         failed += Fatal;
                     }
                 }

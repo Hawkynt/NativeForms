@@ -25,6 +25,18 @@ internal static partial class Shoot
     public static string? HoverWiring => OperatingSystem.IsMacOS() ? ShootMacOS.HoverWiring() : null;
 
     /// <summary>
+    /// What the injected-input route says about itself, where the route had to be built by hand.
+    /// </summary>
+    /// <remarks>
+    /// Only macOS answers. Its events are constructed argument by argument through a ten-argument
+    /// Objective-C selector, and a wrong signature there does not fail — it reads the wrong registers
+    /// and hands back something that looks like an event. So the constructors are asked to repeat
+    /// their own arguments back before any check depends on them, and the answer goes in the log
+    /// beside the counts it underwrites.
+    /// </remarks>
+    public static string? InputRoute => OperatingSystem.IsMacOS() ? ShootInputMac.Route() : null;
+
+    /// <summary>
     /// Which native classes the window is really made of, where the platform can be asked.
     /// </summary>
     /// <remarks>

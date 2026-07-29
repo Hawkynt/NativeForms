@@ -20,7 +20,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; hover wired, not witnessed end to end |
 | Dialogs (message box, file, colour, font) | complete | complete | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
-| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; `CGEvent` injection skips — a runner grants no Accessibility permission |
+| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; input posted as an `NSEvent` into the application's own queue, which needs no Accessibility grant |
 
 ## Side by side
 
@@ -517,6 +517,38 @@ down — which is the failure an application would hit the first time anything t
 open. It runs on macOS alone, because a check whose failure mode is a wait belongs in the job that is
 bounded at three minutes and advisory rather than in the gating Windows one, which has no step timeout
 at all.
+
+Injected input no longer goes through the window server, and that is why there is any at all. The
+probe used to post a `CGEvent` at the HID tap, which is the truer gesture and unusable here: macOS
+gates synthetic input behind the Accessibility permission, a hosted runner grants none, and a post
+from an untrusted process is accepted and silently dropped. `AXIsProcessTrusted` answered yes on that
+runner as well, so the probe could not even tell a skip from a failure — every run reported no clicks
+and no keystrokes with no way to say which. What needs no grant is the application's own queue:
+`+[NSEvent keyEventWithType:…]` and `+[NSEvent mouseEventWithType:…]` build the event,
+`[NSApp postEvent:atStart:]` puts it in, and it comes back out of
+`nextEventMatchingMask:untilDate:inMode:dequeue:` — the same call the toolkit's loop pulls with. What
+that gives up is the window server and the process boundary. What it keeps is what the check was ever
+about: the event is dispatched with `sendEvent:`, so the window hit-tests it, the view under the point
+receives it, the first responder takes the key, and the toolkit hears about it or does not.
+
+Two things about building one are worth writing down rather than rediscovering. The key constructor
+takes ten arguments, and on Apple's AArch64 ABI the receiver, the selector and six of them fill the
+integer registers while the point and the timestamp go in the floating ones — so the key code, a
+`short` and the last argument, lands on the stack packed to its own size rather than in a slot of its
+own. A signature that merely looks right reads the wrong bytes and answers something plausible, which
+is why the probe builds one event and reads its key code and characters back before anything trusts
+the path, and prints what it read. The mouse constructor's pressure is a `float` and not a `double`,
+which is the same hazard in miniature. The character is handed over twice, as a key code and as a
+string, because AppKit's text input re-derives the letter from the key code and the layout on some
+routes and reads the string on others — and a key code that disagreed with its string would insert
+whichever the field happened to consult.
+
+The queue is also drained by the probe rather than by the loop, and it has to be: the checks run from
+a timer tick, a tick is work the loop posted to itself, and the loop is not fetching events for as
+long as one is running. So the injector makes the same fetch-and-dispatch pair the loop makes. The
+shutter's own settling is kept separate from that and stays a plain run-loop spin, because
+dispatching input while a view is being asked to draw itself is how a capture ends up photographing a
+window mid-gesture.
 
 ### What this backend still refuses, and why
 
