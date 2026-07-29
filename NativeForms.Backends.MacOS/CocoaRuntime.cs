@@ -415,6 +415,51 @@ internal static partial class CocoaRuntime
         return converted == 0 ? font : converted;
     }
 
+    /// <summary>
+    /// Where a point inside a view lands in the toolkit's screen coordinates, or
+    /// <see langword="false"/> when the view is not in a window and there is nothing to ask.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Three coordinate systems stand between a control's own pixels and a screen point, and the
+    /// arithmetic that skipped them — adding the widget's frame origin to the client point — answers
+    /// with a point in the <em>parent's</em> space. That reads plausibly for a child of the window and
+    /// is wrong by every ancestor's origin for anything deeper, which is most of a gallery.
+    /// </para>
+    /// <para>
+    /// The client point counts from the top left, which is what a view this backend built counts from
+    /// as well, since it answers <c>isFlipped</c>. A view AppKit built counts from the bottom, so the
+    /// offset is measured from the far edge before the conversion rather than corrected after it.
+    /// </para>
+    /// </remarks>
+    internal static bool TryScreenPoint(nint view, System.Drawing.Point clientPoint, out System.Drawing.Point screen)
+    {
+        screen = default;
+        if (view == 0)
+            return false;
+
+        var window = SendPointer(view, sel_registerName("window"));
+        if (window == 0)
+            return false;
+
+        var height = SendRect(view, sel_registerName("bounds")).Height;
+        var local = new CGPoint
+        {
+            X = clientPoint.X,
+            Y = SendBool(view, sel_registerName("isFlipped")) ? clientPoint.Y : height - clientPoint.Y,
+        };
+
+        // toView:nil is "the window's own space", which is the space an event reports its location in.
+        var inWindow = SendConvert(view, sel_registerName("convertPoint:toView:"), local, 0);
+        var onScreen = SendPoint(window, sel_registerName("convertPointToScreen:"), inWindow);
+
+        // And back out of Cocoa's bottom-left screen space, which is the flip CocoaPopupPeer makes in
+        // the other direction when it reads where a press landed.
+        var display = CocoaNative.CGDisplayPixelsHigh(CocoaNative.CGMainDisplayID());
+        screen = new((int)Math.Round(onScreen.X), (int)Math.Round(display - onScreen.Y));
+        return true;
+    }
+
     /// <summary>Builds a class at run time, which is how a view gets a <c>drawRect:</c> to call back into.</summary>
     [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint objc_allocateClassPair(nint superclass, string name, nint extraBytes);

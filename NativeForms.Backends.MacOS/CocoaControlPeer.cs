@@ -105,7 +105,17 @@ internal abstract class CocoaControlPeer : IControlPeer
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setEnabled:"), enabled);
     }
 
-    public Point PointToScreen(Point clientPoint) => new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Asked of AppKit rather than computed, for the reason
+    /// <see cref="CocoaRuntime.TryScreenPoint"/> gives. The frame arithmetic is kept only for a widget
+    /// that is not in a window yet: the core maps points on controls it has realized but not yet
+    /// shown, and answering nothing there would be worse than answering the parent's space.
+    /// </remarks>
+    public Point PointToScreen(Point clientPoint)
+        => CocoaRuntime.TryScreenPoint(this.Handle, clientPoint, out var screen)
+            ? screen
+            : new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
     public virtual void Focus()
     {

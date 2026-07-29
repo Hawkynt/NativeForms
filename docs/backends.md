@@ -354,6 +354,20 @@ an owner-drawn canvas, which is one unlabelled rectangle of pixels to a screen r
 the only description there will ever be. A role macOS has no word for is left alone rather than
 guessed at.
 
+A point on a control now names a place on the screen. It did not: the peers answered by adding the
+widget's own frame origin to the client point, which is the point's place in its *parent*. For a
+control sitting directly on the window that reads plausibly and is short by the caption's height; for
+anything deeper it is wrong by every ancestor's origin, which in this gallery is a page inside a tab
+control inside a form. Nothing crashed and nothing looked wrong, because the two things that ask are
+both invisible in a capture — where a menu opens, and where an injected click is aimed. Both are now
+asked of AppKit: the point is converted to the window's own space with `convertPoint:toView:nil`, to
+the desktop with `convertPointToScreen:`, and flipped against the main display's height, which is the
+same flip the loop makes in the other direction when it reads where a press landed. The client point
+is measured from the far edge first on a view AppKit built, since those count from the bottom, where
+every view this backend builds answers `isFlipped` and counts from the top as the toolkit does. A
+widget that is not in a window yet keeps the old arithmetic rather than answering nothing: the core
+maps points on controls it has realized and not yet shown.
+
 Popups do light-dismiss. There is no pointer grab behind it — AppKit's own route to an event before
 dispatch is a block, which the interop rules keep out of this assembly — so the application's event
 loop makes the decision instead, offering every press to the deepest open surface first. A press

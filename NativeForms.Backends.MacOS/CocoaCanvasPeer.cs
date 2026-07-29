@@ -481,7 +481,11 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
 
     public void Invalidate(Rectangle bounds) => this.InvalidateAll();
 
-    public Point PointToScreen(Point clientPoint) => new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
+    /// <inheritdoc cref="CocoaControlPeer.PointToScreen"/>
+    public Point PointToScreen(Point clientPoint)
+        => CocoaRuntime.TryScreenPoint(_view, clientPoint, out var screen)
+            ? screen
+            : new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
     public void AddChild(IControlPeer child)
     {

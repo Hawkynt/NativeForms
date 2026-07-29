@@ -216,7 +216,20 @@ internal sealed class CocoaWindowPeer : IWindowPeer
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setAlphaValue:"), opacity);
     }
 
-    public Point PointToScreen(Point clientPoint) => new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Of the content view, not of the window: a form states its client points inside its client area,
+    /// and the window's own origin is the frame's — a caption's height above it. The frame arithmetic
+    /// remains for a window that is not on screen yet, which has no view to ask.
+    /// </remarks>
+    public Point PointToScreen(Point clientPoint)
+        => _window != 0
+            && CocoaRuntime.TryScreenPoint(
+                CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView")),
+                clientPoint,
+                out var screen)
+            ? screen
+            : new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
     /// <inheritdoc/>
     /// <remarks>
