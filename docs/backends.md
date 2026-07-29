@@ -68,12 +68,11 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 `NSTextView` in an `NSScrollView`, and the gallery's sixteen pages all pass the walkthrough's state
 round-trip and layout audit.
 
-Not working yet: six of the nine promotions, and the colour and font choosers answer as if cancelled
-(both are shared modeless panels on macOS, which is a different shape from this seam's blocking
-call). Mouse and keyboard events are routed into the toolkit but not verified end to end the way the
-Win32 backend's are, and hovering is the gap inside that gap: presses, drags and the wheel arrive, but
-neither the window nor a popup asks AppKit for mouse-moved events, so nothing highlights under the
-pointer.
+Not working yet: the colour and font choosers answer as if cancelled — both are shared modeless
+panels on macOS, which is a different shape from this seam's blocking call. Mouse and keyboard events
+are routed into the toolkit but not verified end to end the way the Win32 backend's are, and hovering
+is the gap inside that gap: presses, drags and the wheel arrive, but neither the window nor a popup
+asks AppKit for mouse-moved events, so nothing highlights under the pointer.
 
 Three of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
 its switch and radio types, `ProgressBar` an `NSProgressIndicator`. The six that decline do so on
