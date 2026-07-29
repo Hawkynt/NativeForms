@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 
 namespace Hawkynt.NativeForms.Backends.MacOS;
@@ -117,6 +118,103 @@ internal sealed class CocoaRadioButtonPeer : CocoaCheckBoxPeer, IRadioButtonPeer
         : base(_Radio)
     {
     }
+}
+
+/// <summary>
+/// A caption frame: a real <c>NSBox</c>, filling a plain view that carries the control's own
+/// coordinate system and holds the children on top of it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The shape <see cref="IGroupBoxPeer"/> prescribes, and for the reason it gives: parenting the
+/// children into the box instead would shift every one of them by whatever inset AppKit reserves for
+/// the border and the title, so the same bounds would land in a different place depending on whether
+/// the control was promoted — which is the one thing a promotion is not allowed to change.
+/// </para>
+/// <para>
+/// The box is added before any child and AppKit draws subviews in order, so it stays behind them; and
+/// because it is behind them, hit-testing finds a child first and the frame never eats a click meant
+/// for what it surrounds.
+/// </para>
+/// <para>
+/// The host view is the canvas class, which answers <c>isFlipped</c>. A plain <c>NSView</c> would put
+/// its origin at the bottom left and mirror every child inside the frame — laid out correctly and
+/// drawn in the wrong half, which reads as a layout bug rather than a coordinate one.
+/// </para>
+/// </remarks>
+internal sealed class CocoaGroupBoxPeer : CocoaControlPeer, IGroupBoxPeer
+{
+    private readonly nint _box;
+
+    public CocoaGroupBoxPeer()
+        : base(CocoaCanvasPeer.CreateFlippedView())
+    {
+        if (this.Handle == 0)
+            return;
+
+        var allocated = CocoaRuntime.Allocate("NSBox");
+        _box = allocated == 0
+            ? 0
+            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+
+        if (_box != 0)
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("addSubview:"), _box);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The frame is stretched over the whole surface, which a plain view will not do for it.</remarks>
+    public override void SetBounds(Rectangle bounds)
+    {
+        base.SetBounds(bounds);
+        if (_box != 0)
+            CocoaRuntime.SendRectVoidOnly(_box, CocoaRuntime.sel_registerName("setFrame:"), new(0, 0, bounds.Width, bounds.Height));
+    }
+
+    /// <summary>The caption belongs to the box; the view behind it has nothing to say.</summary>
+    public override void SetText(string text)
+    {
+        if (_box == 0)
+            return;
+
+        var title = CocoaRuntime.NSString(text);
+        if (title == 0)
+            return;
+
+        CocoaRuntime.SendVoid(_box, CocoaRuntime.sel_registerName("setTitle:"), title);
+        CocoaNative.CFRelease(title);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Neither object is an <c>NSControl</c>, so neither answers <c>setEnabled:</c> — and an
+    /// unrecognized selector does not fail quietly here, it ends the process. A group box has no
+    /// disabled look on macOS anyway; what a disabled group means is that its children are disabled,
+    /// and the core disables each of those itself.
+    /// </remarks>
+    public override void SetEnabled(bool enabled) { }
+
+    /// <inheritdoc/>
+    public void AddChild(IControlPeer child)
+    {
+        if (this.Handle == 0 || ViewOf(child) is not { } view)
+            return;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("addSubview:"), view);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Bookkeeping only, and there is none: the child peer's own disposal takes its view out
+    /// of this one.</remarks>
+    public void RemoveChild(IControlPeer child) { }
+
+    /// <summary>The AppKit object behind a peer, whichever kind of peer it is.</summary>
+    private static nint? ViewOf(IControlPeer child)
+        => child switch
+        {
+            CocoaCanvasPeer canvas when canvas.Handle != 0 => canvas.Handle,
+            CocoaControlPeer control when control.Handle != 0 => control.Handle,
+            _ => null,
+        };
 }
 
 /// <summary>A progress indicator: a real <c>NSProgressIndicator</c> in its bar style.</summary>

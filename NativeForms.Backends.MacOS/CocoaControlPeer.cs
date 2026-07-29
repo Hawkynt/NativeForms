@@ -35,7 +35,7 @@ internal abstract class CocoaControlPeer : IControlPeer
     public event EventHandler? PointerLeave;
     public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
 
-    public void SetBounds(Rectangle bounds)
+    public virtual void SetBounds(Rectangle bounds)
     {
         _bounds = bounds;
         if (this.Handle != 0)

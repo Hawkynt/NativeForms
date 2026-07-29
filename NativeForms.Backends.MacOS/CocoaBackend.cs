@@ -111,10 +111,11 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The first three of PRD §12's promotions. A backend opts in by overriding — the factories are
-    /// default-null interface methods — and offering one it cannot serve faithfully would be worse than
-    /// declining, because the core would stop drawing the control that does work. The rest still
-    /// decline: a combo box, a list box and a scroller carry enough state that a half-answer would show.
+    /// The promotions PRD §12 asks for that this backend can serve. A backend opts in by overriding —
+    /// the factories are default-null interface methods — and offering one it cannot serve faithfully
+    /// would be worse than declining, because the core would stop drawing the control that does work.
+    /// The rest still decline: a combo box, a list box, a scroller, a slider and a hyperlink each carry
+    /// state AppKit's nearest object does not hold, and a half-answer would show.
     /// </remarks>
     public ICheckBoxPeer CreateCheckBox() => new CocoaCheckBoxPeer();
 
@@ -123,6 +124,9 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     public IProgressBarPeer CreateProgressBar() => new CocoaProgressBarPeer();
+
+    /// <inheritdoc/>
+    public IGroupBoxPeer CreateGroupBox() => new CocoaGroupBoxPeer();
 
     /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)

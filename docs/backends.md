@@ -15,10 +15,10 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Status | Complete | Complete | **Under construction** |
 | Owner-drawn painting | Cairo | GDI | CoreGraphics |
 | Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
-| Native widget promotion (§12) | 9 controls | 9 controls | 3: check box, radio, progress |
+| Native widget promotion (§12) | 9 controls | 9 controls | 4: check box, radio, progress, group box |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
-| Mouse & keyboard | complete | complete | press, drag, wheel, keys, hover; hover wired, not yet witnessed end to end |
+| Mouse & keyboard | complete | complete | press, drag, wheel, keys; hover wired, not witnessed end to end |
 | Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
 | CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; `CGEvent` injection skips — a runner grants no Accessibility permission |
 
@@ -54,9 +54,9 @@ as one drawn by the platform. The shapes are ours; the values are the desktop's.
 **Native promotion changes what is drawn at all.** On GTK and Win32 nine controls realise onto real
 platform widgets when nothing in their state needs the painter (PRD §12) — a `Button` is a real
 `GtkButton` or `BUTTON`, until you give it an image the platform cannot draw, at which point it swaps
-to the owner-drawn twin and swaps back when you take it away. Cocoa promotes three of the nine — the
-check box, the radio button and the progress bar — on top of `Label`, `Button` and `TextBox`, which are
-always native there; everything else is owner-drawn.
+to the owner-drawn twin and swaps back when you take it away. Cocoa promotes four of the nine — the
+check box, the radio button, the progress bar and the group box — on top of `Label`, `Button` and
+`TextBox`, which are always native there; everything else is owner-drawn.
 
 ## The macOS backend, specifically
 
@@ -79,15 +79,19 @@ holds the keyboard rather than to the one under the pointer — so each canvas c
 active-always because a menu surface is never the key window. The same area is what delivers
 `mouseEntered:`/`mouseExited:`, so a highlight goes out again. What the probe can show is the wiring:
 it reads back off the running window whether moved events are accepted and how many views carry a
-tracking area. What it cannot show is delivery — the window server drops this job's injected pointer
-for want of an Accessibility grant — so hover is stated here as wired rather than as witnessed.
+tracking area — 191 of 443 on the gallery, the rest being AppKit's own controls, which track
+themselves. What it cannot show is delivery: the window server drops this job's injected pointer for
+want of an Accessibility grant, so hover is stated here as wired rather than as witnessed.
 
-Three of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
-its switch and radio types, `ProgressBar` an `NSProgressIndicator`. The six that decline do so on
-purpose — a combo box, a list box, a group box, a track bar, a hyperlink and a scroll bar each carry
-enough state that a half-answer would show, and the seam is built so that returning nothing keeps the
-owner-drawn twin, which already works. Grouping for radios stays in the core; AppKit's own rule is the
-same one (buttons sharing a superview), so the two cannot reach different answers.
+Four of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
+its switch and radio types, `ProgressBar` an `NSProgressIndicator`, and `GroupBox` an `NSBox` filling a
+plain flipped view that holds the children on top of it — the frame and the caption come from the
+desktop, and the children keep the bounds the application gave them rather than being shifted by the
+inset AppKit reserves. The five that decline do so on purpose — a combo box, a list box, a track bar, a
+hyperlink and a scroll bar each carry state AppKit's nearest object does not hold, and a half-answer
+would show; the seam is built so that returning nothing keeps the owner-drawn twin, which already
+works. Grouping for radios stays in the core; AppKit's own rule is the same one (buttons sharing a
+superview), so the two cannot reach different answers.
 
 Colour emoji need nothing: `CTLineDraw` renders them in colour on the same path as every other
 glyph, so the bell in the gallery's toggle-switch caption arrives without the second text engine the
