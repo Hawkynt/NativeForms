@@ -30,7 +30,13 @@ public sealed class CocoaBackend : IPlatformBackend
     public event EventHandler? ThemeChanged { add { } remove { } }
 
     /// <inheritdoc/>
-    public double GetDpiScale() => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <remarks>
+    /// One for now. AppKit measures in points and reports the backing scale per screen, so a Retina
+    /// display is 2.0 — but reading it needs <c>NSScreen</c>, which needs Objective-C messaging that
+    /// this half of the backend deliberately does without. Returning the point scale is honest until
+    /// then; it is wrong only on the axis nothing yet draws on.
+    /// </remarks>
+    public double GetDpiScale() => 1.0;
 
     /// <inheritdoc/>
     public IWindowPeer CreateWindow() => throw new PlatformNotSupportedException(_NotImplemented);
@@ -42,8 +48,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public IPopupPeer CreatePopup(IWindowPeer? owner) => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
-    public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
-        => throw new PlatformNotSupportedException(_NotImplemented);
+    public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new CocoaImage(width, height, argb);
 
     /// <inheritdoc/>
     public ITimerPeer CreateTimer() => throw new PlatformNotSupportedException(_NotImplemented);
@@ -52,10 +57,27 @@ public sealed class CocoaBackend : IPlatformBackend
     public INotifyIconPeer CreateNotifyIcon() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
-    public Size GetScreenSize() => throw new PlatformNotSupportedException(_NotImplemented);
+    public Size GetScreenSize()
+    {
+        var display = CocoaNative.CGMainDisplayID();
+        return new((int)CocoaNative.CGDisplayPixelsWide(display), (int)CocoaNative.CGDisplayPixelsHigh(display));
+    }
 
     /// <inheritdoc/>
-    public Size MeasureText(string text, Font font) => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <remarks>
+    /// CoreText, so the measurement is the one the platform would lay the text out with rather than a
+    /// guess from character counts. A refusal falls back to the shared metric estimate instead of
+    /// reporting zero, which would quietly collapse every layout that measures.
+    /// </remarks>
+    public Size MeasureText(string text, Font font)
+    {
+        if (text.Length == 0)
+            return Size.Empty;
+
+        return CocoaNative.TryMeasure(text, font.Family, font.SizeInPoints, out var width, out var height)
+            ? new((int)Math.Ceiling(width), (int)Math.Ceiling(height))
+            : new((int)Math.Ceiling(text.Length * font.SizeInPoints * 0.6), (int)Math.Ceiling(font.SizeInPoints * 1.3));
+    }
 
     /// <inheritdoc/>
     public IButtonPeer CreateButton() => throw new PlatformNotSupportedException(_NotImplemented);
