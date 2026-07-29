@@ -75,6 +75,55 @@ internal static partial class CocoaRuntime
         return target == 0 ? 0 : SendPointer(target, sel_registerName(selector));
     }
 
+    /// <summary>A rectangle in Cocoa's coordinates: doubles, origin at the bottom left.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CGRect
+    {
+        public double X, Y, Width, Height;
+
+        public CGRect(double x, double y, double width, double height)
+        {
+            this.X = x;
+            this.Y = y;
+            this.Width = width;
+            this.Height = height;
+        }
+    }
+
+    /// <summary>Sends a message taking a rectangle — four doubles, which arm64 passes in registers.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendRect(nint receiver, nint selector, CGRect frame, nint styleMask, nint backing, [MarshalAs(UnmanagedType.U1)] bool defer);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendRectVoid(nint receiver, nint selector, CGRect frame, [MarshalAs(UnmanagedType.U1)] bool display);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, [MarshalAs(UnmanagedType.U1)] bool argument);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, double argument);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, nint first, nint second);
+
+    /// <summary>Pulls the next event from the application's queue.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendEvent(nint receiver, nint selector, nint mask, nint until, nint mode, [MarshalAs(UnmanagedType.U1)] bool dequeue);
+
+    /// <summary>Allocates an instance of a class, ready for an <c>init…</c> message.</summary>
+    internal static nint Allocate(string className)
+    {
+        var target = objc_getClass(className);
+        return target == 0 ? 0 : SendPointer(target, sel_registerName("alloc"));
+    }
+
+    /// <summary>Wraps a managed string as an autoreleased <c>NSString</c>.</summary>
+    internal static nint NSString(string text)
+    {
+        var core = CocoaNative.CreateString(text);
+        return core; // an NSString and a CFStringRef are the same object, bridged for free
+    }
+
     /// <summary>Whether Objective-C messaging is usable at all — the answer is no off macOS.</summary>
     internal static bool Available => OperatingSystem.IsMacOS() && objc_getClass("NSObject") != 0;
 }

@@ -51,7 +51,7 @@ public sealed class CocoaBackend : IPlatformBackend
     }
 
     /// <inheritdoc/>
-    public IWindowPeer CreateWindow() => throw new PlatformNotSupportedException(_NotImplemented);
+    public IWindowPeer CreateWindow() => new CocoaWindowPeer();
 
     /// <inheritdoc/>
     public ICanvasPeer CreateCanvas() => throw new PlatformNotSupportedException(_NotImplemented);
@@ -63,7 +63,14 @@ public sealed class CocoaBackend : IPlatformBackend
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new CocoaImage(width, height, argb);
 
     /// <inheritdoc/>
-    public ITimerPeer CreateTimer() => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A managed timer that hands its tick back through <see cref="Post"/>, so the callback runs on the
+    /// UI thread with everything else the loop drains. An <c>NSTimer</c> would want a target object with
+    /// an Objective-C method on it — a class built at run time purely to receive one message — which is
+    /// more machinery than a queue drain for the same guarantee.
+    /// </remarks>
+    public ITimerPeer CreateTimer() => new CocoaTimerPeer(this);
 
     /// <inheritdoc/>
     public INotifyIconPeer CreateNotifyIcon() => throw new PlatformNotSupportedException(_NotImplemented);
@@ -123,11 +130,74 @@ public sealed class CocoaBackend : IPlatformBackend
     public string? GetClipboardText() => throw new PlatformNotSupportedException(_NotImplemented);
 
     /// <inheritdoc/>
-    public void Post(Action action) => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <summary>Work queued from any thread, drained by <see cref="Run"/> on the UI thread.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _posted = new();
 
     /// <inheritdoc/>
-    public void Run(IWindowPeer mainWindow) => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <remarks>
+    /// A queue the loop drains rather than <c>dispatch_async</c> onto the main queue. Both work; this
+    /// one keeps the ordering guarantee in managed code where it can be reasoned about, and needs no
+    /// block trampoline — a block is an Objective-C object with a calling convention, which is exactly
+    /// the sort of thing §2's rules exist to keep out.
+    /// </remarks>
+    public void Post(Action action) => _posted.Enqueue(action);
 
     /// <inheritdoc/>
-    public void Quit() { }
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// The application has to be told it is a real one before a window will take the keyboard or appear
+    /// in the Dock: a process launched from a terminal is <c>NSApplicationActivationPolicyProhibited</c>
+    /// until <c>setActivationPolicy:</c> says otherwise, and a window shown before that is a window
+    /// nobody can click.
+    /// </para>
+    /// <para>
+    /// The loop pulls one event at a time with <c>nextEventMatchingMask:untilDate:inMode:dequeue:</c>
+    /// rather than calling <c>[NSApp run]</c>, because the queue posted from other threads has to be
+    /// drained between events and <c>run</c> never comes back to let that happen.
+    /// </para>
+    /// </remarks>
+    public void Run(IWindowPeer mainWindow)
+    {
+        var app = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        if (app == 0)
+            return;
+
+        // NSApplicationActivationPolicyRegular
+        CocoaRuntime.SendVoid(app, CocoaRuntime.sel_registerName("setActivationPolicy:"), 0);
+        CocoaRuntime.SendVoid(app, CocoaRuntime.sel_registerName("finishLaunching"));
+        CocoaRuntime.SendVoid(app, CocoaRuntime.sel_registerName("activateIgnoringOtherApps:"), true);
+        mainWindow.Show();
+
+        _running = true;
+        var nextEvent = CocoaRuntime.sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:");
+        var sendEvent = CocoaRuntime.sel_registerName("sendEvent:");
+        var mode = CocoaRuntime.NSString("kCFRunLoopDefaultMode");
+        var distantPast = CocoaRuntime.SendToClass("NSDate", "distantPast");
+
+        while (_running)
+        {
+            while (_posted.TryDequeue(out var action))
+                action();
+
+            var next = CocoaRuntime.SendEvent(app, nextEvent, unchecked((nint)ulong.MaxValue), distantPast, mode, true);
+            if (next == 0)
+            {
+                // Nothing waiting: yield rather than spin, so an idle application is not a busy one.
+                System.Threading.Thread.Sleep(5);
+                continue;
+            }
+
+            CocoaRuntime.SendVoid(app, sendEvent, next);
+        }
+
+        if (mode != 0)
+            CocoaNative.CFRelease(mode);
+    }
+
+    private volatile bool _running;
+
+    /// <inheritdoc/>
+    /// <inheritdoc/>
+    public void Quit() => _running = false;
 }
