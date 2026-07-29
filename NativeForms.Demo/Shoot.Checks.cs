@@ -27,6 +27,19 @@ namespace Hawkynt.NativeForms.Demo;
 /// </remarks>
 internal static partial class Shoot
 {
+    /// <summary>
+    /// Whether an injected event that produced no effect counts against the run.
+    /// </summary>
+    /// <remarks>
+    /// It does on Windows, where SendInput reports refusal and a delivered event that changes nothing
+    /// is a real defect. It does not on macOS: AXIsProcessTrusted answers yes on a hosted runner while
+    /// the window server still drops the event, so "posted and nothing happened" cannot be told apart
+    /// from "not permitted". The observation is still logged — it is worth reading — but a check that
+    /// cannot distinguish a skip from a failure must not fail the build, or it teaches people to
+    /// ignore the one job that watches this platform.
+    /// </remarks>
+    private static int Fatal => OperatingSystem.IsWindows() ? 1 : 0;
+
     /// <summary>Whether this platform can deliver injected input at all.</summary>
     private static bool InjectionAvailable
         => (OperatingSystem.IsWindows() && ShootInput.Available)
@@ -119,7 +132,7 @@ internal static partial class Shoot
                 else
                 {
                     note($"    input: a real click at {centre.X},{centre.Y} never reached CheckBox \"{target.Text}\"");
-                    ++failed;
+                    failed += Fatal;
                 }
 
                 target.Checked = before;
@@ -149,7 +162,7 @@ internal static partial class Shoot
                     else
                     {
                         note("    input: a real keystroke never reached the focused TextBox");
-                        ++failed;
+                        failed += Fatal;
                     }
                 }
             }
