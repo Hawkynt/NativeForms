@@ -136,6 +136,53 @@ internal static unsafe partial class ShootMacOS
         return null;
     }
 
+    /// <summary>
+    /// What the running window says about its hover wiring, read back off AppKit rather than assumed.
+    /// </summary>
+    /// <remarks>
+    /// Injected input is posted here and dropped — the window server does not deliver a synthetic
+    /// event from a process the runner never granted Accessibility to — so no check on this job can
+    /// watch a real pointer move highlight a control. What it can do is ask AppKit whether the two
+    /// things a moved event needs are in place: the window generating them at all, and a tracking
+    /// area on each canvas so the view under the pointer is the one that hears them rather than
+    /// whichever view happens to hold the keyboard. That is short of proof of delivery and says so.
+    /// </remarks>
+    public static string HoverWiring()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "hover: no window to ask";
+
+        var accepts = SendBool(window, sel_registerName("acceptsMouseMovedEvents"));
+        var content = Send(window, sel_registerName("contentView"));
+        var tracked = 0;
+        var views = 0;
+        CountTrackedViews(content, ref views, ref tracked);
+
+        return $"hover: the window {(accepts ? "accepts" : "DROPS")} moved events, "
+            + $"{tracked} of {views} view(s) carry a tracking area";
+    }
+
+    /// <summary>Counts the views under one, and how many of them track the pointer.</summary>
+    private static void CountTrackedViews(nint view, ref int views, ref int tracked)
+    {
+        if (view == 0)
+            return;
+
+        ++views;
+        var areas = Send(view, sel_registerName("trackingAreas"));
+        if (areas != 0 && (int)Send(areas, sel_registerName("count")) > 0)
+            ++tracked;
+
+        var children = Send(view, sel_registerName("subviews"));
+        var count = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+            CountTrackedViews(Send(children, sel_registerName("objectAtIndex:"), i), ref views, ref tracked);
+    }
+
     /// <summary>Records why a capture gave up and answers null, so a caller can return in one line.</summary>
     private static Size? Failed(string reason)
     {

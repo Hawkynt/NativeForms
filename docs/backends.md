@@ -18,7 +18,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Native widget promotion (§12) | 9 controls | 9 controls | 3: check box, radio, progress |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
-| Mouse & keyboard | complete | complete | press, drag, wheel, keys; no hover |
+| Mouse & keyboard | complete | complete | press, drag, wheel, keys, hover; hover wired, not yet witnessed end to end |
 | Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
 | CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; `CGEvent` injection skips — a runner grants no Accessibility permission |
 
@@ -70,9 +70,17 @@ round-trip and layout audit.
 
 Not working yet: the colour and font choosers answer as if cancelled — both are shared modeless
 panels on macOS, which is a different shape from this seam's blocking call. Mouse and keyboard events
-are routed into the toolkit but not verified end to end the way the Win32 backend's are, and hovering
-is the gap inside that gap: presses, drags and the wheel arrive, but neither the window nor a popup
-asks AppKit for mouse-moved events, so nothing highlights under the pointer.
+are routed into the toolkit but not verified end to end the way the Win32 backend's are.
+
+Hover is asked for in both places AppKit needs it asked. A window generates no mouse-moved events
+until `setAcceptsMouseMovedEvents:` says so, and even then it sends `mouseMoved:` to whichever view
+holds the keyboard rather than to the one under the pointer — so each canvas carries an
+`NSTrackingArea` as well, in-visible-rect so it follows the view when the layout moves it and
+active-always because a menu surface is never the key window. The same area is what delivers
+`mouseEntered:`/`mouseExited:`, so a highlight goes out again. What the probe can show is the wiring:
+it reads back off the running window whether moved events are accepted and how many views carry a
+tracking area. What it cannot show is delivery — the window server drops this job's injected pointer
+for want of an Accessibility grant — so hover is stated here as wired rather than as witnessed.
 
 Three of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
 its switch and radio types, `ProgressBar` an `NSProgressIndicator`. The six that decline do so on

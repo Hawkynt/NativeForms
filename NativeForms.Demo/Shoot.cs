@@ -14,6 +14,16 @@ internal static partial class Shoot
     /// </summary>
     public static string? Diagnosis => OperatingSystem.IsMacOS() ? ShootMacOS.Diagnosis : null;
 
+    /// <summary>
+    /// What the platform will say about its hover wiring, where it can say anything at all.
+    /// </summary>
+    /// <remarks>
+    /// Only macOS answers, and only because it has to: hover there needs two separate things turned
+    /// on and neither of them shows up in a screenshot, while the injected pointer this job would
+    /// otherwise prove it with is dropped by the window server for want of an Accessibility grant.
+    /// </remarks>
+    public static string? HoverWiring => OperatingSystem.IsMacOS() ? ShootMacOS.HoverWiring() : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

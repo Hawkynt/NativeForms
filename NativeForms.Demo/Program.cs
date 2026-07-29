@@ -125,6 +125,12 @@ if (shooting)
                 : $"{page:00}-{new string([.. pages.TabPages[page].Text.Where(char.IsLetterOrDigit)]).ToLowerInvariant()}";
 
             var path = Path.Combine(directory, name + ".png");
+
+            // Once, off the first page: whether the pointer can reach a control at all is a property
+            // of the window and its views, not of any one page, and it is invisible in a screenshot.
+            if (page == 0 && Shoot.HoverWiring is { } wiring)
+                Note("  " + wiring);
+
             try
             {
                 var size = Shoot.Window(form, path);

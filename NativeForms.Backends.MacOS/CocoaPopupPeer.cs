@@ -50,7 +50,15 @@ internal sealed class CocoaPopupPeer : IPopupPeer
                 2,   // NSBackingStoreBuffered
                 false);
 
-        if (_window != 0 && _canvas.Handle != 0)
+        if (_window == 0)
+            return;
+
+        // A menu is read by hovering it, and a window drops mouse-moved events until it is told not
+        // to. This one is never the key window either, which is why the canvas asks for its tracking
+        // area with NSTrackingActiveAlways.
+        CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setAcceptsMouseMovedEvents:"), true);
+
+        if (_canvas.Handle != 0)
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setContentView:"), _canvas.Handle);
     }
 

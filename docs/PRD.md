@@ -56,7 +56,7 @@ Hawkynt.NativeForms                (Core: controls, layout, events, App)   [plat
  └─ .Backends                      (IPlatformBackend + peer interfaces)
 Hawkynt.NativeForms.Backends.Windows   (Win32/user32/comctl32/uxtheme via [LibraryImport])  SHIPPING
 Hawkynt.NativeForms.Backends.Gtk       (GTK 3 via [LibraryImport])                          SHIPPING
-Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend)                      STUB — throws
+Hawkynt.NativeForms.Backends.MacOS     (Cocoa/AppKit via objc_msgSend)                      UNDER CONSTRUCTION
 Hawkynt.NativeForms.Generators         (Roslyn generator, packed as an analyzer in Core)     SHIPPING
 ```
 

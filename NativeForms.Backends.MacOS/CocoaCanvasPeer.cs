@@ -40,8 +40,55 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             ? 0
             : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
 
-        if (_view != 0)
-            _canvases[_view] = this;
+        if (_view == 0)
+            return;
+
+        _canvases[_view] = this;
+        InstallTrackingArea(_view);
+    }
+
+    /// <summary>
+    /// Asks AppKit to route the pointer's movement over this view to it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Hover has to be asked for twice on AppKit and neither half works alone, which is why nothing
+    /// highlighted under the pointer while presses, drags and the wheel all arrived: a window drops
+    /// mouse-moved events unless <c>setAcceptsMouseMovedEvents:</c> turns them on (the window peers do
+    /// that), and even then it sends <c>mouseMoved:</c> to its first responder rather than to the view
+    /// under the pointer. A tracking area is what makes the view under the pointer the one that hears
+    /// it — and it is also what produces <c>mouseEntered:</c> and <c>mouseExited:</c>, without which a
+    /// highlight would light up and never go out.
+    /// </para>
+    /// <para>
+    /// <c>NSTrackingInVisibleRect</c> because the rectangle would otherwise be a snapshot: the view is
+    /// created at 1×1 and given its real frame later, and every layout after that moves it again.
+    /// AppKit keeps an in-visible-rect area glued to the view's visible bounds itself, so the hover
+    /// region cannot drift away from the control the way a rectangle passed once would.
+    /// <c>NSTrackingActiveAlways</c> because a menu surface is never the key window, and hover is the
+    /// whole of how a menu is read.
+    /// </para>
+    /// </remarks>
+    private static void InstallTrackingArea(nint view)
+    {
+        // NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved | NSTrackingActiveAlways |
+        // NSTrackingInVisibleRect.
+        const nint options = 0x01 | 0x02 | 0x80 | 0x200;
+
+        var allocated = CocoaRuntime.Allocate("NSTrackingArea");
+        if (allocated == 0)
+            return;
+
+        var area = CocoaRuntime.SendTrackingArea(
+            allocated,
+            CocoaRuntime.sel_registerName("initWithRect:options:owner:userInfo:"),
+            new(0, 0, 1, 1), // ignored: NSTrackingInVisibleRect substitutes the view's own visible rect
+            options,
+            view,
+            0);
+
+        if (area != 0)
+            CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("addTrackingArea:"), area);
     }
 
     /// <summary>
@@ -117,6 +164,12 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
         Add(created, "mouseUp:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseUp);
         Add(created, "mouseDragged:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
         Add(created, "mouseMoved:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
+
+        // The tracking area's own pair. Entering is a move like any other, so it goes to the same
+        // place; leaving is what puts a highlight out again, and without it the last cell the pointer
+        // touched stays lit after the pointer has gone somewhere else entirely.
+        Add(created, "mouseEntered:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
+        Add(created, "mouseExited:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseExited);
         Add(created, "rightMouseDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnRightMouseDown);
         Add(created, "scrollWheel:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnScrollWheel);
         Add(created, "keyDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyDownEvent);
@@ -198,6 +251,13 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
 
         var at = LocationOf(self, theEvent);
         canvas.MouseMove?.Invoke(canvas, new(MouseButtons.None, at.X, at.Y, 0, ModifiersOf(theEvent)));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnMouseExited(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is { } canvas)
+            canvas.MouseLeave?.Invoke(canvas, EventArgs.Empty);
     }
 
     [System.Runtime.InteropServices.UnmanagedCallersOnly]

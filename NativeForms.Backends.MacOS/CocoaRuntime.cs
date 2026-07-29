@@ -129,6 +129,15 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendRectInit(nint receiver, nint selector, CGRect frame);
 
+    /// <summary>Builds a tracking area: a rectangle, its option flags, its owner and its user info.</summary>
+    /// <remarks>
+    /// The rectangle is four doubles, which AArch64 hands over in the floating registers as one
+    /// aggregate — so it is declared as the struct it is rather than as loose doubles, and the three
+    /// pointer-sized arguments after it land in the integer registers where the selector expects them.
+    /// </remarks>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendTrackingArea(nint receiver, nint selector, CGRect rect, nint options, nint owner, nint userInfo);
+
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial void SendRectVoidOnly(nint receiver, nint selector, CGRect frame);
 

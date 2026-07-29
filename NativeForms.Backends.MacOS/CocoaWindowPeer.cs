@@ -56,6 +56,12 @@ internal sealed class CocoaWindowPeer : IWindowPeer
                 _Buffered,
                 false);
 
+        // Off by default, and a window that has it off never even generates the events its views would
+        // have to be offered — so a press arrived, a drag arrived, the wheel arrived, and hover did
+        // not. Nothing under the pointer highlighted and a menu could not be read at all.
+        if (_window != 0)
+            CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setAcceptsMouseMovedEvents:"), true);
+
         // A window's content view is a plain NSView, so its origin is the bottom left and every direct
         // child lands mirrored — the menu bar at the foot of the window, the tab strip off the top.
         // Replacing it with the canvas class, which answers isFlipped, makes the window agree with the
