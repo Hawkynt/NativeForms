@@ -132,6 +132,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public IListBoxPeer CreateListBox() => new CocoaListBoxPeer();
 
     /// <inheritdoc/>
+    public ILinkLabelPeer CreateLinkLabel() => new CocoaLinkLabelPeer();
+
+    /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
     {
         _ = owner;

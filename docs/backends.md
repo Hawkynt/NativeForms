@@ -15,7 +15,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Status | Complete | Complete | **Under construction** |
 | Owner-drawn painting | Cairo | GDI | CoreGraphics |
 | Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
-| Native widget promotion (§12) | 9 controls | 9 controls | 5: check box, radio, progress, group box, list box |
+| Native widget promotion (§12) | 9 controls | 9 controls | 6: check box, radio, progress, group box, list box, link label |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; hover wired, not witnessed end to end |
@@ -54,9 +54,9 @@ as one drawn by the platform. The shapes are ours; the values are the desktop's.
 **Native promotion changes what is drawn at all.** On GTK and Win32 nine controls realise onto real
 platform widgets when nothing in their state needs the painter (PRD §12) — a `Button` is a real
 `GtkButton` or `BUTTON`, until you give it an image the platform cannot draw, at which point it swaps
-to the owner-drawn twin and swaps back when you take it away. Cocoa promotes five of the nine — the
-check box, the radio button, the progress bar, the group box and the list box — on top of `Label`,
-`Button` and `TextBox`, which are always native there; everything else is owner-drawn.
+to the owner-drawn twin and swaps back when you take it away. Cocoa promotes six of the nine — the
+check box, the radio button, the progress bar, the group box, the list box and the link label — on top
+of `Label`, `Button` and `TextBox`, which are always native there; everything else is owner-drawn.
 
 ## The macOS backend, specifically
 
@@ -85,16 +85,16 @@ much of the tab strip has realized by the time the shutter arms.) What it cannot
 window server drops this job's injected pointer for want of an Accessibility grant, so hover is stated
 here as wired rather than as witnessed.
 
-Five of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
+Six of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
 its switch and radio types, `ProgressBar` an `NSProgressIndicator`, `GroupBox` an `NSBox` filling a
 plain flipped view that holds the children on top of it — the frame and the caption come from the
 desktop, and the children keep the bounds the application gave them rather than being shifted by the
-inset AppKit reserves — and `ListBox` an `NSTableView` in an `NSScrollView`. The four that decline do
-so on purpose — a combo box, a track bar, a hyperlink and a scroll bar each carry state AppKit's
-nearest object does not hold, and a half-answer would show; the seam is built so that returning
-nothing keeps the owner-drawn twin, which already works. Grouping for radios stays in the core;
-AppKit's own rule is the same one (buttons sharing a superview), so the two cannot reach different
-answers.
+inset AppKit reserves — `ListBox` an `NSTableView` in an `NSScrollView`, and `LinkLabel` an
+`NSTextField` carrying an attributed link. The three that decline do so on purpose — a combo box, a
+track bar and a scroll bar each carry state AppKit's nearest object does not hold, and a half-answer
+would show; the seam is built so that returning nothing keeps the owner-drawn twin, which already
+works. Grouping for radios stays in the core; AppKit's own rule is the same one (buttons sharing a
+superview), so the two cannot reach different answers.
 
 The list is the first promotion here that has to be fed rather than merely set. A table asks a data
 source how many rows there are and what is in each, so this one needs a second runtime class — three
@@ -105,6 +105,20 @@ discovering. A programmatic selection produces the same `tableViewSelectionDidCh
 does, unlike AppKit's target/action, so the peer suppresses its own echo; and activation is the double
 click alone, because Return does not activate a row on this desktop — Finder spends it on renaming —
 and inventing the gesture would be less native rather than more.
+
+The hyperlink has no control behind it on this desktop, only a convention: a selectable, non-editable
+`NSTextField` whose string carries `NSLinkAttributeName`. That is what is served, and it buys the
+platform's pointing-hand cursor, a link colour that follows the appearance and the accent without the
+painter being taught either, and a field an accessibility client reads as text containing a link. Two
+things about it are ours rather than the platform's. The class is a run-time subclass of `NSTextField`,
+because a field lends its editing to the window's shared field editor and makes *itself* that editor's
+delegate — `textView:clickedOnLink:atIndex:` therefore arrives at the field and not at anything the
+field's own `setDelegate:` was handed, since that protocol does not carry the method. And AppKit has no
+visited state at all, so the visited colour is computed here by the same rule the painter uses (the
+link colour half of the way to the disabled text colour) applied to the platform's own colours, so the
+promoted link and the painted one agree by arithmetic rather than by coincidence. Activation by Return
+is the one thing lost: a non-editable field is not in the key loop, so the gesture the owner-drawn twin
+serves does not reach the widget.
 
 Colour emoji need nothing: `CTLineDraw` renders them in colour on the same path as every other
 glyph, so the bell in the gallery's toggle-switch caption arrives without the second text engine the

@@ -243,6 +243,10 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendPointer(nint receiver, nint selector, nint first, double second);
 
+    /// <summary>Sends a measure-and-object message, such as blending one colour part of the way to another.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendPointer(nint receiver, nint selector, double first, nint second);
+
     /// <summary>Builds a colour from its four components.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendColor(nint receiver, nint selector, double red, double green, double blue, double alpha);
