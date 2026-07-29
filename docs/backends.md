@@ -18,9 +18,9 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Native widget promotion (§12) | 9 controls | 9 controls | 9 controls; a slider keeps no step sizes and a drop-down opens modally |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
-| Mouse & keyboard | complete | complete | press, drag, wheel, keys; hover wired, not witnessed end to end |
+| Mouse & keyboard | complete | complete | press, drag, wheel, keys; CI witnesses posted clicks toggling controls and posted keys reaching editors, hover only wired |
 | Dialogs (message box, file, colour, font) | complete | complete | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
-| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; input posted as an `NSEvent` into the application's own queue, which needs no Accessibility grant |
+| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + `NSEvent`s posted into the application's own queue (no Accessibility grant needed), reporting |
 
 ## Side by side
 
@@ -69,9 +69,11 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 `NSTextView` in an `NSScrollView`, a `NotifyIcon` is a real `NSStatusItem` in the menu bar, and the
 gallery's sixteen pages all pass the walkthrough's state round-trip and layout audit.
 
-Not working yet: mouse and keyboard events are routed into the toolkit but not verified end to end the
-way the Win32 backend's are. Everything else this backend still declines is listed at the end of this
-section, split into what the platform does not have and what has not been written.
+Not working yet: hover is routed into the toolkit but not verified end to end the way the Win32
+backend's is. Presses and keys now are — the probe posts them and reports how many arrived, which on
+the last run was two clicks toggling a control and seven keystrokes reaching a focused editor.
+Everything else this backend still declines is listed at the end of this section, split into what the
+platform does not have and what has not been written.
 
 An owner-drawn icon reaches the screen. It did not until now — every control that shows a picture it
 draws itself, which is the toolbar buttons, the list and tree rows, the grid cells, the tab headers
@@ -183,9 +185,10 @@ active-always because a menu surface is never the key window. The same area is w
 it reads back off the running window whether moved events are accepted and how many views carry a
 tracking area — 187 of the gallery's, one per owner-drawn canvas; the rest are AppKit's own controls,
 which track themselves. (Only the tracked count is worth reading: the total moves run to run with how
-much of the tab strip has realized by the time the shutter arms.) What it cannot show is delivery: the
-window server drops this job's injected pointer for want of an Accessibility grant, so hover is stated
-here as wired rather than as witnessed.
+much of the tab strip has realized by the time the shutter arms.) What it does not show is delivery.
+That is now a gap in the probe rather than in the platform: it posts presses and keys and no moves,
+because nothing in the walkthrough asserts on a highlight — so hover is still stated here as wired
+rather than as witnessed, and the honest reason is that nobody has written the check.
 
 A native widget hears the pointer as well, which it did not before. A canvas hears it because its
 class carries the methods, and an `NSButton` is AppKit's class and can be given none — so its tracking
@@ -206,8 +209,8 @@ hiding one. None of this could be reached until the paragraph above existed, bec
 native widget's tip over from its hover timer and a native widget here delivered no hover at all.
 
 Neither half is witnessed. A tip is drawn in a window of the platform's own that a capture of the
-gallery's content view does not contain, and the pointer that would raise it is the one the window
-server drops. What the probe reads back is the wiring: how many AppKit widgets report the pointer to
+gallery's content view does not contain, and the pointer that would raise it is the one nothing posts.
+What the probe reads back is the wiring: how many AppKit widgets report the pointer to
 the toolkit, which in the gallery is one — the tipped button on the first page. Every other tipped
 control there is owner-drawn, and an owner-drawn control is watched through its canvas instead.
 
@@ -326,8 +329,9 @@ window list holds nothing for it — and reporting "missing" from that absence w
 finding. The probe now asks the platform directly instead: it takes a second status item of its own,
 checks whether that one comes with a button, and gives it straight back. On the runner it does, which
 says status items work in that session and the toolkit's own is somewhere the window list does not
-reach. What is still unwitnessed is the icon and the tooltip on the item's button, and a press on it,
-which is the same undeliverable gesture as every other injected click here.
+reach. What is still unwitnessed is the icon and the tooltip on the item's button, and a press on it:
+an injected event carries the number of the window it is going to, and this one has no window in this
+process to name.
 
 The hyperlink has no control behind it on this desktop, only a convention: a selectable, non-editable
 `NSTextField` whose string carries `NSLinkAttributeName`. That is what is served, and it buys the
@@ -394,8 +398,9 @@ arrives as an `NSURL` from AppKit's own detector and often as a plain string fro
 are asked for and anything else is refused rather than read as characters. `DetectUrls` runs the
 checker over the text that is already there as well as switching detection on for what is typed next,
 because every document a program builds is set rather than typed and would otherwise carry no links to
-click at all. The probe reports the delegate sitting on the text view; what it cannot report is a click
-reaching it, for the same reason the hover figure is stated as wiring.
+click at all. The probe reports the delegate sitting on the text view; what it does not report is a
+click reaching it, because a click that lands on a link is a click aimed at a run of characters and
+the walkthrough aims at controls.
 
 The class-at-construction rule no longer shows anywhere in the text box. AppKit picks between
 `NSTextField`, `NSSecureTextField` and an `NSTextView` in an `NSScrollView` when the object is made, so
@@ -464,8 +469,13 @@ key means — and mapped by the same arithmetic the GTK backend uses, since `Key
 virtual-key numbering and letters and digits carry their own ASCII there. The function keys are listed
 one by one rather than as a range: they are contiguous on the other two platforms and here F1 is 0x7A,
 F2 is 0x78 and F3 is 0x63, so a range over them would answer with whatever key sits at the arithmetic.
-This one is implemented and not witnessed — the keystroke that would prove it is the one the window
-server drops.
+What CI now witnesses is the half below this one: a posted key reaches the focused editor and the
+character comes back out of the peer. The mapping itself is still unwitnessed, and the reason is
+worth stating exactly rather than waving at. The toolkit stands ahead of the editor in the event
+loop, and the probe drains the queue itself — the checks run from a timer tick and the loop is not
+fetching events while one runs — so the keys it posts are dispatched straight to AppKit and never
+pass the seam that would name them. Proving the table would mean the probe pumping through the
+toolkit's interception rather than around it.
 
 The probe reports all of this the way it reports the tracking areas and the cursor targets: read back
 off the running window rather than claimed. The button figure is a pair, and has to be — a push
@@ -473,9 +483,13 @@ button, a check box and a radio button are all `NSButton` here, and the promoted
 before the plain one was, so only "every `NSButton` in the window has the toolkit's target" says
 anything about the one that was missing. The two editor figures are counted apart because they are
 two different objects with two different change messages, and either of them at zero is the
-regression this line exists to catch. What it still cannot show is delivery, for the reason every
-other wiring line here gives: the window server drops this job's injected pointer and keyboard for
-want of an Accessibility grant.
+regression this line exists to catch. Delivery is no longer only wiring here: the closing line of the
+same log counts the posted clicks that toggled a control and the posted keys that reached a focused
+editor, and both are above zero. Not every one lands: on the last run two of the five check boxes the
+walkthrough aimed at toggled, and all seven of the keystrokes arrived. Why those three presses
+produced nothing is not yet known and is not guessed at here — the probe names the control and the
+coordinate it aimed at, which is where finding out starts. It is reported rather than hidden, because
+two is a path that works and misses and zero would have been a path that does not work at all.
 
 `Form.ShowDialog` blocks. It did not: `RunModal` showed the window and returned, so a caller had
 `DialogResult.Cancel` before the user had seen the dialog and the core disposed the peer tree
