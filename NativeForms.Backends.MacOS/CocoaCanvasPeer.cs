@@ -83,9 +83,23 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             (nint)(delegate* unmanaged<nint, nint, CocoaRuntime.CGRect, void>)&DrawRect,
             "v@:{CGRect={CGPoint=dd}{CGSize=dd}}");
 
+        // A flipped view puts its origin at the top left with y growing down, which is the toolkit's
+        // convention and Win32's and GTK's. Without it every child sits mirrored inside its parent —
+        // laid out correctly and drawn in the wrong half, which reads as a layout bug rather than a
+        // coordinate one.
+        CocoaRuntime.class_addMethod(
+            created,
+            CocoaRuntime.sel_registerName("isFlipped"),
+            (nint)(delegate* unmanaged<nint, nint, byte>)&IsFlipped,
+            "c@:");
+
         CocoaRuntime.objc_registerClassPair(created);
         _viewClass = created;
     }
+
+    /// <summary>Answers YES, so this view's coordinates run top-left down like the toolkit's.</summary>
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static byte IsFlipped(nint self, nint selector) => 1;
 
     /// <summary>AppKit's paint callback, dispatched to the canvas that owns the view.</summary>
     [System.Runtime.InteropServices.UnmanagedCallersOnly]
@@ -122,14 +136,32 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
 
     public void AddChild(IControlPeer child)
     {
-        if (_view != 0 && child is CocoaCanvasPeer canvas && canvas.Handle != 0)
-            CocoaRuntime.SendVoid(_view, CocoaRuntime.sel_registerName("addSubview:"), canvas.Handle);
+        if (_view == 0)
+            return;
+
+        var view = child switch
+        {
+            CocoaCanvasPeer canvas when canvas.Handle != 0 => canvas.Handle,
+            CocoaControlPeer control when control.Handle != 0 => control.Handle,
+            _ => 0,
+        };
+
+        if (view != 0)
+            CocoaRuntime.SendVoid(_view, CocoaRuntime.sel_registerName("addSubview:"), view);
     }
 
+    /// <inheritdoc/>
     public void RemoveChild(IControlPeer child)
     {
-        if (child is CocoaCanvasPeer canvas && canvas.Handle != 0)
-            CocoaRuntime.SendVoid(canvas.Handle, CocoaRuntime.sel_registerName("removeFromSuperview"));
+        var view = child switch
+        {
+            CocoaCanvasPeer canvas => canvas.Handle,
+            CocoaControlPeer control => control.Handle,
+            _ => 0,
+        };
+
+        if (view != 0)
+            CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("removeFromSuperview"));
     }
 
     public void SetVisible(bool visible)

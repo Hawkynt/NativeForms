@@ -185,9 +185,34 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     public void ShowToolTip(string? text) { }
 
-    public void AddChild(IControlPeer child) { }
+    /// <summary>
+    /// Puts a child's view into the window's content view, which is what makes it appear at all.
+    /// </summary>
+    public void AddChild(IControlPeer child)
+    {
+        if (_window == 0 || ViewOf(child) is not { } view)
+            return;
 
-    public void RemoveChild(IControlPeer child) { }
+        var content = CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView"));
+        if (content != 0)
+            CocoaRuntime.SendVoid(content, CocoaRuntime.sel_registerName("addSubview:"), view);
+    }
+
+    /// <inheritdoc/>
+    public void RemoveChild(IControlPeer child)
+    {
+        if (ViewOf(child) is { } view)
+            CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("removeFromSuperview"));
+    }
+
+    /// <summary>The AppKit object behind a peer, whichever kind of peer it is.</summary>
+    private static nint? ViewOf(IControlPeer child)
+        => child switch
+        {
+            CocoaCanvasPeer canvas when canvas.Handle != 0 => canvas.Handle,
+            CocoaControlPeer control when control.Handle != 0 => control.Handle,
+            _ => null,
+        };
 
     public void RunModal(IWindowPeer? owner) => this.Show();
 
