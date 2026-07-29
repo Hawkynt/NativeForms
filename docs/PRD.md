@@ -170,7 +170,10 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] `ITheme`: accent, window/control/field background, text/disabled/selection colors, default font,
       row height, scrollbar size — queried from the OS (`GetSysColor`/`SPI_GETNONCLIENTMETRICS` on
       Win32; `GtkStyleContext`/`gtk-font-name` on GTK; `NSColor`'s semantic colours and
-      `systemFontOfSize:` on Cocoa); `DefaultTheme` fallback for headless/tests.
+      `systemFontOfSize:` on Cocoa); `DefaultTheme` fallback for headless/tests. Every entry is opaque,
+      which on Cocoa means compositing the translucent semantic colours onto the window's own first: a
+      control that averages two entries — a scrollbar trough is the control background half-way to the
+      border — reads their channels, and `separatorColor`'s are all zero.
 - [x] `ICanvasPeer` + `OwnerDrawnControl`: one paintable/focusable native surface per backend, so
       every custom control is written once and runs on any backend. Mouse/key/focus + paint plumbed.
 - [x] Decoder-free `IImage` (32-bit ARGB) so controls show icons without an image library.

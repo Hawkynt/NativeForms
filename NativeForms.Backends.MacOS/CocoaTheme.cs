@@ -24,8 +24,14 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// colour right has made a bad trade.
 /// </para>
 /// <para>
-/// Alpha is kept rather than flattened. <c>separatorColor</c> is a tenth of an opaque black; forcing
-/// it opaque the way a <c>COLORREF</c> arrives would draw every border on the desktop in black.
+/// Every colour leaves here opaque, composited onto the window's own — which is what the other two
+/// backends hand over and what an owner-drawn control assumes. Several of these are translucent:
+/// <c>separatorColor</c> is a tenth of an opaque black. Filling with one of those directly comes out
+/// right either way, because the alpha does the work at draw time; *arithmetic* on one does not. A
+/// control that mixes two palette entries — the scrollbar trough is the control background half-way
+/// to the border — averages the channels, and averaging against a colour whose channels are zero
+/// gives near-black rather than a lighter shade of the surface. That is what every scrollbar on this
+/// backend was painted in.
 /// </para>
 /// </remarks>
 internal sealed class CocoaTheme : ITheme
@@ -39,7 +45,11 @@ internal sealed class CocoaTheme : ITheme
         var pushed = PushAppearance(out var previous);
         try
         {
-            this.WindowBackground = Read(colors, "windowBackgroundColor", fallback.WindowBackground);
+            // The surface everything else is composited onto, and the first thing read for that reason.
+            // It is opaque on this desktop, and it is stated as opaque rather than assumed to be: there
+            // is nothing behind a window to composite it against.
+            var surface = Opaque(Read(colors, "windowBackgroundColor", fallback.WindowBackground, fallback.WindowBackground));
+            this.WindowBackground = surface;
 
             // The window's own colour again, and not controlColor, which reads like the obvious answer
             // and is the wrong surface: it is the white a bezelled control fills itself with, so every
@@ -47,21 +57,21 @@ internal sealed class CocoaTheme : ITheme
             // give this and the window the same value — COLOR_BTNFACE twice on Win32, the theme
             // background twice on GTK — because a control at rest is chrome, and chrome on this desktop
             // is the window's grey.
-            this.ControlBackground = this.WindowBackground;
-            this.ControlText = Read(colors, "controlTextColor", fallback.ControlText);
-            this.DisabledText = Read(colors, "disabledControlTextColor", fallback.DisabledText);
-            this.FieldBackground = Read(colors, "textBackgroundColor", fallback.FieldBackground);
-            this.Accent = Read(colors, "controlAccentColor", fallback.Accent);
-            this.SelectionBackground = Read(colors, "selectedContentBackgroundColor", fallback.SelectionBackground);
-            this.SelectionText = Read(colors, "alternateSelectedControlTextColor", fallback.SelectionText);
-            this.Border = Read(colors, "separatorColor", fallback.Border);
-            this.GridLine = Read(colors, "gridColor", fallback.GridLine);
+            this.ControlBackground = surface;
+            this.ControlText = Read(colors, "controlTextColor", fallback.ControlText, surface);
+            this.DisabledText = Read(colors, "disabledControlTextColor", fallback.DisabledText, surface);
+            this.FieldBackground = Read(colors, "textBackgroundColor", fallback.FieldBackground, surface);
+            this.Accent = Read(colors, "controlAccentColor", fallback.Accent, surface);
+            this.SelectionBackground = Read(colors, "selectedContentBackgroundColor", fallback.SelectionBackground, surface);
+            this.SelectionText = Read(colors, "alternateSelectedControlTextColor", fallback.SelectionText, surface);
+            this.Border = Read(colors, "separatorColor", fallback.Border, surface);
+            this.GridLine = Read(colors, "gridColor", fallback.GridLine, surface);
 
             // A table header here is the window's own grey with a rule under it rather than a surface of
             // its own, so it takes the window colour instead of inventing a shade the desktop does not
             // use.
-            this.HeaderBackground = Read(colors, "windowBackgroundColor", fallback.HeaderBackground);
-            this.HeaderText = Read(colors, "headerTextColor", fallback.HeaderText);
+            this.HeaderBackground = Read(colors, "windowBackgroundColor", fallback.HeaderBackground, surface);
+            this.HeaderText = Read(colors, "headerTextColor", fallback.HeaderText, surface);
         }
         finally
         {
@@ -180,13 +190,16 @@ internal sealed class CocoaTheme : ITheme
     /// <inheritdoc/>
     public int DoubleClickTime { get; }
 
-    /// <summary>One of <c>NSColor</c>'s semantic colours in sRGB, or <paramref name="fallback"/>.</summary>
+    /// <summary>
+    /// One of <c>NSColor</c>'s semantic colours in sRGB, composited onto <paramref name="surface"/>, or
+    /// <paramref name="fallback"/>.
+    /// </summary>
     /// <remarks>
     /// The conversion is not optional: a semantic colour is a dynamic one that resolves against the
     /// current appearance, and asking it for a red component before it is in a component-bearing space
     /// raises rather than converting.
     /// </remarks>
-    private static Color Read(nint colors, string name, Color fallback)
+    private static Color Read(nint colors, string name, Color fallback, Color surface)
     {
         if (colors == 0)
             return fallback;
@@ -208,11 +221,32 @@ internal sealed class CocoaTheme : ITheme
         var green = CocoaRuntime.SendDouble(converted, CocoaRuntime.sel_registerName("greenComponent"));
         var blue = CocoaRuntime.SendDouble(converted, CocoaRuntime.sel_registerName("blueComponent"));
         var alpha = CocoaRuntime.SendDouble(converted, CocoaRuntime.sel_registerName("alphaComponent"));
-        return Color.FromArgb(Channel(alpha), Channel(red), Channel(green), Channel(blue));
+        return Flatten(Color.FromArgb(Channel(alpha), Channel(red), Channel(green), Channel(blue)), surface);
     }
 
     /// <summary>One component of a colour, as a byte.</summary>
     private static int Channel(double component) => (int)Math.Clamp(Math.Round(component * 255), 0, 255);
+
+    /// <summary>The same colour with the alpha dropped, which is what a surface answers with.</summary>
+    private static Color Opaque(Color color) => Color.FromArgb(byte.MaxValue, color);
+
+    /// <summary>The colour as it lands on <paramref name="surface"/>, with nothing left to composite.</summary>
+    private static Color Flatten(Color color, Color surface)
+    {
+        if (color.A == byte.MaxValue)
+            return color;
+
+        var alpha = color.A / 255.0;
+        return Color.FromArgb(
+            byte.MaxValue,
+            Mix(color.R, surface.R, alpha),
+            Mix(color.G, surface.G, alpha),
+            Mix(color.B, surface.B, alpha));
+    }
+
+    /// <summary>One channel of <paramref name="over"/> laid on <paramref name="under"/> at that alpha.</summary>
+    private static int Mix(byte over, byte under, double alpha)
+        => (int)Math.Clamp(Math.Round((over * alpha) + (under * (1 - alpha))), 0, 255);
 
     /// <summary>
     /// The system UI font at its own size — <c>systemFontOfSize:0</c> is how AppKit is asked for the

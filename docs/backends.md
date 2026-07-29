@@ -246,8 +246,18 @@ guarded by `respondsToSelector:`, because several of these colours arrived in 10
 unrecognized selector aborts the process rather than answering nil. Each colour is converted into
 sRGB before its components are read, for the same reason the colour chooser converts — a semantic
 colour resolves against the current appearance and has no red component until it is in a space that
-has one. And alpha is kept rather than flattened the way a `COLORREF` arrives: `separatorColor` is a
-tenth of an opaque black, and forcing it opaque would draw every border on the desktop in black. And
+has one. And every one of them leaves opaque, composited onto the window's own colour, which is what
+the other two hand over and what an owner-drawn control assumes. Several of these are translucent:
+`separatorColor` is a tenth of an opaque black. Filling with one of those directly comes out right
+either way, because the alpha does the work at draw time — but arithmetic on one does not, and a
+palette entry is arithmetic as often as it is a colour. A scrollbar's trough is the control background
+half-way to the border, averaged channel by channel because no desktop publishes a trough colour of
+its own; averaging against a colour whose channels are all zero gives near-black instead of a lighter
+shade of the surface, and that is what every scrollbar this backend drew was painted in — `#ABABAB`
+for the recess and `#9A9A9A` for the thumb against a window of `#ECECEC`, where GTK's are `#E1DEDB`
+and `#CDC7C2` against `#F6F5F4`. The panels, the grid, the calendar and the code box each photographed
+with a dark grey slab down one side. Composited first, the same two work out to `#E0E0E0` and
+`#D4D4D4`, and dark mode follows without a second rule because the backdrop is read the same way. And
 a control surface is `windowBackgroundColor`, not `controlColor`, which reads like the obvious answer
 and is the wrong surface: it is the white a bezelled control fills itself with, and serving it made
 every panel, page and button at rest the colour of a text field — the gallery photographed as one
