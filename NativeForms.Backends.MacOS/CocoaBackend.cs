@@ -22,11 +22,22 @@ public sealed class CocoaBackend : IPlatformBackend
     /// <inheritdoc/>
     public bool IsSupported => OperatingSystem.IsMacOS();
 
-    /// <inheritdoc/>
-    public ITheme Theme => DefaultTheme.Instance;
+    private ITheme? _theme;
 
     /// <inheritdoc/>
-    /// <remarks>Never raised: the placeholder serves the static fallback theme only.</remarks>
+    /// <remarks>
+    /// Read from the desktop on first ask and kept, which is what a theme being an immutable snapshot
+    /// means. The first ask comes with the first control, by which point <c>NSApplication</c> exists
+    /// and the semantic colours have an appearance to resolve against.
+    /// </remarks>
+    public ITheme Theme => _theme ??= new CocoaTheme();
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Never raised yet: the snapshot is right for the appearance the application started in, and
+    /// following the user into dark mode needs an observer on
+    /// <c>effectiveAppearance</c> that nothing here installs.
+    /// </remarks>
     public event EventHandler? ThemeChanged { add { } remove { } }
 
     /// <inheritdoc/>

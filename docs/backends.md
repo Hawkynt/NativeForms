@@ -153,6 +153,26 @@ and eight angles worked out by hand. The radius is clamped to half the shorter s
 Cairo backend clamps it, so a pill asked for more radius than it can hold is a capsule on both rather
 than whatever each renderer would invent.
 
+The palette and the UI font are the desktop's. This backend served the shared fallback theme until
+now — a Windows palette and Segoe UI at 9pt, on a desktop that has neither font nor palette. The size
+is the part that did visible damage rather than the names: a point is a pixel here and 96 dpi's worth
+of one on Windows, so every owner-drawn string photographed about a quarter smaller than the text
+beside it in a real `NSTextField`, and a label that measures itself came out too narrow for its own
+caption — measured with the theme's font, drawn by AppKit with the system's, and clipped by the
+difference. The colours now come from `NSColor`'s semantic ones, the font from
+`systemFontOfSize:0`, which is AppKit's way of being asked for the size it would use itself, and the
+double-click interval from `NSEvent`. Three things about the reading are worth stating. Every send is
+guarded by `respondsToSelector:`, because several of these colours arrived in 10.14 and an
+unrecognized selector aborts the process rather than answering nil. Each colour is converted into
+sRGB before its components are read, for the same reason the colour chooser converts — a semantic
+colour resolves against the current appearance and has no red component until it is in a space that
+has one. And alpha is kept rather than flattened the way a `COLORREF` arrives: `separatorColor` is a
+tenth of an opaque black, and forcing it opaque would draw every border on the desktop in black. The
+scrollbar metric stays the shared 16, which is what a legacy `NSScroller` reports anyway and what this
+backend draws its own scrollbars at. What is not served is the change: the snapshot is right for the
+appearance the application started in, and following the user into dark mode needs an observer on
+`effectiveAppearance` that nothing here installs yet.
+
 Owner-drawn text is the colour and the weight it was asked for. Until now it was black and regular on
 every page of every shot, from two independent causes that look like one. CoreText does not fill
 glyphs with the context's fill colour: it uses the string's own foreground attribute, which defaults
