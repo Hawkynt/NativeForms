@@ -27,6 +27,7 @@ BackendRegistry.Register(new CocoaBackend());
 
 var shooting = Array.IndexOf(args, "--shoot") >= 0;
 var shootFailures = 0;
+var shootShots = 0;
 
 // Opened before the gallery is built, not after. A WinExe has no console to complain to and nobody
 // watches one on a runner, so everything the shoot has to say goes into the artifact — and the run
@@ -115,6 +116,7 @@ if (shooting)
     {
         // One tick of the real loop first, so the shot is of a window the platform has finished
         // mapping and painting rather than one caught mid-realization.
+        Note("load fired, arming the shutter");
         var shutter = new Hawkynt.NativeForms.Timer { Interval = 400 };
         shutter.Tick += (_, _) =>
         {
@@ -126,6 +128,9 @@ if (shooting)
             try
             {
                 var size = Shoot.Window(form, path);
+                if (size is not null)
+                    ++shootShots;
+
                 Note(size is { } written
                     ? $"shot: {name} ({written.Width}x{written.Height})"
                     : $"shot failed: {name} - no capture route produced pixels");
@@ -179,4 +184,11 @@ if (shooting)
 }
 
 Application.Run(form);
+
+// Says whether the loop ran at all. A backend under construction can return from Run before the
+// shutter ever ticks, and the difference between "the shot failed" and "nothing ever asked for one"
+// is invisible without this line.
+if (shooting)
+    Note($"loop returned, {shootShots} shot(s) taken");
+
 return shootFailures > 0 ? 1 : Autopilot.ExitCode;
