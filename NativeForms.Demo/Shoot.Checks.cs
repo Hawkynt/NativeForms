@@ -228,6 +228,14 @@ internal static partial class Shoot
         return reports.Count == 0 ? null : $"list geometry: first visible row {string.Join(", ", reports)}";
     }
 
+    /// <summary>What a toolkit popup opened inside the dialog did when the user pressed outside it.</summary>
+    /// <remarks>
+    /// Written by <see cref="Modal"/>'s own timer and read after it, because there is no other moment
+    /// to run in: <c>ShowDialog</c> does not come back until the dialog does, so everything that
+    /// happens inside one has to be armed before it opens.
+    /// </remarks>
+    private static string _popupInDialog = "not reached";
+
     /// <summary>
     /// Shows a form modally and reports whether the call actually blocked, or <see langword="null"/>
     /// where this is not the platform that needed asking.
@@ -267,17 +275,56 @@ internal static partial class Shoot
             Controls = { new Label { Bounds = new(20, 20, 280, 24), Text = "Closing itself in a moment." } },
         };
 
+        var menu = new ContextMenuStrip();
+        menu.Items.AddRange(new ToolStripMenuItem("One"), new ToolStripMenuItem("Two"));
+
         // Started before the dialog goes up, because ShowDialog does not come back until it comes
-        // down: there is no later moment to arm anything from.
+        // down: there is no later moment to arm anything from. Three ticks rather than one, because
+        // the press that dismisses the popup has to be delivered by the modal loop and the modal loop
+        // is not turning while this handler is inside it — so opening, pressing and reading the answer
+        // are three separate visits.
+        var step = 0;
+        var posted = false;
         var closer = new Timer { Interval = 200 };
         closer.Tick += (_, _) =>
         {
-            closer.Stop();
+            switch (++step)
+            {
+                case 1:
+                    menu.Show(dialog, new(200, 100));
+                    if (!menu.IsOpen)
+                        _popupInDialog = "a popup opened inside the dialog did not report itself open";
 
-            // A verdict on a modal form closes it, which is what makes this a round trip: the answer
-            // the caller reads back is the one set here rather than the Cancel a form gets for being
-            // closed without one.
-            dialog.DialogResult = DialogResult.OK;
+                    return;
+
+                case 2:
+                    // Posted and left. A modal session dispatches its own events, so what has to
+                    // happen next is the session's turn — which cannot come round until this handler
+                    // has returned, because the loop drains this queue between turns.
+                    if (!menu.IsOpen)
+                        return;
+
+                    posted = ShootInputMac.Click(dialog.PointToScreen(new(10, 10)));
+                    if (!posted)
+                        _popupInDialog = "a press outside the popup could not be posted";
+
+                    return;
+
+                default:
+                    if (posted)
+                        _popupInDialog = menu.IsOpen
+                            ? "a popup opened inside the dialog was NOT dismissed by a press outside it"
+                            : "a popup opened inside the dialog dismissed on a press outside it";
+
+                    menu.Close();
+                    closer.Stop();
+
+                    // A verdict on a modal form closes it, which is what makes this a round trip: the
+                    // answer the caller reads back is the one set here rather than the Cancel a form
+                    // gets for being closed without one.
+                    dialog.DialogResult = DialogResult.OK;
+                    return;
+            }
         };
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -287,11 +334,12 @@ internal static partial class Shoot
         closer.Stop();
 
         var elapsed = clock.ElapsedMilliseconds;
-        return elapsed >= 150 && result == DialogResult.OK
+        return (elapsed >= 150 && result == DialogResult.OK
             ? $"modal dialog: ShowDialog blocked {elapsed} ms and answered {result} "
                 + "(so the session ran, and the timer that ended it was drained inside it)"
             : $"modal dialog: ShowDialog returned after {elapsed} ms with {result} — it did NOT block, "
-                + "so a caller would have its answer before the user saw the window";
+                + "so a caller would have its answer before the user saw the window")
+            + Environment.NewLine + "  modal dialog: " + _popupInDialog;
     }
 
     /// <summary>

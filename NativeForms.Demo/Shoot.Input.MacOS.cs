@@ -242,14 +242,14 @@ internal static partial class ShootInputMac
             return;
 
         SendVoid(app, sel_registerName("activateIgnoringOtherApps:"), true);
-        if (ShootMacOS.GalleryWindow() is var window and not 0)
+        if (TargetWindow() is var window and not 0)
             Send(window, sel_registerName("makeKeyAndOrderFront:"), 0);
     }
 
     /// <summary>Clicks at a screen point, reporting whether the events were built and posted.</summary>
     public static bool Click(Point screen)
     {
-        var window = ShootMacOS.GalleryWindow();
+        var window = TargetWindow();
         if (window == 0)
             return false;
 
@@ -341,10 +341,27 @@ internal static partial class ShootInputMac
         CFRelease(mode);
     }
 
-    /// <summary>The gallery window's number, which is how an event says where it is going.</summary>
+    /// <summary>
+    /// The window an injected event is aimed at: the one being shown modally while a dialog is up,
+    /// and otherwise the gallery.
+    /// </summary>
+    /// <remarks>
+    /// Asked of <c>NSApp</c> rather than worked out, because a modal session is exactly what
+    /// <c>modalWindow</c> reports and the alternative — picking the largest visible window — would
+    /// answer with the gallery behind the dialog, which is the one window a press must not be aimed at
+    /// while one is up.
+    /// </remarks>
+    private static nint TargetWindow()
+    {
+        var app = SharedApplication();
+        var modal = app == 0 ? 0 : Send(app, sel_registerName("modalWindow"));
+        return modal != 0 ? modal : ShootMacOS.GalleryWindow();
+    }
+
+    /// <summary>The target window's number, which is how an event says where it is going.</summary>
     private static nint WindowNumber()
     {
-        var window = ShootMacOS.GalleryWindow();
+        var window = TargetWindow();
         return window == 0 ? 0 : Send(window, sel_registerName("windowNumber"));
     }
 

@@ -539,18 +539,33 @@ public sealed class CocoaBackend : IPlatformBackend
                 continue;
             }
 
-            // The open popups get first refusal. A press outside the deepest one closes it and is
-            // swallowed, which is what a pointer grab would do on the platforms that take one. The
-            // text box gets second refusal, for the reason CocoaTextBoxPeer.InterceptKey gives: this
-            // is the only place on this platform that stands ahead of the editor's own handling, so a
-            // key the toolkit consumes is one that is never sent on.
-            if (!CocoaPopupPeer.Intercept(next) && !CocoaTextBoxPeer.InterceptKey(next))
+            if (!Intercept(next))
                 CocoaRuntime.SendVoid(app, sendEvent, next);
         }
 
         if (mode != 0)
             CocoaNative.CFRelease(mode);
     }
+
+    /// <summary>
+    /// Offers an event to the toolkit before AppKit dispatches it, answering whether it was consumed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The open popups get first refusal. A press outside the deepest one closes it and is swallowed,
+    /// which is what a pointer grab would do on the platforms that take one. The text box gets second
+    /// refusal, for the reason <see cref="CocoaTextBoxPeer.InterceptKey"/> gives: this is the only
+    /// place on this platform that stands ahead of the editor's own handling, so a key the toolkit
+    /// consumes is one that is never sent on.
+    /// </para>
+    /// <para>
+    /// One method rather than a pair of calls at the site that made them, because there are two sites
+    /// now: a modal session dispatches its own events, so <see cref="RunModal"/> has to make the same
+    /// offer or a dialog becomes a place where popups do not close.
+    /// </para>
+    /// </remarks>
+    private static bool Intercept(nint theEvent)
+        => CocoaPopupPeer.Intercept(theEvent) || CocoaTextBoxPeer.InterceptKey(theEvent);
 
     private volatile bool _running;
 
@@ -593,13 +608,15 @@ public sealed class CocoaBackend : IPlatformBackend
     /// covers both. Quitting ends it too, so a session cannot outlive the application that owns it.
     /// </para>
     /// <para>
-    /// What a session does not do is let this loop see the events: <c>runModalSession:</c> fetches and
-    /// dispatches them itself, restricted to the modal window. So the two interceptions
-    /// <see cref="Run"/> makes — light dismiss and the text box's key seam — do not run inside a
-    /// dialog, and a toolkit popup opened from one is not offered the press that should close it. That
-    /// is written down in <c>docs/backends.md</c> rather than worked around here, because the ways
-    /// around it are re-implementing modality by hand or making every popup a child window of the
-    /// dialog, and neither is worth doing blind.
+    /// The session dispatches its own events, which used to mean this loop never saw them: the two
+    /// interceptions <see cref="Run"/> makes — light dismiss and the text box's key seam — did not run
+    /// inside a dialog, so a toolkit popup opened from one stayed up because the press that should
+    /// have closed it went straight to whatever was underneath. The queue is therefore looked at
+    /// before each turn of the session and <em>not</em> taken from: whatever
+    /// <see cref="Intercept"/> consumes is then removed, and everything the toolkit does not want is
+    /// left exactly where the session expects to find it. That keeps modality AppKit's — the
+    /// alternatives were re-implementing it by hand or making every popup a child window of the dialog
+    /// — while there is still only one place the toolkit stands ahead of the platform.
     /// </para>
     /// </remarks>
     internal void RunModal(CocoaWindowPeer peer)
@@ -614,17 +631,24 @@ public sealed class CocoaBackend : IPlatformBackend
         if (session == 0)
             return;
 
+        var mode = CocoaRuntime.NSString("kCFRunLoopDefaultMode");
+
         try
         {
             // NSModalResponseContinue
             const nint running = -1002;
             var run = CocoaRuntime.sel_registerName("runModalSession:");
 
-            while (!_quitting
-                && !peer.IsClosed
-                && CocoaRuntime.SendInteger(app, run, session) == running
-                && CocoaRuntime.SendBool(window, visible))
+            while (!_quitting && !peer.IsClosed)
             {
+                // Ahead of the session's turn, so a press the toolkit wants is gone before the session
+                // can dispatch it to whatever sits behind the popup it should have closed.
+                InterceptPending(app, mode);
+
+                if (CocoaRuntime.SendInteger(app, run, session) != running
+                    || !CocoaRuntime.SendBool(window, visible))
+                    break;
+
                 // The reason this is a session at all. A dialog is not a pause in the application:
                 // its timers still tick and its background work still comes home, and both arrive
                 // through this queue.
@@ -637,6 +661,43 @@ public sealed class CocoaBackend : IPlatformBackend
         finally
         {
             CocoaRuntime.SendVoid(app, CocoaRuntime.sel_registerName("endModalSession:"), session);
+            if (mode != 0)
+                CocoaNative.CFRelease(mode);
+        }
+    }
+
+    /// <summary>
+    /// Offers whatever is at the head of the queue to <see cref="Intercept"/>, taking out only what
+    /// the toolkit consumed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Peeked rather than dequeued, which is the whole of the design. Taking an event out and putting
+    /// the unwanted ones back would reorder the queue and hand this method AppKit's job of deciding
+    /// which window may have them; leaving them alone means the session still sees the same queue it
+    /// always did, in the same order, and the only events that vanish are the ones the toolkit
+    /// swallowed on purpose.
+    /// </para>
+    /// <para>
+    /// It stops at the first event the toolkit does not want rather than walking past it, because that
+    /// event is the session's to dispatch and the one behind it becomes the head as soon as it has
+    /// been. The loop turns every few milliseconds, so "the next one, next time" is not a delay
+    /// anybody can perceive — and the bound keeps a burst of presses from being drained here in one go.
+    /// </para>
+    /// </remarks>
+    private static void InterceptPending(nint app, nint mode)
+    {
+        var next = CocoaRuntime.sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:");
+        var distantPast = CocoaRuntime.SendToClass("NSDate", "distantPast");
+        var mask = unchecked((nint)ulong.MaxValue);
+
+        for (var i = 0; i < 16; ++i)
+        {
+            var pending = CocoaRuntime.SendEvent(app, next, mask, distantPast, mode, false);
+            if (pending == 0 || !Intercept(pending))
+                break;
+
+            CocoaRuntime.SendEvent(app, next, mask, distantPast, mode, true);
         }
     }
 }

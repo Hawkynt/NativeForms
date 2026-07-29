@@ -518,10 +518,28 @@ told.
 
 What the session does not do is let the loop see the events. `runModalSession:` fetches and dispatches
 them itself, restricted to the modal window, so the two interceptions the loop makes — a popup's light
-dismiss and the text box's key seam — do not run inside a dialog, and a menu opened from one is not
-offered the press that should close it. The ways around that are re-implementing modality by hand or
-making every popup a child window of the dialog, and neither is worth doing on a platform nobody here
-can watch it on. It is stated rather than approximated.
+dismiss and the text box's key seam — did not run inside a dialog, and a menu opened from one was
+never offered the press that should close it: the press went straight to whatever sat behind the menu,
+and the menu stayed up.
+
+It is offered now, and the shape of the offer is the point. The two named ways around this were
+re-implementing modality by hand and making every popup a child window of the dialog, and both replace
+the platform's own rule with one of ours. What the modal pump does instead is *look* at the head of the
+queue without taking it — `nextEventMatchingMask:` with `dequeue:NO` — hand it to the same
+interception the main loop uses, and take it out only if the toolkit consumed it. Everything the
+toolkit does not want is left exactly where the session expects to find it, in the order it was in, so
+modality stays AppKit's; and there is still one method deciding what the toolkit stands ahead of,
+which is what keeps the dialog and the main loop from drifting apart. It stops at the first event it
+does not want rather than walking past it, because that event is the session's to dispatch and the one
+behind it becomes the head as soon as it has been — and the pump turns every few milliseconds.
+
+One thing about a popup inside a dialog is still the platform's rule rather than ours: a session
+withholds events from every window but the modal one, and a toolkit popup is a borderless window of
+its own rather than a child of the dialog. So a press *outside* the popup reaches the toolkit, because
+the pump sees the whole queue, and a press *inside* it does not, because the session declines to
+dispatch it and the toolkit has no reason to swallow it. Light dismiss works; picking an item out of a
+menu opened inside a dialog does not. That is the child-window question again, and it is written down
+here rather than answered with a reparenting nobody can watch.
 
 This one is witnessed. The probe puts a real form up modally at the end of its run, with a `Timer` set
 to close it, and reports how long `ShowDialog` took and what it answered. That is two claims in one
@@ -531,6 +549,12 @@ down — which is the failure an application would hit the first time anything t
 open. It runs on macOS alone, because a check whose failure mode is a wait belongs in the job that is
 bounded at three minutes and advisory rather than in the gating Windows one, which has no step timeout
 at all.
+
+The popup inside it is witnessed the same way, and it took three visits rather than one to arrange.
+The dialog's timer opens a context menu on the first tick, posts a press at a corner of the dialog on
+the second, and reads the menu's own `IsOpen` on the third — because the press has to be delivered by
+the modal pump, and the modal pump is not turning while a tick is inside it. The log says which of the
+three it got to, so a run that never opened the menu cannot be read as one that dismissed it.
 
 Injected input no longer goes through the window server, and that is why there is any at all. The
 probe used to post a `CGEvent` at the HID tap, which is the truer gesture and unusable here: macOS
@@ -586,10 +610,8 @@ colour as well, and an image means swapping the field for an `NSImageView` — w
 peer does with a `GtkImage`, and on the same terms, since neither backend draws an icon beside a
 caption. So the gap against the other two is an image-only label and an underlined letter, not every
 label with a picture in it, and nothing in the gallery asks for either — which is also why this is
-still written down: there would be nothing in a shot to say it had worked. A toolkit popup
-opened inside a modal dialog is not light-dismissed, because AppKit's session dispatches the events
-the loop would otherwise have offered it (above). These are named here so that a screenshot that looks
-finished is not read as one.
+still written down: there would be nothing in a shot to say it had worked. This is named here so that a
+screenshot that looks finished is not read as one.
 
 ## How the screenshots are produced
 
