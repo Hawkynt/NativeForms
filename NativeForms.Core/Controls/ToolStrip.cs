@@ -48,6 +48,16 @@ public class ToolStrip : OwnerDrawnControl
     /// <summary>The theme font the cache was measured with; a different snapshot voids it.</summary>
     private Font _measuredFont;
 
+    /// <summary>The floating tip for the hovered item: its surface, delay timer and current state.
+    /// An item owns no peer, so the bar shows the tip on its behalf — the per-item sibling of the
+    /// <see cref="ToolTip"/> component, sharing its delays and popup painting.</summary>
+    private IPopupPeer? _tipPopup;
+    private Timer? _tipTimer;
+    private string _tipText = string.Empty;
+    private Point _tipPoint;
+    private bool _tipShown;
+    private bool _tipAutoPopPhase;
+
     /// <summary>Creates an empty toolbar.</summary>
     public ToolStrip()
     {
@@ -135,6 +145,12 @@ public class ToolStrip : OwnerDrawnControl
         _dropDown?.CloseAll();
         _dropDown = null;
         _itemWidths = null;
+        _tipShown = false;
+        _tipAutoPopPhase = false;
+        _tipTimer?.Dispose();
+        _tipTimer = null;
+        _tipPopup?.Dispose();
+        _tipPopup = null;
     }
 
     /// <summary>The lazily created drop-down engine shared by drop-down buttons and the chevron, with
@@ -202,6 +218,10 @@ public class ToolStrip : OwnerDrawnControl
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
+
+        // A press means the user knows what the button is; the tip has served its purpose and would
+        // otherwise hang over whatever the click opens.
+        this.HideToolTip();
         if (e.Button != MouseButtons.Left)
             return;
 
@@ -268,11 +288,13 @@ public class ToolStrip : OwnerDrawnControl
         if (_dragIndex >= 0 && this.DragItem(e.X))
             return;
 
+        _tipPoint = e.Location;
         var index = this.ItemAt(e.X, out _);
         if (index == _hoverIndex)
             return;
 
         _hoverIndex = index;
+        this.ArmToolTip();
         this.Invalidate();
     }
 
@@ -305,12 +327,105 @@ public class ToolStrip : OwnerDrawnControl
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
+        this.HideToolTip();
         if (_hoverIndex < 0 && _pressedIndex < 0)
             return;
 
         _hoverIndex = -1;
         _pressedIndex = -1;
         this.Invalidate();
+    }
+
+    // --- Item tooltips ---------------------------------------------------------------------------
+
+    /// <summary>The hovered item's tip text, or <see langword="null"/> when there is nothing to show.</summary>
+    private string? HoveredTipText
+        => _hoverIndex >= 0 && _hoverIndex < this.Items.Count && this.Items[_hoverIndex] is { } item
+            && item is not ToolStripSeparator
+            && item.ToolTipText is { Length: > 0 } text
+                ? text
+                : null;
+
+    /// <summary>The hovered item changed: takes down any tip that was up and arms the show delay for
+    /// the new one, if it has a tip at all.</summary>
+    private void ArmToolTip()
+    {
+        this.HideToolTip();
+        if (this.Backend is null || this.HoveredTipText is null)
+            return;
+
+        var timer = this.EnsureTipTimer();
+        timer.Interval = 500; // the ToolTip component's initial delay
+        timer.Start();
+    }
+
+    /// <summary>Hides the tip and disarms any pending delay.</summary>
+    private void HideToolTip()
+    {
+        _tipTimer?.Stop();
+        _tipAutoPopPhase = false;
+        if (!_tipShown)
+            return;
+
+        _tipShown = false;
+        _tipPopup?.Hide();
+    }
+
+    /// <summary>The delay elapsed: shows the hovered item's tip near the cursor, then takes it down
+    /// again after the auto-pop phase.</summary>
+    private void OnTipTimerTick(object? sender, EventArgs e)
+    {
+        var timer = _tipTimer!;
+        timer.Stop();
+        if (_tipAutoPopPhase)
+        {
+            this.HideToolTip();
+            return;
+        }
+
+        if (this.Backend is not { } backend || this.HoveredTipText is not { } text)
+            return;
+
+        _tipText = text;
+        var popup = this.EnsureTipPopup(backend);
+        _tipShown = true;
+        popup.ShowAt(
+            this.PointToScreen(new Point(_tipPoint.X, _tipPoint.Y + this.LogicalToDevice(ToolTip.CursorOffset))),
+            ToolTip.MeasureTip(backend, text));
+
+        _tipAutoPopPhase = true;
+        timer.Interval = 5000; // the ToolTip component's auto-pop delay
+        timer.Start();
+    }
+
+    /// <summary>Creates the tip delay timer on first use.</summary>
+    private Timer EnsureTipTimer()
+    {
+        var timer = _tipTimer;
+        if (timer is not null)
+            return timer;
+
+        timer = new(this.Backend!);
+        timer.Tick += this.OnTipTimerTick;
+        return _tipTimer = timer;
+    }
+
+    /// <summary>Creates the tip popup on first use, painting through the shared
+    /// <see cref="ToolTip"/> renderer.</summary>
+    private IPopupPeer EnsureTipPopup(IPlatformBackend backend)
+    {
+        var popup = _tipPopup;
+        if (popup is not null)
+            return popup;
+
+        popup = backend.CreatePopup(this.OwnerWindowPeer);
+
+        // Passive, exactly like ToolTip's own surface: a tip that grabbed would spend the next click
+        // closing itself instead of pressing the button it was aimed at.
+        popup.LightDismiss = false;
+        popup.Paint += (_, e) => ToolTip.PaintTip(e.Graphics, this.Theme, _tipText);
+        popup.Dismissed += (_, _) => _tipShown = false;
+        return _tipPopup = popup;
     }
 
     /// <summary>Paints one inline item in its current hover/pressed/checked state.</summary>

@@ -284,4 +284,80 @@ internal sealed class ToolStripTests
 
         Assert.That(combo.Visible, Is.False, "a host pushed into the overflow hides its control");
     }
+
+    // ---- item tooltips: an icon-only button states nowhere else what it does ----
+
+    [Test]
+    public void An_items_tooltip_pops_up_after_the_hover_delay_and_auto_hides()
+    {
+        var strip = CreateStrip(out var canvas, out var backend);
+        strip.Items.Add(new ToolStripButton("Run") { ToolTipText = "Run it" });
+
+        canvas.RaiseMouseMove(5, 5);
+        var timer = backend.Timers.Single();
+        Assert.That(timer.StartedIntervals, Is.EqualTo(new[] { 500 }), "armed with the tooltip initial delay");
+
+        timer.FireTick();
+        var popup = PopupOf(backend);
+        Assert.Multiple(() =>
+        {
+            Assert.That(popup.IsShown, Is.True);
+            Assert.That(popup.RaisePaint().DrewText("Run it"), Is.True);
+        });
+
+        timer.FireTick(); // the auto-pop phase elapses
+        Assert.That(popup.IsShown, Is.False);
+    }
+
+    [Test]
+    public void An_items_tooltip_hides_when_the_pointer_leaves_or_presses()
+    {
+        var strip = CreateStrip(out var canvas, out var backend);
+        strip.Items.Add(new ToolStripButton("Run") { ToolTipText = "Run it" });
+
+        canvas.RaiseMouseMove(5, 5);
+        backend.Timers.Single().FireTick();
+        var popup = PopupOf(backend);
+        Assert.That(popup.IsShown, Is.True);
+
+        canvas.RaiseMouseLeave();
+        Assert.That(popup.IsShown, Is.False, "leaving the bar hides the tip");
+
+        canvas.RaiseMouseMove(5, 5);
+        backend.Timers.Single().FireTick();
+        Assert.That(popup.IsShown, Is.True);
+
+        canvas.RaiseMouseDown(5, 5);
+        Assert.That(popup.IsShown, Is.False, "a press hides the tip");
+    }
+
+    [Test]
+    public void Moving_between_items_shows_the_tip_of_the_one_under_the_pointer()
+    {
+        var strip = CreateStrip(out var canvas, out var backend);
+        strip.Items.Add(new ToolStripButton("Run") { ToolTipText = "Run it" });   // width 29
+        strip.Items.Add(new ToolStripButton("Stop") { ToolTipText = "Stop it" });
+
+        canvas.RaiseMouseMove(5, 5);
+        backend.Timers.Single().FireTick();
+        var popup = PopupOf(backend);
+        Assert.That(popup.RaisePaint().DrewText("Run it"), Is.True);
+
+        canvas.RaiseMouseMove(35, 5); // the second button
+        Assert.That(popup.IsShown, Is.False, "the previous item's tip goes away with the hover");
+
+        backend.Timers.Single().FireTick();
+        Assert.That(popup.RaisePaint().DrewText("Stop it"), Is.True);
+    }
+
+    [Test]
+    public void An_item_without_tooltip_text_never_arms_the_delay()
+    {
+        var strip = CreateStrip(out var canvas, out var backend);
+        strip.Items.Add(new ToolStripButton("Run"));
+
+        canvas.RaiseMouseMove(5, 5);
+
+        Assert.That(backend.Timers, Is.Empty);
+    }
 }

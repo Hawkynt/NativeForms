@@ -134,6 +134,17 @@ public abstract class ToolStripItem
         }
     } = true;
 
+    /// <summary>
+    /// Hover text for this item, the moral equivalent of <c>ToolStripItem.ToolTipText</c>. An item
+    /// owns no peer, so the tip is floated by the hosting <see cref="ToolStrip"/> rather than by the
+    /// <see cref="ToolTip"/> component, which registers per <see cref="Control"/> — but the delays
+    /// and the popup painting are the same ones. Empty or <see langword="null"/> means no tip.
+    /// </summary>
+    /// <remarks>
+    /// This matters most for an icon-only button, which otherwise states nowhere at all what it does.
+    /// </remarks>
+    public string? ToolTipText { get; set; }
+
     /// <summary>Arbitrary user data riding along with the item.</summary>
     public object? Tag { get; set; }
 
