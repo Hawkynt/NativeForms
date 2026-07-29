@@ -174,6 +174,21 @@ public class Breadcrumb : OwnerDrawnControl
     public Func<string, IReadOnlyList<BreadcrumbItem>>? PathParser { get; set; }
 
     /// <summary>
+    /// Supplies the text the edit field starts from. Left <see langword="null"/>, the captions are
+    /// joined with <see cref="PathSeparator"/>, which is <see cref="FullPath"/>. The counterpart of
+    /// <see cref="PathParser"/>: a caller that resolves its own paths composes its own too.
+    /// </summary>
+    /// <remarks>
+    /// Joining captions assumes one separator runs the whole way down, and not every namespace is
+    /// like that. A file browser showing an archive opened in place has a filesystem path as far as
+    /// the archive file and the archive's own entry names below it, each with its own convention — on
+    /// Windows a backslash above and a forward slash within — so no single separator reproduces it and
+    /// the field opened on a path that did not exist. Such a caller already knows the path it is
+    /// showing and can just say so.
+    /// </remarks>
+    public Func<string>? PathComposer { get; set; }
+
+    /// <summary>
     /// Supplies path completions for the edit field: given the text typed so far, returns candidate
     /// full paths. The first candidate that extends the typed text is appended and selected, so typing
     /// on replaces it and Enter accepts it. Delegate-driven, so it completes against a real directory,
@@ -436,7 +451,10 @@ public class Breadcrumb : OwnerDrawnControl
         _suggestPopup = null;
     }
 
-    /// <summary>Switches the bar to its edit field, prefilled with <see cref="FullPath"/> and focused.</summary>
+    /// <summary>
+    /// Switches the bar to its edit field, prefilled with <see cref="PathComposer"/>'s text or, left
+    /// unset, <see cref="FullPath"/>, and focused.
+    /// </summary>
     public void BeginEdit()
     {
         if (_editing)
@@ -444,7 +462,7 @@ public class Breadcrumb : OwnerDrawnControl
 
         var editor = this.EnsureEditor();
         _autoCompleting = true; // the prefill must not trigger a completion
-        editor.Text = this.FullPath;
+        editor.Text = this.PathComposer?.Invoke() ?? this.FullPath;
         _autoCompleting = false;
         _editorPrevText = editor.Text;
         editor.Bounds = new Rectangle(0, 0, this.Width, this.Height);

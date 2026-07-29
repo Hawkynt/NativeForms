@@ -374,4 +374,36 @@ internal sealed class BreadcrumbTests
 
         Assert.That(crumb.FullPath, Is.EqualTo("Home/Docs/Sub"));
     }
+
+    [Test]
+    public void A_caller_that_composes_its_own_path_seeds_the_field_with_it()
+    {
+        // A namespace no single separator can join: a filesystem path down to an archive file, then
+        // the archive's own entry names, which on Windows means a backslash above and a slash within.
+        // Joining captions produced a path that did not exist, so the caller says what it is showing.
+        var crumb = new Breadcrumb { PathSeparator = "\\" };
+        crumb.Items.AddRange("C:\\", "tmp", "sample.zip", "sub");
+        crumb.PathComposer = () => "C:\\tmp\\sample.zip/sub";
+        Realize(crumb, out _);
+
+        crumb.BeginEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(crumb.EditorText, Is.EqualTo("C:\\tmp\\sample.zip/sub"));
+            Assert.That(crumb.FullPath, Is.EqualTo("C:\\tmp\\sample.zip\\sub"),
+                "joining the captions is still what FullPath means; only the seed is the caller's");
+        });
+    }
+
+    [Test]
+    public void Without_a_composer_the_field_still_starts_from_the_joined_path()
+    {
+        var crumb = ThreeSegments(); // Home / Docs / Sub
+        Realize(crumb, out _);
+
+        crumb.BeginEdit();
+
+        Assert.That(crumb.EditorText, Is.EqualTo("Home/Docs/Sub"));
+    }
 }
