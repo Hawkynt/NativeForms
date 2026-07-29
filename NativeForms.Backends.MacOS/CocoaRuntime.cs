@@ -317,6 +317,88 @@ internal static partial class CocoaRuntime
         return core; // an NSString and a CFStringRef are the same object, bridged for free
     }
 
+    /// <summary>
+    /// Whether an object would answer a selector, which is the only safe way to offer one to an object
+    /// whose exact class is not known. An unrecognized selector aborts the process rather than raising
+    /// something catchable, so asking first is not defensive — it is the difference between a widget
+    /// that ignores a property and an application that stops.
+    /// </summary>
+    internal static bool Responds(nint receiver, string selector)
+        => receiver != 0
+        && SendBool(receiver, sel_registerName("respondsToSelector:"), sel_registerName(selector));
+
+    /// <summary>
+    /// A colour as an sRGB <c>NSColor</c>, or zero for the empty colour, which is how the core says
+    /// "leave the platform's own".
+    /// </summary>
+    /// <remarks>
+    /// sRGB rather than the calibrated or device space: a colour the toolkit states in bytes is an
+    /// sRGB colour, and handing those bytes to a different space would draw a shade nobody asked for
+    /// and would also raise when read back, since a colour only answers for components in its own space.
+    /// </remarks>
+    internal static nint NSColorOf(System.Drawing.Color color)
+    {
+        if (color.IsEmpty)
+            return 0;
+
+        var colours = objc_getClass("NSColor");
+        return colours == 0
+            ? 0
+            : SendColor(
+                colours,
+                sel_registerName("colorWithSRGBRed:green:blue:alpha:"),
+                color.R / 255.0,
+                color.G / 255.0,
+                color.B / 255.0,
+                color.A / 255.0);
+    }
+
+    /// <summary>
+    /// The toolkit's font as an <c>NSFont</c>, falling back to the system font at the same size when
+    /// the family is not installed.
+    /// </summary>
+    /// <remarks>
+    /// Bold and italic are not part of a font's name on this platform, they are traits, and only
+    /// <c>NSFontManager</c> knows which installed face carries them — asking for "Helvetica Bold" by
+    /// name works for the handful of families that ship one under that name and answers nothing for the
+    /// rest. A family with no bold face at all comes back unconverted rather than synthesised, which is
+    /// AppKit's own answer and better than a smeared one.
+    /// </remarks>
+    internal static nint NSFontOf(Drawing.Font font)
+    {
+        var fonts = objc_getClass("NSFont");
+        if (fonts == 0)
+            return 0;
+
+        var family = NSString(font.Family);
+        var named = family == 0
+            ? 0
+            : SendPointer(fonts, sel_registerName("fontWithName:size:"), family, font.SizeInPoints);
+
+        if (family != 0)
+            CocoaNative.CFRelease(family);
+
+        if (named == 0)
+            named = SendLength(fonts, sel_registerName("systemFontOfSize:"), font.SizeInPoints);
+
+        return named == 0 ? 0 : WithTraits(named, font.Style);
+    }
+
+    /// <summary>NSFontTraitMask: italic is bit 0, bold bit 1 — the pair the rich text box converts with.</summary>
+    private static nint WithTraits(nint font, Drawing.FontStyle style)
+    {
+        var mask = ((style & Drawing.FontStyle.Italic) != 0 ? 1 : 0) | ((style & Drawing.FontStyle.Bold) != 0 ? 2 : 0);
+        if (mask == 0)
+            return font;
+
+        var manager = SendToClass("NSFontManager", "sharedFontManager");
+        if (manager == 0)
+            return font;
+
+        var converted = SendPointer(manager, sel_registerName("convertFont:toHaveTrait:"), font, mask);
+        return converted == 0 ? font : converted;
+    }
+
     /// <summary>Builds a class at run time, which is how a view gets a <c>drawRect:</c> to call back into.</summary>
     [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint objc_allocateClassPair(nint superclass, string name, nint extraBytes);

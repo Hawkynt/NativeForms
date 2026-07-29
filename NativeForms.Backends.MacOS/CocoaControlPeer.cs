@@ -83,11 +83,56 @@ internal abstract class CocoaControlPeer : IControlPeer
     public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
         => CocoaAccessibility.Describe(this.Handle, name, description, role);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Offered rather than sent: <c>setFont:</c> is <c>NSControl</c>'s, and a peer whose handle is a
+    /// plain <c>NSView</c> would abort the process on an unrecognized selector instead of ignoring it.
+    /// </remarks>
+    public void SetFont(Font font)
+    {
+        if (!CocoaRuntime.Responds(this.Handle, "setFont:"))
+            return;
+
+        var native = CocoaRuntime.NSFontOf(font);
+        if (native != 0)
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setFont:"), native);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// An empty colour means the core never had one set anywhere up the chain, so the widget keeps
+    /// whatever the desktop gave it — the same reading as the other two backends.
+    /// </para>
+    /// <para>
+    /// A background is turned on as well as set. AppKit's text-bearing widgets carry a colour they do
+    /// not draw — a label is built with <c>drawsBackground</c> off precisely so it sits on whatever is
+    /// behind it — and a colour that is stored and not painted is not an answer to what was asked.
+    /// </para>
+    /// <para>
+    /// A button's title colour is not served. <c>NSButton</c> has no <c>setTextColor:</c>; its caption
+    /// takes its colour from the button's own style, and the only way past that is an attributed title,
+    /// which then owns the font and the mnemonic as well. Doing half of it would leave a button whose
+    /// caption follows one property and ignores the next.
+    /// </para>
+    /// </remarks>
+    public void SetColors(Color foreColor, Color backColor)
+    {
+        if (this.Handle == 0)
+            return;
+
+        if (CocoaRuntime.NSColorOf(foreColor) is var text and not 0 && CocoaRuntime.Responds(this.Handle, "setTextColor:"))
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setTextColor:"), text);
+
+        if (CocoaRuntime.NSColorOf(backColor) is not (var back and not 0) || !CocoaRuntime.Responds(this.Handle, "setBackgroundColor:"))
+            return;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBackgroundColor:"), back);
+        if (CocoaRuntime.Responds(this.Handle, "setDrawsBackground:"))
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setDrawsBackground:"), true);
+    }
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
-
-    public void SetFont(Font font) { }
-
-    public void SetColors(Color foreColor, Color backColor) { }
 
     public void SetCursor(Cursor cursor) { }
 

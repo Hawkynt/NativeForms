@@ -401,7 +401,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public Font? ShowFontDialog(Font font)
     {
         var manager = CocoaRuntime.SendToClass("NSFontManager", "sharedFontManager");
-        var initial = NativeFont(font);
+        var initial = CocoaRuntime.NSFontOf(font);
         if (manager == 0 || initial == 0)
             return null;
 
@@ -432,26 +432,6 @@ public sealed class CocoaBackend : IPlatformBackend
             name.Length > 0 ? name : font.Family,
             size > 0 ? (float)size : font.SizeInPoints,
             style);
-    }
-
-    /// <summary>The toolkit's font as an <c>NSFont</c>, falling back to the system one by size.</summary>
-    private static nint NativeFont(Font font)
-    {
-        var fonts = CocoaRuntime.objc_getClass("NSFont");
-        if (fonts == 0)
-            return 0;
-
-        var family = CocoaRuntime.NSString(font.Family);
-        var named = family == 0
-            ? 0
-            : CocoaRuntime.SendPointer(fonts, CocoaRuntime.sel_registerName("fontWithName:size:"), family, font.SizeInPoints);
-
-        if (family != 0)
-            CocoaNative.CFRelease(family);
-
-        return named != 0
-            ? named
-            : CocoaRuntime.SendLength(fonts, CocoaRuntime.sel_registerName("systemFontOfSize:"), font.SizeInPoints);
     }
 
     /// <inheritdoc/>

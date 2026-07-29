@@ -85,6 +85,19 @@ is right in CoreGraphics' coordinates and upside down in this one, so the painte
 about the destination rectangle inside a saved state rather than flipping the context, which would
 put every string on its head as well.
 
+A native widget wears the font and the colours the application gave it. Those two calls did nothing
+before, so a `Label` told to be red and bold on macOS was neither. Both are offered with
+`respondsToSelector:` rather than sent, because they are `NSControl`'s and a peer whose handle is a
+plain `NSView` would abort the process on an unrecognized selector instead of ignoring it. Three
+details: bold and italic are traits here rather than part of a font's name, so the family is resolved
+first and then converted through `NSFontManager` — asking for "Helvetica Bold" by name works for the
+few families that ship one under that name and answers nothing for the rest; a background colour is
+switched on as well as set, since AppKit's text widgets carry a colour they do not draw and a label is
+built with `drawsBackground` off on purpose; and a button's title colour is not served at all, because
+`NSButton` has no `setTextColor:` and the only way past that is an attributed title, which would then
+own the font and the mnemonic too. This is implemented but not witnessed: the gallery sets no font or
+colour on a native widget, so nothing in the probe's shots or its census would change if it regressed.
+
 A rounded rectangle is round here too. It was square until now — the two calls forwarded to their
 square siblings, which is why the toggle switch's pill, the toast, the info bar and the progress tiles
 photographed with corners the other two backends do not draw. CoreGraphics has no rounded-rectangle
