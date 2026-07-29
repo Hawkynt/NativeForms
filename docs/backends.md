@@ -873,8 +873,17 @@ where they arise, as is the pair of `RichTextBox` limits that come down to Objec
 so out loud rather than quietly deleting the heading: everything this backend does not do is now
 either something the platform does not have, listed above and argued for, or a limit set out where it
 arises — an `NSSlider`'s step sizes, a drop-down that opens modally, a menu item that cannot be chosen
-inside a dialog, a hover that is wired and not witnessed. What is left is a backend that is honest
-rather than one that is finished.
+inside a dialog, a hover that is wired and not witnessed, a multiline box with no placeholder. What is
+left is a backend that is honest rather than one that is finished.
+
+That last one is the Win32 paragraph's argument in another accent, and it belongs on this page rather
+than in a screenshot nobody reads closely. `NSTextField` carries a `placeholderString` and
+`NSTextView` carries nothing of the sort, so a box that has gone multiline has no hint to show: the
+gallery's "Multiline placeholder (empty)" is blank on macOS and blank on Windows, and reads
+"Owner-drawn multiline placeholder…" only on GTK. Painting one after the text view's own draw is what
+GTK does, and is sound there because the toolkit owns that surface's exposure; here the caret, the
+selection and the scroll position all belong to AppKit's layout manager, so the toolkit would be
+putting text where the editor is about to put a caret and neither would know about the other.
 
 ## How the screenshots are produced
 
