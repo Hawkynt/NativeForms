@@ -234,7 +234,8 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     }
 
     /// <summary>The toolkit's modifier set for an event's AppKit flags.</summary>
-    private static KeyModifiers ModifiersOf(nint theEvent)
+    /// <remarks>Shared with the text box, whose keys the loop reads off the same events.</remarks>
+    internal static KeyModifiers ModifiersOf(nint theEvent)
     {
         var flags = CocoaRuntime.SendInteger(theEvent, CocoaRuntime.sel_registerName("modifierFlags"));
         var modifiers = KeyModifiers.None;
@@ -342,7 +343,8 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     }
 
     /// <summary>The toolkit key for an event's virtual key code.</summary>
-    private static Keys KeyOf(nint theEvent)
+    /// <remarks>Shared with the text box, so a canvas and a native editor read a key the same way.</remarks>
+    internal static Keys KeyOf(nint theEvent)
         => CocoaRuntime.SendUShort(theEvent, CocoaRuntime.sel_registerName("keyCode")) switch
         {
             0x24 => Keys.Enter,

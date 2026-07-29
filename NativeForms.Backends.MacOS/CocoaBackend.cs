@@ -540,8 +540,11 @@ public sealed class CocoaBackend : IPlatformBackend
             }
 
             // The open popups get first refusal. A press outside the deepest one closes it and is
-            // swallowed, which is what a pointer grab would do on the platforms that take one.
-            if (!CocoaPopupPeer.Intercept(next))
+            // swallowed, which is what a pointer grab would do on the platforms that take one. The
+            // text box gets second refusal, for the reason CocoaTextBoxPeer.InterceptKey gives: this
+            // is the only place on this platform that stands ahead of the editor's own handling, so a
+            // key the toolkit consumes is one that is never sent on.
+            if (!CocoaPopupPeer.Intercept(next) && !CocoaTextBoxPeer.InterceptKey(next))
                 CocoaRuntime.SendVoid(app, sendEvent, next);
         }
 

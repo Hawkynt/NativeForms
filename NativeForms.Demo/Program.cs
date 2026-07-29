@@ -185,6 +185,11 @@ if (shooting)
             if (Shoot.ListGeometry(form) is { } lists)
                 Note("  " + lists);
 
+            // After the walk as well: a button on a tab page has no native widget behind it until the
+            // page it lives on has been shown at least once, so an earlier count reads one page.
+            if (Shoot.NativeInput is { } native)
+                Note("  " + native);
+
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 

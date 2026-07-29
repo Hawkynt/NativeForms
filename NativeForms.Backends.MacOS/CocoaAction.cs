@@ -83,8 +83,8 @@ internal static unsafe class CocoaAction
 }
 
 /// <summary>
-/// The object AppKit sends an <c>NSTextView</c>'s delegate messages to: a link was clicked, and an
-/// edit is about to happen.
+/// The object AppKit sends an editor's delegate messages to: the text changed, a link was clicked, and
+/// an edit is about to happen.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -98,9 +98,17 @@ internal static unsafe class CocoaAction
 /// resulting length is known before a character exists.
 /// </para>
 /// <para>
-/// Both live on one class because a text view has one delegate. Splitting them would mean the second
-/// thing attached silently unhooked the first, which is the sort of failure that shows up as "links
-/// stopped working when I set a length limit" a long way from here.
+/// The change notification arrives under two different names for the two objects a text box can be,
+/// and both are carried here rather than in two classes. An <c>NSTextView</c> tells its delegate
+/// <c>textDidChange:</c>; an <c>NSTextField</c> edits through the window's shared field editor and
+/// forwards the same fact to <em>its</em> delegate as <c>controlTextDidChange:</c>. One object
+/// answering both is what lets the peer attach the same delegate to whichever half it currently is,
+/// including across the swap that turns one into the other.
+/// </para>
+/// <para>
+/// Everything lives on one class because a text view has one delegate. Splitting them would mean the
+/// second thing attached silently unhooked the first, which is the sort of failure that shows up as
+/// "links stopped working when I set a length limit" a long way from here.
 /// </para>
 /// <para>
 /// The link arrives as whatever was put in the attribute: AppKit's own detector stores an
@@ -116,6 +124,9 @@ internal static unsafe class CocoaTextViewDelegate
 
     /// <summary>What each delegate reports link clicks to, by delegate pointer.</summary>
     private static readonly ConcurrentDictionary<nint, Action<string>> _handlers = new();
+
+    /// <summary>What each delegate reports the user's edits to, by delegate pointer.</summary>
+    private static readonly ConcurrentDictionary<nint, Action> _changes = new();
 
     /// <summary>The character limit each delegate enforces, by delegate pointer.</summary>
     private static readonly ConcurrentDictionary<nint, int> _limits = new();
@@ -138,6 +149,13 @@ internal static unsafe class CocoaTextViewDelegate
             _handlers[target] = handler;
     }
 
+    /// <summary>Points a delegate's change notifications at <paramref name="handler"/>.</summary>
+    internal static void ReportChanges(nint target, Action handler)
+    {
+        if (target != 0)
+            _changes[target] = handler;
+    }
+
     /// <summary>Sets the characters a delegate lets its text view hold; zero or less lifts the limit.</summary>
     internal static void Limit(nint target, int maximum)
     {
@@ -157,6 +175,7 @@ internal static unsafe class CocoaTextViewDelegate
             return;
 
         _handlers.TryRemove(target, out _);
+        _changes.TryRemove(target, out _);
         _limits.TryRemove(target, out _);
     }
 
@@ -172,6 +191,21 @@ internal static unsafe class CocoaTextViewDelegate
         var created = CocoaRuntime.objc_allocateClassPair(superclass, "NativeFormsTextViewDelegate", 0);
         if (created == 0)
             return;
+
+        // "v@:@": returns void, takes self, _cmd and the notification. The two names are the same
+        // fact told by the two objects a text box can be — a text view says it of itself, a text
+        // field says it of the shared field editor it borrowed — so both land in one place.
+        CocoaRuntime.class_addMethod(
+            created,
+            CocoaRuntime.sel_registerName("textDidChange:"),
+            (nint)(delegate* unmanaged<nint, nint, nint, void>)&TextDidChange,
+            "v@:@");
+
+        CocoaRuntime.class_addMethod(
+            created,
+            CocoaRuntime.sel_registerName("controlTextDidChange:"),
+            (nint)(delegate* unmanaged<nint, nint, nint, void>)&TextDidChange,
+            "v@:@");
 
         // "c@:@@Q": returns BOOL, takes self, _cmd, the text view, the link and the character index.
         CocoaRuntime.class_addMethod(
@@ -191,6 +225,14 @@ internal static unsafe class CocoaTextViewDelegate
 
         CocoaRuntime.objc_registerClassPair(created);
         _class = created;
+    }
+
+    /// <summary>The user edited the text, whichever of the two objects reported it.</summary>
+    [UnmanagedCallersOnly]
+    private static void TextDidChange(nint self, nint selector, nint notification)
+    {
+        if (_changes.TryGetValue(self, out var handler))
+            handler();
     }
 
     [UnmanagedCallersOnly]

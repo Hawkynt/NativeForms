@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
@@ -277,11 +278,29 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
 }
 
 /// <summary>A push button: a real <c>NSButton</c>.</summary>
+/// <remarks>
+/// The press comes back through AppKit's target/action, which is the only route an <c>NSControl</c>
+/// has: there is no click signal to connect and no callback to register, so an object has to be the
+/// target and a selector has to be the action. Both are <see cref="CocoaAction"/>'s, exactly as the
+/// promoted check box, radio button and tray item already use them — one target per peer, so a button
+/// cannot report for another one.
+/// </remarks>
 internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
 {
+    private readonly nint _target;
+
     public CocoaButtonPeer()
         : base(Create())
     {
+        if (this.Handle == 0)
+            return;
+
+        _target = CocoaAction.Create(this.OnClicked);
+        if (_target == 0)
+            return;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setTarget:"), _target);
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAction:"), CocoaAction.Selector);
     }
 
     /// <inheritdoc/>
@@ -388,8 +407,19 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
         });
     }
 
-    /// <summary>Raises <see cref="Clicked"/> once AppKit's target/action routing is wired.</summary>
-    private void Unused2() => Clicked?.Invoke(this, EventArgs.Empty);
+    /// <summary>The widget reporting that the user pressed it.</summary>
+    /// <remarks>
+    /// A key equivalent counts as a press here, which is what makes <see cref="SetDefault"/> work: the
+    /// Return key sends the same action to the same target as the pointer does.
+    /// </remarks>
+    private void OnClicked() => Clicked?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc/>
+    public override void Dispose()
+    {
+        CocoaAction.Forget(_target);
+        base.Dispose();
+    }
 }
 
 /// <summary>
@@ -410,10 +440,32 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
 /// rather than in the text view, so a masked multiline box is not a thing there is a class for. The
 /// wish is kept rather than dropped, and applied if the box ever goes back to a single line.
 /// </para>
+/// <para>
+/// The two things the user does to a box arrive by two different routes, because AppKit offers no
+/// third. An edit comes through the delegate, which both halves have a change message for. A key does
+/// not: a field lends its editing to the window's shared field editor, so the keystroke is delivered
+/// to an <c>NSTextView</c> this backend did not build and cannot add a method to — the same fact that
+/// made the link label a subclass rather than a delegate. What stands in for it is the loop:
+/// <see cref="CocoaBackend.Run"/> already pulls every event before AppKit dispatches it, which is one
+/// step earlier than any widget hears anything, so the key is offered to the box that has the keyboard
+/// there and only reaches the editor if nothing consumed it.
+/// </para>
 /// </remarks>
 internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
 {
+    /// <summary>
+    /// The boxes currently editing, by the object AppKit will make first responder for each — the text
+    /// view of a multiline box, the field of a single-line one.
+    /// </summary>
+    private static readonly ConcurrentDictionary<nint, CocoaTextBoxPeer> _boxes = new();
+
     private bool _secure;
+
+    /// <summary>Whether the peer is reporting a change — see <see cref="GetSelection"/>.</summary>
+    private bool _inChange;
+
+    /// <summary>The text the core last wrote, which during a change is the content before the edit.</summary>
+    private string _pushed = string.Empty;
 
     /// <summary>
     /// The editing view when this is multiline, otherwise zero. A field has none of its own: AppKit
@@ -437,6 +489,8 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     public CocoaTextBoxPeer()
         : base(Create(secure: false))
     {
+        this.Bind();
+        this.AttachEditorDelegate();
     }
 
     /// <inheritdoc/>
@@ -479,6 +533,7 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     /// <remarks>A text view holds a string, not a "string value"; the base class speaks to controls.</remarks>
     public override void SetText(string text)
     {
+        _pushed = text;
         if (_textView == 0)
         {
             base.SetText(text);
@@ -627,8 +682,10 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
 
         var carried = this.GetText();
         var replaced = this.Handle;
+        this.Unbind();
         _textView = editor;
         this.Handle = host;
+        this.Bind();
 
         var superview = replaced == 0 ? 0 : CocoaRuntime.SendPointer(replaced, CocoaRuntime.sel_registerName("superview"));
         if (superview != 0)
@@ -649,29 +706,129 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     /// </summary>
     private protected virtual void OnEditorChanged()
     {
-        if (_editorDelegate != 0 && _textView != 0)
-            CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setDelegate:"), _editorDelegate);
-
+        this.AttachEditorDelegate();
         this.ApplyMaxLength();
     }
 
-    /// <summary>The text view's delegate, built and attached on the first thing that needs one.</summary>
+    /// <summary>Attaches the delegate and points its change notification at this peer.</summary>
     /// <remarks>
-    /// One object for both the jobs AppKit routes through a text view's delegate, because a text view
-    /// has one delegate: a second one attached would silently unhook the first.
+    /// Not virtual, because the constructor calls it: a box reports the user's edits from the moment it
+    /// exists rather than from the first time something else happens to need a delegate.
+    /// </remarks>
+    private void AttachEditorDelegate()
+        => CocoaTextViewDelegate.ReportChanges(this.EnsureEditorDelegate(), this.OnTextChanged);
+
+    /// <summary>The widget reporting that the user changed the text.</summary>
+    /// <remarks>
+    /// The flag is what <see cref="GetSelection"/> reads: AppKit reports the change once the editor has
+    /// already advanced its caret past what was inserted, and the seam promises the caret as it stood
+    /// before the edit.
+    /// </remarks>
+    private void OnTextChanged()
+    {
+        _inChange = true;
+        try
+        {
+            TextChangedByUser?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            _inChange = false;
+        }
+    }
+
+    /// <summary>The editor's delegate, built and attached on the first thing that needs one.</summary>
+    /// <remarks>
+    /// One object for every job AppKit routes through a delegate, because an editor has one: a second
+    /// one attached would silently unhook the first. Which object it goes on is the box's current half
+    /// — a multiline box's own text view, or the field, which forwards what the shared field editor
+    /// tells it.
     /// </remarks>
     private protected nint EnsureEditorDelegate()
     {
-        if (_textView == 0)
+        var editor = _textView != 0 ? _textView : this.Handle;
+        if (editor == 0)
             return 0;
 
         if (_editorDelegate == 0)
             _editorDelegate = CocoaTextViewDelegate.Create();
 
         if (_editorDelegate != 0)
-            CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setDelegate:"), _editorDelegate);
+            CocoaRuntime.SendVoid(editor, CocoaRuntime.sel_registerName("setDelegate:"), _editorDelegate);
 
         return _editorDelegate;
+    }
+
+    /// <summary>Makes this box findable by whatever AppKit will make first responder for it.</summary>
+    private void Bind()
+    {
+        if (_textView != 0)
+            _boxes[_textView] = this;
+        else if (this.Handle != 0)
+            _boxes[this.Handle] = this;
+    }
+
+    /// <summary>The counterpart of <see cref="Bind"/>, so a swapped-out object stops answering.</summary>
+    private void Unbind()
+    {
+        if (_textView != 0)
+            _boxes.TryRemove(_textView, out _);
+
+        if (this.Handle != 0)
+            _boxes.TryRemove(this.Handle, out _);
+    }
+
+    /// <summary>
+    /// Offers a key to the box that currently has the keyboard, before AppKit dispatches it, and
+    /// answers whether the toolkit consumed it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The seam says a key reaches the box <em>before</em> the native editor acts on it and that a
+    /// handled one never gets there — which on this platform can only be done here. There is no class
+    /// to override: a text field is edited by the window's shared field editor, an object AppKit owns,
+    /// and a delegate hears about commands (<c>insertNewline:</c>, <c>insertTab:</c>) rather than about
+    /// keys. The loop stands one step earlier than either, so a consumed key is simply one that is
+    /// never sent on.
+    /// </para>
+    /// <para>
+    /// The first responder is the editing object itself for a multiline box and the borrowed field
+    /// editor for a single-line one — and a field editor carries the field it is lent to as its
+    /// delegate, which is the same fact the link label relies on. So the responder is looked up
+    /// directly first and through its delegate second.
+    /// </para>
+    /// </remarks>
+    internal static bool InterceptKey(nint theEvent)
+    {
+        // NSEventTypeKeyDown.
+        if (theEvent == 0 || _boxes.IsEmpty
+            || (int)CocoaRuntime.SendInteger(theEvent, CocoaRuntime.sel_registerName("type")) != 10)
+            return false;
+
+        var window = CocoaRuntime.SendPointer(theEvent, CocoaRuntime.sel_registerName("window"));
+        var responder = window == 0
+            ? 0
+            : CocoaRuntime.SendPointer(window, CocoaRuntime.sel_registerName("firstResponder"));
+
+        if (responder == 0)
+            return false;
+
+        if (!_boxes.TryGetValue(responder, out var box))
+        {
+            var lender = CocoaRuntime.Responds(responder, "delegate")
+                ? CocoaRuntime.SendPointer(responder, CocoaRuntime.sel_registerName("delegate"))
+                : 0;
+
+            if (lender == 0 || !_boxes.TryGetValue(lender, out box))
+                return false;
+        }
+
+        if (box.KeyDown is not { } handler)
+            return false;
+
+        var args = new KeyEventArgs(CocoaCanvasPeer.KeyOf(theEvent), CocoaCanvasPeer.ModifiersOf(theEvent));
+        handler(box, args);
+        return args.Handled;
     }
 
     /// <summary>
@@ -742,13 +899,24 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The change notification arrives once the editor has finished the edit and moved its caret past
+    /// what was inserted, so during a change the caret is walked back to where the edit began — the
+    /// convention <see cref="ITextBoxPeer.GetSelection"/> promises, and the one a <c>GtkEntry</c>
+    /// reports natively. What the core last wrote is exactly the pre-edit content, so the distance is
+    /// the length the text has grown by since.
+    /// </remarks>
     public (int Start, int Length) GetSelection()
     {
         if (Editor() is not { } editor)
             return (this.GetText().Length, 0);
 
         var range = CocoaRuntime.SendRange(editor, CocoaRuntime.sel_registerName("selectedRange"));
-        return ((int)range.Location, (int)range.Length);
+        var start = (int)range.Location;
+        if (_inChange)
+            start -= Math.Max(0, this.GetText().Length - _pushed.Length);
+
+        return (Math.Max(0, start), (int)range.Length);
     }
 
     /// <summary>The view the selection lives in: this box's own, or the field editor lent to it.</summary>
@@ -783,12 +951,7 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     {
         if (_textView != 0)
         {
-            // Nothing is built for "no limit": a box that never had one needs no delegate at all.
-            if (_maxLength > 0)
-                CocoaTextViewDelegate.Limit(this.EnsureEditorDelegate(), _maxLength);
-            else
-                CocoaTextViewDelegate.Limit(_editorDelegate, 0);
-
+            CocoaTextViewDelegate.Limit(this.EnsureEditorDelegate(), _maxLength);
             return;
         }
 
@@ -810,6 +973,7 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     /// <inheritdoc/>
     public override void Dispose()
     {
+        this.Unbind();
         CocoaTextViewDelegate.Forget(_editorDelegate);
         CocoaLengthFormatter.Forget(_formatter);
         if (_formatter != 0)
@@ -819,12 +983,5 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
         }
 
         base.Dispose();
-    }
-
-    /// <summary>Raises the input events once AppKit's delegate routing is wired.</summary>
-    private void Unused3()
-    {
-        TextChangedByUser?.Invoke(this, EventArgs.Empty);
-        KeyDown?.Invoke(this, new(Keys.None, KeyModifiers.None));
     }
 }

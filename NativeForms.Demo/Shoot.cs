@@ -46,6 +46,16 @@ internal static partial class Shoot
     public static string? WindowChrome => OperatingSystem.IsMacOS() ? ShootMacOS.WindowChrome() : null;
 
     /// <summary>
+    /// Whether the plain native widgets report the user's work to the toolkit, where it can be asked.
+    /// </summary>
+    /// <remarks>
+    /// Read at the end of the walkthrough for the same reason the class census is: a widget on a tab
+    /// page does not exist until the page has been shown, so a count taken earlier describes one
+    /// sixteenth of the gallery.
+    /// </remarks>
+    public static string? NativeInput => OperatingSystem.IsMacOS() ? ShootMacOS.NativeInput() : null;
+
+    /// <summary>
     /// Whether the rich text box's link activation reaches the toolkit, where the platform can be asked.
     /// </summary>
     /// <remarks>Wiring, not delivery — for the reason <see cref="HoverWiring"/> gives.</remarks>

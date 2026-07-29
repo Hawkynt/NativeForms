@@ -311,6 +311,103 @@ internal static unsafe partial class ShootMacOS
     }
 
     /// <summary>
+    /// Whether the plain widgets report what the user does to them, read back off the running window.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The same limit every other wiring line here carries: the window server drops this job's injected
+    /// pointer and keyboard for want of an Accessibility grant, so no check on this runner can watch a
+    /// real press reach a button. What it can ask is whether the two things a report needs are on the
+    /// widgets — a target and an action on the button, a delegate on the editor — because AppKit reads
+    /// both back.
+    /// </para>
+    /// <para>
+    /// The button figure is a pair on purpose. A push button, a check box and a radio button are all
+    /// <c>NSButton</c> here, and the promoted two were wired long before the plain one was, so a count
+    /// on its own could not tell the difference. The two numbers being equal is the claim: every
+    /// <c>NSButton</c> in the window reports to the toolkit, push buttons included.
+    /// </para>
+    /// <para>
+    /// The editor figures are counted apart because they are two different objects with two different
+    /// change messages — a field forwards what the shared field editor tells it, a text view says it of
+    /// itself — and one of them being zero is exactly the regression this line exists to catch. A link
+    /// label is excluded by name: it is a subclass of its own and hears its clicks a different way.
+    /// </para>
+    /// </remarks>
+    public static string NativeInput()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "native input: no window to ask";
+
+        var counts = new NativeInputCounts();
+        CountInputWiring(Send(window, sel_registerName("contentView")), ref counts);
+
+        return $"native input: {counts.WiredButtons} of {counts.Buttons} NSButton(s) carry the toolkit's "
+            + $"action target, {counts.WiredFields} NSTextField(s) and {counts.WiredViews} NSTextView(s) "
+            + "report their edits to it";
+    }
+
+    /// <summary>What one walk of the view tree found about the widgets that report to the toolkit.</summary>
+    private struct NativeInputCounts
+    {
+        public int Buttons, WiredButtons, WiredFields, WiredViews;
+    }
+
+    /// <summary>Tallies the widgets under one view that are wired to report the user's work.</summary>
+    private static void CountInputWiring(nint view, ref NativeInputCounts counts)
+    {
+        if (view == 0)
+            return;
+
+        var name = class_getName(object_getClass(view)) is var raw && raw != 0
+            ? Marshal.PtrToStringUTF8(raw)
+            : null;
+
+        switch (name)
+        {
+            case "NSButton":
+                ++counts.Buttons;
+                if (TargetClassOf(view, "target") == "NativeFormsAction")
+                    ++counts.WiredButtons;
+
+                break;
+
+            case "NSTextField" or "NSSecureTextField":
+                if (TargetClassOf(view, "delegate") == "NativeFormsTextViewDelegate")
+                    ++counts.WiredFields;
+
+                break;
+
+            case "NSTextView":
+                if (TargetClassOf(view, "delegate") == "NativeFormsTextViewDelegate")
+                    ++counts.WiredViews;
+
+                break;
+        }
+
+        var children = Send(view, sel_registerName("subviews"));
+        var count = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+            CountInputWiring(Send(children, sel_registerName("objectAtIndex:"), i), ref counts);
+    }
+
+    /// <summary>The class name of whatever a view answers for a selector, or null.</summary>
+    private static string? TargetClassOf(nint view, string selector)
+    {
+        var ask = sel_registerName(selector);
+        if (!SendBool(view, sel_registerName("respondsToSelector:"), ask))
+            return null;
+
+        var target = Send(view, ask);
+        var raw = target == 0 ? 0 : class_getName(object_getClass(target));
+        return raw == 0 ? null : Marshal.PtrToStringUTF8(raw);
+    }
+
+    /// <summary>
     /// Whether the two routes a pointer shape takes on this platform are in place on the live window.
     /// </summary>
     /// <remarks>
@@ -383,14 +480,21 @@ internal static unsafe partial class ShootMacOS
             CountTrackingOwners(Send(children, sel_registerName("objectAtIndex:"), i), className, ref watched);
     }
 
-    /// <summary>Counts the views under one whose delegate is the toolkit's link target.</summary>
+    /// <summary>Counts the text views under one whose delegate is the toolkit's link target.</summary>
+    /// <remarks>
+    /// Text views only. The same delegate now sits on every single-line field as well, because it is
+    /// also where an edit is reported from — but a field has no link to click, so counting one here
+    /// would inflate this number with widgets it says nothing about.
+    /// </remarks>
     private static void CountLinkDelegates(nint view, ref int wired)
     {
         if (view == 0)
             return;
 
         var ask = sel_registerName("delegate");
-        if (SendBool(view, sel_registerName("respondsToSelector:"), ask)
+        if (class_getName(object_getClass(view)) is var self && self != 0
+            && Marshal.PtrToStringUTF8(self) == "NSTextView"
+            && SendBool(view, sel_registerName("respondsToSelector:"), ask)
             && Send(view, ask) is var target && target != 0
             && class_getName(object_getClass(target)) is var raw && raw != 0
             && Marshal.PtrToStringUTF8(raw) == "NativeFormsTextViewDelegate")

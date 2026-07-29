@@ -54,9 +54,10 @@ as one drawn by the platform. The shapes are ours; the values are the desktop's.
 **Native promotion changes what is drawn at all.** On GTK and Win32 nine controls realise onto real
 platform widgets when nothing in their state needs the painter (PRD §12) — a `CheckBox` is a real
 `GtkCheckButton` or `BUTTON`, until you give it an image no platform box draws beside its caption, at
-which point it swaps to the owner-drawn twin and swaps back when you take it away. Cocoa now promotes all nine too, on top
-of `Label`, `Button` and `TextBox`, which are always native there; everything else is owner-drawn. Two
-of the nine keep something back on that backend, and the macOS section below says which.
+which point it swaps to the owner-drawn twin and swaps back when you take it away. Cocoa now promotes
+all nine too, on top of `Label`, `Button` and `TextBox`, which are always native there; everything
+else is owner-drawn. Two of the nine keep something back on that backend, and the macOS section below
+says which.
 
 ## The macOS backend, specifically
 
@@ -123,8 +124,9 @@ icon on it — the caption shows a proxy icon only for a window standing for a f
 and the only icon a running process can set is the application's own in the Dock, which is one per
 process where the property is one per window, so a second form would silently replace the first
 form's. There is nothing to implement and nothing being put off; an application that wants an icon on
-macOS ships one in its bundle. The probe reads all of the rest back off the live window, and because the gallery sets a minimum
-size of its own that line is a round trip rather than a statement of wiring.
+macOS ships one in its bundle. The probe reads all of the rest back off the live window, and because
+the gallery sets a minimum size of its own that line is a round trip rather than a statement of
+wiring.
 
 A native widget wears the font and the colours the application gave it. Those two calls did nothing
 before, so a `Label` told to be red and bold on macOS was neither. Both are offered with
@@ -405,6 +407,47 @@ That delegate is the one the link clicks arrive at as well, because a text view 
 second one attached would silently unhook the first. It is therefore named for the text view rather
 than for either job, and the probe counts it as what it is.
 
+A button now reports its press and a text box its edit, which is where this backend was least honest:
+both events existed, nothing ever raised them, and a screenshot of a gallery full of working-looking
+widgets said nothing about it. The button is the easy half — an `NSControl` reports a press by sending
+a selector to a target object, so it gets the same `CocoaAction` the promoted check box, radio button
+and tray item have used all along, one per peer so a button cannot answer for another one. A key
+equivalent sends the same action, which is what makes the default button's Return work without a
+second path.
+
+The edit is two messages for what is one fact, because a text box here is two objects. An `NSTextView`
+tells its delegate `textDidChange:`; an `NSTextField` has no editor of its own — the window lends it a
+shared one — and forwards the same thing to *its* delegate as `controlTextDidChange:`. Both land on
+the one runtime delegate class this backend already had, which is what lets the peer attach the same
+object to whichever half it currently is, including across the swap that turns one into the other.
+The caret is walked back while the change is being reported: AppKit says so after the editor has moved
+past what was inserted, and the seam promises where the edit *began* — the only reading that
+identifies an edit, since the text alone is ambiguous whenever the typed character matches its
+neighbours. That is the same compensation the Win32 peer makes for `EN_CHANGE`, and what a `GtkEntry`
+reports natively.
+
+A key is the one of the three with nowhere to be attached. There is no class to override: a field is
+edited by the window's shared field editor, an object AppKit owns, and a delegate is told about
+*commands* — `insertNewline:`, `insertTab:` — rather than about keys. So the loop serves it. The
+application's event pump already pulls every event before AppKit dispatches it, which is one step
+earlier than any widget hears anything, so the key is offered to whichever box holds the keyboard
+there and is simply not sent on if the toolkit consumed it — which is exactly what the seam means by a
+handled key the native editor never sees. The box is found by the event's first responder: itself when
+it is multiline, and otherwise the borrowed field editor, which carries the field it was lent to as
+its delegate — the same fact the link label is built on. Keys that reach it are the set the canvas
+translates, so a native editor and an owner-drawn one read a keystroke the same way; letters are not
+in that set on either.
+
+The probe reports all of this the way it reports the tracking areas and the cursor targets: read back
+off the running window rather than claimed. The button figure is a pair, and has to be — a push
+button, a check box and a radio button are all `NSButton` here, and the promoted two were wired long
+before the plain one was, so only "every `NSButton` in the window has the toolkit's target" says
+anything about the one that was missing. The two editor figures are counted apart because they are
+two different objects with two different change messages, and either of them at zero is the
+regression this line exists to catch. What it still cannot show is delivery, for the reason every
+other wiring line here gives: the window server drops this job's injected pointer and keyboard for
+want of an Accessibility grant.
+
 ### What this backend still refuses, and why
 
 Nothing on it does nothing without appearing here. The list is in two halves, because "this platform
@@ -427,11 +470,11 @@ owns the font and the colour as well — one piece of work serving both, and not
 does not block here: `RunModal` shows the window and returns, so a caller gets `DialogResult.Cancel`
 back immediately and the form is disposed underneath them. The native dialogs do not go through it —
 `NSAlert` and the four panels each run a session of their own — so the message box and the file,
-colour and font pickers are unaffected, and it is a `Form` shown modally that is missing. And the
-plain widgets still carry events nothing raises: a `Button` reports no click and a `TextBox` no edit
-of its own, because neither has been given the target/action and delegate wiring the promoted controls
-already have. Those are the next things to do on this backend, and they are named here so that a
-screenshot that looks finished is not read as one.
+colour and font pickers are unaffected, and it is a `Form` shown modally that is missing. And a
+keystroke reaches a native editor as one of the keys the canvas translates, which is the navigation
+and editing set: a letter arrives as `Keys.None`, so a mnemonic or a shortcut typed inside a text box
+is not routed on this backend. That is the canvas's table rather than the text box's, and widening it
+would serve both. These are named here so that a screenshot that looks finished is not read as one.
 
 ## How the screenshots are produced
 
