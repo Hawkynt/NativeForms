@@ -42,6 +42,36 @@ if (measureStartup)
 // loop is actually running, so the shutdown is clean — without driving the gallery.
 var shooting = Array.IndexOf(args, "--shoot") >= 0;
 var shootFailures = 0;
+
+// Opened before the gallery is built, not after. A WinExe has no console to complain to and nobody
+// watches one on a runner, so everything the shoot has to say goes into the artifact — and the run
+// that most needs explaining is the one that dies during construction, which is exactly what a
+// platform whose backend is still a placeholder does. Setting the log up afterwards means that run
+// produces nothing at all, which is what the first macOS probe did.
+var shootDirectory = string.Empty;
+var shootLog = string.Empty;
+void Note(string line)
+{
+    Console.WriteLine(line);
+    if (shootLog.Length > 0)
+        File.AppendAllText(shootLog, line + Environment.NewLine);
+}
+
+if (shooting)
+{
+    var index = Array.IndexOf(args, "--shoot");
+    shootDirectory = index + 1 < args.Length && !args[index + 1].StartsWith('-')
+        ? args[index + 1]
+        : Path.Combine(Path.GetTempPath(), "nativeforms-shots");
+
+    Directory.CreateDirectory(shootDirectory);
+    shootLog = Path.Combine(shootDirectory, "shoot.log");
+    File.WriteAllText(shootLog, $"shoot on {Environment.OSVersion} / {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}{Environment.NewLine}");
+    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        File.AppendAllText(shootLog, $"unhandled: {e.ExceptionObject}{Environment.NewLine}");
+
+    Note("backends registered, building the gallery");
+}
 if (measureStartup && !shooting)
     form.Load += (_, _) =>
     {
@@ -66,27 +96,7 @@ if (measureStartup && !shooting)
 // interesting, but it has a real HWND, which is all the capture route selection needs.
 if (shooting)
 {
-    var shootIndex = Array.IndexOf(args, "--shoot");
-    var directory = shootIndex + 1 < args.Length && !args[shootIndex + 1].StartsWith('-')
-        ? args[shootIndex + 1]
-        : Path.Combine(Path.GetTempPath(), "nativeforms-shots");
-
-    Directory.CreateDirectory(directory);
-
-    // A WinExe has no console to complain to, and on a CI runner nobody is watching one anyway: the
-    // first attempt at this exited 1 in two seconds having said nothing at all, which is a diagnosis
-    // of precisely nothing. Everything the shoot has to say goes into the artifact beside the PNGs,
-    // including whatever killed it.
-    var log = Path.Combine(directory, "shoot.log");
-    void Note(string line)
-    {
-        Console.WriteLine(line);
-        File.AppendAllText(log, line + Environment.NewLine);
-    }
-
-    File.WriteAllText(log, $"shoot on {Environment.OSVersion} / {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}{Environment.NewLine}");
-    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-        File.AppendAllText(log, $"unhandled: {e.ExceptionObject}{Environment.NewLine}");
+    var directory = shootDirectory;
 
     // Every page, not just the one that happens to be in front. Switching pages through the tab
     // control's own property rather than by synthesizing clicks is what makes this work on every
