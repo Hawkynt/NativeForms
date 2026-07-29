@@ -2557,7 +2557,7 @@ public class DataGridView : OwnerDrawnControl
                 if (icon is null)
                 {
                     var plain = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - (2 * _CellPadding)), cellRect.Height);
-                    g.DrawText(text, theme.DefaultFont, foreColor, plain, alignment);
+                    g.DrawText(TextTrim.ToWidth(g, text, theme.DefaultFont, plain.Width), theme.DefaultFont, foreColor, plain, alignment);
                     break;
                 }
 
@@ -2596,7 +2596,7 @@ public class DataGridView : OwnerDrawnControl
                         _ => (textRect, ContentAlignment.MiddleLeft),
                     };
 
-                    g.DrawText(text, theme.DefaultFont, foreColor, band, bandAlignment);
+                    g.DrawText(TextTrim.ToWidth(g, text, theme.DefaultFont, band.Width), theme.DefaultFont, foreColor, band, bandAlignment);
                 }
 
                 break;

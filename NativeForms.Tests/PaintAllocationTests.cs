@@ -508,6 +508,39 @@ internal sealed class PaintAllocationTests
     }
 
     [Test]
+    public void ListView_repaint_of_labels_too_long_for_their_cells_allocates_nothing()
+    {
+        // Shortening a label to fit builds a string, and building one per frame is exactly what this
+        // fixture exists to catch — so every name here is far too long for its cell, in both the
+        // views that centre a label under an icon and the one that lays it out in columns.
+        var list = new ListView { Bounds = new(0, 0, 320, 200), View = ListViewView.LargeIcon };
+        list.Items.AddRange(
+        [
+            new ListViewItem("a very long plain ascii filename indeed.txt"),
+            new ListViewItem("🎉 an emoji name that does not come close to fitting.txt"),
+            new ListViewItem("日本語のとても長いファイル名です.txt"),
+        ]);
+        list.SelectedIndex = 0;
+
+        Assert.That(MeasureSteadyStatePaint(list), Is.Zero);
+    }
+
+    [Test]
+    public void DataGridView_repaint_of_text_too_long_for_its_column_allocates_nothing()
+    {
+        var grid = new DataGridView { Bounds = new(0, 0, 200, 160) };
+        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Person)o!).Name) { Width = 80 });
+        grid.Items.AddRange(
+        [
+            new Person("a very long plain ascii filename indeed.txt", 30),
+            new Person("🎉 an emoji name that does not come close to fitting.txt", 25),
+        ]);
+        grid.SelectedRowIndex = 0;
+
+        Assert.That(MeasureSteadyStatePaint(grid), Is.Zero);
+    }
+
+    [Test]
     public void TreeView_steady_state_repaint_allocates_nothing()
     {
         var tree = new TreeView { Bounds = new(0, 0, 240, 200) };
