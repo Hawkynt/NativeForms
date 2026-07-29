@@ -51,7 +51,7 @@ public sealed class CocoaBackend : IPlatformBackend
     }
 
     /// <inheritdoc/>
-    public IWindowPeer CreateWindow() => new CocoaWindowPeer();
+    public IWindowPeer CreateWindow() => new CocoaWindowPeer(this);
 
     /// <inheritdoc/>
     public ICanvasPeer CreateCanvas() => new CocoaCanvasPeer();

@@ -140,8 +140,11 @@ jobs:
       #
       # Expected to fail until the backend exists, so it reports rather than blocks. It becomes a gate
       # the same way the Windows job did — by passing.
+      # Bounded, because a backend under construction can leave the loop running with nothing left to
+      # end it — and a probe that hangs tells you less than one that stops and hands over its log.
       - name: Probe the gallery
         continue-on-error: true
+        timeout-minutes: 3
         run: dotnet run --project NativeForms.Demo --configuration Release --no-build -- --shoot "${{ runner.temp }}/shots"
       - name: Upload the probe
         if: always()

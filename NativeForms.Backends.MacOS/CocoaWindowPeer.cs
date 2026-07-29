@@ -25,6 +25,7 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// </remarks>
 internal sealed class CocoaWindowPeer : IWindowPeer
 {
+    private readonly CocoaBackend _backend;
     // NSWindowStyleMask
     private const nint _Titled = 1 << 0;
     private const nint _Closable = 1 << 1;
@@ -39,8 +40,11 @@ internal sealed class CocoaWindowPeer : IWindowPeer
     private Rectangle _bounds = new(0, 0, 400, 300);
     private nint _style = _Titled | _Closable | _Miniaturizable | _Resizable;
 
-    public CocoaWindowPeer()
+    private bool _quitsOnClose;
+
+    public CocoaWindowPeer(CocoaBackend backend)
     {
+        _backend = backend;
         var allocated = CocoaRuntime.Allocate("NSWindow");
         _window = allocated == 0
             ? 0
@@ -110,6 +114,14 @@ internal sealed class CocoaWindowPeer : IWindowPeer
     {
         if (_window != 0)
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("close"));
+
+        Closed?.Invoke(this, EventArgs.Empty);
+
+        // The main window closing is what ends the application. AppKit would normally do this through
+        // NSApplicationDelegate's applicationShouldTerminateAfterLastWindowClosed:, which needs a
+        // delegate object; the peer knows the same fact and can say so directly.
+        if (_quitsOnClose)
+            _backend.Quit();
     }
 
     public void SetBorderStyle(FormBorderStyle borderStyle)
@@ -187,7 +199,7 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     public void SetIcon(int width, int height, ReadOnlySpan<int> argb) { }
 
-    public void SetQuitsOnClose(bool quits) { }
+    public void SetQuitsOnClose(bool quits) => _quitsOnClose = quits;
 
     public void Dispose() => this.Close();
 
@@ -200,7 +212,6 @@ internal sealed class CocoaWindowPeer : IWindowPeer
         PointerMove?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
         ContextMenuRequested?.Invoke(this, new(Point.Empty));
         CloseRequested?.Invoke(this, new());
-        Closed?.Invoke(this, EventArgs.Empty);
         BoundsChangedByUser?.Invoke(this, _bounds);
         WindowStateChanged?.Invoke(this, FormWindowState.Normal);
     }
