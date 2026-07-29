@@ -170,6 +170,22 @@ size rather than a slot each, so a merely plausible signature reads the wrong by
 something that looks like an image. Owner-drawn `DrawImage` is still a no-op and is not part of this;
 the conversion is where a later change would start.
 
+One more thing about it is ordering rather than messaging: the peer promotes the process to
+`NSApplicationActivationPolicyRegular` before asking for the item. A process launched from a terminal
+is `Prohibited` and owns no part of the menu bar, and the loop only promotes it when it *starts* — by
+which time an application has already built its tray icon, which would have been handed over with
+nowhere to be.
+
+What the probe can say about this one is less than about the promotions, and the shape of the limit is
+worth writing down because the first two attempts at it reported a false negative. The item's button
+is not reachable from `[NSApp windows]` — a status item is hosted outside the application, so the
+window list holds nothing for it — and reporting "missing" from that absence was a guess dressed as a
+finding. The probe now asks the platform directly instead: it takes a second status item of its own,
+checks whether that one comes with a button, and gives it straight back. On the runner it does, which
+says status items work in that session and the toolkit's own is somewhere the window list does not
+reach. What is still unwitnessed is the icon and the tooltip on the item's button, and a press on it,
+which is the same undeliverable gesture as every other injected click here.
+
 The hyperlink has no control behind it on this desktop, only a convention: a selectable, non-editable
 `NSTextField` whose string carries `NSLinkAttributeName`. That is what is served, and it buys the
 platform's pointing-hand cursor, a link colour that follows the appearance and the accent without the
