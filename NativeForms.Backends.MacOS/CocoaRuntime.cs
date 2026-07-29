@@ -31,7 +31,18 @@ internal static partial class CocoaRuntime
 
     /// <summary>Looks a class up by name; zero when the framework defining it is not loaded.</summary>
     [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint objc_getClass(string name);
+    private static partial nint objc_getClass_raw(string name);
+
+    /// <summary>
+    /// Looks an Objective-C class up, having made sure the framework that defines it is loaded.
+    /// </summary>
+    internal static nint objc_getClass(string name)
+    {
+        if (!_appKit.IsValueCreated)
+            _ = _appKit.Value;
+
+        return objc_getClass_raw(name);
+    }
 
     /// <summary>Interns a selector, which is how a method is named at run time.</summary>
     [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
@@ -142,6 +153,27 @@ internal static partial class CocoaRuntime
     [return: MarshalAs(UnmanagedType.U1)]
     internal static partial bool class_addMethod(nint cls, nint selector, nint implementation, string types);
 
-    /// <summary>Whether Objective-C messaging is usable at all — the answer is no off macOS.</summary>
-    internal static bool Available => OperatingSystem.IsMacOS() && objc_getClass("NSObject") != 0;
+    /// <summary>
+    /// Whether Objective-C messaging is usable, having first made sure AppKit is in the process.
+    /// </summary>
+    /// <remarks>
+    /// A framework's classes do not exist until something loads it. Nothing here links AppKit — every
+    /// other import is CoreFoundation, CoreGraphics or CoreText — so <c>objc_getClass("NSWindow")</c>
+    /// answered zero, every peer quietly did nothing, and the run loop returned at once because there
+    /// was no <c>NSApplication</c> to ask for events. No error anywhere: an application that builds its
+    /// whole interface and then exits without drawing, which is exactly what the probe reported.
+    /// </remarks>
+    internal static bool Available => _appKit.Value;
+
+    private static readonly Lazy<bool> _appKit = new(LoadAppKit);
+
+    private static bool LoadAppKit()
+    {
+        if (!OperatingSystem.IsMacOS())
+            return false;
+
+        // AppKit pulls in Foundation, so one load covers both.
+        NativeLibrary.TryLoad("/System/Library/Frameworks/AppKit.framework/AppKit", out _);
+        return objc_getClass_raw("NSApplication") != 0;
+    }
 }
