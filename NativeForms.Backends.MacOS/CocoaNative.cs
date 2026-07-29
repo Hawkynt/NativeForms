@@ -140,8 +140,24 @@ internal static partial class CocoaNative
     [LibraryImport(_CoreGraphics)]
     internal static partial void CGContextSetTextPosition(nint context, double x, double y);
 
+    /// <summary>
+    /// A 2D affine transform: six doubles, and the reason this is a struct rather than six parameters.
+    /// </summary>
+    /// <remarks>
+    /// AArch64 passes a homogeneous float aggregate in registers only up to four members. Six exceeds
+    /// that, so the ABI passes it indirectly — and a declaration taking six loose doubles hands the
+    /// callee six registers where it expects a pointer. It does not fail: it reads whatever the pointer
+    /// register happened to hold and transforms the text by nonsense, which is how a text matrix turns
+    /// glyphs into wedges.
+    /// </remarks>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CGAffineTransform
+    {
+        public double A, B, C, D, Tx, Ty;
+    }
+
     [LibraryImport(_CoreGraphics)]
-    internal static partial void CGContextSetTextMatrix(nint context, double a, double b, double c, double d, double tx, double ty);
+    internal static partial void CGContextSetTextMatrix(nint context, CGAffineTransform matrix);
 
     /// <summary>
     /// Draws one line of text at a baseline, returning whether it could. The line is built and thrown
@@ -181,7 +197,7 @@ internal static partial class CocoaNative
             // The context is flipped so the toolkit's y grows downward; glyphs would come out mirrored
             // unless the text matrix flips back, which is the standard pairing for drawing text into a
             // flipped context rather than a special case.
-            CGContextSetTextMatrix(context, 1, 0, 0, -1, 0, 0);
+            CGContextSetTextMatrix(context, new() { A = 1, D = -1 });
             CGContextSetTextPosition(context, x, baseline);
             CTLineDraw(line, context);
             return true;
