@@ -81,6 +81,12 @@ into a Cairo surface, GDI into a DIB section, `cacheDisplayInRect:` into an `NSB
 a CI runner has no desktop session to point a screenshot tool at, and because asking the widgets to
 paint gives the toolkit's own output rather than whatever was stacked on a desktop.
 
+Each backend finds the window its own way, and on macOS the obvious way is wrong: `mainWindow` and
+`keyWindow` are both nil while the application is inactive, which on a runner it is for the first
+several seconds — nothing competes for the focus, so nothing hurries the window server along. The
+shot count wandered between none and fifteen of sixteen until the capture started picking the window
+out of `[NSApp windows]`, which does not depend on activation.
+
 Regenerate the comparison strips with the three artifacts side by side; the CI jobs
 `screenshots (windows)` and `macos probe` upload theirs on every push.
 
