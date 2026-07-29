@@ -355,7 +355,9 @@ strategy (may differ per platform; note exceptions inline).
 - [~] `TextBox` (native: Win32 EDIT / GTK GtkEntry + GtkTextView-in-ScrolledWindow)
   - [x] Single-line editing, `TextChanged` (echo-guarded two-way sync, once per user edit)
   - [x] `Multiline` (vertical scrollbar; live flip recreates the widget and re-flushes buffered
-        text/selection, same control id so `WM_COMMAND` routing survives)
+        text/selection, same control id so `WM_COMMAND` routing survives). A line break is `\n` in
+        the core on every backend; the Win32 peer translates to and from the `\r\n` an `EDIT` breaks
+        on, caret indices included, so `Lines` and `SelectionStart` mean one thing everywhere
   - [x] `PlaceholderText` (single-line cue banner: `EM_SETCUEBANNER` /
         `gtk_entry_set_placeholder_text`)
   - [x] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength` (GTK: entry only —

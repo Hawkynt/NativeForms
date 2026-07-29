@@ -18,6 +18,15 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// boxes show no placeholder until an owner-drawn hint is added. Character casing is normalized by
 /// the core, so no <c>ES_UPPERCASE</c>/<c>ES_LOWERCASE</c> style bits are needed here.
 ///
+/// A line break is <c>\n</c> everywhere above this class and <c>\r\n</c> inside the widget, so it is
+/// translated on the way in and back on the way out. An EDIT breaks a line on the pair alone — a bare
+/// <c>\n</c> is a character it has no glyph for and draws as nothing, which is how a three-line box
+/// photographed as one line — while the toolkit cannot let the convention become platform-dependent
+/// or <c>Lines</c>, <c>TextLength</c> and every caret index would mean different things per backend.
+/// The character indices <c>EM_SETSEL</c> and <c>EM_GETSEL</c> speak count that pair as two, so they
+/// are mapped as well, and only for a multiline box: a single-line EDIT holds no break at all, so the
+/// two numberings are the same one and nothing is walked.
+///
 /// Keys have no <c>WM_COMMAND</c> notification, so <see cref="KeyDown"/> comes from a window-procedure
 /// subclass on the EDIT: the replacement proc is a static function pointer and the peer is recovered
 /// from a handle-keyed map, never from a captured closure or a marshalled delegate.
@@ -150,15 +159,21 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         if (_multiline == multiline)
             return;
 
+        // ES_MULTILINE cannot be toggled on a live EDIT window: capture the live text and selection
+        // into the buffers, tear the HWND down and rebuild it with the new style bits. The control
+        // id is reused, so the parent's WM_COMMAND routing keeps working unchanged. Both reads happen
+        // before the flag moves, because which numbering EM_GETSEL is answering in is a property of
+        // the window still standing rather than of the one about to be built.
+        if (Handle != 0)
+        {
+            this.SetText(this.GetText());
+            (_selectionStart, _selectionLength) = this.GetSelection();
+        }
+
         _multiline = multiline;
         if (Handle == 0)
             return;
 
-        // ES_MULTILINE cannot be toggled on a live EDIT window: capture the live text and selection
-        // into the buffers, tear the HWND down and rebuild it with the new style bits. The control
-        // id is reused, so the parent's WM_COMMAND routing keeps working unchanged.
-        this.SetText(this.GetText());
-        (_selectionStart, _selectionLength) = this.GetSelection();
         this.Unsubclass();
         NativeMethods.DestroyWindow(Handle);
         Handle = 0;
@@ -222,8 +237,13 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     {
         _selectionStart = start;
         _selectionLength = length;
-        if (Handle != 0)
-            NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETSEL, start, start + length);
+        if (Handle == 0)
+            return;
+
+        var text = _multiline ? this.GetText() : null;
+        var from = text is null ? start : NativeIndexOf(text, start);
+        var to = text is null ? start + length : NativeIndexOf(text, start + length);
+        NativeMethods.SendMessageW(Handle, NativeMethods.EM_SETSEL, from, to);
     }
 
     /// <inheritdoc/>
@@ -238,15 +258,25 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         // EN_CHANGE arrives once the EDIT has finished the edit and moved its caret past what was
         // inserted, so during a change the caret is walked back to where the edit began — the
         // convention ITextBoxPeer.GetSelection promises, and the one a GtkEntry reports natively.
-        // _text still holds the value the core last pushed, which is exactly the pre-edit content.
+        // _text still holds the value the core last pushed, which is exactly the pre-edit content —
+        // measured the way the widget counts it, since the difference being taken is the widget's.
         if (_inChange)
-            start -= Math.Max(0, GetTextLength() - _text.Length);
+            start -= Math.Max(0, GetTextLength() - NativeLengthOf(_text));
 
-        return (Math.Max(0, start), end - start);
+        start = Math.Max(0, start);
+        if (end < start)
+            end = start;
+
+        if (!_multiline)
+            return (start, end - start);
+
+        var text = this.GetText();
+        var from = CoreIndexOf(text, start);
+        return (from, CoreIndexOf(text, end) - from);
     }
 
-    /// <summary>The character count the EDIT currently holds.</summary>
-    private int GetTextLength() => Handle == 0 ? _text.Length : NativeMethods.GetWindowTextLengthW(Handle);
+    /// <summary>The character count the EDIT currently holds, in the widget's own numbering.</summary>
+    private int GetTextLength() => Handle == 0 ? NativeLengthOf(_text) : NativeMethods.GetWindowTextLengthW(Handle);
 
     /// <inheritdoc/>
     public string GetText()
@@ -262,7 +292,80 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
         fixed (char* p = buffer)
             length = NativeMethods.GetWindowTextW(Handle, p, buffer.Length);
 
-        return new string(buffer, 0, length);
+        return ToCoreLineEndings(new string(buffer, 0, length));
+    }
+
+    /// <inheritdoc/>
+    public override void SetText(string text)
+    {
+        _text = text ?? string.Empty;
+        if (Handle != 0)
+            NativeMethods.SetWindowTextW(Handle, ToNativeLineEndings(_text));
+    }
+
+    /// <summary>The two characters a line break can be written with, for the scan that decides whether
+    /// a translation is needed at all.</summary>
+    private static readonly char[] _LineBreakChars = ['\r', '\n'];
+
+    /// <summary>
+    /// The widget's spelling of <paramref name="text"/>: every line break a <c>\r\n</c> pair.
+    /// </summary>
+    /// <remarks>
+    /// A string with no break in it — which is nearly every one — is handed straight back, so the
+    /// common single-line case pays one scan and allocates nothing.
+    /// </remarks>
+    internal static string ToNativeLineEndings(string text)
+        => text.IndexOfAny(_LineBreakChars) < 0 ? text : ToCoreLineEndings(text).Replace("\n", "\r\n");
+
+    /// <summary>
+    /// The toolkit's spelling of <paramref name="text"/>: every line break a single <c>\n</c>.
+    /// </summary>
+    /// <remarks>
+    /// A lone <c>\r</c> folds too, because a rich edit stores a paragraph mark as one and hands it
+    /// back that way — the same translation therefore serves both classes this peer builds.
+    /// </remarks>
+    internal static string ToCoreLineEndings(string text)
+        => text.IndexOf('\r') < 0 ? text : text.Replace("\r\n", "\n").Replace('\r', '\n');
+
+    /// <summary>How many characters the widget counts <paramref name="text"/> as.</summary>
+    internal static int NativeLengthOf(string text)
+    {
+        var extra = 0;
+        for (var i = 0; i < text.Length; ++i)
+            if (text[i] == '\n')
+                ++extra;
+
+        return text.Length + extra;
+    }
+
+    /// <summary>The widget's index for the core index <paramref name="index"/> into <paramref name="text"/>.</summary>
+    internal static int NativeIndexOf(string text, int index)
+    {
+        if (index <= 0)
+            return 0;
+
+        var native = 0;
+        var limit = Math.Min(index, text.Length);
+        for (var i = 0; i < limit; ++i)
+            native += text[i] == '\n' ? 2 : 1;
+
+        // An index past the end is clamped by the widget anyway; carrying the excess keeps a caret
+        // asked for beyond the text from silently jumping backwards.
+        return native + (index - limit);
+    }
+
+    /// <summary>The core index for the widget index <paramref name="index"/> into <paramref name="text"/>.</summary>
+    internal static int CoreIndexOf(string text, int index)
+    {
+        var native = 0;
+        var core = 0;
+        while (core < text.Length && native < index)
+        {
+            native += text[core] == '\n' ? 2 : 1;
+            ++core;
+        }
+
+        return core + Math.Max(0, index - native);
     }
 
     /// <inheritdoc/>
