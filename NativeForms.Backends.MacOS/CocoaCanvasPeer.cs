@@ -44,6 +44,23 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             _canvases[_view] = this;
     }
 
+    /// <summary>
+    /// A bare view of the canvas class, for use where something needs the flipped coordinate system
+    /// without a canvas behind it — a window's content view, which is otherwise a plain
+    /// <c>NSView</c> and therefore bottom-up.
+    /// </summary>
+    internal static nint CreateFlippedView()
+    {
+        EnsureViewClass();
+        if (_viewClass == 0)
+            return 0;
+
+        var allocated = CocoaRuntime.SendPointer(_viewClass, CocoaRuntime.sel_registerName("alloc"));
+        return allocated == 0
+            ? 0
+            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+    }
+
     /// <summary>The view handle, so a container can add it to its own.</summary>
     internal nint Handle => _view;
 
