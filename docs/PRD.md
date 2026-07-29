@@ -1130,8 +1130,9 @@ backend without the widget, and what runs the moment an app asks for something t
       it silently. `CheckedListBox` overrides it to `false` for exactly that reason.
 - [x] **Backends may decline.** `IPlatformBackend.CreateCheckBox()` is a **default interface method
       returning `null`**, so a backend opts in by overriding rather than being broken by a new member.
-      macOS and the headless test backend decline for free — which is what keeps the paint-level test
-      suite on the owner-drawn path.
+      The headless test backend declines for free — which is what keeps the paint-level test suite on
+      the owner-drawn path. macOS took the same free ride until it opted into all nine; what it still
+      declines it declines *inside* a peer, per call, with the reason in `docs/backends.md`.
 
 ### Promotion candidates, in payoff order
 
