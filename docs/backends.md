@@ -153,6 +153,16 @@ and eight angles worked out by hand. The radius is clamped to half the shorter s
 Cairo backend clamps it, so a pill asked for more radius than it can hold is a capsule on both rather
 than whatever each renderer would invent.
 
+A caption asked to be centred is centred. It was right-aligned, on every macOS run, from the one
+enumeration on this platform whose values depend on the ABI rather than on the OS version: AppKit's
+original `NSTextAlignment` is left, right, centre, and 10.12 renumbered it to UIKit's left, centre,
+right everywhere `TARGET_ABI_USES_IOS_VALUES` holds — which is everything except 64-bit Intel. One
+number for both exchanges right with centre on exactly one of the two architectures, and the wrong
+one is the one nearly every Mac now is. The number is chosen by the process architecture now, the
+same way the float-returning message send already chooses its entry point. Left was never affected,
+which is why nothing but a screenshot was ever going to catch it: the gallery's centred label sat
+hard against the right edge of its box for as long as this backend had a label at all.
+
 The palette and the UI font are the desktop's. This backend served the shared fallback theme until
 now — a Windows palette and Segoe UI at 9pt, on a desktop that has neither font nor palette. The size
 is the part that did visible damage rather than the names: a point is a pixel here and 96 dpi's worth
@@ -161,13 +171,22 @@ beside it in a real `NSTextField`, and a label that measures itself came out too
 caption — measured with the theme's font, drawn by AppKit with the system's, and clipped by the
 difference. The colours now come from `NSColor`'s semantic ones, the font from
 `systemFontOfSize:0`, which is AppKit's way of being asked for the size it would use itself, and the
-double-click interval from `NSEvent`. Three things about the reading are worth stating. Every send is
+double-click interval from `NSEvent`. Four things about the reading are worth stating. Every send is
 guarded by `respondsToSelector:`, because several of these colours arrived in 10.14 and an
 unrecognized selector aborts the process rather than answering nil. Each colour is converted into
 sRGB before its components are read, for the same reason the colour chooser converts — a semantic
 colour resolves against the current appearance and has no red component until it is in a space that
 has one. And alpha is kept rather than flattened the way a `COLORREF` arrives: `separatorColor` is a
-tenth of an opaque black, and forcing it opaque would draw every border on the desktop in black. The
+tenth of an opaque black, and forcing it opaque would draw every border on the desktop in black. And
+a control surface is `windowBackgroundColor`, not `controlColor`, which reads like the obvious answer
+and is the wrong surface: it is the white a bezelled control fills itself with, and serving it made
+every panel, page and button at rest the colour of a text field — the gallery photographed as one
+sheet of white paper with an `ECECEC` tab strip laid across the top, a seam no macOS window has, and
+the `ClockFace` dial, a filled ellipse in that colour over a field-coloured surface, went white on
+white and left only its numbers and its hand in the shot. The other two backends already give the
+window and a control surface the same value, `COLOR_BTNFACE` twice on Win32 and the theme background
+twice on GTK, because a control at rest is chrome; fields stay `textBackgroundColor`, so the
+distinction the seam carries — chrome against paper — is the one that survives. The
 scrollbar metric stays the shared 16, which is what a legacy `NSScroller` reports anyway and what this
 backend draws its own scrollbars at. What is not served is the change: the snapshot is right for the
 appearance the application started in, and following the user into dark mode needs an observer on
