@@ -99,10 +99,10 @@ public sealed class CocoaBackend : IPlatformBackend
     }
 
     /// <inheritdoc/>
-    public IButtonPeer CreateButton() => throw new PlatformNotSupportedException(_NotImplemented);
+    public IButtonPeer CreateButton() => new CocoaButtonPeer();
 
     /// <inheritdoc/>
-    public ILabelPeer CreateLabel() => throw new PlatformNotSupportedException(_NotImplemented);
+    public ILabelPeer CreateLabel() => new CocoaLabelPeer();
 
     /// <inheritdoc/>
     public ITextBoxPeer CreateTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
