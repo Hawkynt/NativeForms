@@ -15,7 +15,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Status | Complete | Complete | **Under construction** |
 | Owner-drawn painting | Cairo | GDI | CoreGraphics |
 | Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
-| Native widget promotion (§12) | 9 controls | 9 controls | none yet |
+| Native widget promotion (§12) | 9 controls | 9 controls | 3: check box, radio, progress |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | not yet |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; no hover |
@@ -54,8 +54,9 @@ as one drawn by the platform. The shapes are ours; the values are the desktop's.
 **Native promotion changes what is drawn at all.** On GTK and Win32 nine controls realise onto real
 platform widgets when nothing in their state needs the painter (PRD §12) — a `Button` is a real
 `GtkButton` or `BUTTON`, until you give it an image the platform cannot draw, at which point it swaps
-to the owner-drawn twin and swaps back when you take it away. Cocoa offers none of this yet, so every
-control there is owner-drawn except `Label`, `Button` and `TextBox`, which are always native.
+to the owner-drawn twin and swaps back when you take it away. Cocoa promotes three of the nine — the
+check box, the radio button and the progress bar — on top of `Label`, `Button` and `TextBox`, which are
+always native there; everything else is owner-drawn.
 
 ## The macOS backend, specifically
 
@@ -67,12 +68,19 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 `NSTextView` in an `NSScrollView`, and the gallery's sixteen pages all pass the walkthrough's state
 round-trip and layout audit.
 
-Not working yet: no native-widget promotion, and the colour and font choosers answer as if cancelled
+Not working yet: six of the nine promotions, and the colour and font choosers answer as if cancelled
 (both are shared modeless panels on macOS, which is a different shape from this seam's blocking
 call). Mouse and keyboard events are routed into the toolkit but not verified end to end the way the
 Win32 backend's are, and hovering is the gap inside that gap: presses, drags and the wheel arrive, but
 neither the window nor a popup asks AppKit for mouse-moved events, so nothing highlights under the
 pointer.
+
+Three of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
+its switch and radio types, `ProgressBar` an `NSProgressIndicator`. The six that decline do so on
+purpose — a combo box, a list box, a group box, a track bar, a hyperlink and a scroll bar each carry
+enough state that a half-answer would show, and the seam is built so that returning nothing keeps the
+owner-drawn twin, which already works. Grouping for radios stays in the core; AppKit's own rule is the
+same one (buttons sharing a superview), so the two cannot reach different answers.
 
 Accessibility goes through `NSAccessibility`: a label, a help string and a role on the view. A real
 AppKit control already answers for itself, so this mostly refines what the platform knows — except on

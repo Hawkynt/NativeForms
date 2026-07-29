@@ -110,6 +110,21 @@ public sealed class CocoaBackend : IPlatformBackend
     public ITextBoxPeer CreateTextBox() => new CocoaTextBoxPeer();
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The first three of PRD §12's promotions. A backend opts in by overriding — the factories are
+    /// default-null interface methods — and offering one it cannot serve faithfully would be worse than
+    /// declining, because the core would stop drawing the control that does work. The rest still
+    /// decline: a combo box, a list box and a scroller carry enough state that a half-answer would show.
+    /// </remarks>
+    public ICheckBoxPeer CreateCheckBox() => new CocoaCheckBoxPeer();
+
+    /// <inheritdoc/>
+    public IRadioButtonPeer CreateRadioButton() => new CocoaRadioButtonPeer();
+
+    /// <inheritdoc/>
+    public IProgressBarPeer CreateProgressBar() => new CocoaProgressBarPeer();
+
+    /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
     {
         _ = owner;
