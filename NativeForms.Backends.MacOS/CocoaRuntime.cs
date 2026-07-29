@@ -30,7 +30,7 @@ internal static partial class CocoaRuntime
     private const string _ObjC = "/usr/lib/libobjc.A.dylib";
 
     /// <summary>Looks a class up by name; zero when the framework defining it is not loaded.</summary>
-    [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport(_ObjC, EntryPoint = "objc_getClass", StringMarshalling = StringMarshalling.Utf8)]
     private static partial nint objc_getClass_raw(string name);
 
     /// <summary>
