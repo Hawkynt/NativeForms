@@ -84,32 +84,38 @@ internal static unsafe partial class ShootMacOS
 
         var bounds = new Rect { X = 0, Y = 0, Width = size.Width, Height = size.Height };
 
-        // Let the run loop settle and the view actually draw before caching it. The shutter fires from
-        // a queued tick, so a pending frame may not have been rendered yet — caching then returns an
-        // empty rep and reports "no capture route produced pixels", which is what dropped this from
-        // fifteen pages to two the moment the timer stopped over-ticking and hiding it.
-        ShootInputMac.Drain();
-        Send(view, sel_registerName("display"));
+        // The shutter fires from a queued tick, so a pending frame may not have rendered when the
+        // capture asks for it — caching an undrawn view yields an empty rep. Waiting once was not
+        // enough: the shot count wandered between fifteen and none across runs of the same commit,
+        // which is a race, not a bug in any one step. So the whole attempt repeats, each round letting
+        // the run loop breathe first, and the first one that produces bytes wins.
+        for (var attempt = 0; attempt < 5; ++attempt)
+        {
+            ShootInputMac.Drain();
+            Send(view, sel_registerName("display"));
 
-        var rep = SendRect(view, sel_registerName("bitmapImageRepForCachingDisplayInRect:"), bounds);
-        if (rep == 0)
-            return null;
+            var rep = SendRect(view, sel_registerName("bitmapImageRepForCachingDisplayInRect:"), bounds);
+            if (rep == 0)
+                continue;
 
-        SendRect(view, sel_registerName("cacheDisplayInRect:toBitmapImageRep:"), bounds, rep);
+            SendRect(view, sel_registerName("cacheDisplayInRect:toBitmapImageRep:"), bounds, rep);
 
-        var data = Send(rep, sel_registerName("representationUsingType:properties:"), _Png, EmptyDictionary());
-        if (data == 0)
-            return null;
+            var data = Send(rep, sel_registerName("representationUsingType:properties:"), _Png, EmptyDictionary());
+            if (data == 0)
+                continue;
 
-        var bytes = Send(data, sel_registerName("bytes"));
-        var length = (int)Send(data, sel_registerName("length"));
-        if (bytes == 0 || length <= 0)
-            return null;
+            var bytes = Send(data, sel_registerName("bytes"));
+            var length = (int)Send(data, sel_registerName("length"));
+            if (bytes == 0 || length <= 0)
+                continue;
 
-        using (var file = File.Create(path))
-            file.Write(new ReadOnlySpan<byte>((void*)bytes, length));
+            using (var file = File.Create(path))
+                file.Write(new ReadOnlySpan<byte>((void*)bytes, length));
 
-        return size;
+            return size;
+        }
+
+        return null;
     }
 
     /// <summary>An empty <c>NSDictionary</c> for the encoder's options.</summary>
