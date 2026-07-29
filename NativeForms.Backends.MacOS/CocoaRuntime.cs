@@ -243,6 +243,14 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendPointer(nint receiver, nint selector, nint first, double second);
 
+    /// <summary>Builds an object from a rectangle and a flag, such as a pop-up that is not a pull-down.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendRectInit(nint receiver, nint selector, CGRect frame, [MarshalAs(UnmanagedType.U1)] bool flag);
+
+    /// <summary>Sends a four-object message, such as registering for one notification from one sender.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, nint first, nint second, nint third, nint fourth);
+
     /// <summary>Sends a message taking a flag and answering an object, such as a panel made on demand.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendBoolArgument(nint receiver, nint selector, [MarshalAs(UnmanagedType.U1)] bool argument);

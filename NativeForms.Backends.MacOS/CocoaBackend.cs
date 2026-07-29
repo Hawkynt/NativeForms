@@ -116,8 +116,10 @@ public sealed class CocoaBackend : IPlatformBackend
     /// The promotions PRD §12 asks for that this backend can serve. A backend opts in by overriding —
     /// the factories are default-null interface methods — and offering one it cannot serve faithfully
     /// would be worse than declining, because the core would stop drawing the control that does work.
-    /// The rest still decline: a combo box, a scroller, a slider and a hyperlink each carry state
-    /// AppKit's nearest object does not hold, and a half-answer would show.
+    /// All nine are now served. The last three needed arithmetic rather than wiring — a scroller holds a
+    /// fraction where the toolkit holds a range, and a slider has no step model at all — so what each
+    /// cannot express is refused in the peer and written down in <c>docs/backends.md</c> rather than
+    /// approximated.
     /// </remarks>
     public ICheckBoxPeer CreateCheckBox() => new CocoaCheckBoxPeer();
 
@@ -135,6 +137,15 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     public ILinkLabelPeer CreateLinkLabel() => new CocoaLinkLabelPeer();
+
+    /// <inheritdoc/>
+    public IComboBoxPeer CreateComboBox() => new CocoaComboBoxPeer();
+
+    /// <inheritdoc/>
+    public IScrollBarPeer CreateScrollBar(bool vertical) => new CocoaScrollBarPeer(vertical);
+
+    /// <inheritdoc/>
+    public ITrackBarPeer CreateTrackBar(bool vertical) => new CocoaTrackBarPeer(vertical);
 
     /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)

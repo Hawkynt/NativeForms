@@ -15,7 +15,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Status | Complete | Complete | **Under construction** |
 | Owner-drawn painting | Cairo | GDI | CoreGraphics |
 | Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
-| Native widget promotion (§12) | 9 controls | 9 controls | 6: check box, radio, progress, group box, list box, link label |
+| Native widget promotion (§12) | 9 controls | 9 controls | 9 controls; a slider keeps no step sizes and a drop-down opens modally |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; hover wired, not witnessed end to end |
@@ -54,9 +54,9 @@ as one drawn by the platform. The shapes are ours; the values are the desktop's.
 **Native promotion changes what is drawn at all.** On GTK and Win32 nine controls realise onto real
 platform widgets when nothing in their state needs the painter (PRD §12) — a `Button` is a real
 `GtkButton` or `BUTTON`, until you give it an image the platform cannot draw, at which point it swaps
-to the owner-drawn twin and swaps back when you take it away. Cocoa promotes six of the nine — the
-check box, the radio button, the progress bar, the group box, the list box and the link label — on top
-of `Label`, `Button` and `TextBox`, which are always native there; everything else is owner-drawn.
+to the owner-drawn twin and swaps back when you take it away. Cocoa now promotes all nine too, on top
+of `Label`, `Button` and `TextBox`, which are always native there; everything else is owner-drawn. Two
+of the nine keep something back on that backend, and the macOS section below says which.
 
 ## The macOS backend, specifically
 
@@ -107,16 +107,42 @@ much of the tab strip has realized by the time the shutter arms.) What it cannot
 window server drops this job's injected pointer for want of an Accessibility grant, so hover is stated
 here as wired rather than as witnessed.
 
-Six of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
-its switch and radio types, `ProgressBar` an `NSProgressIndicator`, `GroupBox` an `NSBox` filling a
-plain flipped view that holds the children on top of it — the frame and the caption come from the
-desktop, and the children keep the bounds the application gave them rather than being shifted by the
-inset AppKit reserves — `ListBox` an `NSTableView` in an `NSScrollView`, and `LinkLabel` an
-`NSTextField` carrying an attributed link. The three that decline do so on purpose — a combo box, a
-track bar and a scroll bar each carry state AppKit's nearest object does not hold, and a half-answer
-would show; the seam is built so that returning nothing keeps the owner-drawn twin, which already
-works. Grouping for radios stays in the core; AppKit's own rule is the same one (buttons sharing a
-superview), so the two cannot reach different answers.
+All nine of PRD §12's promotions are served. `CheckBox` and `RadioButton` become an `NSButton` in its
+switch and radio types, `ProgressBar` an `NSProgressIndicator`, `GroupBox` an `NSBox` filling a plain
+flipped view that holds the children on top of it — the frame and the caption come from the desktop,
+and the children keep the bounds the application gave them rather than being shifted by the inset
+AppKit reserves — `ListBox` an `NSTableView` in an `NSScrollView`, `LinkLabel` an `NSTextField`
+carrying an attributed link, `ComboBox` an `NSPopUpButton`, `HScrollBar`/`VScrollBar` an `NSScroller`
+and `TrackBar` an `NSSlider`. Grouping for radios stays in the core; AppKit's own rule is the same one
+(buttons sharing a superview), so the two cannot reach different answers.
+
+The last three each needed a decision the obvious reading gets wrong, and each keeps something back
+rather than approximating it.
+
+`NSPopUpButton`'s items are added as `NSMenuItem`s straight into its menu, not through
+`addItemWithTitle:`. That call looks obvious and quietly loses data: it removes any existing item with
+the same title first, so a list holding one string twice — two files called `index.html`, two people
+called Chris — arrives one item short with every index after it wrong. What is *not* served the way
+the seam describes is opening the list: AppKit tracks a menu in a nested event loop, so `performClick:`
+does not return until the menu closes and there is no "show it and carry on". Setting `DroppedDown`
+therefore blocks here where the same line returns at once on Windows. It is served that way rather
+than ignored, because what the property asks for does happen.
+
+`NSScroller` has no range model — a knob position between nothing and everything, and how much of the
+track the knob covers, and that is all — so the peer keeps minimum, maximum, large change and small
+change itself and projects them onto those two fractions. The reachable maximum stays
+`maximum - largeChange + 1`, and the integer cannot drift, because it is recomputed from the fraction
+against the same range that produced it. The scroller is asked for the legacy style: a modern overlay
+scroller fades out when nothing is scrolling, which is right inside a scroll view and wrong for one an
+application placed as a control. Orientation is fixed at construction, since `NSScroller` reads it off
+the frame it is initialized with and never revisits it.
+
+`NSSlider` is the one place a call is refused outright. There is no small or large change on this
+platform: an arrow key moves a slider by a hundredth of its range, or from tick to tick when it has
+tick marks, and neither is a number a caller sets. It could be faked by giving the slider as many tick
+marks as the range has steps — and the slider would grow a row of notches nobody asked for, while the
+control already models tick frequency separately. So `SetSteps` does nothing on this backend, and says
+so here rather than leaving it to be discovered.
 
 The list is the first promotion here that has to be fed rather than merely set. A table asks a data
 source how many rows there are and what is in each, so this one needs a second runtime class — three
