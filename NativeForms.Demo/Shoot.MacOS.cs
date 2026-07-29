@@ -51,6 +51,10 @@ internal static unsafe partial class ShootMacOS
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial nint Send(nint receiver, nint selector, nint first, nint second);
 
+    /// <summary>Sends a message taking a C string, which is how a named constant becomes an NSString.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend", StringMarshalling = StringMarshalling.Utf8)]
+    private static partial nint SendUtf8(nint receiver, nint selector, string text);
+
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial nint SendRect(nint receiver, nint selector, Rect frame);
 
@@ -622,6 +626,68 @@ internal static unsafe partial class ShootMacOS
             + $"NSFontManager {(manager != 0 ? "resolves" : "MISSING")} "
             + "(neither is run here: a modeless panel needs someone to close it)";
     }
+
+    /// <summary>
+    /// Whether a live appearance change reaches the toolkit: the palette is read, the application is
+    /// pushed into dark aqua, and the palette is read again with the event counted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one check here that changes the desktop's mind rather than reading it, which is why it runs
+    /// after the last shot: an appearance is a property of the whole application, so posing this before
+    /// the walkthrough would photograph half a gallery in the other mode. It is put back afterwards,
+    /// because <c>setAppearance:nil</c> is how a process says "whatever the user chose" and leaving a
+    /// probe's choice behind would be a lie told to every check after it.
+    /// </para>
+    /// <para>
+    /// Two facts in one line, and both are needed. The count says the observation is installed and
+    /// firing; the two colours say the snapshot behind it was actually dropped — an event raised over a
+    /// theme that kept its old palette would repaint every control in the appearance the user just left.
+    /// </para>
+    /// </remarks>
+    public static string AppearanceSwitch()
+    {
+        var application = objc_getClass("NSApplication") is var applications && applications != 0
+            ? Send(applications, sel_registerName("sharedApplication"))
+            : 0;
+
+        var setter = sel_registerName("setAppearance:");
+        if (application == 0 || !SendBool(application, sel_registerName("respondsToSelector:"), setter))
+            return "appearance: this macOS has no settable appearance, so a live switch cannot be posed";
+
+        var appearances = objc_getClass("NSAppearance");
+        var names = objc_getClass("NSString");
+        var name = names == 0 ? 0 : SendUtf8(names, sel_registerName("stringWithUTF8String:"), "NSAppearanceNameDarkAqua");
+        var dark = appearances == 0 || name == 0 ? 0 : Send(appearances, sel_registerName("appearanceNamed:"), name);
+        if (dark == 0)
+            return "appearance: NSAppearance has no dark aqua here, so a live switch cannot be posed";
+
+        var backend = Hawkynt.NativeForms.Backends.BackendRegistry.Resolve();
+        var before = backend.Theme.WindowBackground;
+        var raised = 0;
+        EventHandler count = (_, _) => ++raised;
+
+        backend.ThemeChanged += count;
+        Color after;
+        try
+        {
+            Send(application, setter, dark);
+            ShootInputMac.Drain();
+            after = backend.Theme.WindowBackground;
+        }
+        finally
+        {
+            Send(application, setter, 0); // nil: back to whatever the user's desktop is set to
+            ShootInputMac.Drain();
+            backend.ThemeChanged -= count;
+        }
+
+        return $"appearance: switched to dark aqua — the toolkit heard {raised} change(s) and its window "
+            + $"background went from {Hex(before)} to {Hex(after)}, then was put back";
+    }
+
+    /// <summary>A colour as the six hex digits a palette is usually quoted in.</summary>
+    private static string Hex(Color colour) => $"#{colour.R:X2}{colour.G:X2}{colour.B:X2}";
 
     /// <summary>Tallies the class of every view under one, itself included.</summary>
     private static void CountClasses(nint view, Dictionary<string, int> counts)

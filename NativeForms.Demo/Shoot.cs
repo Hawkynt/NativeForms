@@ -103,6 +103,17 @@ internal static partial class Shoot
     /// </remarks>
     public static string? Choosers => OperatingSystem.IsMacOS() ? ShootMacOS.Choosers() : null;
 
+    /// <summary>
+    /// Whether the toolkit follows the desktop into the other appearance, posed by switching the
+    /// application into dark aqua and back.
+    /// </summary>
+    /// <remarks>
+    /// The only check that changes something about the desktop rather than reading it, so it runs after
+    /// the last shot and undoes itself. Both other backends have followed a live theme change since
+    /// they were written; this is the line that says whether this one does.
+    /// </remarks>
+    public static string? Appearance => OperatingSystem.IsMacOS() ? ShootMacOS.AppearanceSwitch() : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

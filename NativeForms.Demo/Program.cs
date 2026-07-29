@@ -210,6 +210,11 @@ if (shooting)
             if (Shoot.Choosers is { } choosers)
                 Note("  " + choosers);
 
+            // After every shot, because this one changes the application's appearance to see whether the
+            // change is followed — posing it earlier would photograph part of the gallery in dark mode.
+            if (Shoot.Appearance is { } appearance)
+                Note("  " + appearance);
+
             // Last of the lot, and after the shutter has stopped. It is the only check here that
             // nests a message loop inside this one — a second shutter tick arriving mid-dialog would
             // photograph the wrong window — and the only one whose failure mode is a wait rather than

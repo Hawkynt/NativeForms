@@ -258,9 +258,29 @@ window and a control surface the same value, `COLOR_BTNFACE` twice on Win32 and 
 twice on GTK, because a control at rest is chrome; fields stay `textBackgroundColor`, so the
 distinction the seam carries — chrome against paper — is the one that survives. The
 scrollbar metric stays the shared 16, which is what a legacy `NSScroller` reports anyway and what this
-backend draws its own scrollbars at. What is not served is the change: the snapshot is right for the
-appearance the application started in, and following the user into dark mode needs an observer on
-`effectiveAppearance` that nothing here installs yet.
+backend draws its own scrollbars at.
+
+The change is served too, and the shape of the seam is the reason it was left until now. A desktop
+switched into dark mode while the application is running does not send a notification here — it
+changes a property, `NSApp`'s `effectiveAppearance` — so the observation is KVO, and KVO wants an
+object carrying `observeValueForKeyPath:ofObject:change:context:`. That is the run-time class this
+backend already builds for a button's target and a text view's delegate, for the same reason: there
+is no managed instance Objective-C can message. The property is watched on the application rather
+than on a window, because an appearance is one per process here and so is the theme built from it;
+watching windows would raise one change three times for a form with three of them. The observation
+arms itself on the first subscriber rather than in the constructor, since the backend is built before
+there is an `NSApplication` to watch, and a failed attempt leaves nothing behind and is simply made
+again by the next owner-drawn control that realizes. Nothing is ever taken back off: an observation
+removed while the process is being torn down is a message to objects AppKit may already have let go
+of, where one left in place costs a pointer and cannot misfire. The snapshot is dropped before the
+event is raised, because a handler's first move is to repaint and a repaint reads the theme.
+
+This one is witnessed. The probe pushes the application into dark aqua after the last shot — after,
+because an appearance is a property of the whole application and posing it earlier would photograph
+half a gallery in the other mode — reads the palette on both sides of the switch, counts the changes
+the toolkit was told about, and puts the appearance back. Two facts in one line, and both are needed:
+the count says the observation fired, and the two colours say the snapshot behind it was actually
+dropped rather than repainted from the palette the user just left.
 
 Owner-drawn text is the colour and the weight it was asked for. Until now it was black and regular on
 every page of every shot, from two independent causes that look like one. CoreText does not fill

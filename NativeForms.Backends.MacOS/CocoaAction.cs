@@ -83,6 +83,114 @@ internal static unsafe class CocoaAction
 }
 
 /// <summary>
+/// The object AppKit tells that the desktop's appearance changed: a key-value observer on the running
+/// application's own <c>effectiveAppearance</c>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A live switch into dark mode is not a notification on this platform, it is a property changing — so
+/// the seam is KVO, and KVO wants an object carrying
+/// <c>observeValueForKeyPath:ofObject:change:context:</c>. That is <see cref="CocoaAction"/>'s shape for
+/// <see cref="CocoaAction">the same reason</see>: there is no managed instance Objective-C can message,
+/// so the class is built at run time and the handler comes back out of a static map rather than out of a
+/// closure nothing could have marshalled.
+/// </para>
+/// <para>
+/// The property is watched on <c>NSApp</c> rather than on a window, because an appearance is one per
+/// process here and so is the theme built from it — watching windows would raise the same event once per
+/// window for one change. It is offered with <c>respondsToSelector:</c>, since
+/// <c>effectiveAppearance</c> arrived in 10.14 and an unrecognized selector aborts the process instead
+/// of answering nothing.
+/// </para>
+/// <para>
+/// Nothing is ever taken back off. The observer and its key path live as long as the application does,
+/// and an observation removed while the process is being torn down is a message to objects AppKit may
+/// already have let go of — where one that is simply left in place costs a pointer and cannot misfire.
+/// </para>
+/// </remarks>
+internal static unsafe class CocoaAppearanceObserver
+{
+    /// <summary>The runtime class, built on first use.</summary>
+    private static nint _class;
+
+    /// <summary>The key path, kept because the observation outlives the call that starts it.</summary>
+    private static nint _keyPath;
+
+    /// <summary>What each observer does, by observer pointer — the map that replaces a captured closure.</summary>
+    private static readonly ConcurrentDictionary<nint, Action> _handlers = new();
+
+    /// <summary>
+    /// Starts watching the application's appearance, answering the observer or zero when this platform
+    /// has no such property to watch.
+    /// </summary>
+    internal static nint Observe(Action handler)
+    {
+        EnsureClass();
+        if (_class == 0)
+            return 0;
+
+        var application = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        if (application == 0 || !CocoaRuntime.Responds(application, "effectiveAppearance"))
+            return 0;
+
+        var allocated = CocoaRuntime.SendPointer(_class, CocoaRuntime.sel_registerName("alloc"));
+        var observer = allocated == 0 ? 0 : CocoaRuntime.SendPointer(allocated, CocoaRuntime.sel_registerName("init"));
+        if (observer == 0)
+            return 0;
+
+        _keyPath = _keyPath != 0 ? _keyPath : CocoaRuntime.NSString("effectiveAppearance");
+        if (_keyPath == 0)
+            return 0;
+
+        _handlers[observer] = handler;
+
+        // Options zero: what the change dictionary carries is of no interest, since the answer is to
+        // read the whole palette again rather than to apply a delta. The notification arrives either way.
+        CocoaRuntime.SendVoid(
+            application,
+            CocoaRuntime.sel_registerName("addObserver:forKeyPath:options:context:"),
+            observer,
+            _keyPath,
+            0,
+            0);
+
+        return observer;
+    }
+
+    private static void EnsureClass()
+    {
+        if (_class != 0 || !CocoaRuntime.Available)
+            return;
+
+        var superclass = CocoaRuntime.objc_getClass("NSObject");
+        if (superclass == 0)
+            return;
+
+        var created = CocoaRuntime.objc_allocateClassPair(superclass, "NativeFormsAppearanceObserver", 0);
+        if (created == 0)
+            return;
+
+        // "v@:@@@^v": returns void, takes self, _cmd, the key path, the object it changed on, the
+        // change dictionary and the context pointer the observation was registered with.
+        CocoaRuntime.class_addMethod(
+            created,
+            CocoaRuntime.sel_registerName("observeValueForKeyPath:ofObject:change:context:"),
+            (nint)(delegate* unmanaged<nint, nint, nint, nint, nint, nint, void>)&ObserveValue,
+            "v@:@@@^v");
+
+        CocoaRuntime.objc_registerClassPair(created);
+        _class = created;
+    }
+
+    [UnmanagedCallersOnly]
+    private static void ObserveValue(nint self, nint selector, nint keyPath, nint changed, nint change, nint context)
+    {
+        if (_handlers.TryGetValue(self, out var handler))
+            handler();
+    }
+}
+
+/// <summary>
 /// The object AppKit sends an editor's delegate messages to: the text changed, a link was clicked, and
 /// an edit is about to happen.
 /// </summary>

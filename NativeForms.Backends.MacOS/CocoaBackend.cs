@@ -28,17 +28,57 @@ public sealed class CocoaBackend : IPlatformBackend
     /// <remarks>
     /// Read from the desktop on first ask and kept, which is what a theme being an immutable snapshot
     /// means. The first ask comes with the first control, by which point <c>NSApplication</c> exists
-    /// and the semantic colours have an appearance to resolve against.
+    /// and the semantic colours have an appearance to resolve against. The snapshot is dropped when the
+    /// appearance changes, so the next ask reads the palette the user just switched to.
     /// </remarks>
     public ITheme Theme => _theme ??= new CocoaTheme();
 
+    /// <summary>The KVO observer watching the application's appearance, or zero while none is installed.</summary>
+    private nint _appearance;
+
     /// <inheritdoc/>
     /// <remarks>
-    /// Never raised yet: the snapshot is right for the appearance the application started in, and
-    /// following the user into dark mode needs an observer on
-    /// <c>effectiveAppearance</c> that nothing here installs.
+    /// <para>
+    /// A desktop switched into dark mode while the application is running changes <c>NSApp</c>'s
+    /// <c>effectiveAppearance</c>, which is a property rather than a notification — so the observation is
+    /// KVO, through the run-time class in <see cref="CocoaAppearanceObserver"/>.
+    /// </para>
+    /// <para>
+    /// It is installed on the first subscriber rather than in the constructor, because the property
+    /// belongs to <c>NSApplication</c> and the backend is built before there is one. A failed attempt
+    /// leaves nothing behind and is simply made again by the next subscriber, which is every owner-drawn
+    /// control as it realizes — so the observation arms itself as soon as there is an application to
+    /// watch, without anything having to know when that was.
+    /// </para>
     /// </remarks>
-    public event EventHandler? ThemeChanged { add { } remove { } }
+    public event EventHandler? ThemeChanged
+    {
+        add
+        {
+            if (_appearance == 0)
+                _appearance = CocoaAppearanceObserver.Observe(this.OnAppearanceChanged);
+
+            _themeChanged += value;
+        }
+
+        remove => _themeChanged -= value;
+    }
+
+    private EventHandler? _themeChanged;
+
+    /// <summary>
+    /// The appearance changed: throw the snapshot away and tell everything painting from it.
+    /// </summary>
+    /// <remarks>
+    /// In that order, because a handler's first move is to repaint and a repaint reads
+    /// <see cref="Theme"/> — so the fresh palette has to be what the next ask builds, not the one the
+    /// event was raised against.
+    /// </remarks>
+    private void OnAppearanceChanged()
+    {
+        _theme = null;
+        _themeChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <inheritdoc/>
     /// <remarks>

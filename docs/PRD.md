@@ -175,8 +175,8 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       every custom control is written once and runs on any backend. Mouse/key/focus + paint plumbed.
 - [x] Decoder-free `IImage` (32-bit ARGB) so controls show icons without an image library.
 - [x] Light/dark mode + high-contrast follow-the-OS: `IPlatformBackend.ThemeChanged`
-      (WM_THEMECHANGED family / GtkSettings notify), theme-cache invalidation, realized
-      owner-drawn controls repaint, `ITheme.IsHighContrast`.
+      (WM_THEMECHANGED family / GtkSettings notify / KVO on `NSApp`'s `effectiveAppearance`),
+      theme-cache invalidation, realized owner-drawn controls repaint, `ITheme.IsHighContrast`.
 - [~] DPI: `GetDpiScale` + `Control.LogicalToDevice` groundwork done; GTK pins native
       widget text to the owner-drawn 96-DPI font-map baseline so labels match native
       controls on HiDPI screens; per-monitor rescale-on-move pending.
