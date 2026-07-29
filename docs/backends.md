@@ -122,8 +122,18 @@ typed), and a selection spanning two typefaces takes the one it starts in, becau
 means `enumerateAttribute:…usingBlock:` and a block is exactly the Objective-C object this backend's
 interop rules keep out. Zoom goes through the enclosing scroll view's magnification, which is
 absolute — the text view's own `scaleUnitSquareToSize:` multiplies whatever scale it already carries,
-so an absolute factor served that way would drift with every call. The link-activation event is still
-unwired.
+so an absolute factor served that way would drift with every call.
+
+Link activation is wired, through the one shape AppKit offers: a delegate object answering
+`textView:clickedOnLink:atIndex:`, built at run time the way the canvas's `drawRect:` is. It answers
+yes, which is what stops AppKit opening the URL itself behind the application's back — the toolkit's
+`LinkClicked` is the application's hook, so the platform must not act on the click as well. The link
+arrives as an `NSURL` from AppKit's own detector and often as a plain string from a document, so both
+are asked for and anything else is refused rather than read as characters. `DetectUrls` runs the
+checker over the text that is already there as well as switching detection on for what is typed next,
+because every document a program builds is set rather than typed and would otherwise carry no links to
+click at all. The probe reports the delegate sitting on the text view; what it cannot report is a click
+reaching it, for the same reason the hover figure is stated as wiring.
 
 The class-at-construction rule no longer shows anywhere in the text box. AppKit picks between
 `NSTextField`, `NSSecureTextField` and an `NSTextView` in an `NSScrollView` when the object is made, so

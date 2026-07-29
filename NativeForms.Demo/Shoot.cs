@@ -34,6 +34,12 @@ internal static partial class Shoot
     /// </remarks>
     public static string? NativeWidgets => OperatingSystem.IsMacOS() ? ShootMacOS.NativeWidgets() : null;
 
+    /// <summary>
+    /// Whether the rich text box's link activation reaches the toolkit, where the platform can be asked.
+    /// </summary>
+    /// <remarks>Wiring, not delivery — for the reason <see cref="HoverWiring"/> gives.</remarks>
+    public static string? LinkWiring => OperatingSystem.IsMacOS() ? ShootMacOS.LinkWiring() : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

@@ -467,7 +467,14 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
         this.SetReadOnly(_readOnly);
         this.SetHasFrame(_hasFrame);
         this.SetPlaceholder(_placeholder);
+        this.OnEditorChanged();
     }
+
+    /// <summary>
+    /// Called after a swap has settled, so a subclass can re-attach whatever it hung off the editing
+    /// view — which is a different object than it was a moment ago.
+    /// </summary>
+    private protected virtual void OnEditorChanged() { }
 
     /// <summary>
     /// Builds the multiline editor: a text view inside a scroll view, which is the pair AppKit uses for

@@ -36,8 +36,37 @@ internal sealed unsafe class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextB
 
     private string _rtf = string.Empty;
 
+    /// <summary>The delegate object AppKit reports link clicks to, built when the text view appears.</summary>
+    private nint _linkTarget;
+
     /// <inheritdoc/>
     public event EventHandler<string>? LinkClicked;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The text view is not this peer's own object — the plain box builds it when it is told it is
+    /// multiline, and builds another one if it is ever told again — so the delegate is attached here
+    /// rather than in a constructor that runs before there is anything to attach it to.
+    /// </remarks>
+    private protected override void OnEditorChanged()
+    {
+        if (this.TextView == 0)
+            return;
+
+        _linkTarget = _linkTarget != 0 ? _linkTarget : CocoaLinkTarget.Create(this.OnLinkClicked);
+        if (_linkTarget != 0)
+            CocoaRuntime.SendVoid(this.TextView, CocoaRuntime.sel_registerName("setDelegate:"), _linkTarget);
+    }
+
+    /// <summary>AppKit reporting that the user clicked a link, with the link it was.</summary>
+    private void OnLinkClicked(string url) => LinkClicked?.Invoke(this, url);
+
+    /// <inheritdoc/>
+    public override void Dispose()
+    {
+        CocoaLinkTarget.Forget(_linkTarget);
+        base.Dispose();
+    }
 
     /// <summary>The document being edited, or zero before the text view exists.</summary>
     private nint Storage
@@ -393,11 +422,23 @@ internal sealed unsafe class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextB
     }
 
     /// <inheritdoc/>
-    /// <remarks>Applies to text typed from now on, which is where AppKit's own detector runs.</remarks>
+    /// <remarks>
+    /// Two calls, because the switch alone would only half serve the property. AppKit's automatic
+    /// detection runs as text is typed, so a document that was set rather than typed — which is every
+    /// document a program builds — would carry no links at all and the click would have nothing to
+    /// report. <c>checkTextInDocument:</c> is the same checker run over what is already there, which is
+    /// what Windows Forms means by <c>DetectUrls</c>.
+    /// </remarks>
     public void SetDetectUrls(bool detectUrls)
     {
-        if (this.TextView != 0)
-            CocoaRuntime.SendVoid(this.TextView, CocoaRuntime.sel_registerName("setAutomaticLinkDetectionEnabled:"), detectUrls);
+        if (this.TextView == 0)
+            return;
+
+        CocoaRuntime.SendVoid(this.TextView, CocoaRuntime.sel_registerName("setAutomaticLinkDetectionEnabled:"), detectUrls);
+
+        var check = CocoaRuntime.sel_registerName("checkTextInDocument:");
+        if (detectUrls && CocoaRuntime.SendBool(this.TextView, CocoaRuntime.sel_registerName("respondsToSelector:"), check))
+            CocoaRuntime.SendVoid(this.TextView, check, 0);
     }
 
     /// <inheritdoc/>
@@ -427,7 +468,4 @@ internal sealed unsafe class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextB
         CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setMaxMagnification:"), 20.0);
         CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setMagnification:"), (double)factor);
     }
-
-    /// <summary>Raises <see cref="LinkClicked"/> once the text view's delegate reports activations.</summary>
-    private void Unused4() => LinkClicked?.Invoke(this, string.Empty);
 }

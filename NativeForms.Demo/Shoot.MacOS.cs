@@ -61,6 +61,11 @@ internal static unsafe partial class ShootMacOS
     [return: MarshalAs(UnmanagedType.U1)]
     private static partial bool SendBool(nint receiver, nint selector);
 
+    /// <summary>Asks a yes/no question taking one object, such as whether a view answers a selector.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static partial bool SendBool(nint receiver, nint selector, nint argument);
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
     {
@@ -205,6 +210,49 @@ internal static unsafe partial class ShootMacOS
             .Select(entry => $"{entry.Key}x{entry.Value}");
 
         return "native widgets: " + string.Join(", ", listed);
+    }
+
+    /// <summary>
+    /// How many views report their link clicks to the toolkit, read back off the running window.
+    /// </summary>
+    /// <remarks>
+    /// The same limit the hover line carries, for the same reason: a click on a link cannot be
+    /// delivered on this job — the window server drops the injected pointer for want of an
+    /// Accessibility grant — so what can be shown is that the text view holds the delegate AppKit will
+    /// send <c>textView:clickedOnLink:atIndex:</c> to, not that it has sent one. That is short of proof
+    /// and says so.
+    /// </remarks>
+    public static string LinkWiring()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "link activation: no window to ask";
+
+        var wired = 0;
+        CountLinkDelegates(Send(window, sel_registerName("contentView")), ref wired);
+        return $"link activation: {wired} view(s) carry the toolkit's link delegate";
+    }
+
+    /// <summary>Counts the views under one whose delegate is the toolkit's link target.</summary>
+    private static void CountLinkDelegates(nint view, ref int wired)
+    {
+        if (view == 0)
+            return;
+
+        var ask = sel_registerName("delegate");
+        if (SendBool(view, sel_registerName("respondsToSelector:"), ask)
+            && Send(view, ask) is var target && target != 0
+            && class_getName(object_getClass(target)) is var raw && raw != 0
+            && Marshal.PtrToStringUTF8(raw) == "NativeFormsLinkTarget")
+            ++wired;
+
+        var children = Send(view, sel_registerName("subviews"));
+        var count = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+            CountLinkDelegates(Send(children, sel_registerName("objectAtIndex:"), i), ref wired);
     }
 
     /// <summary>Tallies the class of every view under one, itself included.</summary>
