@@ -49,15 +49,16 @@ internal sealed partial class CocoaImage(int width, int height, ReadOnlySpan<int
     /// <inheritdoc/>
     public void Dispose()
     {
+        // Marked converted first and unconditionally. An image disposed before anything ever drew it
+        // has no handle to release, and leaving it unmarked would let a later draw build one that
+        // nothing would ever release — the leak is on the path where the bitmap was never used at all,
+        // which is exactly the path a "release what we have" guard walks straight past.
+        _converted = true;
         if (_handle == 0)
             return;
 
         CocoaNative.CGImageRelease(_handle);
         _handle = 0;
-
-        // Left marked as converted, so a draw after a dispose paints nothing instead of quietly
-        // rebuilding the image the caller just gave up.
-        _converted = true;
     }
 
     /// <summary>
