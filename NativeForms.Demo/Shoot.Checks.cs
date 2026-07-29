@@ -83,6 +83,10 @@ internal static partial class Shoot
     /// <summary>Pointer moves that were injected through the OS and observed arriving.</summary>
     public static int Hovers { get; private set; }
 
+    /// <summary>Whether the run has already said why a posted move reaches nothing.</summary>
+    /// <remarks>Once is a finding; sixteen times is a log that buries the fifteen lines around it.</remarks>
+    private static bool _moveReported;
+
     /// <summary>Every control in the tree rooted at <paramref name="control"/>, itself included.</summary>
     private static IEnumerable<Control> Walk(Control control)
     {
@@ -220,18 +224,20 @@ internal static partial class Shoot
             box.Text = original;
         }
 
-        // Hover, which on macOS is the one input route this backend wires and nothing has ever shown
-        // arriving — the window is asked to generate moved events and every canvas carries a tracking
-        // area, and both of those are read back off the live window rather than exercised. A press says
-        // nothing about it: a press carries its own location and the view under it is handed the event
-        // whatever the tracking areas think. So a move is posted on its own, at an owner-drawn control,
-        // whose canvas is the surface that carries the area. macOS only, because this is the gap that
-        // is macOS's; Win32's pointer is already driven end to end by the autopilot's SendInput.
-        // A leaf, and that matters: the first owner-drawn control in the walk is the page itself, whose
-        // canvas is underneath every other one on it. AppKit delivers a move to the deepest view at the
-        // point, so aiming at the middle of the page tests whichever control happens to sit there and
-        // reports the page hearing nothing — which is correct behaviour read as a failure. A control
-        // with no children of its own is the deepest thing at its own centre.
+        // Hover, which on macOS is the one input route this backend wires and nothing has shown
+        // arriving. A press says nothing about it — a press carries its own location and the view under
+        // it is handed the event whatever the tracking areas think — so a move is posted on its own.
+        // The target is an owner-drawn control with no children of its own, which makes it the deepest
+        // view at its own centre and so the one AppKit would hand the move to; aiming at the page
+        // instead lands on whichever control happens to sit in the middle of it and reports the page
+        // hearing nothing, which is correct behaviour read as a failure. macOS only, because this is the
+        // gap that is macOS's: the Win32 pointer is already driven end to end by SendInput.
+        //
+        // It has never once landed, and the reason is the injection route rather than the wiring: an
+        // event handed to sendEvent: is dispatched to a view, and tracking areas are not dispatched at
+        // all — AppKit works entered, exited and moved out from where the window server says the pointer
+        // is, which a posted event does not move. The check stays because it costs one event and would
+        // light up the moment either half of that changed, and it says so once rather than once a page.
         if (OperatingSystem.IsMacOS()
             && Walk(page).OfType<OwnerDrawnControl>()
                 .FirstOrDefault(c => !c.IsNativeWidget && c.Controls.Count == 0 && OnScreen(c)) is { } hovered)
@@ -247,9 +253,14 @@ internal static partial class Shoot
                     InjectDrain();
                     if (moved > 0)
                         ++Hovers;
-                    else
-                        note($"    input: a real move to {centre.X},{centre.Y} never reached "
-                            + $"{hovered.GetType().Name} ({InjectAt(centre)} is under the point)");
+                    else if (!_moveReported)
+                    {
+                        _moveReported = true;
+                        note($"    input: a posted move to {centre.X},{centre.Y} did not reach "
+                            + $"{hovered.GetType().Name}, whose {InjectAt(centre)} is the view under the "
+                            + "point — a tracking area is driven by the window server's pointer, not by "
+                            + "an event handed to sendEvent:, so this route cannot witness hover at all");
+                    }
                 }
             }
             finally
