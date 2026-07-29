@@ -112,13 +112,65 @@ public sealed class CocoaBackend : IPlatformBackend
     /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
     {
-        // NSAlert is modal and wants the run loop; until it is wired, a dialog that cannot be shown
-        // answers as if it were dismissed rather than ending the process.
-        _ = text;
-        _ = caption;
-        _ = icon;
         _ = owner;
-        return buttons == MessageBoxButtons.OK ? DialogResult.OK : DialogResult.Cancel;
+        var alert = CocoaRuntime.Allocate("NSAlert");
+        if (alert != 0)
+            alert = CocoaRuntime.SendPointer(alert, CocoaRuntime.sel_registerName("init"));
+
+        if (alert == 0)
+            return buttons == MessageBoxButtons.OK ? DialogResult.OK : DialogResult.Cancel;
+
+        try
+        {
+            SetString(alert, "setMessageText:", caption.Length > 0 ? caption : text);
+            if (caption.Length > 0)
+                SetString(alert, "setInformativeText:", text);
+
+            // NSAlertStyle: warning 0, informational 1, critical 2. Cocoa has no question style —
+            // a dialog that asks something is informational there, and inventing an icon for it would
+            // be less native, not more.
+            CocoaRuntime.SendVoid(
+                alert,
+                CocoaRuntime.sel_registerName("setAlertStyle:"),
+                icon switch { MessageBoxIcon.Error => 2, MessageBoxIcon.Warning => 0, _ => 1 });
+
+            // Buttons are added in the platform's order: the default action first, which AppKit puts
+            // at the right. The result is mapped by position rather than by comparing captions, so it
+            // keeps working when these strings are localized.
+            (string Title, DialogResult Result)[] choices = buttons switch
+            {
+                MessageBoxButtons.OKCancel => [("OK", DialogResult.OK), ("Cancel", DialogResult.Cancel)],
+                MessageBoxButtons.YesNo => [("Yes", DialogResult.Yes), ("No", DialogResult.No)],
+                MessageBoxButtons.YesNoCancel =>
+                    [("Yes", DialogResult.Yes), ("No", DialogResult.No), ("Cancel", DialogResult.Cancel)],
+                MessageBoxButtons.RetryCancel => [("Retry", DialogResult.Retry), ("Cancel", DialogResult.Cancel)],
+                MessageBoxButtons.AbortRetryIgnore =>
+                    [("Abort", DialogResult.Abort), ("Retry", DialogResult.Retry), ("Ignore", DialogResult.Ignore)],
+                _ => [("OK", DialogResult.OK)],
+            };
+
+            foreach (var choice in choices)
+                SetString(alert, "addButtonWithTitle:", choice.Title);
+
+            // runModal answers NSAlertFirstButtonReturn (1000) plus the button's index.
+            var chosen = (int)(CocoaRuntime.SendInteger(alert, CocoaRuntime.sel_registerName("runModal")) - 1000);
+            return (uint)chosen < (uint)choices.Length ? choices[chosen].Result : DialogResult.Cancel;
+        }
+        finally
+        {
+            CocoaRuntime.SendVoid(alert, CocoaRuntime.sel_registerName("release"));
+        }
+    }
+
+    /// <summary>Sends a message taking one string, releasing the string afterwards.</summary>
+    private static void SetString(nint target, string selector, string value)
+    {
+        var text = CocoaRuntime.NSString(value);
+        if (text == 0)
+            return;
+
+        CocoaRuntime.SendVoid(target, CocoaRuntime.sel_registerName(selector), text);
+        CocoaNative.CFRelease(text);
     }
 
     /// <inheritdoc/>
