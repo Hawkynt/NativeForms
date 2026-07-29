@@ -122,8 +122,8 @@ internal static unsafe partial class ShootInputMac
     }
 
     /// <summary>
-    /// Runs the pending run-loop sources, so an injected event has been delivered and handled before
-    /// anything asks whether it arrived.
+    /// Runs the pending run-loop sources, so whatever was just asked for — a delivered event, a
+    /// pending frame — has happened before anything asks whether it did.
     /// </summary>
     public static void Drain()
     {

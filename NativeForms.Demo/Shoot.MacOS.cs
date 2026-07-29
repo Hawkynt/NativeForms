@@ -84,6 +84,13 @@ internal static unsafe partial class ShootMacOS
 
         var bounds = new Rect { X = 0, Y = 0, Width = size.Width, Height = size.Height };
 
+        // Let the run loop settle and the view actually draw before caching it. The shutter fires from
+        // a queued tick, so a pending frame may not have been rendered yet — caching then returns an
+        // empty rep and reports "no capture route produced pixels", which is what dropped this from
+        // fifteen pages to two the moment the timer stopped over-ticking and hiding it.
+        ShootInputMac.Drain();
+        Send(view, sel_registerName("display"));
+
         var rep = SendRect(view, sel_registerName("bitmapImageRepForCachingDisplayInRect:"), bounds);
         if (rep == 0)
             return null;
