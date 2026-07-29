@@ -529,9 +529,16 @@ queue without taking it — `nextEventMatchingMask:` with `dequeue:NO` — hand 
 interception the main loop uses, and take it out only if the toolkit consumed it. Everything the
 toolkit does not want is left exactly where the session expects to find it, in the order it was in, so
 modality stays AppKit's; and there is still one method deciding what the toolkit stands ahead of,
-which is what keeps the dialog and the main loop from drifting apart. It stops at the first event it
-does not want rather than walking past it, because that event is the session's to dispatch and the one
-behind it becomes the head as soon as it has been — and the pump turns every few milliseconds.
+which is what keeps the dialog and the main loop from drifting apart.
+
+What makes looking at the head of the queue enough is the mask. The first attempt asked for any event
+and stopped at the first one the toolkit did not want, on the reasoning that the session would
+dispatch it and the one behind would become the head — and the probe caught it: the first thing in
+front of a press is the pointer moving to where it is about to press, so the peek stopped on the move
+every time and the press behind it went to the session unseen. Asking only for the four types the
+toolkit can consume — a left, right or other mouse press, and a key going down — skips everything
+else without disturbing it, which is exactly what an `NSButton`'s own tracking loop does while it
+waits for a release.
 
 One thing about a popup inside a dialog is still the platform's rule rather than ours: a session
 withholds events from every window but the modal one, and a toolkit popup is a borderless window of

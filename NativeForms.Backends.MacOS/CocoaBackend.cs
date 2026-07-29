@@ -679,25 +679,33 @@ public sealed class CocoaBackend : IPlatformBackend
     /// swallowed on purpose.
     /// </para>
     /// <para>
-    /// It stops at the first event the toolkit does not want rather than walking past it, because that
-    /// event is the session's to dispatch and the one behind it becomes the head as soon as it has
-    /// been. The loop turns every few milliseconds, so "the next one, next time" is not a delay
-    /// anybody can perceive — and the bound keeps a burst of presses from being drained here in one go.
+    /// The mask is what makes looking at the head of the queue enough. Asking for any event at all
+    /// answers with whatever happens to be first, and the first thing before a press is the pointer
+    /// moving to where it is about to press — so a peek that stopped there never saw the press behind
+    /// it, and the session dispatched both. Asking only for the four event types the toolkit can
+    /// consume skips past everything else without disturbing it, which is the same thing an
+    /// <c>NSButton</c>'s own tracking loop does when it waits for a release.
     /// </para>
     /// </remarks>
     private static void InterceptPending(nint app, nint mode)
     {
         var next = CocoaRuntime.sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:");
         var distantPast = CocoaRuntime.SendToClass("NSDate", "distantPast");
-        var mask = unchecked((nint)ulong.MaxValue);
 
         for (var i = 0; i < 16; ++i)
         {
-            var pending = CocoaRuntime.SendEvent(app, next, mask, distantPast, mode, false);
+            var pending = CocoaRuntime.SendEvent(app, next, _Interceptable, distantPast, mode, false);
             if (pending == 0 || !Intercept(pending))
                 break;
 
-            CocoaRuntime.SendEvent(app, next, mask, distantPast, mode, true);
+            CocoaRuntime.SendEvent(app, next, _Interceptable, distantPast, mode, true);
         }
     }
+
+    /// <summary>
+    /// The events <see cref="Intercept"/> can consume, as an <c>NSEventMask</c>: a left, right or
+    /// other mouse press, and a key going down.
+    /// </summary>
+    /// <remarks>A mask bit is one shifted by the event's own type, which is how AppKit spells this.</remarks>
+    private const nint _Interceptable = (1 << 1) | (1 << 3) | (1 << 10) | (1 << 25);
 }
