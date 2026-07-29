@@ -102,6 +102,31 @@ internal static partial class CocoaNative
             : 0;
     }
 
+    [LibraryImport(_CoreFoundation)]
+    private static partial nint CFStringGetLength(nint text);
+
+    [LibraryImport(_CoreFoundation)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static partial bool CFStringGetCString(nint text, Span<byte> buffer, nint size, uint encoding);
+
+    /// <summary>Reads a Core Foundation string into managed form.</summary>
+    internal static string ReadString(nint text)
+    {
+        if (text == 0)
+            return string.Empty;
+
+        var length = (int)CFStringGetLength(text);
+        if (length <= 0)
+            return string.Empty;
+
+        // UTF-8 needs up to four bytes per code unit, plus the terminator the C API writes.
+        var buffer = new byte[(length * 4) + 1];
+        const uint utf8 = 0x08000100;
+        return CFStringGetCString(text, buffer, buffer.Length, utf8)
+            ? System.Text.Encoding.UTF8.GetString(buffer, 0, Array.IndexOf(buffer, (byte)0) is var end and >= 0 ? end : buffer.Length - 1)
+            : string.Empty;
+    }
+
     /// <summary>Releases a Core Foundation object unless it is null.</summary>
     private static void Release(nint handle)
     {

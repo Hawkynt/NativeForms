@@ -105,7 +105,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public ILabelPeer CreateLabel() => new CocoaLabelPeer();
 
     /// <inheritdoc/>
-    public ITextBoxPeer CreateTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
+    public ITextBoxPeer CreateTextBox() => new CocoaTextBoxPeer();
 
     /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)

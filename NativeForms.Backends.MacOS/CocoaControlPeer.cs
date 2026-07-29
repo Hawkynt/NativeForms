@@ -210,3 +210,101 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
     /// <summary>Raises <see cref="Clicked"/> once AppKit's target/action routing is wired.</summary>
     private void Unused2() => Clicked?.Invoke(this, EventArgs.Empty);
 }
+
+/// <summary>An editable field: an <c>NSTextField</c>, or an <c>NSSecureTextField</c> when masked.</summary>
+/// <remarks>
+/// AppKit decides between plain and secure at construction — there is no "make this one a password
+/// field" message — so a text box that is told its mask character after realization keeps the class it
+/// was built with. The toolkit sets the mask before flushing state in practice; when it does not, the
+/// field stays plain rather than silently showing the characters it promised to hide, which is why the
+/// mask is remembered and reported rather than ignored.
+/// </remarks>
+internal sealed class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
+{
+    private bool _secure;
+
+    public CocoaTextBoxPeer()
+        : base(Create(secure: false))
+    {
+    }
+
+    /// <inheritdoc/>
+    public event EventHandler? TextChangedByUser;
+
+    /// <inheritdoc/>
+    public event EventHandler<KeyEventArgs>? KeyDown;
+
+    private static nint Create(bool secure)
+    {
+        var allocated = CocoaRuntime.Allocate(secure ? "NSSecureTextField" : "NSTextField");
+        return allocated == 0
+            ? 0
+            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+    }
+
+    /// <inheritdoc/>
+    public string GetText()
+    {
+        if (this.Handle == 0)
+            return string.Empty;
+
+        var value = CocoaRuntime.SendPointer(this.Handle, CocoaRuntime.sel_registerName("stringValue"));
+        return value == 0 ? string.Empty : CocoaNative.ReadString(value);
+    }
+
+    /// <inheritdoc/>
+    public void SetReadOnly(bool readOnly)
+    {
+        if (this.Handle != 0)
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setEditable:"), !readOnly);
+    }
+
+    /// <inheritdoc/>
+    public void SetHasFrame(bool hasFrame)
+    {
+        if (this.Handle != 0)
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBezeled:"), hasFrame);
+    }
+
+    /// <inheritdoc/>
+    public void SetPlaceholder(string placeholder)
+    {
+        if (this.Handle == 0)
+            return;
+
+        var text = CocoaRuntime.NSString(placeholder);
+        if (text == 0)
+            return;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setPlaceholderString:"), text);
+        CocoaNative.CFRelease(text);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Remembered rather than applied: see the class remarks on why the class is fixed at
+    /// construction.</remarks>
+    public void SetPasswordChar(char passwordChar) => _secure = passwordChar != '\0';
+
+    /// <summary>Whether this field was asked to mask its content but could not.</summary>
+    internal bool WantsMasking => _secure;
+
+    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
+
+    /// <remarks>A multi-line field is an NSTextView inside an NSScrollView, a different object
+    /// entirely rather than a flag, so it waits for its own peer.</remarks>
+    public void SetMultiline(bool multiline) { }
+
+    public void SetMaxLength(int maxLength) { }
+
+    public void SetSelection(int start, int length) { }
+
+    /// <inheritdoc/>
+    public (int Start, int Length) GetSelection() => (this.GetText().Length, 0);
+
+    /// <summary>Raises the input events once AppKit's delegate routing is wired.</summary>
+    private void Unused3()
+    {
+        TextChangedByUser?.Invoke(this, EventArgs.Empty);
+        KeyDown?.Invoke(this, new(Keys.None, KeyModifiers.None));
+    }
+}
