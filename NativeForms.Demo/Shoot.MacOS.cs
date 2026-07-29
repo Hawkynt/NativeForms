@@ -315,17 +315,17 @@ internal static unsafe partial class ShootMacOS
             ? Send(barClass, sel_registerName("systemStatusBar"))
             : 0;
 
-        var probe = bar == 0 ? 0 : SendLength(bar, sel_registerName("statusItemWithLength:"), -1);
-        var button = probe == 0 ? 0 : Send(probe, sel_registerName("button"));
-        if (bar != 0 && probe != 0)
-            Send(bar, sel_registerName("removeStatusItem:"), probe);
+        var spare = bar == 0 ? 0 : SendLength(bar, sel_registerName("statusItemWithLength:"), -1);
+        var spareButton = spare == 0 ? 0 : Send(spare, sel_registerName("button"));
+        if (bar != 0 && spare != 0)
+            Send(bar, sel_registerName("removeStatusItem:"), spare);
 
         // The activation policy comes with it: a Prohibited process owns no part of the menu bar, so
         // an item handed to one has nowhere to be.
         var policy = app == 0 ? -1 : (int)Send(app, sel_registerName("activationPolicy"));
 
         return $"status item: not among the application's {count} window(s); a fresh NSStatusItem "
-            + $"{(button != 0 ? "does" : "does NOT")} come with a button here "
+            + $"{(spareButton != 0 ? "does" : "does NOT")} come with a button here "
             + $"(NSStatusBar {(bar != 0 ? "resolves" : "does not resolve")}, activation policy {policy})";
     }
 
