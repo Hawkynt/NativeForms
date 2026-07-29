@@ -325,6 +325,36 @@ internal sealed class DataGridViewColumnTypesTests
             "the explicit fore color survives selection");
     }
 
+    /// <summary>
+    /// The rule under a link is measured, and it has to measure the string that was drawn rather than
+    /// the one that was asked for. Measuring the full text put the rule out past the cell and under the
+    /// column beside it — a link visibly underlined wider than its own visible glyphs.
+    /// </summary>
+    [Test]
+    public void Link_column_underlines_no_more_than_the_text_it_could_fit()
+    {
+        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
+        {
+            Kind = DataGridViewColumnKind.Link,
+        });
+        grid.Items.Add(new Row { Name = "https://example.invalid/a/long/path" });
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        // The 100px column leaves 96px past the padding, and a character measures 7px: thirteen of
+        // them fit, so twelve survive alongside the ellipsis and the rule runs 91px from x=4.
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                g.Operations.Exists(o => o.StartsWith("text \"https://exam…\"") && o.Contains(_Accent)),
+                Is.True,
+                "the link is shortened to its cell");
+            Assert.That(g.DrewText("https://example.invalid"), Is.False, "never the whole address");
+            Assert.That(g.Operations, Does.Contain($"line {_Accent} 4,40-95,40"), "the rule stops with the glyphs");
+        });
+    }
+
     [Test]
     public void Image_selector_paints_icon_before_the_cell_text()
     {

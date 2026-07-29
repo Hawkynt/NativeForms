@@ -2477,6 +2477,11 @@ public class DataGridView : OwnerDrawnControl
                 var text = this.GetDisplayText(column, item, modelIndex);
                 var linkColor = style.ForeColor ?? (selected ? theme.SelectionText : theme.Accent);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding), cellRect.Height);
+
+                // Shortened before it is measured, because the rule below it is placed from that
+                // measurement: an address too long for its column drew a clipped link with an underline
+                // running on past it and under the column beside it.
+                text = TextTrim.ToWidth(g, text, theme.DefaultFont, textRect.Width);
                 g.DrawText(text, theme.DefaultFont, linkColor, textRect, alignment);
 
                 var size = g.MeasureText(text, theme.DefaultFont);
@@ -2536,7 +2541,15 @@ public class DataGridView : OwnerDrawnControl
             {
                 var arrowZone = Math.Min(_ComboArrowZone, cellRect.Width);
                 var textRect = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - _CellPadding - arrowZone), cellRect.Height);
-                g.DrawText(this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, foreColor, textRect, alignment);
+
+                // The rectangle already has the arrow zone taken out of it, so a value wider than what
+                // is left ran under the arrow and out of the cell rather than stopping at either.
+                g.DrawText(
+                    TextTrim.ToWidth(g, this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, textRect.Width),
+                    theme.DefaultFont,
+                    foreColor,
+                    textRect,
+                    alignment);
 
                 // The drop arrow: a themed triangle of stacked lines, like the ComboBox field's.
                 var centerX = cellRect.Right - arrowZone + (arrowZone / 2);

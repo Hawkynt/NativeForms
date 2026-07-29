@@ -449,7 +449,10 @@ internal sealed class DataGridViewEditingTests
     public void Combo_cell_paints_the_value_and_a_drop_arrow()
     {
         var grid = MakeGrid(out var rows);
-        rows[0].Status = "Active";
+
+        // Short enough to survive whole: the 60px column leaves 40px once the padding and the arrow
+        // zone are gone, and a cell shortens what it cannot fit — which is not what this test is about.
+        rows[0].Status = "New";
         grid.Columns[1].Kind = DataGridViewColumnKind.ComboBox;
         grid.Columns[1].ValueSelector = static o => ((Row)o!).Status;
         var backend = RealizeBackend(grid);
@@ -460,7 +463,7 @@ internal sealed class DataGridViewEditingTests
         // row 0 (y 22..44): the widest row at y=30 spans 148..156, in the control text color.
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Active\"") && o.Contains("@104,22")), Is.True, "cell value");
+            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"New\"") && o.Contains("@104,22")), Is.True, "cell value");
             Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 148,30-156,30"), "drop arrow");
         });
     }

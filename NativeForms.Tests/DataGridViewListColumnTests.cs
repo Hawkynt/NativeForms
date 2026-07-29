@@ -76,13 +76,31 @@ internal sealed class DataGridViewListColumnTests
     /// <summary>The y a click lands on to hit the popup's nth row, at the theme's 22 px row height.</summary>
     private static int PopupRow(int index) => (index * 22) + 11;
 
+    /// <summary>
+    /// Widens the list column until a whole joined summary fits in it.
+    /// </summary>
+    /// <remarks>
+    /// The default 60px column leaves 40px once the padding and the drop arrow are gone, which is
+    /// narrower than any two of the choices read joined — and a cell shortens what it cannot fit. That
+    /// is right, and it would leave the tests below asserting on an ellipsis rather than on the join
+    /// they exist to pin, so they are given the room instead of the summary being made unrealistic.
+    /// </remarks>
+    private static void RoomForTheWholeSummary(DataGridView grid)
+    {
+        grid.Bounds = new(0, 0, 300, 110);
+        grid.Columns[1].Width = 140;
+    }
+
     // --- Single-select list ------------------------------------------------------------------------
 
     [Test]
     public void ListBox_cell_paints_the_value_and_the_drop_arrow()
     {
         var grid = MakeGrid(out var rows);
-        rows[0].Status = "Active";
+
+        // Short enough to survive whole: the column leaves 40px once the padding and the arrow zone
+        // are gone, and a cell shortens what it cannot fit — which is not what this test is about.
+        rows[0].Status = "New";
         AsSingleList(grid);
         var backend = RealizeBackend(grid);
 
@@ -90,8 +108,36 @@ internal sealed class DataGridViewListColumnTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(g.Operations.Exists(static o => o.StartsWith("text \"Active\"") && o.Contains("@104,22")), Is.True, "cell value");
+            Assert.That(g.Operations.Exists(static o => o.StartsWith("text \"New\"") && o.Contains("@104,22")), Is.True, "cell value");
             Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 148,30-156,30"), "the drop arrow the combo cell paints too");
+        });
+    }
+
+    /// <summary>
+    /// The cell text is laid into a rectangle the arrow zone has already been taken out of, so a value
+    /// wider than what is left ran straight under the arrow and out of the cell. Every other cell kind
+    /// shortens instead; this one is drawn by the painter the combo and the checked list share, so all
+    /// three were wrong together.
+    /// </summary>
+    [Test]
+    public void ListBox_cell_shortens_a_value_to_what_the_drop_arrow_leaves()
+    {
+        var grid = MakeGrid(out var rows);
+        rows[0].Status = "Active and blocked";
+        AsSingleList(grid);
+        var backend = RealizeBackend(grid);
+
+        var g = CanvasOf(backend).RaisePaint();
+
+        // The 60px column leaves 40px once the padding and the 16px arrow zone are gone, and a
+        // character measures 7px: five fit, so four survive alongside the ellipsis.
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                g.Operations.Exists(static o => o.StartsWith("text \"Acti…\"") && o.Contains("@104,22")),
+                Is.True,
+                "shortened to the space the arrow leaves");
+            Assert.That(g.DrewText("Active and blocked"), Is.False, "never the full value under the arrow");
         });
     }
 
@@ -99,14 +145,14 @@ internal sealed class DataGridViewListColumnTests
     public void ListBox_cell_text_runs_through_the_item_display_selector()
     {
         var grid = MakeGrid(out var rows);
-        rows[0].Status = "Active";
+        rows[0].Status = "New";
         var column = AsSingleList(grid);
         column.ItemDisplaySelector = static o => $"[{o}]";
         var backend = RealizeBackend(grid);
 
         var g = CanvasOf(backend).RaisePaint();
 
-        Assert.That(g.DrewText("[Active]"), Is.True);
+        Assert.That(g.DrewText("[New]"), Is.True);
     }
 
     [Test]
@@ -210,6 +256,7 @@ internal sealed class DataGridViewListColumnTests
         var grid = MakeGrid(out var rows);
         rows[0].Tags = new object?[] { "New", "Done" };
         AsSetList(grid, DataGridViewColumnKind.ListBox);
+        RoomForTheWholeSummary(grid);
         var backend = RealizeBackend(grid);
 
         var g = CanvasOf(backend).RaisePaint();
@@ -301,6 +348,7 @@ internal sealed class DataGridViewListColumnTests
         var grid = MakeGrid(out var rows);
         rows[0].Tags = new object?[] { "Active", "Blocked" };
         AsSetList(grid, DataGridViewColumnKind.CheckedListBox);
+        RoomForTheWholeSummary(grid);
         var backend = RealizeBackend(grid);
 
         var g = CanvasOf(backend).RaisePaint();
@@ -485,6 +533,7 @@ internal sealed class DataGridViewListColumnTests
         var grid = MakeGrid(out var rows);
         rows[0].Tags = new object?[] { "New" };
         AsSetList(grid, DataGridViewColumnKind.CheckedListBox);
+        RoomForTheWholeSummary(grid);
         var backend = RealizeBackend(grid);
         var canvas = CanvasOf(backend);
         Assert.That(canvas.RaisePaint().DrewText("New"), Is.True, "primes the display-text cache");
