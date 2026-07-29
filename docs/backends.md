@@ -119,6 +119,16 @@ highlight and scroll position all belong to USER32, so the toolkit would be putt
 editor is about to put a caret and neither would know about the other. So the multiline placeholder
 is stated as absent on this backend rather than approximated.
 
+**The binding changes more than the hint, and the shots say what.** Every page moves: a promoted check
+box, radio button and combo box arrive in the desktop's own drawing rather than in Windows 2000's, a
+progress bar is a continuous run rather than a row of blocks, a track bar takes the accent-coloured
+thumb, and the cue banner turns up in an editable `ComboBox`'s edit as well as in a `TextBox`. One
+consequence is worth naming because it reads as a regression and is not: Windows 11 draws a themed
+scroll bar as a hairline with no arrow buttons until the pointer is over it, so the gallery's
+standalone `HScrollBar` and `VScrollBar` — which nothing is hovering while a capture is taken —
+photograph as a thin line and a small thumb where they used to photograph as the whole classic
+control. That is this desktop's scroll bar, which is the entire point.
+
 ## The macOS backend, specifically
 
 It is genuinely incomplete, and the table above says so rather than leaving you to discover it.
