@@ -19,7 +19,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; hover wired, not witnessed end to end |
-| Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
+| Dialogs (message box, file, colour, font) | complete | complete | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
 | CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; `CGEvent` injection skips — a runner grants no Accessibility permission |
 
 ## Side by side
@@ -68,9 +68,31 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 `NSTextView` in an `NSScrollView`, a `NotifyIcon` is a real `NSStatusItem` in the menu bar, and the
 gallery's sixteen pages all pass the walkthrough's state round-trip and layout audit.
 
-Not working yet: the colour and font choosers answer as if cancelled — both are shared modeless
-panels on macOS, which is a different shape from this seam's blocking call. Mouse and keyboard events
-are routed into the toolkit but not verified end to end the way the Win32 backend's are.
+Not working yet: mouse and keyboard events are routed into the toolkit but not verified end to end the
+way the Win32 backend's are.
+
+The colour and font choosers now answer, and the shape of the answer is worth reading before relying
+on it. Both are shared modeless panels here — the platform keeps exactly one of each and shows it —
+so neither has an OK, a Cancel, or any notion of being dismissed with a result. What makes them fit a
+blocking call is a modal *session*: `beginModalSessionForWindow:` and `runModalSession:`, pumped until
+the panel is no longer visible. `runModalForWindow:` is the obvious call and the wrong one, because it
+ends when something calls `stopModal` and nothing on either panel ever does. A panel that refuses to
+appear at all ends the wait immediately rather than blocking on a window nobody can see.
+
+Cancellation is therefore inferred, not reported: the colour chooser answers the colour if the user
+changed it and nothing if they did not, and the font chooser does the same by comparing what
+`NSFontManager` converts the incoming font into against the font it was given. For any caller the two
+readings are the same outcome — a dialog that hands back exactly what it was passed has changed
+nothing — but an application that distinguishes "cancelled" from "confirmed the current value" will
+see the first where Windows would give it the second. The colour comes back through sRGB rather than
+raw: a colour picked from the crayon or spectrum pickers lives in whatever space that picker works in,
+and asking such a colour for its red component raises rather than converting.
+
+This is also the one thing on this page that CI does not exercise. A modeless panel ends when a person
+closes it, and no runner has one; a probe that opened either would hold the job until its timeout and
+report nothing. What the probe does check is that both shared objects resolve, which rules out the
+silent failure — a chooser whose class never resolved answers null forever, and that is
+indistinguishable from a user who cancels every time.
 
 Hover is asked for in both places AppKit needs it asked. A window generates no mouse-moved events
 until `setAcceptsMouseMovedEvents:` says so, and even then it sends `mouseMoved:` to whichever view

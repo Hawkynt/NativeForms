@@ -177,7 +177,7 @@ internal static partial class CocoaRuntime
 
     /// <summary>Asks an integer question about a point, such as which row a table has there.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
-    internal static partial nint SendInteger(nint receiver, nint selector, CGPoint point);
+    internal static partial nint SendIntegerAt(nint receiver, nint selector, CGPoint point);
 
     /// <summary>Sends a message taking an object and a flag, such as a selection that does not extend.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
@@ -242,6 +242,14 @@ internal static partial class CocoaRuntime
     /// <summary>Sends an object-and-measure message that answers an object, such as resizing a font.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendPointer(nint receiver, nint selector, nint first, double second);
+
+    /// <summary>Sends a message taking a flag and answering an object, such as a panel made on demand.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendBoolArgument(nint receiver, nint selector, [MarshalAs(UnmanagedType.U1)] bool argument);
+
+    /// <summary>Reads an integer answer to a one-object question, such as a modal session's state.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendInteger(nint receiver, nint selector, nint argument);
 
     /// <summary>Sends a message taking one measure and answering an object, such as an item of a length.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]

@@ -263,15 +263,185 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     /// <remarks>
-    /// <c>NSColorPanel</c> is a shared, modeless panel — the platform keeps one and shows it — so it
-    /// has no modal answer to wait for. Running it properly means opening it and reporting changes as
-    /// they happen, which is a different shape from the blocking call this seam offers; until that is
-    /// wired the panel is not shown at all rather than shown and ignored.
+    /// <para>
+    /// <c>NSColorPanel</c> is a shared, modeless panel: the platform keeps exactly one, shows it, and
+    /// has no notion of being dismissed with an answer. What makes it fit this seam's blocking shape is
+    /// a modal *session* — <c>beginModalSessionForWindow:</c> and <c>runModalSession:</c> — pumped
+    /// until the panel is no longer on screen. <c>runModalForWindow:</c> would be the obvious call and
+    /// the wrong one: it ends when something calls <c>stopModal</c>, and nothing on this panel ever
+    /// does, because it has no button that means "done".
+    /// </para>
+    /// <para>
+    /// Which is also why cancellation is inferred rather than reported. The panel has no OK and no
+    /// Cancel, only a close box, so what is answered is the colour if the user changed it and nothing
+    /// if they did not — the same outcome either reading would produce for any caller, since a dialog
+    /// that hands back exactly what it was given has not changed anything.
+    /// </para>
     /// </remarks>
-    public Color? ShowColorDialog(Color color) => null;
+    public Color? ShowColorDialog(Color color)
+    {
+        var panel = CocoaRuntime.SendToClass("NSColorPanel", "sharedColorPanel");
+        if (panel == 0)
+            return null;
+
+        var colours = CocoaRuntime.objc_getClass("NSColor");
+        var initial = colours == 0
+            ? 0
+            : CocoaRuntime.SendColor(
+                colours,
+                CocoaRuntime.sel_registerName("colorWithSRGBRed:green:blue:alpha:"),
+                color.R / 255.0,
+                color.G / 255.0,
+                color.B / 255.0,
+                1.0);
+
+        // No alpha: the other two platforms' colour dialogs have none, and a channel one backend can
+        // answer and two cannot is a difference an application would have to code around.
+        CocoaRuntime.SendVoid(panel, CocoaRuntime.sel_registerName("setShowsAlpha:"), false);
+        if (initial != 0)
+            CocoaRuntime.SendVoid(panel, CocoaRuntime.sel_registerName("setColor:"), initial);
+
+        if (!RunPanel(panel))
+            return null;
+
+        var chosen = ReadColor(CocoaRuntime.SendPointer(panel, CocoaRuntime.sel_registerName("color")));
+        return chosen is { } picked && picked != color ? picked : null;
+    }
+
+    /// <summary>An <c>NSColor</c> as the toolkit's, converted to sRGB first, or null.</summary>
+    /// <remarks>
+    /// The conversion is not optional. A colour picked from the panel's crayons or its spectrum is in
+    /// whatever space that picker works in, and asking such a colour for its red component does not
+    /// convert it — it raises, because the component is not one it has.
+    /// </remarks>
+    private static Color? ReadColor(nint color)
+    {
+        if (color == 0)
+            return null;
+
+        var space = CocoaRuntime.SendToClass("NSColorSpace", "sRGBColorSpace");
+        var converted = space == 0
+            ? 0
+            : CocoaRuntime.SendPointer(color, CocoaRuntime.sel_registerName("colorUsingColorSpace:"), space);
+
+        if (converted == 0)
+            return null;
+
+        var red = CocoaRuntime.SendDouble(converted, CocoaRuntime.sel_registerName("redComponent"));
+        var green = CocoaRuntime.SendDouble(converted, CocoaRuntime.sel_registerName("greenComponent"));
+        var blue = CocoaRuntime.SendDouble(converted, CocoaRuntime.sel_registerName("blueComponent"));
+        return Color.FromArgb(Channel(red), Channel(green), Channel(blue));
+    }
+
+    /// <summary>One component of a colour, as a byte.</summary>
+    private static int Channel(double component) => (int)Math.Clamp(Math.Round(component * 255), 0, 255);
+
+    /// <summary>
+    /// Shows a shared panel and pumps events until the user closes it, answering whether it ever
+    /// appeared.
+    /// </summary>
+    /// <remarks>
+    /// The loop's exit condition is the panel's own visibility rather than the session's return value
+    /// alone, because a panel with no "done" button never stops the session. A panel that refuses to
+    /// appear ends the wait at once — a call that blocked forever on a window nobody can see is the one
+    /// failure worse than answering as if cancelled, which is what this seam did before.
+    /// </remarks>
+    private static bool RunPanel(nint panel)
+    {
+        var app = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        if (app == 0)
+            return false;
+
+        CocoaRuntime.SendVoid(panel, CocoaRuntime.sel_registerName("makeKeyAndOrderFront:"), 0);
+        if (!CocoaRuntime.SendBool(panel, CocoaRuntime.sel_registerName("isVisible")))
+            return false;
+
+        var session = CocoaRuntime.SendPointer(app, CocoaRuntime.sel_registerName("beginModalSessionForWindow:"), panel);
+        if (session == 0)
+            return false;
+
+        try
+        {
+            // NSModalResponseContinue
+            const nint running = -1002;
+            var run = CocoaRuntime.sel_registerName("runModalSession:");
+            var visible = CocoaRuntime.sel_registerName("isVisible");
+
+            while (CocoaRuntime.SendInteger(app, run, session) == running
+                && CocoaRuntime.SendBool(panel, visible))
+                System.Threading.Thread.Sleep(5); // the session returns at once when the queue is empty
+        }
+        finally
+        {
+            CocoaRuntime.SendVoid(app, CocoaRuntime.sel_registerName("endModalSession:"), session);
+        }
+
+        return true;
+    }
 
     /// <inheritdoc/>
-    public Font? ShowFontDialog(Font font) => null;
+    /// <remarks>
+    /// The font panel is run the same way, and read a different way. It reports nothing directly:
+    /// changing a setting sends <c>changeFont:</c> up the responder chain, and what that handler is
+    /// expected to do is ask <c>NSFontManager</c> to convert its current font. So this asks the same
+    /// question once, at the end — <c>convertFont:</c> applies whatever the user did to the font that
+    /// was handed in, which needs no target object and no responder of our own.
+    /// </remarks>
+    public Font? ShowFontDialog(Font font)
+    {
+        var manager = CocoaRuntime.SendToClass("NSFontManager", "sharedFontManager");
+        var initial = NativeFont(font);
+        if (manager == 0 || initial == 0)
+            return null;
+
+        CocoaRuntime.SendVoid(manager, CocoaRuntime.sel_registerName("setSelectedFont:isMultiple:"), initial, false);
+
+        // fontPanel:YES creates the panel if there is not one yet.
+        var panel = CocoaRuntime.SendBoolArgument(manager, CocoaRuntime.sel_registerName("fontPanel:"), true);
+        if (panel == 0 || !RunPanel(panel))
+            return null;
+
+        var chosen = CocoaRuntime.SendPointer(manager, CocoaRuntime.sel_registerName("convertFont:"), initial);
+        if (chosen == 0 || CocoaRuntime.SendBool(chosen, CocoaRuntime.sel_registerName("isEqual:"), initial))
+            return null;
+
+        var family = CocoaRuntime.SendPointer(chosen, CocoaRuntime.sel_registerName("familyName"));
+        var name = family == 0 ? font.Family : CocoaNative.ReadString(family);
+        var size = CocoaRuntime.SendDouble(chosen, CocoaRuntime.sel_registerName("pointSize"));
+
+        // NSFontTraitMask: italic is bit 0, bold bit 1 — the same pair the rich text box converts with.
+        var traits = CocoaRuntime.SendPointer(manager, CocoaRuntime.sel_registerName("traitsOfFont:"), chosen);
+        var style = FontStyle.Regular;
+        if ((traits & 2) != 0)
+            style |= FontStyle.Bold;
+        if ((traits & 1) != 0)
+            style |= FontStyle.Italic;
+
+        return new(
+            name.Length > 0 ? name : font.Family,
+            size > 0 ? (float)size : font.SizeInPoints,
+            style);
+    }
+
+    /// <summary>The toolkit's font as an <c>NSFont</c>, falling back to the system one by size.</summary>
+    private static nint NativeFont(Font font)
+    {
+        var fonts = CocoaRuntime.objc_getClass("NSFont");
+        if (fonts == 0)
+            return 0;
+
+        var family = CocoaRuntime.NSString(font.Family);
+        var named = family == 0
+            ? 0
+            : CocoaRuntime.SendPointer(fonts, CocoaRuntime.sel_registerName("fontWithName:size:"), family, font.SizeInPoints);
+
+        if (family != 0)
+            CocoaNative.CFRelease(family);
+
+        return named != 0
+            ? named
+            : CocoaRuntime.SendLength(fonts, CocoaRuntime.sel_registerName("systemFontOfSize:"), font.SizeInPoints);
+    }
 
     /// <inheritdoc/>
     public IRichTextBoxPeer CreateRichTextBox() => new CocoaRichTextBoxPeer();

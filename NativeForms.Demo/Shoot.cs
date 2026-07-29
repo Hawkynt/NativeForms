@@ -49,6 +49,17 @@ internal static partial class Shoot
     /// </remarks>
     public static string? StatusItem => OperatingSystem.IsMacOS() ? ShootMacOS.StatusItem() : null;
 
+    /// <summary>
+    /// Whether the objects the colour and font choosers are built on resolve, where they are shared
+    /// panels rather than dialogs.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately short of running them: a modeless panel ends when someone closes it, and a
+    /// walkthrough has nobody to do that. What this rules out is the silent failure — a chooser whose
+    /// class never resolved answers null forever, which reads exactly like a user always cancelling.
+    /// </remarks>
+    public static string? Choosers => OperatingSystem.IsMacOS() ? ShootMacOS.Choosers() : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

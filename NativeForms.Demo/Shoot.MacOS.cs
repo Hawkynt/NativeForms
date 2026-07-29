@@ -284,7 +284,23 @@ internal static unsafe partial class ShootMacOS
             return $"status item: present, image {(image != 0 ? "set" : "MISSING")}, tooltip {(tip != 0 ? "set" : "MISSING")}";
         }
 
-        return "status item: no NSStatusBarButton among the application's windows";
+        // Not found is worth explaining rather than merely reporting: the status bar itself may not
+        // exist on a session without a menu bar, and a modern status item may be hosted in a window
+        // this process does not list. The two look identical from the outside without these.
+        var bar = objc_getClass("NSStatusBar") is var barClass && barClass != 0
+            ? Send(barClass, sel_registerName("systemStatusBar"))
+            : 0;
+
+        var names = new List<string>(count);
+        for (var i = 0; i < count; ++i)
+        {
+            var window = Send(windows, sel_registerName("objectAtIndex:"), i);
+            if (window != 0 && class_getName(object_getClass(window)) is var raw && raw != 0)
+                names.Add(Marshal.PtrToStringUTF8(raw) ?? "?");
+        }
+
+        return $"status item: no NSStatusBarButton found; NSStatusBar {(bar != 0 ? "resolves" : "MISSING")}, "
+            + $"{count} app window(s): {(names.Count == 0 ? "none" : string.Join(", ", names))}";
     }
 
     /// <summary>The first status-bar button at or under a view, or zero.</summary>
@@ -304,6 +320,31 @@ internal static unsafe partial class ShootMacOS
                 return found;
 
         return 0;
+    }
+
+    /// <summary>
+    /// Whether the shared panels the colour and font choosers run actually exist in this process.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole of what a runner can say about those two. Both are modeless panels that a
+    /// person closes, and nobody is here to close one — a probe that opened either would hold the job
+    /// until its timeout and report nothing at all. What it can rule out is the silent failure: a class
+    /// that does not resolve makes the chooser answer null forever, which is indistinguishable from a
+    /// user pressing Cancel every single time.
+    /// </remarks>
+    public static string Choosers()
+    {
+        var colour = objc_getClass("NSColorPanel") is var colourClass && colourClass != 0
+            ? Send(colourClass, sel_registerName("sharedColorPanel"))
+            : 0;
+
+        var manager = objc_getClass("NSFontManager") is var managerClass && managerClass != 0
+            ? Send(managerClass, sel_registerName("sharedFontManager"))
+            : 0;
+
+        return $"choosers: NSColorPanel {(colour != 0 ? "resolves" : "MISSING")}, "
+            + $"NSFontManager {(manager != 0 ? "resolves" : "MISSING")} "
+            + "(neither is run here: a modeless panel needs someone to close it)";
     }
 
     /// <summary>Tallies the class of every view under one, itself included.</summary>

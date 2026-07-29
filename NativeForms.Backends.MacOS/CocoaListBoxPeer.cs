@@ -241,7 +241,7 @@ internal sealed class CocoaListBoxPeer : CocoaControlPeer, IListBoxPeer
             return 0;
 
         var visible = CocoaRuntime.SendRect(this.Handle, CocoaRuntime.sel_registerName("documentVisibleRect"));
-        var row = (int)CocoaRuntime.SendInteger(_table, CocoaRuntime.sel_registerName("rowAtPoint:"), new() { X = 0, Y = visible.Y });
+        var row = (int)CocoaRuntime.SendIntegerAt(_table, CocoaRuntime.sel_registerName("rowAtPoint:"), new() { X = 0, Y = visible.Y });
         return Math.Max(0, row);
     }
 
@@ -258,7 +258,7 @@ internal sealed class CocoaListBoxPeer : CocoaControlPeer, IListBoxPeer
             return -1;
 
         var visible = CocoaRuntime.SendRect(this.Handle, CocoaRuntime.sel_registerName("documentVisibleRect"));
-        var row = (int)CocoaRuntime.SendInteger(
+        var row = (int)CocoaRuntime.SendIntegerAt(
             _table,
             CocoaRuntime.sel_registerName("rowAtPoint:"),
             new() { X = visible.X + x, Y = visible.Y + y });

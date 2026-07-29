@@ -183,6 +183,9 @@ if (shooting)
             if (Shoot.StatusItem is { } tray)
                 Note("  " + tray);
 
+            if (Shoot.Choosers is { } choosers)
+                Note("  " + choosers);
+
             // Say what was actually exercised, not just that nothing complained: a run that injected
             // nothing and reported a pass would be the same lie as a blank screenshot reporting success.
             var injected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
