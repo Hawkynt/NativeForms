@@ -56,14 +56,44 @@ internal static unsafe partial class ShootInputMac
     [LibraryImport(_CoreFoundation)]
     private static partial void CFRelease(nint handle);
 
+    /// <summary>Whether this process is allowed to post synthetic events.</summary>
+    [LibraryImport("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static partial bool AXIsProcessTrusted();
+
     [LibraryImport(_CoreFoundation)]
     private static partial int CFRunLoopRunInMode(nint mode, double seconds, [MarshalAs(UnmanagedType.U1)] bool returnAfterSourceHandled);
 
     [LibraryImport(_CoreFoundation, StringMarshalling = StringMarshalling.Utf8)]
     private static partial nint CFStringCreateWithCString(nint allocator, string name, uint encoding);
 
-    /// <summary>Whether injected input can be delivered here at all.</summary>
-    public static bool Available { get; private set; } = true;
+    /// <summary>
+    /// Whether injected input can be delivered here at all.
+    /// </summary>
+    /// <remarks>
+    /// macOS accepts a posted CGEvent from an untrusted process and silently drops it, so "the post
+    /// succeeded" says nothing about delivery — the first run of this reported a real click that never
+    /// reached a check box, which was the permission missing rather than the toolkit failing. Asking
+    /// the Accessibility API up front is the only way to tell a skip from a failure, and a check that
+    /// cannot tell them apart is worse than no check.
+    /// </remarks>
+    public static bool Available => _trusted.Value;
+
+    private static readonly Lazy<bool> _trusted = new(() =>
+    {
+        try
+        {
+            return AXIsProcessTrusted();
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    });
 
     /// <summary>Clicks at a screen point, reporting whether the event was created and posted.</summary>
     public static bool Click(Point screen)
@@ -80,10 +110,7 @@ internal static unsafe partial class ShootInputMac
         var down = CGEventCreateKeyboardEvent(0, 0, true);
         var up = CGEventCreateKeyboardEvent(0, 0, false);
         if (down == 0 || up == 0)
-        {
-            Available = false;
             return false;
-        }
 
         // The key code is nothing in particular; the character is carried as a Unicode payload, which
         // is what lets one path type anything without a keyboard-layout table.
@@ -115,10 +142,7 @@ internal static unsafe partial class ShootInputMac
     private static bool Post(nint theEvent)
     {
         if (theEvent == 0)
-        {
-            Available = false;
             return false;
-        }
 
         CGEventPost(_HidTap, theEvent);
         CFRelease(theEvent);

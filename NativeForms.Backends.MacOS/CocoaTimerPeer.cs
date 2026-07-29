@@ -15,6 +15,13 @@ internal sealed class CocoaTimerPeer(CocoaBackend backend) : ITimerPeer
 {
     private System.Threading.Timer? _timer;
 
+    /// <summary>
+    /// Whether ticks are wanted. A tick is queued onto the UI thread rather than run where it fires,
+    /// so one can already be in the queue when Stop is called — and a timer that ticks after being
+    /// stopped is not a timer, it is a race. The flag is read when the queued work finally runs.
+    /// </summary>
+    private volatile bool _running;
+
     /// <inheritdoc/>
     public event EventHandler? Tick;
 
@@ -22,16 +29,27 @@ internal sealed class CocoaTimerPeer(CocoaBackend backend) : ITimerPeer
     public void Start(int intervalMs)
     {
         var period = Math.Max(1, intervalMs);
-        _timer ??= new(_ => backend.Post(() => this.Tick?.Invoke(this, EventArgs.Empty)));
+        _running = true;
+        _timer ??= new(_ => backend.Post(() =>
+        {
+            if (_running)
+                this.Tick?.Invoke(this, EventArgs.Empty);
+        }));
+
         _timer.Change(period, period);
     }
 
     /// <inheritdoc/>
-    public void Stop() => _timer?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+    public void Stop()
+    {
+        _running = false;
+        _timer?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+    }
 
     /// <inheritdoc/>
     public void Dispose()
     {
+        _running = false;
         _timer?.Dispose();
         _timer = null;
     }
