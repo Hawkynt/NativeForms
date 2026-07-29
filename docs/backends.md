@@ -85,6 +85,16 @@ is right in CoreGraphics' coordinates and upside down in this one, so the painte
 about the destination rectangle inside a saved state rather than flipping the context, which would
 put every string on its head as well.
 
+A disabled icon is grey here too. A control does not compute the dimming itself — it asks the bitmap
+for its greyed sibling and draws that, which is how the look lives with the image rather than being
+reinvented by every control that shows one — and this backend answered nothing, so the toolbar's off
+button, the disabled icon label and the frozen picture box photographed in full colour on macOS while
+the other two showed them grey. The sibling is built on the first disabled draw and kept, for the same
+reason the `CGImage` is. It is computed from the straight-alpha pixels the core handed over rather
+than from the `CGImage`, whose channels are already scaled by their own alpha — weighting those would
+darken a half-transparent icon a second time. The channel weights are the ones the Cairo and GDI
+backends use, so "disabled" is one grey across all three rather than each renderer's own.
+
 The window holds the chrome the form asked for, with one refusal. Resize limits go to `setMinSize:`
 and `setMaxSize:`, which constrain the frame rather than the content — the same measurement the
 toolkit states its bounds in here, so the number a caller gives is the number the user drags against,

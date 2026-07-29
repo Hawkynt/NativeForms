@@ -46,9 +46,44 @@ internal sealed partial class CocoaImage(int width, int height, ReadOnlySpan<int
         }
     }
 
+    /// <summary>The greyed sibling, built on the first disabled draw and kept.</summary>
+    private CocoaImage? _disabled;
+
+    /// <inheritdoc/>
+    public IImage? DisabledImage => _disabled ??= this.CreateGrayscale();
+
+    /// <summary>
+    /// Realises the greyed copy: every channel replaced by the pixel's luminance, alpha untouched.
+    /// </summary>
+    /// <remarks>
+    /// The same weights the other two backends use (77/150/29 over 256, which is Rec. 601), so a
+    /// disabled toolbar icon is the same grey on all three rather than each renderer's own idea of one.
+    /// Computed from the straight-alpha source rather than from the <c>CGImage</c>: the pixels
+    /// CoreGraphics holds are premultiplied, and weighting those would darken a half-transparent icon
+    /// twice — once by its own alpha and again when it is composited.
+    /// </remarks>
+    private CocoaImage CreateGrayscale()
+    {
+        var source = this.Pixels;
+        var grey = new int[source.Length];
+        for (var i = 0; i < source.Length; ++i)
+        {
+            var pixel = unchecked((uint)source[i]);
+            var alpha = pixel & 0xFF000000;
+            uint red = (pixel >> 16) & 0xFF, green = (pixel >> 8) & 0xFF, blue = pixel & 0xFF;
+            var luminance = ((red * 77) + (green * 150) + (blue * 29)) >> 8;
+            grey[i] = unchecked((int)(alpha | (luminance << 16) | (luminance << 8) | luminance));
+        }
+
+        return new(this.Width, this.Height, grey);
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
+        _disabled?.Dispose();
+        _disabled = null;
+
         // Marked converted first and unconditionally. An image disposed before anything ever drew it
         // has no handle to release, and leaving it unmarked would let a later draw build one that
         // nothing would ever release — the leak is on the path where the bitmap was never used at all,
