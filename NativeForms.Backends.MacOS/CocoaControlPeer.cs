@@ -19,8 +19,15 @@ internal abstract class CocoaControlPeer : IControlPeer
 
     private protected CocoaControlPeer(nint handle) => this.Handle = handle;
 
-    /// <summary>The underlying AppKit object.</summary>
-    internal nint Handle { get; }
+    /// <summary>
+    /// The underlying AppKit object. A peer may swap it — AppKit fixes a control's class at
+    /// construction, so a state change the class cannot express is served by building the other object
+    /// and replacing this one in its superview.
+    /// </summary>
+    internal nint Handle { get; private protected set; }
+
+    /// <summary>Where the widget was last put, so a replacement can be given the same frame.</summary>
+    private protected Rectangle BoundsValue => _bounds;
 
     public event EventHandler? GotFocus;
     public event EventHandler? LostFocus;
@@ -54,7 +61,7 @@ internal abstract class CocoaControlPeer : IControlPeer
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setHidden:"), !visible);
     }
 
-    public void SetEnabled(bool enabled)
+    public virtual void SetEnabled(bool enabled)
     {
         if (this.Handle != 0)
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setEnabled:"), enabled);
@@ -62,7 +69,7 @@ internal abstract class CocoaControlPeer : IControlPeer
 
     public Point PointToScreen(Point clientPoint) => new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
-    public void Focus()
+    public virtual void Focus()
     {
         if (this.Handle != 0)
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("becomeFirstResponder"));
@@ -211,17 +218,38 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
     private void Unused2() => Clicked?.Invoke(this, EventArgs.Empty);
 }
 
-/// <summary>An editable field: an <c>NSTextField</c>, or an <c>NSSecureTextField</c> when masked.</summary>
+/// <summary>
+/// An editable field: an <c>NSTextField</c> (an <c>NSSecureTextField</c> when masked) on one line, or
+/// an <c>NSTextView</c> inside an <c>NSScrollView</c> once it is told it is multiline.
+/// </summary>
 /// <remarks>
-/// AppKit decides between plain and secure at construction — there is no "make this one a password
-/// field" message — so a text box that is told its mask character after realization keeps the class it
-/// was built with. The toolkit sets the mask before flushing state in practice; when it does not, the
-/// field stays plain rather than silently showing the characters it promised to hide, which is why the
-/// mask is remembered and reported rather than ignored.
+/// <para>
+/// AppKit fixes the class at construction — there is no "make this one a password field" message and
+/// no "make this one multiline" one either — so a state change the class cannot express is served by
+/// building the other object and swapping it into the superview. That is the recreation
+/// <see cref="ITextBoxPeer.SetMultiline"/> allows: the text and the frame move across, the parent's
+/// child order is preserved, and the core never learns that the widget it holds is a different one.
+/// </para>
+/// <para>
+/// Masking is the exception, because the two classes differ in what they show rather than in what they
+/// are: a box told its mask character after realization keeps the plain field rather than silently
+/// showing the characters it promised to hide, which is why the wish is remembered and reported.
+/// </para>
 /// </remarks>
 internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
 {
     private bool _secure;
+
+    /// <summary>
+    /// The editing view when this is multiline, otherwise zero. A field has none of its own: AppKit
+    /// lends every text field in a window the same shared field editor while it has focus.
+    /// </summary>
+    private nint _textView;
+
+    // Remembered because a swap has to put them back, and nothing re-flushes them from the core.
+    private bool _readOnly;
+    private bool _hasFrame = true;
+    private bool _enabled = true;
 
     public CocoaTextBoxPeer()
         : base(Create(secure: false))
@@ -242,9 +270,21 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
             : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
     }
 
+    /// <summary>Whether this box edits through a text view of its own rather than a shared field editor.</summary>
+    private protected bool IsMultiline => _textView != 0;
+
+    /// <summary>The text view behind a multiline box, or zero.</summary>
+    private protected nint TextView => _textView;
+
     /// <inheritdoc/>
     public string GetText()
     {
+        if (_textView != 0)
+        {
+            var content = CocoaRuntime.SendPointer(_textView, CocoaRuntime.sel_registerName("string"));
+            return content == 0 ? string.Empty : CocoaNative.ReadString(content);
+        }
+
         if (this.Handle == 0)
             return string.Empty;
 
@@ -253,23 +293,56 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     }
 
     /// <inheritdoc/>
-    public void SetReadOnly(bool readOnly)
+    /// <remarks>A text view holds a string, not a "string value"; the base class speaks to controls.</remarks>
+    public override void SetText(string text)
     {
-        if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setEditable:"), !readOnly);
+        if (_textView == 0)
+        {
+            base.SetText(text);
+            return;
+        }
+
+        var value = CocoaRuntime.NSString(text);
+        if (value == 0)
+            return;
+
+        CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setString:"), value);
+        CocoaNative.CFRelease(value);
     }
 
     /// <inheritdoc/>
+    public void SetReadOnly(bool readOnly)
+    {
+        _readOnly = readOnly;
+        var target = _textView != 0 ? _textView : this.Handle;
+        if (target != 0)
+            CocoaRuntime.SendVoid(target, CocoaRuntime.sel_registerName("setEditable:"), !readOnly && _enabled);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A scroll view frames itself with a border type rather than a bezel, so the same wish reaches two
+    /// different messages. Sending the field's to the scroll view would not be ignored — it would be an
+    /// unrecognized selector, which ends the process.
+    /// </remarks>
     public void SetHasFrame(bool hasFrame)
     {
-        if (this.Handle != 0)
+        _hasFrame = hasFrame;
+        if (this.Handle == 0)
+            return;
+
+        if (_textView != 0)
+            // NSBorderType: none 0, bezel 2.
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBorderType:"), hasFrame ? 2 : 0);
+        else
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBezeled:"), hasFrame);
     }
 
     /// <inheritdoc/>
+    /// <remarks>Single-line only: a text view has no placeholder, and AppKit offers none for one.</remarks>
     public void SetPlaceholder(string placeholder)
     {
-        if (this.Handle == 0)
+        if (this.Handle == 0 || _textView != 0)
             return;
 
         var text = CocoaRuntime.NSString(placeholder);
@@ -288,20 +361,127 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     /// <summary>Whether this field was asked to mask its content but could not.</summary>
     internal bool WantsMasking => _secure;
 
-    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A scroll view is a plain view and answers no <c>setEnabled:</c>, so a multiline box takes its
+    /// enablement where the editing happens: a disabled editor is one that cannot be typed in and
+    /// cannot be selected out of.
+    /// </remarks>
+    public override void SetEnabled(bool enabled)
+    {
+        _enabled = enabled;
+        if (_textView == 0)
+        {
+            base.SetEnabled(enabled);
+            return;
+        }
 
-    /// <remarks>A multi-line field is an NSTextView inside an NSScrollView, a different object
-    /// entirely rather than a flag, so it waits for its own peer.</remarks>
-    public void SetMultiline(bool multiline) { }
+        CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setEditable:"), enabled && !_readOnly);
+        CocoaRuntime.SendVoid(_textView, CocoaRuntime.sel_registerName("setSelectable:"), enabled);
+    }
 
-    public void SetMaxLength(int maxLength) { }
+    /// <inheritdoc/>
+    /// <remarks>The scroll view is scenery; the keyboard belongs to the view inside it.</remarks>
+    public override void Focus()
+    {
+        if (_textView == 0)
+        {
+            base.Focus();
+            return;
+        }
+
+        var window = CocoaRuntime.SendPointer(_textView, CocoaRuntime.sel_registerName("window"));
+        if (window != 0)
+            CocoaRuntime.SendVoid(window, CocoaRuntime.sel_registerName("makeFirstResponder:"), _textView);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The swap, and the reason the class remarks exist. It happens before the parent has been given
+    /// the view during realization — the core flushes a peer's own state and only then hands it to its
+    /// container — and after it when the property is set on a live control, which is what the
+    /// <c>replaceSubview:with:</c> is for.
+    /// </remarks>
+    public void SetMultiline(bool multiline)
+    {
+        if (multiline == (_textView != 0))
+            return;
+
+        var (host, editor) = multiline ? CreateScrolled(this.BoundsValue) : (Create(_secure), 0);
+        if (host == 0)
+            return; // keep the widget there is rather than trade a working one for nothing
+
+        var carried = this.GetText();
+        var replaced = this.Handle;
+        _textView = editor;
+        this.Handle = host;
+
+        var superview = replaced == 0 ? 0 : CocoaRuntime.SendPointer(replaced, CocoaRuntime.sel_registerName("superview"));
+        if (superview != 0)
+            CocoaRuntime.SendVoid(superview, CocoaRuntime.sel_registerName("replaceSubview:with:"), replaced, host);
+
+        this.SetBounds(this.BoundsValue);
+        this.SetText(carried);
+        this.SetEnabled(_enabled);
+        this.SetReadOnly(_readOnly);
+        this.SetHasFrame(_hasFrame);
+    }
+
+    /// <summary>
+    /// Builds the multiline editor: a text view inside a scroll view, which is the pair AppKit uses for
+    /// every editor taller than a line.
+    /// </summary>
+    /// <remarks>
+    /// The text grows downward without bound and never sideways, and the container tracks the view's
+    /// width — which is what makes a resize re-wrap the text instead of scrolling it out of sight.
+    /// </remarks>
+    private static (nint Host, nint Editor) CreateScrolled(Rectangle bounds)
+    {
+        var width = Math.Max(1, bounds.Width);
+        var height = Math.Max(1, bounds.Height);
+        var frame = new CocoaRuntime.CGRect(0, 0, width, height);
+
+        var scroll = CocoaRuntime.Allocate("NSScrollView");
+        if (scroll != 0)
+            scroll = CocoaRuntime.SendRectInit(scroll, CocoaRuntime.sel_registerName("initWithFrame:"), frame);
+
+        var view = CocoaRuntime.Allocate("NSTextView");
+        if (view != 0)
+            view = CocoaRuntime.SendRectInit(view, CocoaRuntime.sel_registerName("initWithFrame:"), frame);
+
+        if (scroll == 0 || view == 0)
+            return (0, 0);
+
+        // Far enough that no document reaches it; AppKit's own idiom here is FLT_MAX, which is only
+        // "no limit" spelled in a way that invites a float to overflow into it.
+        const double unbounded = 1e7;
+        CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setMinSize:"), new CocoaRuntime.CGSize(0, height));
+        CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setMaxSize:"), new CocoaRuntime.CGSize(unbounded, unbounded));
+        CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setVerticallyResizable:"), true);
+        CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setHorizontallyResizable:"), false);
+
+        // NSViewWidthSizable, so the editor follows the clip view when the box is resized.
+        CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setAutoresizingMask:"), 2);
+
+        if (CocoaRuntime.SendPointer(view, CocoaRuntime.sel_registerName("textContainer")) is var container && container != 0)
+        {
+            CocoaRuntime.SendVoid(container, CocoaRuntime.sel_registerName("setContainerSize:"), new CocoaRuntime.CGSize(width, unbounded));
+            CocoaRuntime.SendVoid(container, CocoaRuntime.sel_registerName("setWidthTracksTextView:"), true);
+        }
+
+        CocoaRuntime.SendVoid(scroll, CocoaRuntime.sel_registerName("setHasVerticalScroller:"), true);
+        CocoaRuntime.SendVoid(scroll, CocoaRuntime.sel_registerName("setAutohidesScrollers:"), true);
+        CocoaRuntime.SendVoid(scroll, CocoaRuntime.sel_registerName("setDocumentView:"), view);
+        return (scroll, view);
+    }
 
     /// <inheritdoc/>
     /// <remarks>
     /// The selection belongs to the field editor, not the field: AppKit shares one <c>NSTextView</c>
     /// between every text field in a window and lends it to whichever has focus. A field that is not
     /// focused has no editor and therefore no selection to set, which is why this asks first rather
-    /// than messaging null and quietly doing nothing.
+    /// than messaging null and quietly doing nothing. A multiline box owns its editor, so it always has
+    /// one.
     /// </remarks>
     public void SetSelection(int start, int length)
     {
@@ -324,15 +504,20 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
         return ((int)range.Location, (int)range.Length);
     }
 
-    /// <summary>The field editor currently lent to this field, or null when it is not focused.</summary>
-    private nint? Editor()
+    /// <summary>The view the selection lives in: this box's own, or the field editor lent to it.</summary>
+    private protected nint? Editor()
     {
+        if (_textView != 0)
+            return _textView;
+
         if (this.Handle == 0)
             return null;
 
         var editor = CocoaRuntime.SendPointer(this.Handle, CocoaRuntime.sel_registerName("currentEditor"));
         return editor == 0 ? null : editor;
     }
+
+    public void SetMaxLength(int maxLength) { }
 
     /// <summary>Raises the input events once AppKit's delegate routing is wired.</summary>
     private void Unused3()

@@ -134,6 +134,17 @@ internal static partial class CocoaRuntime
         public double X, Y;
     }
 
+    /// <summary>A size in Cocoa's coordinates: two doubles, which every ABI here passes in registers.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CGSize(double width, double height)
+    {
+        public double Width = width, Height = height;
+    }
+
+    /// <summary>Sends a message taking a size.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendVoid(nint receiver, nint selector, CGSize size);
+
     /// <summary>Reads a point-valued property — two doubles, which AArch64 returns in registers.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial CGPoint SendPoint(nint receiver, nint selector);

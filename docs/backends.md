@@ -63,14 +63,21 @@ It is genuinely incomplete, and the table above says so rather than leaving you 
 
 Working: AppKit loads, windows open, the view hierarchy builds with the toolkit's coordinates,
 the event loop runs, owner-drawn painting and text render through CoreGraphics and CoreText, images
-and text measurement work, the clipboard works both ways, and the gallery's sixteen pages all pass
-the walkthrough's state round-trip and layout audit.
+and text measurement work, the clipboard works both ways, a multiline `TextBox` is a real
+`NSTextView` in an `NSScrollView`, and the gallery's sixteen pages all pass the walkthrough's state
+round-trip and layout audit.
 
 Not working yet: no native-widget promotion, no accessibility, the colour and font choosers answer as
 if cancelled (both are shared modeless panels on macOS, which is a different shape from this seam's
-blocking call), multiline text is a single-line field, rich text shows its plain text, popups do not
-light-dismiss, and while mouse and keyboard events are routed into the toolkit they are not yet
-verified end to end the way the Win32 backend's are.
+blocking call), rich text shows its plain text, popups do not light-dismiss, and while mouse and
+keyboard events are routed into the toolkit they are not yet verified end to end the way the Win32
+backend's are.
+
+A password `TextBox` is the one place the class-at-construction rule still shows: AppKit picks between
+`NSTextField` and `NSSecureTextField` when the object is made, and the toolkit sets the mask before
+realization in practice, so a box told to mask afterwards stays plain rather than silently showing
+what it promised to hide. Multiline no longer has that problem — the peer builds the other object and
+swaps it into the superview.
 
 ## How the screenshots are produced
 
