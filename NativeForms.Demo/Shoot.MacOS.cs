@@ -284,24 +284,34 @@ internal static unsafe partial class ShootMacOS
             return $"status item: present, image {(image != 0 ? "set" : "MISSING")}, tooltip {(tip != 0 ? "set" : "MISSING")}";
         }
 
-        // Not found is worth explaining rather than merely reporting: the status bar itself may not
-        // exist on a session without a menu bar, and a modern status item may be hosted in a window
-        // this process does not list. The two look identical from the outside without these.
+        // No button in reach does not mean no item. Since the status bar started hosting its items out
+        // of process, the button is a remote view and the application keeps only the host window — so
+        // what is left to read is the window's level, and NSStatusWindowLevel is a level nothing else
+        // this process creates would ask for.
+        for (var i = 0; i < count; ++i)
+        {
+            var window = Send(windows, sel_registerName("objectAtIndex:"), i);
+            if (window == 0 || (int)Send(window, sel_registerName("level")) != _StatusWindowLevel)
+                continue;
+
+            var name = class_getName(object_getClass(window)) is var raw && raw != 0
+                ? Marshal.PtrToStringUTF8(raw)
+                : "?";
+
+            return $"status item: present as {name} at NSStatusWindowLevel, hosted out of process "
+                + "(its button is a remote view, so the image and tooltip cannot be read back here)";
+        }
+
         var bar = objc_getClass("NSStatusBar") is var barClass && barClass != 0
             ? Send(barClass, sel_registerName("systemStatusBar"))
             : 0;
 
-        var names = new List<string>(count);
-        for (var i = 0; i < count; ++i)
-        {
-            var window = Send(windows, sel_registerName("objectAtIndex:"), i);
-            if (window != 0 && class_getName(object_getClass(window)) is var raw && raw != 0)
-                names.Add(Marshal.PtrToStringUTF8(raw) ?? "?");
-        }
-
-        return $"status item: no NSStatusBarButton found; NSStatusBar {(bar != 0 ? "resolves" : "MISSING")}, "
-            + $"{count} app window(s): {(names.Count == 0 ? "none" : string.Join(", ", names))}";
+        return $"status item: MISSING - no button and no status-level window among {count} app window(s); "
+            + $"NSStatusBar {(bar != 0 ? "resolves" : "does not resolve")}";
     }
+
+    /// <summary>NSStatusWindowLevel — where the menu bar's extras sit, and nothing else here does.</summary>
+    private const int _StatusWindowLevel = 25;
 
     /// <summary>The first status-bar button at or under a view, or zero.</summary>
     private static nint FindStatusButton(nint view)
