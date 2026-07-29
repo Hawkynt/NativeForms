@@ -153,6 +153,10 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial CGPoint SendConvert(nint receiver, nint selector, CGPoint point, nint fromView);
 
+    /// <summary>Converts a point through a one-argument message, such as a window's to screen space.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial CGPoint SendPoint(nint receiver, nint selector, CGPoint point);
+
     /// <summary>Reads an integer-valued property.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendInteger(nint receiver, nint selector);

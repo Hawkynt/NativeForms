@@ -351,7 +351,10 @@ public sealed class CocoaBackend : IPlatformBackend
                 continue;
             }
 
-            CocoaRuntime.SendVoid(app, sendEvent, next);
+            // The open popups get first refusal. A press outside the deepest one closes it and is
+            // swallowed, which is what a pointer grab would do on the platforms that take one.
+            if (!CocoaPopupPeer.Intercept(next))
+                CocoaRuntime.SendVoid(app, sendEvent, next);
         }
 
         if (mode != 0)

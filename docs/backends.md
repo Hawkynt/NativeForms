@@ -18,9 +18,9 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Native widget promotion (§12) | 9 controls | 9 controls | none yet |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | not yet |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | not yet |
-| Mouse & keyboard | complete | complete | routed; injection checked in CI |
+| Mouse & keyboard | complete | complete | press, drag, wheel, keys; no hover |
 | Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
-| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + real `CGEvent`, reporting |
+| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; `CGEvent` injection skips — a runner grants no Accessibility permission |
 
 ## Side by side
 
@@ -69,9 +69,17 @@ round-trip and layout audit.
 
 Not working yet: no native-widget promotion, no accessibility, the colour and font choosers answer as
 if cancelled (both are shared modeless panels on macOS, which is a different shape from this seam's
-blocking call), rich text shows its plain text, popups do not light-dismiss, and while mouse and
+blocking call), rich text shows its plain text, and while mouse and
 keyboard events are routed into the toolkit they are not yet verified end to end the way the Win32
-backend's are.
+backend's are. Hovering is the gap inside that gap: presses, drags and the wheel arrive, but neither
+the window nor a popup asks AppKit for mouse-moved events, so nothing highlights under the pointer.
+
+Popups do light-dismiss. There is no pointer grab behind it — AppKit's own route to an event before
+dispatch is a block, which the interop rules keep out of this assembly — so the application's event
+loop makes the decision instead, offering every press to the deepest open surface first. A press
+outside it is offered to the owner (which is how a menu cascade routes a click on a shallower level of
+itself) and otherwise closes it, and either way it is swallowed rather than also landing on whatever
+was underneath.
 
 A password `TextBox` is the one place the class-at-construction rule still shows: AppKit picks between
 `NSTextField` and `NSSecureTextField` when the object is made, and the toolkit sets the mask before
