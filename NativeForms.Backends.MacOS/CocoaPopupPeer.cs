@@ -306,6 +306,16 @@ internal sealed class CocoaNotifyIconPeer : INotifyIconPeer
 
     public CocoaNotifyIconPeer()
     {
+        // A status item needs the application to own a slice of the menu bar, and a process launched
+        // from a terminal is NSApplicationActivationPolicyProhibited until something says otherwise.
+        // The loop says so when it starts, which is after the interface has been built — and a tray
+        // icon is one of the things an application builds first. Asked for here, the item has a menu
+        // bar to go in; left until Run, it is created into a process that has none and quietly has no
+        // window at all.
+        var app = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        if (app != 0 && CocoaRuntime.SendInteger(app, CocoaRuntime.sel_registerName("activationPolicy")) != 0)
+            CocoaRuntime.SendBool(app, CocoaRuntime.sel_registerName("setActivationPolicy:"), 0);
+
         var bar = CocoaRuntime.SendToClass("NSStatusBar", "systemStatusBar");
         _item = bar == 0
             ? 0

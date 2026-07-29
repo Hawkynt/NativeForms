@@ -306,8 +306,13 @@ internal static unsafe partial class ShootMacOS
             ? Send(barClass, sel_registerName("systemStatusBar"))
             : 0;
 
+        // The activation policy comes with it, because it is the one thing that makes a status item
+        // silently amount to nothing: a Prohibited process owns no part of the menu bar, so the item is
+        // handed over and has nowhere to be.
+        var policy = app == 0 ? -1 : (int)Send(app, sel_registerName("activationPolicy"));
+
         return $"status item: MISSING - no button and no status-level window among {count} app window(s); "
-            + $"NSStatusBar {(bar != 0 ? "resolves" : "does not resolve")}";
+            + $"NSStatusBar {(bar != 0 ? "resolves" : "does not resolve")}, activation policy {policy}";
     }
 
     /// <summary>NSStatusWindowLevel — where the menu bar's extras sit, and nothing else here does.</summary>
