@@ -37,7 +37,13 @@ internal sealed class CocoaTheme : ITheme
         var colors = CocoaRuntime.objc_getClass("NSColor");
 
         this.WindowBackground = Read(colors, "windowBackgroundColor", fallback.WindowBackground);
-        this.ControlBackground = Read(colors, "controlColor", fallback.ControlBackground);
+
+        // The window's own colour again, and not controlColor, which reads like the obvious answer and
+        // is the wrong surface: it is the white a bezelled control fills itself with, so every panel,
+        // page and button at rest came out the colour of a text field. The other two backends give this
+        // and the window the same value — COLOR_BTNFACE twice on Win32, the theme background twice on
+        // GTK — because a control at rest is chrome, and chrome on this desktop is the window's grey.
+        this.ControlBackground = this.WindowBackground;
         this.ControlText = Read(colors, "controlTextColor", fallback.ControlText);
         this.DisabledText = Read(colors, "disabledControlTextColor", fallback.DisabledText);
         this.FieldBackground = Read(colors, "textBackgroundColor", fallback.FieldBackground);
