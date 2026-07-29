@@ -359,7 +359,9 @@ strategy (may differ per platform; note exceptions inline).
         the core on every backend; the Win32 peer translates to and from the `\r\n` an `EDIT` breaks
         on, caret indices included, so `Lines` and `SelectionStart` mean one thing everywhere
   - [x] `PlaceholderText` (single-line cue banner: `EM_SETCUEBANNER` /
-        `gtk_entry_set_placeholder_text`)
+        `gtk_entry_set_placeholder_text`). The Win32 half needs the host process bound to ComCtl32
+        version 6 — an application manifest, which the demo now ships (`NativeForms.Demo/app.manifest`);
+        an unmanifested process answers nothing and shows no hint
   - [x] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength` (GTK: entry only —
         GtkTextView has no native limit, documented), `CharacterCasing` (core-side, all backends)
   - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live

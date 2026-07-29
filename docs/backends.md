@@ -89,6 +89,36 @@ long time as a font-fallback failure somewhere in the text path — and the pain
 at all. The peer now applies the theme's own font whenever the application named none, which is the
 same font the painter resolves, so a caption and the string drawn beside it agree by construction.
 
+**The placeholder needs the application's own manifest, and so does half the rest of this backend.**
+A greyed hint inside an `EDIT` is `EM_SETCUEBANNER`, and only ComCtl32 version 6 answers it — that
+assembly re-registers the stock window classes for any process bound to it, so the same `EDIT` is a
+different implementation depending on a declaration made before a line of the program ran. The
+binding is a side-by-side dependency in the process's own manifest, read at load time. The peer sent
+the message all along and an unmanifested process dropped it, so the hint was simply missing from
+every Windows shot while GTK and Cocoa drew theirs. The gallery now ships
+`NativeForms.Demo/app.manifest`, and an application built on this toolkit should copy it: without it
+the process gets the stock controls Windows 2000 shipped — bevelled scroll bars, dithered tracks, no
+cue banner, and no `SysLink` class for a `LinkLabel` to promote onto, so that control quietly stays
+owner-drawn.
+
+There is a second route and it is worth naming, because leaving it out would make the manifest look
+like the only one: `CreateActCtx` over a manifest resource, activated and deactivated around every
+`CreateWindowEx`, which is what Windows Forms' `EnableVisualStyles` does. It is not taken here for
+two reasons. It needs a manifest resource in a file on disk to point at, and the build this toolkit
+exists for is a single-file NativeAOT executable whose only manifest is the process one being argued
+about. And it puts an activate/deactivate pair on the creation path of every widget, to buy per
+window what one declaration buys once, at load, for nothing. Which controls a process gets is also
+the application's decision rather than a library's to make on its behalf, so it is left where the
+declaration is.
+
+**A multiline box shows no hint here, and is not given a drawn one.** `EM_SETCUEBANNER` is a
+single-line message and a multiline `EDIT` ignores it, manifest or no manifest. GTK paints the hint
+itself after the `GtkTextView`'s own draw, which is sound there because the toolkit owns that
+surface's exposure; the same move on Win32 means painting into a window whose caret, selection
+highlight and scroll position all belong to USER32, so the toolkit would be putting text where the
+editor is about to put a caret and neither would know about the other. So the multiline placeholder
+is stated as absent on this backend rather than approximated.
+
 ## The macOS backend, specifically
 
 It is genuinely incomplete, and the table above says so rather than leaving you to discover it.

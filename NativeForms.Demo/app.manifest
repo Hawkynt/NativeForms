@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="Hawkynt.NativeForms.Demo" />
+
+  <!-- Everything below this line is what the .NET SDK's own default manifest carries; the
+       dependency at the end is the only thing added, and it is the reason this file exists. -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!-- Without these the process is shimmed as a pre-Vista application and GetVersionEx lies to it. -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{e2011457-1546-43c5-a5fe-008deee3d3f0}" /><!-- Vista -->
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}" /><!-- 7 -->
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}" /><!-- 8 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" /><!-- 8.1 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" /><!-- 10 and 11 -->
+    </application>
+  </compatibility>
+
+  <!-- ComCtl32 version 6. A process reaches it no other way: the side-by-side assembly is bound at
+       load time from this declaration, so there is no call an application or a library can make to
+       switch it on afterwards. What it decides is which of two implementations every stock control
+       in the process is - the themed one or the one from Windows 2000 - and with it whether an EDIT
+       answers EM_SETCUEBANNER at all and whether the SysLink class exists to promote a LinkLabel
+       onto. An application that ships without it gets a working toolkit that looks a decade out of
+       date on its own desktop. -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*" />
+    </dependentAssembly>
+  </dependency>
+</assembly>

@@ -13,6 +13,11 @@
     <!-- The autopilot walkthrough writes GdkEvent fields through pointers, which the LibraryImport
          generator and Unsafe.AsRef both need an unsafe context for. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Binds the process to ComCtl32 version 6, which is the only way a Windows process reaches the
+         themed stock controls; see the file itself. Harmless on Linux and macOS, where nothing reads
+         a Win32 resource. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
