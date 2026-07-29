@@ -206,6 +206,15 @@ does, unlike AppKit's target/action, so the peer suppresses its own echo; and ac
 click alone, because Return does not activate a row on this desktop — Finder spends it on renaming —
 and inventing the gesture would be less native rather than more.
 
+Where a promoted list is scrolled to, and which row is under a point, are the table's answers rather
+than the toolkit's — a scroll view's visible rectangle is in the document's coordinates, and a control
+hands its points over in its own. Both had never been called by anything: "it compiles" was all the
+evidence there was. The walkthrough now asks every list on every backend, at the end of the run, and
+reports the first visible row twice over — once as the scroll position, once as the row under the top
+of the client area. They are the same number or the line says which two they were, which is enough to
+catch a sign, an origin or a coordinate space gone wrong without inventing a rule about where an
+application's list ought to be scrolled to.
+
 The tray icon is an `NSStatusItem`, because the menu bar is where this desktop puts what Windows puts
 in a notification area. The item is taken from the shared status bar when the component is built
 rather than when it is first shown — the button behind it carries the icon, the tooltip and the

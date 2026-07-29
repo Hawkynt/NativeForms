@@ -180,6 +180,11 @@ if (shooting)
             if (Shoot.WindowChrome is { } chrome)
                 Note("  " + chrome);
 
+            // After the walk, for the same reason the class census is: a list on a tab page has no rows
+            // to be scrolled among until the page it lives on has been shown at least once.
+            if (Shoot.ListGeometry(form) is { } lists)
+                Note("  " + lists);
+
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 

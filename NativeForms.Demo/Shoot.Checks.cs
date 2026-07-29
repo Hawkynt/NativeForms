@@ -174,6 +174,41 @@ internal static partial class Shoot
     }
 
     /// <summary>
+    /// What the form's lists answer when asked where they are scrolled to and which row sits under a
+    /// point, or <see langword="null"/> when it holds no list with anything in it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two peer members every backend implements and nothing has ever called. "It compiles" was the
+    /// whole of the evidence for them, and on a promoted list neither answer comes from the toolkit at
+    /// all — the widget lays its own rows out, so a wrong sign, a wrong origin or a coordinate space
+    /// confused with the document's would go unnoticed until an application asked.
+    /// </para>
+    /// <para>
+    /// Reported rather than asserted. Where a list is scrolled to is the application's business, so a
+    /// rule invented here about where it ought to be would fail a list that is simply somewhere else.
+    /// What the two numbers do show is that the calls run, come back, and agree with each other: the
+    /// row under the first pixel row of the client area is the first visible row, whatever number that
+    /// happens to be, and a regression to -1 or to a crash has nowhere to hide in that.
+    /// </para>
+    /// </remarks>
+    public static string? ListGeometry(Control root)
+    {
+        var reports = new List<string>();
+        foreach (var list in Walk(root).OfType<ListBox>())
+        {
+            if (list.Items.Count == 0 || list.Width <= 8 || list.Height <= 8)
+                continue;
+
+            var top = list.TopIndex;
+            var here = list.IndexFromPoint(4, 4);
+            reports.Add(here == top ? $"{top}" : $"{top} but the top row reads {here}");
+        }
+
+        return reports.Count == 0 ? null : $"list geometry: first visible row {string.Join(", ", reports)}";
+    }
+
+    /// <summary>
     /// Runs the checks over one page, appending a line per failure and returning how many failed.
     /// </summary>
     public static int Check(Control page, Size host, Action<string> note)
