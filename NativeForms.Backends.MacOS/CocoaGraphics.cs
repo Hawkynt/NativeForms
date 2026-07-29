@@ -7,21 +7,26 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// The drawing surface for an owner-drawn control, backed by a <c>CGContext</c>.
 /// </summary>
 /// <remarks>
+/// <para>
 /// CoreGraphics is plain C, so every primitive here is a direct <c>[LibraryImport]</c> call with no
-/// messaging involved. Its y-axis grows upward like the rest of Cocoa, so the context is flipped once
-/// on construction and every rectangle afterwards is in the toolkit's top-left coordinates — the same
-/// decision the window peer makes, made once more in the one other place coordinates cross over.
+/// messaging involved.
+/// </para>
+/// <para>
+/// The context arrives already in the toolkit's coordinates and is left that way. The canvas view
+/// answers <c>isFlipped</c>, which is AppKit's own way of saying "origin top left, y downward", and it
+/// flips the drawing context to match — so flipping again here mirrors everything. It did: the grid's
+/// header row photographed at the bottom of the canvas with its text upside down, which is what a
+/// double flip looks like and is easy to miss while the only things drawn are symmetric rectangles.
+/// </para>
 /// </remarks>
-internal sealed class CocoaGraphics(nint context, int height) : IGraphics, IDisposable
+internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
 {
-    private readonly nint _context = Flip(context, height);
+    private readonly nint _context = Enter(context);
 
-    /// <summary>Turns the context upside down so the toolkit's top-left origin is the natural one.</summary>
-    private static nint Flip(nint context, int height)
+    /// <summary>Saves the state this instance will restore, leaving the flipped view's transform alone.</summary>
+    private static nint Enter(nint context)
     {
         CocoaNative.CGContextSaveGState(context);
-        CocoaNative.CGContextTranslateCTM(context, 0, height);
-        CocoaNative.CGContextScaleCTM(context, 1, -1);
         return context;
     }
 
@@ -133,6 +138,6 @@ internal sealed class CocoaGraphics(nint context, int height) : IGraphics, IDisp
 
     public void PopClip() => CocoaNative.CGContextRestoreGState(_context);
 
-    /// <summary>Undoes the flip, leaving the context as AppKit handed it over.</summary>
+    /// <summary>Restores the state, leaving the context as AppKit handed it over.</summary>
     public void Dispose() => CocoaNative.CGContextRestoreGState(_context);
 }

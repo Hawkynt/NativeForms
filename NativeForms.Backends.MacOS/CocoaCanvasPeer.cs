@@ -113,7 +113,7 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             return;
 
         var area = new Rectangle(0, 0, canvas._bounds.Width, canvas._bounds.Height);
-        using var graphics = new CocoaGraphics(context, area.Height);
+        using var graphics = new CocoaGraphics(context);
         canvas.Paint?.Invoke(canvas, new(graphics, area));
     }
 
