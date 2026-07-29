@@ -132,13 +132,28 @@ internal abstract class CocoaControlPeer : IControlPeer
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setDrawsBackground:"), true);
     }
 
-    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The other of the two routes AppKit offers (see <see cref="CocoaCursor"/>). A widget whose class
+    /// this backend did not build cannot be given a <c>resetCursorRects</c> of its own, so it is
+    /// watched by a tracking area asking for cursor updates instead — installed on the first shape an
+    /// application actually asks for, because an AppKit control already carries the right one and a
+    /// rectangle laid over that unasked would take the platform's own answer away.
+    /// </remarks>
+    public void SetCursor(Cursor cursor)
+    {
+        if (this.Handle == 0)
+            return;
 
-    public void SetCursor(Cursor cursor) { }
+        CocoaCursor.Track(this.Handle);
+        CocoaCursor.Apply(this.Handle, cursor);
+    }
+
+    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void ShowToolTip(string? text) { }
 
-    public virtual void Dispose() { }
+    public virtual void Dispose() => CocoaCursor.Forget(this.Handle);
 
     /// <summary>Keeps the events referenced until AppKit's routing feeds them.</summary>
     private protected void Unused()

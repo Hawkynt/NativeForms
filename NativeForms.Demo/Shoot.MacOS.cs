@@ -306,6 +306,79 @@ internal static unsafe partial class ShootMacOS
         return $"link activation: {wired} view(s) carry the toolkit's link delegate";
     }
 
+    /// <summary>
+    /// Whether the two routes a pointer shape takes on this platform are in place on the live window.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Nothing can witness a cursor. A capture is the window drawing itself and the pointer belongs to
+    /// the window server, painted over the top of every window on the desktop — so unlike the hover
+    /// figure, this one is not short of proof because of a missing Accessibility grant, it is short of
+    /// proof because there is nothing to photograph.
+    /// </para>
+    /// <para>
+    /// The two halves are asked in the two ways they can be. A view this backend built claims its own
+    /// rectangle in <c>resetCursorRects</c>, and whether it has such a method of its own rather than
+    /// <c>NSView</c>'s is a question the runtime answers directly — the two classes hand back the same
+    /// <c>Method</c> when the subclass has not overridden it. A widget AppKit built is watched by a
+    /// tracking area instead, and both the area and its owner read back off the view.
+    /// </para>
+    /// </remarks>
+    public static string CursorWiring()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "cursors: no window to ask";
+
+        var canvas = objc_getClass("NativeFormsCanvas");
+        var view = objc_getClass("NSView");
+        var selector = sel_registerName("resetCursorRects");
+        var overridden = canvas != 0
+            && view != 0
+            && class_getInstanceMethod(canvas, selector) != class_getInstanceMethod(view, selector);
+
+        var watched = 0;
+        CountCursorTargets(Send(window, sel_registerName("contentView")), ref watched);
+
+        return $"cursors: the canvas class {(overridden ? "claims" : "does NOT claim")} its own cursor rects, "
+            + $"{watched} AppKit widget(s) carry the toolkit's cursor-update target "
+            + "(no capture can show a pointer: it belongs to the window server)";
+    }
+
+    /// <summary>The method a class would run for a selector, inherited or its own.</summary>
+    [LibraryImport(_ObjC)]
+    private static partial nint class_getInstanceMethod(nint cls, nint selector);
+
+    /// <summary>Counts the views under one watched by a cursor-update target of this toolkit's.</summary>
+    private static void CountCursorTargets(nint view, ref int watched)
+    {
+        if (view == 0)
+            return;
+
+        var areas = Send(view, sel_registerName("trackingAreas"));
+        var count = areas == 0 ? 0 : (int)Send(areas, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+        {
+            var owner = Send(Send(areas, sel_registerName("objectAtIndex:"), i), sel_registerName("owner"));
+            if (owner != 0
+                && class_getName(object_getClass(owner)) is var raw
+                && raw != 0
+                && Marshal.PtrToStringUTF8(raw) == "NativeFormsCursorTarget")
+            {
+                ++watched;
+                break;
+            }
+        }
+
+        var children = Send(view, sel_registerName("subviews"));
+        var childCount = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < childCount; ++i)
+            CountCursorTargets(Send(children, sel_registerName("objectAtIndex:"), i), ref watched);
+    }
+
     /// <summary>Counts the views under one whose delegate is the toolkit's link target.</summary>
     private static void CountLinkDelegates(nint view, ref int wired)
     {

@@ -252,7 +252,9 @@ internal sealed class CocoaPopupPeer : IPopupPeer
 
     public void SetColors(Color foreColor, Color backColor) { }
 
-    public void SetCursor(Cursor cursor) { }
+    /// <inheritdoc/>
+    /// <remarks>The surface is the canvas; the window around it has nothing under the pointer.</remarks>
+    public void SetCursor(Cursor cursor) => _canvas.SetCursor(cursor);
 
     public void Focus() { }
 

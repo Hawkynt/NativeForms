@@ -169,6 +169,37 @@ much of the tab strip has realized by the time the shutter arms.) What it cannot
 window server drops this job's injected pointer for want of an Accessibility grant, so hover is stated
 here as wired rather than as witnessed.
 
+The pointer changes shape, by whichever of AppKit's two routes the widget under it leaves open. There
+is no message that sets a cursor on a view: a view declares the rectangles it wants a shape over
+inside `resetCursorRects`, which AppKit calls when it decides they are stale — so the toolkit's wish is
+parked in a map the callback reads, the same static-map-instead-of-a-closure shape every other
+callback here uses, and the canvas class grows that one method beside its `drawRect:`. A widget AppKit
+built has a class this backend cannot add a method to, so a native control takes the other route: a
+tracking area asking for cursor updates, owned by a run-time class that answers `cursorUpdate:` by
+setting the shape. That area goes on only when an application actually asks for a shape, because a
+text field already puts an I-beam over itself and a rectangle laid over that unasked would take the
+platform's own answer away.
+
+Five of the toolkit's shapes have no published equivalent here and take the arrow rather than
+something that merely looks close. The wait and app-starting pointers belong to the window server,
+which raises one when a process stops answering, and no message asks for it; the help pointer and the
+two diagonal resize arrows are not in `NSCursor`'s set at all, and a horizontal arrow over a corner
+grip points the wrong way. The splitter shapes take the plain resize arrows, which is what the Win32
+backend does with them for the same reason, and "move everything" takes the open hand, because that is
+how this desktop says a thing can be picked up and there is no four-headed arrow to say it with. A
+custom bitmap cursor is built from the same pixels the other two backends build theirs from, hotspot
+passed straight through: AppKit reads it in the image's own coordinates from the top left, which is
+the corner the toolkit counts from.
+
+Nothing can witness a cursor — not for want of an Accessibility grant this time, but because a capture
+is the window drawing itself while the pointer is the window server's, painted over the top of every
+window on the desktop. So this is stated as wired, and the probe reads back the two things wiring
+means: that the canvas class carries a `resetCursorRects` of its own rather than `NSView`'s, which the
+runtime answers directly since it hands back the same method object when a subclass has overridden
+nothing, and how many AppKit widgets carry the toolkit's cursor-update target. The gallery's toolbars
+page puts a custom bitmap cursor on a group box, whose host view is one of ours, and on the label
+inside it, which is an `NSTextField` — so each route has one to serve.
+
 All nine of PRD §12's promotions are served. `CheckBox` and `RadioButton` become an `NSButton` in its
 switch and radio types, `ProgressBar` an `NSProgressIndicator`, `GroupBox` an `NSBox` filling a plain
 flipped view that holds the children on top of it — the frame and the caption come from the desktop,

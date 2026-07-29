@@ -44,6 +44,10 @@ internal static partial class CocoaRuntime
         return objc_getClass_raw(name);
     }
 
+    /// <summary>The class an object actually is, rather than the one it was declared as.</summary>
+    [LibraryImport(_ObjC)]
+    internal static partial nint object_getClass(nint instance);
+
     /// <summary>Interns a selector, which is how a method is named at run time.</summary>
     [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint sel_registerName(string name);
@@ -140,6 +144,10 @@ internal static partial class CocoaRuntime
 
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial void SendRectVoidOnly(nint receiver, nint selector, CGRect frame);
+
+    /// <summary>Claims a rectangle of a view for a pointer shape: four doubles, then one object.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendCursorRect(nint receiver, nint selector, CGRect rect, nint cursor);
 
     /// <summary>A point in Cocoa's coordinates.</summary>
     [StructLayout(LayoutKind.Sequential)]

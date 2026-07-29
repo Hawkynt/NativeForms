@@ -147,7 +147,11 @@ internal sealed class CocoaScrollBarPeer : CocoaControlPeer, IScrollBarPeer
     }
 
     /// <inheritdoc/>
-    public override void Dispose() => CocoaAction.Forget(_target);
+    public override void Dispose()
+    {
+        CocoaAction.Forget(_target);
+        base.Dispose();
+    }
 }
 
 /// <summary>A slider: a real <c>NSSlider</c>, which is what AppKit has where Win32 has a trackbar.</summary>
@@ -240,5 +244,9 @@ internal sealed class CocoaTrackBarPeer : CocoaControlPeer, ITrackBarPeer
     private void OnValueChanged() => ValueChanged?.Invoke(this, EventArgs.Empty);
 
     /// <inheritdoc/>
-    public override void Dispose() => CocoaAction.Forget(_target);
+    public override void Dispose()
+    {
+        CocoaAction.Forget(_target);
+        base.Dispose();
+    }
 }

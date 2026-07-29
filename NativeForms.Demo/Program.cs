@@ -188,6 +188,11 @@ if (shooting)
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 
+            // After the walk for the same reason the census is: the page carrying the custom-cursor
+            // group box has to have been shown before its children exist to be asked about.
+            if (Shoot.CursorWiring is { } cursors)
+                Note("  " + cursors);
+
             if (Shoot.StatusItem is { } tray)
                 Note("  " + tray);
 

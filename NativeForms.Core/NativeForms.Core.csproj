@@ -20,6 +20,7 @@
     <InternalsVisibleTo Include="Hawkynt.NativeForms.Tests" />
     <InternalsVisibleTo Include="Hawkynt.NativeForms.Backends.Windows" />
     <InternalsVisibleTo Include="Hawkynt.NativeForms.Backends.Gtk" />
+    <InternalsVisibleTo Include="Hawkynt.NativeForms.Backends.MacOS" />
   </ItemGroup>
 
   <!-- Bundle the PropertyGrid source generator INSIDE this package as an analyzer asset. It is not a

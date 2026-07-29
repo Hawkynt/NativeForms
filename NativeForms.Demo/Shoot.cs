@@ -52,6 +52,16 @@ internal static partial class Shoot
     public static string? LinkWiring => OperatingSystem.IsMacOS() ? ShootMacOS.LinkWiring() : null;
 
     /// <summary>
+    /// Whether the two routes a pointer shape can take on macOS are in place, where they can be asked.
+    /// </summary>
+    /// <remarks>
+    /// A cursor is the one property on this list nothing anywhere can photograph: a screen capture is
+    /// of the window's own drawing and the pointer is the window server's, drawn over the top. So this
+    /// is wiring by definition rather than by the limits of this job.
+    /// </remarks>
+    public static string? CursorWiring => OperatingSystem.IsMacOS() ? ShootMacOS.CursorWiring() : null;
+
+    /// <summary>
     /// What the tray icon reports about itself, where the platform keeps one somewhere askable.
     /// </summary>
     /// <remarks>

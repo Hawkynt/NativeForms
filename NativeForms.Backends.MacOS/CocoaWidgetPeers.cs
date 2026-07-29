@@ -104,7 +104,11 @@ internal class CocoaCheckBoxPeer : CocoaControlPeer, ICheckBoxPeer
     }
 
     /// <inheritdoc/>
-    public override void Dispose() => CocoaAction.Forget(_target);
+    public override void Dispose()
+    {
+        CocoaAction.Forget(_target);
+        base.Dispose();
+    }
 }
 
 /// <summary>A radio button: the same <c>NSButton</c>, wearing the radio type.</summary>
@@ -408,6 +412,8 @@ internal sealed unsafe class CocoaLinkLabelPeer : CocoaControlPeer, ILinkLabelPe
     {
         if (this.Handle != 0)
             _links.TryRemove(this.Handle, out _);
+
+        base.Dispose();
     }
 }
 

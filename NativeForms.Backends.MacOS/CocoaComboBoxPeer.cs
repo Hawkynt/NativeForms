@@ -204,5 +204,6 @@ internal sealed class CocoaComboBoxPeer : CocoaControlPeer, IComboBoxPeer
         }
 
         CocoaAction.Forget(_target);
+        base.Dispose();
     }
 }

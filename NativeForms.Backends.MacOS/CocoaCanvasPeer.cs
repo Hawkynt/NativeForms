@@ -111,6 +111,18 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     /// <summary>The view handle, so a container can add it to its own.</summary>
     internal nint Handle => _view;
 
+    /// <summary>
+    /// Whether a view is one this backend built, and therefore one that answers
+    /// <see cref="ResetCursorRects"/> for itself.
+    /// </summary>
+    /// <remarks>
+    /// What keeps the two cursor routes disjoint. A group box's host is one of these while its peer is
+    /// a control peer, so without the question it would be given a cursor rectangle and a tracking
+    /// area both saying the same thing.
+    /// </remarks>
+    internal static bool IsOwnView(nint view)
+        => view != 0 && _viewClass != 0 && CocoaRuntime.object_getClass(view) == _viewClass;
+
     public event EventHandler<PaintEventArgs>? Paint;
     public event EventHandler<MouseEventArgs>? MouseDown;
     public event EventHandler<MouseEventArgs>? MouseUp;
@@ -174,6 +186,14 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
         Add(created, "scrollWheel:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnScrollWheel);
         Add(created, "keyDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyDownEvent);
         Add(created, "keyUp:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyUpEvent);
+
+        // The pointer's shape. AppKit has no "set the cursor on this view" message: a view declares
+        // the rectangles it wants a shape over when asked to, and this is the asking.
+        CocoaRuntime.class_addMethod(
+            created,
+            CocoaRuntime.sel_registerName("resetCursorRects"),
+            (nint)(delegate* unmanaged<nint, nint, void>)&ResetCursorRects,
+            "v@:");
 
         // Without this the view never becomes first responder and no key ever arrives.
         CocoaRuntime.class_addMethod(
@@ -331,6 +351,27 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             _ => Keys.None,
         };
 
+    /// <summary>
+    /// AppKit is rebuilding this view's cursor rectangles: claim the whole of it for the shape the
+    /// control asked for, or claim nothing and let the window's own arrow stand.
+    /// </summary>
+    /// <remarks>
+    /// The rectangle is read back off the view rather than taken from the peer's buffered bounds,
+    /// because a cursor rectangle is in the view's own coordinates and a window's content view is one
+    /// of these too without having a peer behind it. <c>NSView</c>'s own implementation claims nothing,
+    /// so overriding it without calling up loses no platform behaviour.
+    /// </remarks>
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void ResetCursorRects(nint self, nint selector)
+    {
+        var cursor = CocoaCursor.For(self);
+        if (cursor == 0)
+            return;
+
+        var bounds = CocoaRuntime.SendRect(self, CocoaRuntime.sel_registerName("bounds"));
+        CocoaRuntime.SendCursorRect(self, CocoaRuntime.sel_registerName("addCursorRect:cursor:"), bounds, cursor);
+    }
+
     /// <summary>Answers YES, so this view's coordinates run top-left down like the toolkit's.</summary>
     [System.Runtime.InteropServices.UnmanagedCallersOnly]
     private static byte IsFlipped(nint self, nint selector) => 1;
@@ -413,6 +454,11 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
         => CocoaAccessibility.Describe(_view, name, description, role);
 
+    /// <inheritdoc/>
+    /// <remarks>Parked for the view's own <see cref="ResetCursorRects"/> to claim, since AppKit asks
+    /// rather than being told.</remarks>
+    public void SetCursor(Cursor cursor) => CocoaCursor.Apply(_view, cursor);
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void SetText(string text) { }
@@ -423,8 +469,6 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
 
     public void SetColors(Color foreColor, Color backColor) { }
 
-    public void SetCursor(Cursor cursor) { }
-
     public void Focus() { }
 
     public void ShowToolTip(string? text) { }
@@ -433,8 +477,11 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
 
     public void Dispose()
     {
-        if (_view != 0)
-            _canvases.TryRemove(_view, out _);
+        if (_view == 0)
+            return;
+
+        _canvases.TryRemove(_view, out _);
+        CocoaCursor.Forget(_view);
     }
 
     /// <summary>Keeps the input events referenced until AppKit's event routing feeds them.</summary>

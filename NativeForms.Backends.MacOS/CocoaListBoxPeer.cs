@@ -294,6 +294,7 @@ internal sealed class CocoaListBoxPeer : CocoaControlPeer, IListBoxPeer
         CocoaTableSource.Forget(_source);
         CocoaAction.Forget(_doubleTarget);
         ReleaseItems();
+        base.Dispose();
     }
 
     private void ReleaseItems()

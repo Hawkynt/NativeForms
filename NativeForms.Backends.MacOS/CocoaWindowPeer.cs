@@ -201,6 +201,19 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
     public Point PointToScreen(Point clientPoint) => new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A window has no cursor of its own here — the shape belongs to whichever view the pointer is
+    /// over — so the form's goes to its content view, which is one of the backend's own flipped views
+    /// and therefore already answers <c>resetCursorRects</c>. A child that sets its own shape claims
+    /// its own rectangle on top of this one, exactly as the ambient cursor is meant to work.
+    /// </remarks>
+    public void SetCursor(Cursor cursor)
+    {
+        if (_window != 0)
+            CocoaCursor.Apply(CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView")), cursor);
+    }
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void SetEnabled(bool enabled) { }
@@ -208,8 +221,6 @@ internal sealed class CocoaWindowPeer : IWindowPeer
     public void SetFont(Font font) { }
 
     public void SetColors(Color foreColor, Color backColor) { }
-
-    public void SetCursor(Cursor cursor) { }
 
     public void Focus() { }
 
