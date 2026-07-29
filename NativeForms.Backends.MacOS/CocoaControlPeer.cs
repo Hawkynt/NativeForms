@@ -76,9 +76,18 @@ internal abstract class CocoaControlPeer : IControlPeer
     public virtual void SetBounds(Rectangle bounds)
     {
         _bounds = bounds;
-        if (this.Handle != 0)
-            CocoaRuntime.SendRectVoidOnly(this.Handle, CocoaRuntime.sel_registerName("setFrame:"), new(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+        if (this.Handle == 0)
+            return;
+
+        var frame = this.FrameFor(bounds);
+        CocoaRuntime.SendRectVoidOnly(this.Handle, CocoaRuntime.sel_registerName("setFrame:"), new(frame.X, frame.Y, frame.Width, frame.Height));
     }
+
+    /// <summary>
+    /// The frame the widget takes for a rectangle the toolkit gave — the same rectangle, unless the
+    /// AppKit control reserves part of it for something the toolkit does not know about.
+    /// </summary>
+    private protected virtual Rectangle FrameFor(Rectangle bounds) => bounds;
 
     public virtual void SetText(string text)
     {
@@ -249,6 +258,12 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
     private static readonly nint _Underline = CocoaRuntime.Constant("NSUnderlineStyleAttributeName");
     private static readonly nint _Paragraph = CocoaRuntime.Constant("NSParagraphStyleAttributeName");
 
+    /// <summary>
+    /// What an <c>NSTextFieldCell</c> keeps back at each end of its frame before it lays the caption
+    /// out — two points, on a field with no bezel and no border.
+    /// </summary>
+    private const int _TitleInset = 2;
+
     private string _text = string.Empty;
     private bool _useMnemonic = true;
     private ContentAlignment _textAlign;
@@ -306,6 +321,25 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
     /// <summary>Whether the peer should be showing the bitmap instead of a caption.</summary>
     private bool IsImageOnly => _image is not null && _text.Length == 0;
 
+    /// <summary>
+    /// The field's frame, widened by the inset its cell will take back, so the caption occupies exactly
+    /// the rectangle the toolkit asked for.
+    /// </summary>
+    /// <remarks>
+    /// An auto-sized label is given its text's own width, measured with the same font AppKit draws it
+    /// in — and the cell then lays that text out inside a rectangle two points narrower at each end, so
+    /// the last word never fitted and was dropped. "AutoSize measures this label." photographed as
+    /// "AutoSize measures this" on every macOS run while both other backends showed it whole, because
+    /// neither a <c>GtkLabel</c> nor an <c>SS_LEFT</c> static holds anything back. Widening the frame
+    /// rather than padding the measurement keeps the number the toolkit measured the number every
+    /// owner-drawn control lays out with. A bezelled field keeps its frame: there the inset is the
+    /// border, and moving it would draw the box somewhere the toolkit did not put it.
+    /// </remarks>
+    private protected override Rectangle FrameFor(Rectangle bounds)
+        => _isImageView || _borderStyle != BorderStyle.None
+            ? bounds
+            : new(bounds.X - _TitleInset, bounds.Y, bounds.Width + (2 * _TitleInset), bounds.Height);
+
     /// <inheritdoc/>
     public override void SetText(string text)
     {
@@ -321,10 +355,18 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
     }
 
     /// <inheritdoc/>
-    /// <remarks>Bezel on or off; the toolkit's three border styles collapse to AppKit's two.</remarks>
+    /// <remarks>
+    /// Bezel on or off; the toolkit's three border styles collapse to AppKit's two. The frame goes back
+    /// as well, because which of the two the field is decides whether it is widened (see
+    /// <see cref="FrameFor"/>).
+    /// </remarks>
     public void SetBorderStyle(BorderStyle borderStyle)
     {
+        if (_borderStyle == borderStyle)
+            return;
+
         _borderStyle = borderStyle;
+        this.SetBounds(this.BoundsValue);
         this.Apply();
     }
 

@@ -332,6 +332,18 @@ rectangle now take the same half-pixel offset the line already took, which is al
 backend puts them — so a frame and the rules drawn beside it land on one grid instead of two. The
 ellipse does not, because the Cairo backend does not either and a circle has no edge to align.
 
+An auto-sized label shows its last word. It did not: `NSTextFieldCell` lays its title out inside a
+rectangle two points narrower at each end than the frame it was given, and an auto-sized label is
+given exactly its text's own width — measured with the font AppKit is about to draw it in, which is
+what makes four missing points decisive rather than cosmetic. "AutoSize measures this label."
+photographed as "AutoSize measures this" on every macOS run, the whole last word dropped at a word
+boundary because the cell wraps what will not fit and there is only one line to wrap onto. The field's
+frame is widened by the inset rather than the measurement being padded, so the number the toolkit
+measured stays the number every owner-drawn control lays out with, and the caption starts where the
+other two backends start it instead of two pixels further in. A bezelled field keeps its frame, since
+there the inset is the border itself and moving it would draw the box somewhere the toolkit did not
+put it.
+
 Underline and strikeout are drawn rather than attributed. CoreText has an attribute for the first and
 none at all for the second — strikethrough is AppKit's — so one of the two had to be a rule drawn by
 hand and both are, which is what makes them share a thickness, a colour and a length. The metrics come
