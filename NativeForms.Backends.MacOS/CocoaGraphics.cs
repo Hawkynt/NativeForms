@@ -80,12 +80,42 @@ internal sealed class CocoaGraphics(nint context, int height) : IGraphics, IDisp
         CocoaNative.CGContextStrokePath(_context);
     }
 
+    /// <summary>
+    /// Draws one line of text inside <paramref name="bounds"/>, aligned as asked.
+    /// </summary>
     /// <remarks>
-    /// Not drawn yet: text wants a CoreText line laid out into the flipped context, which is the next
-    /// piece rather than this one. Measurement already works, so layout is correct and only the glyphs
-    /// are absent — which is exactly what the probe's screenshot will show.
+    /// The measurement that positions it is the same CoreText call the backend answers
+    /// <c>MeasureText</c> with, so what is drawn and what was laid out agree by construction rather
+    /// than by two estimates happening to match.
     /// </remarks>
-    public void DrawText(string text, Font font, Color color, Rectangle bounds, ContentAlignment alignment = ContentAlignment.TopLeft) { }
+    public void DrawText(string text, Font font, Color color, Rectangle bounds, ContentAlignment alignment = ContentAlignment.TopLeft)
+    {
+        if (text.Length == 0)
+            return;
+
+        var size = this.MeasureText(text, font);
+        var x = alignment switch
+        {
+            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter
+                => bounds.X + ((bounds.Width - size.Width) / 2),
+            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight
+                => bounds.Right - size.Width,
+            _ => bounds.X,
+        };
+
+        var top = alignment switch
+        {
+            ContentAlignment.MiddleLeft or ContentAlignment.MiddleCenter or ContentAlignment.MiddleRight
+                => bounds.Y + ((bounds.Height - size.Height) / 2),
+            ContentAlignment.BottomLeft or ContentAlignment.BottomCenter or ContentAlignment.BottomRight
+                => bounds.Bottom - size.Height,
+            _ => bounds.Y,
+        };
+
+        // CoreText draws from the baseline, not the top of the line box; the ascent is most of the
+        // height, and using the top directly puts every string one line too high.
+        CocoaNative.TryDrawText(_context, text, font.Family, font.SizeInPoints, x, top + (size.Height * 0.8), color);
+    }
 
     public Size MeasureText(string text, Font font)
         => CocoaNative.TryMeasure(text, font.Family, font.SizeInPoints, out var width, out var height)

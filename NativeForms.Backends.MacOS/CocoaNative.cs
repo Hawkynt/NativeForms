@@ -134,6 +134,69 @@ internal static partial class CocoaNative
             CFRelease(handle);
     }
 
+    [LibraryImport(_CoreText)]
+    private static partial void CTLineDraw(nint line, nint context);
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial void CGContextSetTextPosition(nint context, double x, double y);
+
+    [LibraryImport(_CoreGraphics)]
+    internal static partial void CGContextSetTextMatrix(nint context, double a, double b, double c, double d, double tx, double ty);
+
+    /// <summary>
+    /// Draws one line of text at a baseline, returning whether it could. The line is built and thrown
+    /// away per call for now; a cache belongs here once anything measures how much it costs.
+    /// </summary>
+    internal static bool TryDrawText(nint context, string text, string family, double size, double x, double baseline, System.Drawing.Color color)
+    {
+        if (_FontAttributeName == 0 || text.Length == 0)
+            return false;
+
+        var name = CreateString(family);
+        var content = CreateString(text);
+        var font = name == 0 ? 0 : CTFontCreateWithName(name, size, 0);
+        nint attributes = 0;
+        nint attributed = 0;
+        nint line = 0;
+
+        try
+        {
+            if (font == 0 || content == 0)
+                return false;
+
+            attributes = CFDictionaryCreate(0, [_FontAttributeName], [font], 1, 0, 0);
+            if (attributes == 0)
+                return false;
+
+            attributed = CFAttributedStringCreate(0, content, attributes);
+            if (attributed == 0)
+                return false;
+
+            line = CTLineCreateWithAttributedString(attributed);
+            if (line == 0)
+                return false;
+
+            CGContextSetRGBFillColor(context, color.R / 255.0, color.G / 255.0, color.B / 255.0, color.A / 255.0);
+
+            // The context is flipped so the toolkit's y grows downward; glyphs would come out mirrored
+            // unless the text matrix flips back, which is the standard pairing for drawing text into a
+            // flipped context rather than a special case.
+            CGContextSetTextMatrix(context, 1, 0, 0, -1, 0, 0);
+            CGContextSetTextPosition(context, x, baseline);
+            CTLineDraw(line, context);
+            return true;
+        }
+        finally
+        {
+            Release(line);
+            Release(attributed);
+            Release(attributes);
+            Release(font);
+            Release(content);
+            Release(name);
+        }
+    }
+
     /// <summary>Wraps a managed string as a CoreFoundation string the caller must release.</summary>
     internal static nint CreateString(string text)
     {
