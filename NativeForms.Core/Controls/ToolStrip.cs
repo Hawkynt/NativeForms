@@ -33,6 +33,11 @@ public class ToolStrip : OwnerDrawnControl
     private MenuDropDown? _dropDown;
     private int _hoverIndex = -1;
     private int _pressedIndex = -1;
+
+    /// <summary>The item a press armed for reordering, and where the press landed.</summary>
+    private int _dragIndex = -1;
+    private int _dragOriginX;
+    private bool _dragging;
     private List<ToolStripItem>? _overflow;
 
     /// <summary>Cached per-item pixel widths, index-aligned with <see cref="Items"/>; 0 marks an
@@ -175,6 +180,24 @@ public class ToolStrip : OwnerDrawnControl
         }
     }
 
+    /// <summary>
+    /// Whether dragging an item along the strip reorders it (PRD §14). Off by default, because a
+    /// toolbar whose buttons move when you brush past them is worse than one that cannot be rearranged.
+    /// </summary>
+    /// <remarks>
+    /// The gesture users know, rather than the context menu a port had to fall back to. The item moves
+    /// in <see cref="Items"/>, so the new order is the one an application saves and restores — there is
+    /// no display-order indirection here as there is for grid columns, because a tool strip's order
+    /// <em>is</em> its model.
+    /// </remarks>
+    public bool AllowUserToOrderItems { get; set; }
+
+    /// <summary>Raised after a drag moved an item, with the index it landed on.</summary>
+    public event EventHandler<int>? ItemOrderChanged;
+
+    /// <summary>Raises <see cref="ItemOrderChanged"/>.</summary>
+    protected virtual void OnItemOrderChanged(int index) => this.ItemOrderChanged?.Invoke(this, index);
+
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseEventArgs e)
     {
@@ -205,6 +228,12 @@ public class ToolStrip : OwnerDrawnControl
 
             default:
                 _pressedIndex = index;
+                if (this.AllowUserToOrderItems)
+                {
+                    _dragIndex = index;
+                    _dragOriginX = e.X;
+                }
+
                 this.Invalidate();
                 return;
         }
@@ -219,8 +248,15 @@ public class ToolStrip : OwnerDrawnControl
             return;
 
         _pressedIndex = -1;
+        var dragged = _dragging;
+        _dragIndex = -1;
+        _dragging = false;
         this.Invalidate();
-        if (e.Button == MouseButtons.Left && this.ItemAt(e.X, out _) == pressed)
+
+        // A drag that moved an item is not also a click on it: the button ends up under the pointer
+        // by having been dragged there, and firing its action as well would be a second gesture the
+        // user never made.
+        if (!dragged && e.Button == MouseButtons.Left && this.ItemAt(e.X, out _) == pressed)
             this.Items[pressed].PerformClick();
     }
 
@@ -228,12 +264,41 @@ public class ToolStrip : OwnerDrawnControl
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+
+        if (_dragIndex >= 0 && this.DragItem(e.X))
+            return;
+
         var index = this.ItemAt(e.X, out _);
         if (index == _hoverIndex)
             return;
 
         _hoverIndex = index;
         this.Invalidate();
+    }
+
+    /// <summary>
+    /// Slides the armed item to whatever position the pointer is over, reporting whether the drag owns
+    /// the move. One position per crossing: the item swaps with the neighbour under the pointer, so a
+    /// slow drag walks it along rather than teleporting it to the end.
+    /// </summary>
+    private bool DragItem(int x)
+    {
+        if (!_dragging && Math.Abs(x - _dragOriginX) < MarqueeDrag.Threshold)
+            return false; // still a click
+
+        _dragging = true;
+        var target = this.ItemAt(x, out _);
+        if (target < 0 || target == _dragIndex)
+            return true;
+
+        var item = this.Items[_dragIndex];
+        this.Items.RemoveAt(_dragIndex);
+        this.Items.Insert(target, item);
+        _dragIndex = target;
+        _pressedIndex = target;
+        this.Invalidate();
+        this.OnItemOrderChanged(target);
+        return true;
     }
 
     /// <inheritdoc/>
@@ -384,6 +449,10 @@ public class ToolStrip : OwnerDrawnControl
 
         return -1;
     }
+
+    /// <summary>The pixel width of the item at <paramref name="index"/>, so a test can aim at one
+    /// without restating the measuring rules.</summary>
+    internal int MeasureItemWidth(int index) => this.ItemWidth(index, this.Items[index]);
 
     /// <summary>The pixel width of the item at <paramref name="index"/>, from the cache when it is
     /// warm, measured (and cached) otherwise.</summary>

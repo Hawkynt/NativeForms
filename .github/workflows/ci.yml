@@ -119,6 +119,40 @@ jobs:
             ${{ runner.temp }}/shots/*.log
           if-no-files-found: warn
 
+  macos-probe:
+    name: macos probe
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build NativeForms.sln --configuration Release
+      # The development loop for the Cocoa backend, which does not exist yet (PRD §2: the macOS backend
+      # is a placeholder whose every entry point throws). Running the gallery here answers "how far does
+      # the toolkit get on macOS" on every push, and shoot.log records the answer — today that is the
+      # first PlatformNotSupportedException, and each one that moves later is a peer that started
+      # working. The macOS test jobs cannot show this: they pass against headless fakes and never touch
+      # a backend at all.
+      #
+      # Expected to fail until the backend exists, so it reports rather than blocks. It becomes a gate
+      # the same way the Windows job did — by passing.
+      - name: Probe the gallery
+        continue-on-error: true
+        run: dotnet run --project NativeForms.Demo --configuration Release --no-build -- --shoot "${{ runner.temp }}/shots"
+      - name: Upload the probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-probe
+          path: |
+            ${{ runner.temp }}/shots/*.png
+            ${{ runner.temp }}/shots/*.log
+          if-no-files-found: warn
+
   aot:
     name: aot ${{ matrix.rid }}
     strategy:

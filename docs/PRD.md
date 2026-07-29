@@ -1300,9 +1300,15 @@ evidence rather than intent: each line is something a real program wanted and di
       to the item) and on any row in a grid, where rows span the full width and only the vertical extent
       decides. Only visible rows are tested, so a band over a virtual list of a million rows costs a
       screenful.
-- [ ] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
+- [~] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
       move from drag gestures onto context menus. The gestures are the affordance users know; the menus are
       a workaround. `DockPanel` already has drag-to-dock, so the pattern exists to build on.
+      **Toolbar items done**: `ToolStrip.AllowUserToOrderItems` drags an item along the strip, swapping it
+      with the neighbour under the pointer so a slow drag walks it rather than teleporting it, past the same
+      four-pixel threshold the marquee uses. The item moves in `Items`, because a tool strip's order *is*
+      its model — there is no display-order indirection as there is for grid columns. A drag does not also
+      click the item it left under the cursor, which would be a second gesture the user never made.
+      Still open: sidebar sections and pane splitting.
 - [x] **Type-to-filter menus.** `ContextMenuStrip.ShowSearchBox` opens a menu with a search field as its
       first row, narrowing the items below it as you type — matched case-insensitively anywhere in the
       caption, with Backspace widening again, Escape clearing the filter before it closes the menu, and the
