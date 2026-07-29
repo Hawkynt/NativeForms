@@ -161,7 +161,9 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 - [x] `IGraphics` surface: lines, rects, text (native font, aligned), images/icons, clip stack.
       Backed by **GDI** (Win32), **Cairo/Pango** (GTK) and **CoreGraphics/CoreText** (Cocoa), the last
       of which draws text in the colour and the weight it was asked for — CoreText reads neither off
-      the context, so both are stated on the string's attributes and the font's traits.
+      the context, so both are stated on the string's attributes and the font's traits — and outlines a
+      rectangle on the pixel grid rather than across it, since a stroke centred on an integer edge
+      lands as two rows at half coverage and a one-pixel frame stops being visible.
 - [x] Colour emoji in any control's `Text`, on both rendering paths and both platforms. GTK gets it for
       free (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font). On Win32
       the native widgets get it from the OS, and the owner-drawn path diverts the strings that need it to

@@ -321,6 +321,17 @@ instead, which asks the family for the face rather than hoping it ships one call
 that has none answers null and keeps the plain face, which is what the native-widget path does through
 `NSFontManager` for the same reason.
 
+A one-pixel frame is one pixel here, and it took a magnified crop to see that it was not. A stroke is
+centred on its path, so a line of width one laid along an integer edge covers half of the pixel on
+each side of it and arrives as two rows at half coverage. Half of a colour the desktop already draws
+borders in at a tenth of black is nothing anybody sees, which is why the ribbon's group panels, the
+grid's in-cell buttons, a `PictureBox`, a `TableLayoutPanel`'s cell rules and the outline round every
+owner-drawn control read as absent rather than as faint: the border pixel measured `#E0E0E0` against
+an `#ECECEC` page where GTK's measured `#CDC7C2` against `#F6F5F4`. The rectangle and the rounded
+rectangle now take the same half-pixel offset the line already took, which is also where the Cairo
+backend puts them — so a frame and the rules drawn beside it land on one grid instead of two. The
+ellipse does not, because the Cairo backend does not either and a circle has no edge to align.
+
 Underline and strikeout are drawn rather than attributed. CoreText has an attribute for the first and
 none at all for the second — strikethrough is AppKit's — so one of the two had to be a rule drawn by
 hand and both are, which is what makes them share a thickness, a colour and a length. The metrics come

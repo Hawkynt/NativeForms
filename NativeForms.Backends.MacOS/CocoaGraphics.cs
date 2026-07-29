@@ -47,11 +47,23 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
         CocoaNative.CGContextFillRect(_context, Rect(bounds));
     }
 
+    /// <summary>
+    /// Outlines <paramref name="bounds"/>, on the pixel grid rather than across it.
+    /// </summary>
+    /// <remarks>
+    /// A stroke is centred on its path, so a one-pixel line laid along an integer edge covers half of
+    /// the pixel on each side of it and lands as two rows at half coverage — and half of a colour the
+    /// desktop already draws borders in at a tenth of black is nothing you can see. Every frame this
+    /// backend painted was that: the ribbon's group panels, the grid's cell buttons, a picture box, a
+    /// table layout's cell rules. The half-pixel offset is the same one <see cref="DrawLine"/> already
+    /// used and the same one the Cairo backend applies here, so a rectangle and the lines beside it
+    /// land on the same grid.
+    /// </remarks>
     public void DrawRectangle(Color color, Rectangle bounds, int thickness = 1)
     {
         this.SetColor(color, fill: false);
         CocoaNative.CGContextSetLineWidth(_context, thickness);
-        CocoaNative.CGContextStrokeRect(_context, Rect(bounds));
+        CocoaNative.CGContextStrokeRect(_context, new(bounds.X + 0.5, bounds.Y + 0.5, bounds.Width - 1, bounds.Height - 1));
     }
 
     public void FillEllipse(Color color, Rectangle bounds)
@@ -80,7 +92,7 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
         }
 
         this.SetColor(color, fill: true);
-        this.AddRoundedRectPath(bounds, radius);
+        this.AddRoundedRectPath(bounds.X, bounds.Y, bounds.Right, bounds.Bottom, radius);
         CocoaNative.CGContextFillPath(_context);
     }
 
@@ -100,9 +112,9 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
         this.SetColor(color, fill: false);
         CocoaNative.CGContextSetLineWidth(_context, thickness);
 
-        // The edges sit exactly where DrawRectangle's do, without the half-pixel nudge DrawLine uses,
-        // so an outlined pill lines up with the filled one underneath it.
-        this.AddRoundedRectPath(bounds, radius);
+        // The edges sit exactly where DrawRectangle's do — half a pixel in, so the stroke lands on the
+        // grid instead of across it — which is also where the Cairo backend puts them.
+        this.AddRoundedRectPath(bounds.X + 0.5, bounds.Y + 0.5, bounds.Right - 0.5, bounds.Bottom - 0.5, radius);
         CocoaNative.CGContextStrokePath(_context);
     }
 
@@ -122,10 +134,8 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
     /// current point to start from, which is why the run begins on the top edge past the first corner
     /// and not at the corner itself.
     /// </remarks>
-    private void AddRoundedRectPath(Rectangle bounds, int radius)
+    private void AddRoundedRectPath(double left, double top, double right, double bottom, int radius)
     {
-        double left = bounds.X, top = bounds.Y, right = bounds.Right, bottom = bounds.Bottom;
-
         CocoaNative.CGContextBeginPath(_context);
         CocoaNative.CGContextMoveToPoint(_context, left + radius, top);
         CocoaNative.CGContextAddArcToPoint(_context, right, top, right, bottom, radius);
