@@ -43,34 +43,8 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
         if (_view == 0)
             return;
 
-        ClipToBounds(_view);
         _canvases[_view] = this;
         InstallTrackingArea(_view);
-    }
-
-    /// <summary>
-    /// Keeps whatever this view holds inside it.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// A canvas is a surface a control paints, and it is also the container every child of a
-    /// <c>Panel</c>, a tab page or a form sits in. AppKit used to clip a subview to its superview's
-    /// bounds, and stopped for anything linked against the macOS 14 SDK — <c>clipsToBounds</c> arrived
-    /// as a property defaulting to <see langword="false"/>, which is what this is built as. So a child
-    /// too far down or too far right for the container it is in drew straight out of it: the gallery's
-    /// scrolling panel photographed a fifth row of buttons on top of its own horizontal scroll bar,
-    /// where the same panel on GTK and Win32 stops at four.
-    /// </para>
-    /// <para>
-    /// Offered rather than sent, because a system older than 14 has no such selector and an
-    /// unrecognized one aborts the process — on those it already behaves this way.
-    /// </para>
-    /// </remarks>
-    private static void ClipToBounds(nint view)
-    {
-        var selector = CocoaRuntime.sel_registerName("setClipsToBounds:");
-        if (CocoaRuntime.SendBool(view, CocoaRuntime.sel_registerName("respondsToSelector:"), selector))
-            CocoaRuntime.SendVoid(view, selector, true);
     }
 
     /// <summary>
@@ -129,14 +103,9 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             return 0;
 
         var allocated = CocoaRuntime.SendPointer(_viewClass, CocoaRuntime.sel_registerName("alloc"));
-        var view = allocated == 0
+        return allocated == 0
             ? 0
             : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
-
-        if (view != 0)
-            ClipToBounds(view);
-
-        return view;
     }
 
     /// <summary>The view handle, so a container can add it to its own.</summary>

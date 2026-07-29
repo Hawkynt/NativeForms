@@ -344,15 +344,6 @@ other two backends start it instead of two pixels further in. A bezelled field k
 there the inset is the border itself and moving it would draw the box somewhere the toolkit did not
 put it.
 
-A child stays inside the container it was put in. AppKit clipped a subview to its superview's bounds
-until anything linked against the macOS 14 SDK stopped getting that: `clipsToBounds` arrived as a
-property of `NSView` defaulting to false, and this backend builds its views in code, so every one of
-them was built with it off. A control too far down or too far right for its container therefore drew
-straight out of it — the gallery's scrolling `Panel` photographed a fifth row of buttons lying across
-its own horizontal scroll bar, where the same panel on GTK and Win32 stops at four. Every view this
-backend builds now asks for it, offered with `respondsToSelector:` because a system older than 14 has
-no such selector and already behaves this way.
-
 Underline and strikeout are drawn rather than attributed. CoreText has an attribute for the first and
 none at all for the second — strikethrough is AppKit's — so one of the two had to be a rule drawn by
 hand and both are, which is what makes them share a thickness, a colour and a length. The metrics come
