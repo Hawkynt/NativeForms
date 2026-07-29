@@ -27,6 +27,28 @@ namespace Hawkynt.NativeForms.Demo;
 /// </remarks>
 internal static partial class Shoot
 {
+    /// <summary>Whether this platform can deliver injected input at all.</summary>
+    private static bool InjectionAvailable
+        => (OperatingSystem.IsWindows() && ShootInput.Available)
+            || (OperatingSystem.IsMacOS() && ShootInputMac.Available);
+
+    /// <summary>Clicks at a screen point through whichever injector this platform has.</summary>
+    private static bool InjectClick(Point screen)
+        => OperatingSystem.IsWindows() ? ShootInput.Click(screen) : ShootInputMac.Click(screen);
+
+    /// <summary>Types one character through whichever injector this platform has.</summary>
+    private static bool InjectType(char character)
+        => OperatingSystem.IsWindows() ? ShootInput.Type(character) : ShootInputMac.Type(character);
+
+    /// <summary>Lets the platform deliver what was just injected.</summary>
+    private static void InjectDrain()
+    {
+        if (OperatingSystem.IsWindows())
+            InjectDrain();
+        else
+            ShootInputMac.Drain();
+    }
+
     /// <summary>Clicks that were injected through the OS and observed arriving.</summary>
     public static int Clicks { get; private set; }
 
@@ -55,7 +77,7 @@ internal static partial class Shoot
     /// </remarks>
     public static int CheckInput(Control page, string windowTitle, Action<string> note)
     {
-        if (!OperatingSystem.IsWindows() || !ShootInput.Available)
+        if (!InjectionAvailable)
             return 0;
 
         // Only controls actually on screen can be clicked. A page that scrolls, or one whose panes are
@@ -80,16 +102,17 @@ internal static partial class Shoot
         if (target is null && box is null)
             return 0;
 
-        ShootInput.Activate(windowTitle);
+        if (OperatingSystem.IsWindows())
+            ShootInput.Activate(windowTitle);
         var failed = 0;
 
         if (target is not null)
         {
             var before = target.Checked;
             var centre = target.PointToScreen(new(target.Width / 2, target.Height / 2));
-            if (ShootInput.Click(centre))
+            if (InjectClick(centre))
             {
-                ShootInput.Drain();
+                InjectDrain();
                 if (target.Checked != before)
                     ++Clicks;
                 else
@@ -102,14 +125,14 @@ internal static partial class Shoot
             }
         }
 
-        if (box is not null && ShootInput.Available)
+        if (box is not null && InjectionAvailable)
         {
             var original = box.Text;
             box.Text = string.Empty;
             var centre = box.PointToScreen(new(box.Width / 2, box.Height / 2));
-            if (ShootInput.Click(centre))
+            if (InjectClick(centre))
             {
-                ShootInput.Drain();
+                InjectDrain();
 
                 // Only a box the click actually focused can be typed into. A editor hosted inside a
                 // composite — a search field, a token box — may hand focus to its shell instead, and
@@ -117,9 +140,9 @@ internal static partial class Shoot
                 // than finding one. Said out loud so a skip is visible rather than silent.
                 if (!box.Focused)
                     note($"    input: the click did not focus this {box.GetType().Name}, so the keystroke was skipped");
-                else if (ShootInput.Type('Z'))
+                else if (InjectType('Z'))
                 {
-                    ShootInput.Drain();
+                    InjectDrain();
                     if (box.Text.Contains('Z'))
                         ++Keystrokes;
                     else

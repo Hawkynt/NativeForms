@@ -18,9 +18,9 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Native widget promotion (§12) | 9 controls | 9 controls | none yet |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | not yet |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | not yet |
-| Mouse & keyboard | complete | complete | routed, not yet verified end to end |
+| Mouse & keyboard | complete | complete | routed; injection checked in CI |
 | Dialogs (message box, file, colour, font) | complete | complete | answer as if cancelled |
-| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting |
+| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + real `CGEvent`, reporting |
 
 ## Side by side
 
