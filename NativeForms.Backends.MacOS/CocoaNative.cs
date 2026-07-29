@@ -60,6 +60,14 @@ internal static partial class CocoaNative
     [LibraryImport(_CoreGraphics)]
     internal static partial nint CGBitmapContextGetData(nint context);
 
+    /// <summary>
+    /// The stride the context actually allocated, which is not always the one it was asked for — a
+    /// bitmap context may pad its rows for alignment, and writing tightly packed rows into a padded
+    /// buffer shears the picture.
+    /// </summary>
+    [LibraryImport(_CoreGraphics)]
+    internal static partial nint CGBitmapContextGetBytesPerRow(nint context);
+
     [LibraryImport(_CoreGraphics)]
     internal static partial nint CGBitmapContextCreateImage(nint context);
 
@@ -96,6 +104,10 @@ internal static partial class CocoaNative
     [LibraryImport(_CoreGraphics)] internal static partial void CGContextMoveToPoint(nint context, double x, double y);
     [LibraryImport(_CoreGraphics)] internal static partial void CGContextAddLineToPoint(nint context, double x, double y);
     [LibraryImport(_CoreGraphics)] internal static partial void CGContextStrokePath(nint context);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextFillPath(nint context);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextClosePath(nint context);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextAddArcToPoint(nint context, double x1, double y1, double x2, double y2, double radius);
+    [LibraryImport(_CoreGraphics)] internal static partial void CGContextDrawImage(nint context, CocoaRuntime.CGRect rect, nint image);
 
     /// <summary>The context AppKit has made current for the view being drawn.</summary>
     internal static nint CurrentContext()

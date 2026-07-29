@@ -71,6 +71,20 @@ gallery's sixteen pages all pass the walkthrough's state round-trip and layout a
 Not working yet: mouse and keyboard events are routed into the toolkit but not verified end to end the
 way the Win32 backend's are.
 
+An owner-drawn icon reaches the screen. It did not until now — every control that shows a picture it
+draws itself, which is the toolbar buttons, the list and tree rows, the grid cells, the tab headers
+and the `PictureBox`, put down a blank where the icon goes. What was missing was the conversion: the
+backend kept an application's bitmap as the straight-alpha integers the core handed over, and
+CoreGraphics draws a `CGImage` or nothing. It is built on the first draw and kept, because converting
+costs a colour space, a bitmap context and a pass over every pixel, and doing that per frame per icon
+is what a grid full of them would cost. Two details are worth stating rather than rediscovering. The
+row stride is read back off the context instead of assumed: a bitmap context may pad its rows for
+alignment, and tightly packed rows written into a padded buffer shear the picture diagonally. And the
+flip is local — `CGContextDrawImage` lays an image out from the bottom of its rectangle upward, which
+is right in CoreGraphics' coordinates and upside down in this one, so the painter mirrors the context
+about the destination rectangle inside a saved state rather than flipping the context, which would
+put every string on its head as well.
+
 The colour and font choosers now answer, and the shape of the answer is worth reading before relying
 on it. Both are shared modeless panels here — the platform keeps exactly one of each and shows it —
 so neither has an OK, a Cancel, or any notion of being dismissed with a result. What makes them fit a
@@ -167,8 +181,7 @@ throw away what the caller chose without being asked. That icon is also the firs
 turns pixels into a `CGImage` for, through a bitmap context rather than `CGImageCreate` — twelve
 arguments, half of them on the stack, and Apple's AArch64 ABI packs stack arguments to their natural
 size rather than a slot each, so a merely plausible signature reads the wrong bytes and answers
-something that looks like an image. Owner-drawn `DrawImage` is still a no-op and is not part of this;
-the conversion is where a later change would start.
+something that looks like an image. That conversion is now shared with the painter.
 
 One more thing about it is ordering rather than messaging: the peer promotes the process to
 `NSApplicationActivationPolicyRegular` before asking for the item. A process launched from a terminal

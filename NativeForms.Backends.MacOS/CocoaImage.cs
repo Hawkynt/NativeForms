@@ -4,18 +4,25 @@ using Hawkynt.NativeForms.Drawing;
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
 /// <summary>
-/// A bitmap the backend owns, held as the 32-bit ARGB the core handed over.
+/// A bitmap the backend owns: the 32-bit ARGB the core handed over, and the <c>CGImage</c> the
+/// painter draws it as.
 /// </summary>
 /// <remarks>
-/// Deliberately managed pixels rather than a <c>CGImage</c> for now. Nothing draws yet, so a native
-/// bitmap would be an object with no consumer, and creating one is the sort of work that looks like
-/// progress while adding none; the pixels are kept in the form the eventual
-/// <c>CGBitmapContextCreate</c> wants, so the change is local when drawing arrives.
+/// The native image is built on the first draw and kept, not minted per frame. A repaint has to
+/// allocate nothing (PRD §4), and converting a bitmap costs a colour space, a bitmap context and a
+/// pass over every pixel — per frame, per icon, that is the whole cost of a grid full of them. The
+/// straight-alpha pixels stay alongside it because they are what a second conversion would need and
+/// what a greyed sibling would be computed from.
 /// </remarks>
 internal sealed partial class CocoaImage(int width, int height, ReadOnlySpan<int> argb) : IImage
 {
     /// <summary>The pixels, row-major, as 0xAARRGGBB.</summary>
     internal int[] Pixels { get; } = argb.ToArray();
+
+    private nint _handle;
+
+    /// <summary>Whether <see cref="_handle"/> has been settled, so a refusal is not retried per frame.</summary>
+    private bool _converted;
 
     /// <inheritdoc/>
     public int Width { get; } = width;
@@ -23,12 +30,38 @@ internal sealed partial class CocoaImage(int width, int height, ReadOnlySpan<int
     /// <inheritdoc/>
     public int Height { get; } = height;
 
+    /// <summary>
+    /// The <c>CGImage</c> for these pixels, or zero if CoreGraphics declined. Built once: the first
+    /// caller pays, every later frame reads the field.
+    /// </summary>
+    internal nint Handle
+    {
+        get
+        {
+            if (_converted)
+                return _handle;
+
+            _converted = true;
+            return _handle = CreateCGImage(this.Width, this.Height, this.Pixels);
+        }
+    }
+
     /// <inheritdoc/>
-    public void Dispose() { }
+    public void Dispose()
+    {
+        if (_handle == 0)
+            return;
+
+        CocoaNative.CGImageRelease(_handle);
+        _handle = 0;
+
+        // Left marked as converted, so a draw after a dispose paints nothing instead of quietly
+        // rebuilding the image the caller just gave up.
+        _converted = true;
+    }
 
     /// <summary>
-    /// Builds an <c>NSImage</c> from 32-bit ARGB pixels, or zero — the shape AppKit wants wherever an
-    /// application hands the toolkit an icon rather than a drawing.
+    /// Builds a <c>CGImage</c> from 32-bit ARGB pixels, or zero. The caller owns the result.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -47,8 +80,13 @@ internal sealed partial class CocoaImage(int width, int height, ReadOnlySpan<int
     /// pixels are straight. Doing it here rather than pretending is what keeps a half-transparent icon
     /// from coming out too bright.
     /// </para>
+    /// <para>
+    /// The row stride is read back rather than assumed. A bitmap context is free to answer with rows
+    /// wider than the width asked for — alignment is the reason it would — and writing tightly packed
+    /// rows into a padded buffer shears the picture diagonally, one row further off than the last.
+    /// </para>
     /// </remarks>
-    internal static unsafe nint CreateNSImage(int width, int height, ReadOnlySpan<int> argb)
+    internal static unsafe nint CreateCGImage(int width, int height, ReadOnlySpan<int> argb)
     {
         if (width <= 0 || height <= 0 || argb.Length < width * height)
             return 0;
@@ -66,13 +104,34 @@ internal sealed partial class CocoaImage(int width, int height, ReadOnlySpan<int
         if (context == 0)
             return 0;
 
-        var pixels = (int*)CocoaNative.CGBitmapContextGetData(context);
-        if (pixels != null)
-            for (var i = 0; i < width * height; ++i)
-                pixels[i] = Premultiplied(argb[i]);
+        var rows = (byte*)CocoaNative.CGBitmapContextGetData(context);
+        if (rows != null)
+        {
+            var stride = (int)CocoaNative.CGBitmapContextGetBytesPerRow(context);
+            if (stride < width * 4)
+                stride = width * 4;
+
+            for (var y = 0; y < height; ++y)
+            {
+                var pixels = (int*)(rows + ((nint)y * stride));
+                var source = argb.Slice(y * width, width);
+                for (var x = 0; x < width; ++x)
+                    pixels[x] = Premultiplied(source[x]);
+            }
+        }
 
         var image = CocoaNative.CGBitmapContextCreateImage(context);
         CocoaNative.CGContextRelease(context);
+        return image;
+    }
+
+    /// <summary>
+    /// Builds an <c>NSImage</c> from 32-bit ARGB pixels, or zero — the shape AppKit wants wherever an
+    /// application hands the toolkit an icon rather than a drawing.
+    /// </summary>
+    internal static nint CreateNSImage(int width, int height, ReadOnlySpan<int> argb)
+    {
+        var image = CreateCGImage(width, height, argb);
         if (image == 0)
             return 0;
 

@@ -127,8 +127,38 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
             ? new((int)Math.Ceiling(width), (int)Math.Ceiling(height))
             : Size.Empty;
 
-    /// <inheritdoc cref="DrawText"/>
-    public void DrawImage(IImage image, Rectangle bounds) { }
+    /// <summary>
+    /// Blits a backend bitmap into <paramref name="bounds"/>, scaling it to fit.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The flip is handled here and nowhere else. <c>CGContextDrawImage</c> lays an image out from the
+    /// bottom of the rectangle upward, which is right in CoreGraphics' own coordinates and wrong in
+    /// this context: the canvas view answers <c>isFlipped</c>, so y grows downward and an image drawn
+    /// straight arrives on its head. Mirroring the context about the destination rectangle corrects it
+    /// inside a saved state, so the text and the primitives around it keep the transform they expect —
+    /// flipping the whole context instead would put every string upside down.
+    /// </para>
+    /// <para>
+    /// An image from another backend, or one already disposed, draws nothing rather than throwing: a
+    /// painter is called from a native draw callback, where an exception has nowhere to go.
+    /// </para>
+    /// </remarks>
+    public void DrawImage(IImage image, Rectangle bounds)
+    {
+        if (image is not CocoaImage native || bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        var handle = native.Handle;
+        if (handle == 0)
+            return;
+
+        CocoaNative.CGContextSaveGState(_context);
+        CocoaNative.CGContextTranslateCTM(_context, bounds.X, bounds.Y + bounds.Height);
+        CocoaNative.CGContextScaleCTM(_context, 1, -1);
+        CocoaNative.CGContextDrawImage(_context, new CocoaRuntime.CGRect(0, 0, bounds.Width, bounds.Height), handle);
+        CocoaNative.CGContextRestoreGState(_context);
+    }
 
     public void PushClip(Rectangle bounds)
     {
