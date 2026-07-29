@@ -14,11 +14,8 @@ internal static partial class Shoot
         if (OperatingSystem.IsWindows())
             return ShootWindows.Window(form.Text, path);
 
-        // No Cocoa capture yet, because there is no Cocoa backend yet to capture (PRD §2). Saying so
-        // is the point: the macOS job runs the same walkthrough and its log records exactly how far the
-        // toolkit gets on that platform, which is the baseline the backend will be built against.
         if (OperatingSystem.IsMacOS())
-            return null;
+            return ShootMacOS.Window(path);
 
         // GTK finds the window by title, exactly as the autopilot does, so the capture works whether
         // or not the autopilot is driving.
