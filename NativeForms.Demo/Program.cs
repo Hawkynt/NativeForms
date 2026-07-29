@@ -24,22 +24,7 @@ if (Array.IndexOf(args, "--autopilot") >= 0)
 BackendRegistry.Register(new Win32Backend());
 BackendRegistry.Register(new GtkBackend());
 BackendRegistry.Register(new CocoaBackend());
-if (measureStartup)
-    Console.WriteLine($"  phase backends-registered: {startup.Elapsed.TotalMilliseconds:F1} ms");
 
-// --measure-startup-minimal isolates the toolkit's cold floor from the gallery's construction cost:
-// a bare one-label window instead of the whole tabbed showcase.
-Form form = minimalStartup
-    ? new Form { Text = "NativeForms", Bounds = new(0, 0, 320, 160), Controls = { new Label { Bounds = new(20, 20, 260, 24), Text = "Hello, NativeForms." } } }
-    : new MainForm();
-if (!minimalStartup)
-    Autopilot.Attach((MainForm)form);
-if (measureStartup)
-    Console.WriteLine($"  phase constructed: {startup.Elapsed.TotalMilliseconds:F1} ms");
-
-// --measure-startup stops the clock when the form loads (its whole peer tree realized, the window
-// up) and reports the cold time to first window, then closes on the first tick — once the message
-// loop is actually running, so the shutdown is clean — without driving the gallery.
 var shooting = Array.IndexOf(args, "--shoot") >= 0;
 var shootFailures = 0;
 
@@ -72,6 +57,22 @@ if (shooting)
 
     Note("backends registered, building the gallery");
 }
+if (measureStartup)
+    Console.WriteLine($"  phase backends-registered: {startup.Elapsed.TotalMilliseconds:F1} ms");
+
+// --measure-startup-minimal isolates the toolkit's cold floor from the gallery's construction cost:
+// a bare one-label window instead of the whole tabbed showcase.
+Form form = minimalStartup
+    ? new Form { Text = "NativeForms", Bounds = new(0, 0, 320, 160), Controls = { new Label { Bounds = new(20, 20, 260, 24), Text = "Hello, NativeForms." } } }
+    : new MainForm();
+if (!minimalStartup)
+    Autopilot.Attach((MainForm)form);
+if (measureStartup)
+    Console.WriteLine($"  phase constructed: {startup.Elapsed.TotalMilliseconds:F1} ms");
+
+// --measure-startup stops the clock when the form loads (its whole peer tree realized, the window
+// up) and reports the cold time to first window, then closes on the first tick — once the message
+// loop is actually running, so the shutdown is clean — without driving the gallery.
 if (measureStartup && !shooting)
     form.Load += (_, _) =>
     {
