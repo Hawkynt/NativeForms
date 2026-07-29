@@ -219,7 +219,7 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
 /// field stays plain rather than silently showing the characters it promised to hide, which is why the
 /// mask is remembered and reported rather than ignored.
 /// </remarks>
-internal sealed class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
+internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
 {
     private bool _secure;
 
@@ -307,4 +307,90 @@ internal sealed class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
         TextChangedByUser?.Invoke(this, EventArgs.Empty);
         KeyDown?.Invoke(this, new(Keys.None, KeyModifiers.None));
     }
+}
+
+/// <summary>
+/// A rich text field. Styling is accepted and kept rather than applied for now: an attributed
+/// <c>NSTextView</c> is the eventual home, and a control that loses its content would be worse than one
+/// that shows it unstyled.
+/// </summary>
+internal sealed class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextBoxPeer
+{
+    private string _rtf = string.Empty;
+
+    /// <inheritdoc/>
+    public event EventHandler<string>? LinkClicked;
+
+    /// <inheritdoc/>
+    public string GetRtf() => _rtf;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The RTF is remembered and its plain text shown. Parsing it belongs with the NSTextView this will
+    /// become; showing nothing until then would hide content the application believes it displayed.
+    /// </remarks>
+    public void SetRtf(string rtf)
+    {
+        _rtf = rtf;
+        this.SetText(PlainTextOf(rtf));
+    }
+
+    /// <summary>The readable text inside an RTF document: control words and groups dropped.</summary>
+    private static string PlainTextOf(string rtf)
+    {
+        var text = new System.Text.StringBuilder(rtf.Length);
+        var depth = 0;
+        for (var i = 0; i < rtf.Length; ++i)
+        {
+            var c = rtf[i];
+            switch (c)
+            {
+                case '{':
+                    ++depth;
+                    continue;
+                case '}':
+                    --depth;
+                    continue;
+                case '\\':
+                    // A control word runs to the first non-letter; \par and friends become a break.
+                    var start = ++i;
+                    while (i < rtf.Length && char.IsLetter(rtf[i]))
+                        ++i;
+
+                    if (rtf.AsSpan(start, i - start) is "par" or "line")
+                        text.Append('\n');
+
+                    if (i < rtf.Length && rtf[i] != ' ')
+                        --i;
+
+                    continue;
+                default:
+                    if (depth > 0 && !char.IsControl(c))
+                        text.Append(c);
+
+                    continue;
+            }
+        }
+
+        return text.ToString().Trim();
+    }
+
+    // --- Accepted and ignored until the attributed view lands (docs/PRD.md §2) --------------------
+
+    public void SetSelectionStyle(FontStyle style, bool enabled) { }
+
+    public void SetSelectionColor(Color color) { }
+
+    public void SetSelectionFontSize(float sizeInPoints) { }
+
+    public void SetSelectionAlignment(ContentAlignment alignment) { }
+
+    public void SetSelectionBullet(bool bullet) { }
+
+    public void SetDetectUrls(bool detectUrls) { }
+
+    public void SetZoom(float factor) { }
+
+    /// <summary>Raises <see cref="LinkClicked"/> once the attributed view routes them.</summary>
+    private void Unused4() => LinkClicked?.Invoke(this, string.Empty);
 }

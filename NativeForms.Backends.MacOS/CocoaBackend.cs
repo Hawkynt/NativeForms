@@ -57,7 +57,7 @@ public sealed class CocoaBackend : IPlatformBackend
     public ICanvasPeer CreateCanvas() => new CocoaCanvasPeer();
 
     /// <inheritdoc/>
-    public IPopupPeer CreatePopup(IWindowPeer? owner) => throw new PlatformNotSupportedException(_NotImplemented);
+    public IPopupPeer CreatePopup(IWindowPeer? owner) => new CocoaPopupPeer();
 
     /// <inheritdoc/>
     public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new CocoaImage(width, height, argb);
@@ -73,7 +73,9 @@ public sealed class CocoaBackend : IPlatformBackend
     public ITimerPeer CreateTimer() => new CocoaTimerPeer(this);
 
     /// <inheritdoc/>
-    public INotifyIconPeer CreateNotifyIcon() => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <remarks>An <c>NSStatusItem</c> eventually; inert for now so a tray icon nobody can see does not
+    /// take the application down.</remarks>
+    public INotifyIconPeer CreateNotifyIcon() => new CocoaNotifyIconPeer();
 
     /// <inheritdoc/>
     public Size GetScreenSize()
@@ -109,25 +111,70 @@ public sealed class CocoaBackend : IPlatformBackend
 
     /// <inheritdoc/>
     public DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null)
-        => throw new PlatformNotSupportedException(_NotImplemented);
+    {
+        // NSAlert is modal and wants the run loop; until it is wired, a dialog that cannot be shown
+        // answers as if it were dismissed rather than ending the process.
+        _ = text;
+        _ = caption;
+        _ = icon;
+        _ = owner;
+        return buttons == MessageBoxButtons.OK ? DialogResult.OK : DialogResult.Cancel;
+    }
 
     /// <inheritdoc/>
-    public string[]? ShowFileDialog(in FileDialogOptions options) => throw new PlatformNotSupportedException(_NotImplemented);
+    public string[]? ShowFileDialog(in FileDialogOptions options) => null;
 
     /// <inheritdoc/>
-    public Color? ShowColorDialog(Color color) => throw new PlatformNotSupportedException(_NotImplemented);
+    public Color? ShowColorDialog(Color color) => null;
 
     /// <inheritdoc/>
-    public Font? ShowFontDialog(Font font) => throw new PlatformNotSupportedException(_NotImplemented);
+    public Font? ShowFontDialog(Font font) => null;
 
     /// <inheritdoc/>
-    public IRichTextBoxPeer CreateRichTextBox() => throw new PlatformNotSupportedException(_NotImplemented);
+    public IRichTextBoxPeer CreateRichTextBox() => new CocoaRichTextBoxPeer();
 
     /// <inheritdoc/>
-    public void SetClipboardText(string text) => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <remarks><c>NSPasteboard</c>: cleared, then the string written under the plain-text type.</remarks>
+    public void SetClipboardText(string text)
+    {
+        var board = CocoaRuntime.SendToClass("NSPasteboard", "generalPasteboard");
+        if (board == 0)
+            return;
+
+        CocoaRuntime.SendPointer(board, CocoaRuntime.sel_registerName("clearContents"));
+        var value = CocoaRuntime.NSString(text);
+        var type = CocoaRuntime.NSString("public.utf8-plain-text");
+        if (value != 0 && type != 0)
+            CocoaRuntime.SendVoid(board, CocoaRuntime.sel_registerName("setString:forType:"), value, type);
+
+        if (value != 0)
+            CocoaNative.CFRelease(value);
+        if (type != 0)
+            CocoaNative.CFRelease(type);
+    }
 
     /// <inheritdoc/>
-    public string? GetClipboardText() => throw new PlatformNotSupportedException(_NotImplemented);
+    /// <inheritdoc/>
+    public string? GetClipboardText()
+    {
+        var board = CocoaRuntime.SendToClass("NSPasteboard", "generalPasteboard");
+        if (board == 0)
+            return null;
+
+        var type = CocoaRuntime.NSString("public.utf8-plain-text");
+        if (type == 0)
+            return null;
+
+        try
+        {
+            var value = CocoaRuntime.SendPointer(board, CocoaRuntime.sel_registerName("stringForType:"), type);
+            return value == 0 ? null : CocoaNative.ReadString(value);
+        }
+        finally
+        {
+            CocoaNative.CFRelease(type);
+        }
+    }
 
     /// <inheritdoc/>
     /// <summary>Work queued from any thread, drained by <see cref="Run"/> on the UI thread.</summary>
