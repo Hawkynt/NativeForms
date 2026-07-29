@@ -220,6 +220,14 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial ushort SendUShort(nint receiver, nint selector);
 
+    /// <summary>Asks a string for one of its characters, which comes back as a UTF-16 unit.</summary>
+    /// <remarks>
+    /// So a key can be read off an event without minting a managed string for it: a keystroke is not
+    /// the paint path, but one allocation per key pressed is still one nobody asked for.
+    /// </remarks>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial ushort SendUShort(nint receiver, nint selector, nint index);
+
     /// <summary>A range: location and length, as AppKit counts characters.</summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct NSRange

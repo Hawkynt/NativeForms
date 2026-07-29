@@ -342,12 +342,35 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             canvas.KeyUp?.Invoke(canvas, new(KeyOf(theEvent), ModifiersOf(theEvent)));
     }
 
-    /// <summary>The toolkit key for an event's virtual key code.</summary>
-    /// <remarks>Shared with the text box, so a canvas and a native editor read a key the same way.</remarks>
+    /// <summary>The toolkit key for an event, read from its key code and then from what it types.</summary>
+    /// <remarks>
+    /// <para>
+    /// Shared with the text box, so a canvas and a native editor read a key the same way.
+    /// </para>
+    /// <para>
+    /// Two passes, because a Mac keyboard numbers its keys by where they are rather than by what they
+    /// say. A key code is a position on the keyboard and nothing else: 0x00 is the key at the left of
+    /// the home row, which is A on a US layout, Q on a French one and neither on Dvorak — so a table
+    /// from key codes to letters would name the wrong letter for most of the world. The named keys
+    /// have no such problem and go first; everything else is read off
+    /// <c>charactersIgnoringModifiers</c>, which is the layout's own answer to what that key means.
+    /// </para>
+    /// <para>
+    /// Without the second pass every letter and digit arrived as <see cref="Keys.None"/>, which is
+    /// every accelerator, every mnemonic and every Ctrl-shortcut an owner-drawn control defines:
+    /// copy, paste, select-all and find all reach the toolkit as a key it has no name for.
+    /// </para>
+    /// <para>
+    /// The function keys are listed one by one rather than as a range. They are contiguous on GTK and
+    /// on Win32; here F1 is 0x7A, F2 is 0x78 and F3 is 0x63, and a range over that would hand back
+    /// whatever key happened to sit at the arithmetic.
+    /// </para>
+    /// </remarks>
     internal static Keys KeyOf(nint theEvent)
-        => CocoaRuntime.SendUShort(theEvent, CocoaRuntime.sel_registerName("keyCode")) switch
+    {
+        var named = CocoaRuntime.SendUShort(theEvent, CocoaRuntime.sel_registerName("keyCode")) switch
         {
-            0x24 => Keys.Enter,
+            0x24 or 0x4C => Keys.Enter, // Return and the keypad's own Enter
             0x30 => Keys.Tab,
             0x31 => Keys.Space,
             0x33 => Keys.Back,
@@ -361,8 +384,46 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             0x7C => Keys.Right,
             0x7D => Keys.Down,
             0x7E => Keys.Up,
+            0x7A => Keys.F1,
+            0x78 => Keys.F2,
+            0x63 => Keys.F3,
+            0x76 => Keys.F4,
+            0x60 => Keys.F5,
+            0x61 => Keys.F6,
+            0x62 => Keys.F7,
+            0x64 => Keys.F8,
+            0x65 => Keys.F9,
+            0x6D => Keys.F10,
+            0x67 => Keys.F11,
+            0x6F => Keys.F12,
             _ => Keys.None,
         };
+
+        if (named != Keys.None)
+            return named;
+
+        var typed = CocoaRuntime.SendPointer(theEvent, CocoaRuntime.sel_registerName("charactersIgnoringModifiers"));
+        if (typed == 0 || CocoaRuntime.SendInteger(typed, CocoaRuntime.sel_registerName("length")) < 1)
+            return Keys.None;
+
+        // Asked for as one character rather than read back as a string: a key press is not the paint
+        // path, but an allocation per keystroke is still one nobody asked for.
+        var character = (char)CocoaRuntime.SendUShort(typed, CocoaRuntime.sel_registerName("characterAtIndex:"), 0);
+
+        // Letters and digits carry their (uppercased) ASCII code, matching the Win32 virtual-key
+        // numbering that Keys is built on — the same arithmetic the GTK backend does.
+        return char.ToUpperInvariant(character) switch
+        {
+            >= 'A' and <= 'Z' or >= '0' and <= '9' => (Keys)char.ToUpperInvariant(character),
+            '+' or '=' => Keys.Oemplus,
+            '-' or '_' => Keys.OemMinus,
+            ',' => Keys.Oemcomma,
+            '.' => Keys.OemPeriod,
+            '*' => Keys.Multiply,
+            '/' => Keys.Divide,
+            _ => Keys.None,
+        };
+    }
 
     /// <summary>
     /// AppKit is rebuilding this view's cursor rectangles: claim the whole of it for the shape the

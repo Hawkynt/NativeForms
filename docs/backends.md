@@ -435,8 +435,23 @@ there and is simply not sent on if the toolkit consumed it — which is exactly 
 handled key the native editor never sees. The box is found by the event's first responder: itself when
 it is multiline, and otherwise the borrowed field editor, which carries the field it was lent to as
 its delegate — the same fact the link label is built on. Keys that reach it are the set the canvas
-translates, so a native editor and an owner-drawn one read a keystroke the same way; letters are not
-in that set on either.
+translates, so a native editor and an owner-drawn one read a keystroke the same way.
+
+That set is now every key rather than the arrows and the editing block, and the reason it was not
+comes down to what a key code is on this platform. A Mac numbers its keys by where they are: 0x00 is
+the key at the left of the home row, which is A on a US layout, Q on a French one and neither on
+Dvorak — so a table from key codes to letters names the wrong letter for most of the world, and the
+one this backend had listed no letters at all. Every letter and digit therefore arrived as
+`Keys.None`, which is every accelerator, every mnemonic and every Ctrl-shortcut an owner-drawn control
+defines: copy, paste, select-all and find all reached the toolkit as a key it had no name for. So the
+named keys are read from the key code, which is layout-independent because those keys are, and
+anything left over is read from `charactersIgnoringModifiers` — the layout's own answer to what the
+key means — and mapped by the same arithmetic the GTK backend uses, since `Keys` is built on Win32's
+virtual-key numbering and letters and digits carry their own ASCII there. The function keys are listed
+one by one rather than as a range: they are contiguous on the other two platforms and here F1 is 0x7A,
+F2 is 0x78 and F3 is 0x63, so a range over them would answer with whatever key sits at the arithmetic.
+This one is implemented and not witnessed — the keystroke that would prove it is the one the window
+server drops.
 
 The probe reports all of this the way it reports the tracking areas and the cursor targets: read back
 off the running window rather than claimed. The button figure is a pair, and has to be — a push
@@ -509,11 +524,8 @@ where they arise, as is the pair of `RichTextBox` limits that come down to Objec
 `NSTextField` has neither, and both mean an attributed string carrying a text attachment, which then
 owns the font and the colour as well — one piece of work serving both, and not done. A toolkit popup
 opened inside a modal dialog is not light-dismissed, because AppKit's session dispatches the events
-the loop would otherwise have offered it (above). And a keystroke reaches a native editor as one of
-the keys the canvas translates, which is the navigation and editing set: a letter arrives as
-`Keys.None`, so a mnemonic or a shortcut typed inside a text box is not routed on this backend. That
-is the canvas's table rather than the text box's, and widening it would serve both. These are named
-here so that a screenshot that looks finished is not read as one.
+the loop would otherwise have offered it (above). These are named here so that a screenshot that looks
+finished is not read as one.
 
 ## How the screenshots are produced
 
