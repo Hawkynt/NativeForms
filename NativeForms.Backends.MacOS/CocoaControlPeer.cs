@@ -296,10 +296,43 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
 
     public void SetMaxLength(int maxLength) { }
 
-    public void SetSelection(int start, int length) { }
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The selection belongs to the field editor, not the field: AppKit shares one <c>NSTextView</c>
+    /// between every text field in a window and lends it to whichever has focus. A field that is not
+    /// focused has no editor and therefore no selection to set, which is why this asks first rather
+    /// than messaging null and quietly doing nothing.
+    /// </remarks>
+    public void SetSelection(int start, int length)
+    {
+        if (Editor() is not { } editor)
+            return;
+
+        CocoaRuntime.SendRangeVoid(
+            editor,
+            CocoaRuntime.sel_registerName("setSelectedRange:"),
+            new() { Location = Math.Max(0, start), Length = Math.Max(0, length) });
+    }
 
     /// <inheritdoc/>
-    public (int Start, int Length) GetSelection() => (this.GetText().Length, 0);
+    public (int Start, int Length) GetSelection()
+    {
+        if (Editor() is not { } editor)
+            return (this.GetText().Length, 0);
+
+        var range = CocoaRuntime.SendRange(editor, CocoaRuntime.sel_registerName("selectedRange"));
+        return ((int)range.Location, (int)range.Length);
+    }
+
+    /// <summary>The field editor currently lent to this field, or null when it is not focused.</summary>
+    private nint? Editor()
+    {
+        if (this.Handle == 0)
+            return null;
+
+        var editor = CocoaRuntime.SendPointer(this.Handle, CocoaRuntime.sel_registerName("currentEditor"));
+        return editor == 0 ? null : editor;
+    }
 
     /// <summary>Raises the input events once AppKit's delegate routing is wired.</summary>
     private void Unused3()

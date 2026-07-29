@@ -150,6 +150,21 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial ushort SendUShort(nint receiver, nint selector);
 
+    /// <summary>A range: location and length, as AppKit counts characters.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NSRange
+    {
+        public nint Location, Length;
+    }
+
+    /// <summary>Reads a range-valued property — two integers, returned in registers.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial NSRange SendRange(nint receiver, nint selector);
+
+    /// <summary>Sends a message taking a range.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial void SendRangeVoid(nint receiver, nint selector, NSRange range);
+
     /// <summary>Reads one element of an ordered collection.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial nint SendIndex(nint receiver, nint selector, nint index);
