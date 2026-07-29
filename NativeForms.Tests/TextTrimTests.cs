@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Globalization;
 using Hawkynt.NativeForms.Drawing;
+using Hawkynt.NativeForms.Tests.Fakes;
 
 namespace Hawkynt.NativeForms.Tests;
 
@@ -163,6 +164,56 @@ internal sealed class TextTrimTests
     [Test]
     public void An_empty_label_stays_empty()
         => Assert.That(Trim(string.Empty, 500), Is.Empty);
+
+    [Test]
+    public void A_whole_viewport_of_shortened_labels_re_answers_without_allocating()
+    {
+        // Shortening builds a string, so every label a frame draws has to come back out of the memo —
+        // not most of them. A label that misses rebuilds its string on every repaint for as long as
+        // the process lives, and it is not the rare label that pays: whether two names share a memo
+        // slot is decided by the process-wide string hash seed, so the same list allocates on one run
+        // and not on the next. A list long enough to fill a viewport settles it — with a fixed number
+        // of slots and one name evicting another, a working set this size collides every time.
+        //
+        // Measured through NullGraphics, which measures by char and allocates nothing itself, because
+        // what is under test here is the memo rather than the shaper.
+        var g = new NullGraphics();
+        var names = new string[200];
+        for (var i = 0; i < names.Length; ++i)
+            names[i] = $"a rather long file name number {i} that does not fit its column.txt";
+
+        const int Width = 20 * 7; // twenty chars of the headless metrics — every name overflows
+        foreach (var name in names)
+            TextTrim.ToWidth(g, name, TestFont, Width);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var frame = 0; frame < 10; ++frame)
+            foreach (var name in names)
+                TextTrim.ToWidth(g, name, TestFont, Width);
+
+        Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
+    }
+
+    [Test]
+    public void More_labels_than_the_memo_holds_still_come_back_shortened_correctly()
+    {
+        // A scroll through a long list is not a frame, so the memo stops growing at some point and
+        // starts over instead. Past that point it still has to answer, and answer correctly — a
+        // probe run that never found a free slot would hang the UI thread rather than return a wrong
+        // string, which is why this walks well past the cap.
+        var g = new NullGraphics();
+        const int Width = 20 * 7;
+
+        for (var i = 0; i < 6000; ++i)
+        {
+            var name = $"a rather long file name number {i} that does not fit its column.txt";
+            var trimmed = TextTrim.ToWidth(g, name, TestFont, Width);
+
+            Assert.That(trimmed, Does.EndWith(TextTrim.Ellipsis), name);
+            Assert.That(name, Does.StartWith(trimmed[..^TextTrim.Ellipsis.Length]), name);
+            Assert.That(trimmed.Length * 7, Is.LessThanOrEqualTo(Width), name);
+        }
+    }
 
     [Test]
     public void A_label_longer_than_the_stack_buffer_still_trims_on_a_boundary()

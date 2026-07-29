@@ -37,19 +37,37 @@ internal static class TextTrim
     /// <summary>Cluster counts above this are walked on the heap rather than the stack.</summary>
     private const int StackLimit = 256;
 
-    /// <summary>Slots in the memo below. A direct-mapped cache, so this is also the collision
-    /// granularity; a viewport's worth of overflowing labels fits comfortably.</summary>
-    private const int CacheSlots = 64;
+    /// <summary>Slots the memo starts with. Powers of two throughout, so the slot is a mask.</summary>
+    private const int InitialSlots = 64;
 
     /// <summary>
-    /// The last result for a given (text, width, font). Shortening allocates a string, and a repaint
-    /// must allocate nothing at all once warm (see the paint-allocation guarantee) — so the second
-    /// and every later frame answers from here. Struct entries, so filling a slot allocates nothing
-    /// either. Painting is a UI-thread activity, which is what makes an unsynchronized cache sound;
-    /// a torn read would cost a recomputation, never a wrong answer, because every field is compared
-    /// before the result is used.
+    /// The most slots the memo will grow to before it starts over. A frame draws at most as many
+    /// shortened labels as it has cells, so this is a viewport many times over; past it the working
+    /// set is a scroll through a long list rather than a frame, and holding on to every name that
+    /// ever went by would be a leak.
     /// </summary>
-    private static readonly Memo[] _cache = new Memo[CacheSlots];
+    private const int MaxSlots = 4096;
+
+    /// <summary>
+    /// The result for a given (text, width, font). Shortening allocates a string, and a repaint must
+    /// allocate nothing at all once warm (see the paint-allocation guarantee) — so the second and
+    /// every later frame answers from here. Struct entries, so filling a slot allocates nothing
+    /// either.
+    /// </summary>
+    /// <remarks>
+    /// Open addressing rather than one entry per slot, and it is the guarantee above that forces the
+    /// choice: with a direct-mapped memo two names that land on the same slot evict each other on
+    /// every single frame, for the life of the process, and which names those are is decided by the
+    /// process-wide string hash seed — so the same list allocates on one run and not on the next.
+    /// Probing instead keeps both, and the table grows when it fills, so a whole frame's worth of
+    /// labels is answered from the memo however they hash. Painting is a UI-thread activity, which is
+    /// what makes an unsynchronized memo sound; a torn read costs a recomputation, never a wrong
+    /// answer, because the result is published before the key that admits it.
+    /// </remarks>
+    private static Memo[] _cache = new Memo[InitialSlots];
+
+    /// <summary>Entries currently in <see cref="_cache"/>; it grows before it is half full.</summary>
+    private static int _live;
 
     private struct Memo
     {
@@ -74,17 +92,66 @@ internal static class TextTrim
         if (g.MeasureText(text, font).Width <= maxWidth)
             return text;
 
-        var slot = (int)((uint)(text.GetHashCode() ^ (maxWidth * 397)) % CacheSlots);
-        ref var memo = ref _cache[slot];
-        if (memo.Text == text && memo.Width == maxWidth && memo.Font == font)
-            return memo.Result;
+        var cache = _cache;
+        var mask = cache.Length - 1;
+        for (var slot = Slot(text, maxWidth) & mask; ; slot = (slot + 1) & mask)
+        {
+            ref var memo = ref cache[slot];
+            if (memo.Text is null)
+                break; // the probe run ended without the key, so it is not in the table
+
+            if (memo.Width == maxWidth && memo.Font == font && memo.Text == text)
+                return memo.Result;
+        }
 
         var trimmed = Shorten(g, text, font, maxWidth);
-        memo.Text = text;
+        Remember(text, font, maxWidth, trimmed);
+        return trimmed;
+    }
+
+    /// <summary>The slot a key starts probing from; masked by the caller, which knows the size.</summary>
+    private static int Slot(string text, int maxWidth) => text.GetHashCode() ^ (maxWidth * 397);
+
+    /// <summary>Files a freshly shortened result, growing or emptying the table first if it is full
+    /// enough that probe runs would get long.</summary>
+    private static void Remember(string text, Font font, int maxWidth, string trimmed)
+    {
+        if ((_live + 1) * 2 > _cache.Length)
+        {
+            if (_cache.Length < MaxSlots)
+            {
+                var grown = new Memo[_cache.Length * 2];
+                foreach (var entry in _cache)
+                    if (entry.Text is not null)
+                        Place(grown, entry.Text, entry.Font, entry.Width, entry.Result);
+
+                _cache = grown;
+            }
+            else
+            {
+                // Past the cap the working set is no longer a frame, so there is nothing to preserve.
+                Array.Clear(_cache);
+                _live = 0;
+            }
+        }
+
+        Place(_cache, text, font, maxWidth, trimmed);
+        ++_live;
+    }
+
+    /// <summary>Writes an entry into the first free slot of its probe run.</summary>
+    private static void Place(Memo[] cache, string text, Font font, int maxWidth, string trimmed)
+    {
+        var mask = cache.Length - 1;
+        var slot = Slot(text, maxWidth) & mask;
+        while (cache[slot].Text is not null)
+            slot = (slot + 1) & mask;
+
+        ref var memo = ref cache[slot];
         memo.Width = maxWidth;
         memo.Font = font;
         memo.Result = trimmed;
-        return trimmed;
+        memo.Text = text; // last: the key is what admits the entry, so publish it once it is whole
     }
 
     /// <summary>Does the actual search. Only ever reached on a memo miss.</summary>
