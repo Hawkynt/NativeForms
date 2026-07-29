@@ -563,6 +563,30 @@ the second, and reads the menu's own `IsOpen` on the third — because the press
 the modal pump, and the modal pump is not turning while a tick is inside it. The log says which of the
 three it got to, so a run that never opened the menu cannot be read as one that dismissed it.
 
+A label carries a picture and underlines its mnemonic, which are the last two calls on this backend
+that did nothing. Neither is a new idea: the other two do not draw an icon beside a caption either, so
+what "a label with an image" means on all three is a label with an image and *no* text, at which point
+GTK swaps its `GtkLabel` for a `GtkImage` and Win32 builds an `SS_BITMAP` static. This one swaps its
+field for an `NSImageView`, on the same condition and with the same consequence: a captioned label
+keeps its caption and does not render the picture. The bitmap is drawn at the size it was handed over
+rather than scaled to the label's bounds, because that is what the other two do and a scaled icon
+would be the same picture at a different size on one platform of three.
+
+The mnemonic is why this one was put off, and the reason was real. An `NSTextField` has no notion of
+one, so the only route is an attributed value — and an attributed value is what the cell draws with,
+in full: a property it carries no attribute for is a property that silently stops working the moment a
+caption has an ampersand in it. So the font, the text colour and the alignment are read off the widget
+and written back into the string, and setting either of the first two rebuilds it. The parsing is
+Windows Forms' own and matches what the other two translate to their platforms: `&x` underlines `x`,
+`&&` is one literal ampersand, only the first mark counts, and a trailing ampersand marks nothing.
+
+One visible difference is worth stating rather than discovering in a side-by-side. GTK and Win32 both
+hide the underline until the Alt key is held, which is their desktops' convention; this desktop has no
+such convention and no message that reports the modifier, so the line is simply drawn. The gallery's
+Basics page now carries all of it — a label with a mnemonic, one with `UseMnemonic` off showing the
+ampersand literally, and one that is nothing but a picture — which is what makes a regression here
+something a screenshot would show.
+
 Injected input no longer goes through the window server, and that is why there is any at all. The
 probe used to post a `CGEvent` at the HID tap, which is the truer gesture and unusable here: macOS
 gates synthetic input behind the Accessibility permission, a hosted runner grants none, and a post
@@ -611,14 +635,12 @@ twice. A popup is a borderless window whose entire content is one canvas, and in
 An `NSSlider` has no small or large change, and an `NSTextField` no title colour; both are set out
 where they arise, as is the pair of `RichTextBox` limits that come down to Objective-C blocks.
 
-**Written down rather than written.** A `Label` shows no image and underlines no mnemonic. An
-`NSTextField` has neither: a mnemonic means an attributed string, which then owns the font and the
-colour as well, and an image means swapping the field for an `NSImageView` — which is what the GTK
-peer does with a `GtkImage`, and on the same terms, since neither backend draws an icon beside a
-caption. So the gap against the other two is an image-only label and an underlined letter, not every
-label with a picture in it, and nothing in the gallery asks for either — which is also why this is
-still written down: there would be nothing in a shot to say it had worked. This is named here so that a
-screenshot that looks finished is not read as one.
+**Written down rather than written.** Nothing. This half of the list is empty, and it is worth saying
+so out loud rather than quietly deleting the heading: everything this backend does not do is now
+either something the platform does not have, listed above and argued for, or a limit set out where it
+arises — an `NSSlider`'s step sizes, a drop-down that opens modally, a menu item that cannot be chosen
+inside a dialog, a hover that is wired and not witnessed. What is left is a backend that is honest
+rather than one that is finished.
 
 ## How the screenshots are produced
 

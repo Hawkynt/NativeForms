@@ -136,7 +136,7 @@ internal abstract class CocoaControlPeer : IControlPeer
     /// Offered rather than sent: <c>setFont:</c> is <c>NSControl</c>'s, and a peer whose handle is a
     /// plain <c>NSView</c> would abort the process on an unrecognized selector instead of ignoring it.
     /// </remarks>
-    public void SetFont(Font font)
+    public virtual void SetFont(Font font)
     {
         if (!CocoaRuntime.Responds(this.Handle, "setFont:"))
             return;
@@ -164,7 +164,7 @@ internal abstract class CocoaControlPeer : IControlPeer
     /// caption follows one property and ignores the next.
     /// </para>
     /// </remarks>
-    public void SetColors(Color foreColor, Color backColor)
+    public virtual void SetColors(Color foreColor, Color backColor)
     {
         if (this.Handle == 0)
             return;
@@ -225,14 +225,51 @@ internal abstract class CocoaControlPeer : IControlPeer
 }
 
 /// <summary>A caption: a non-editable, borderless <c>NSTextField</c>, which is what AppKit calls a label.</summary>
+/// <remarks>
+/// <para>
+/// A picture is the other two backends' answer rather than a new one. Neither draws an icon beside a
+/// caption: GTK swaps its <c>GtkLabel</c> for a <c>GtkImage</c> when the label has an image and no
+/// text, Win32 builds an <c>SS_BITMAP</c> static on the same condition, and a captioned label keeps
+/// its text and does not render the picture at all. So this swaps its field for an
+/// <c>NSImageView</c> on the same condition and by the same rule, which makes an image-only label mean
+/// one thing on all three instead of three.
+/// </para>
+/// <para>
+/// A mnemonic is an attributed value, and the reason this was put off is that an attributed value
+/// owns everything the cell would otherwise have drawn with. So the font, the text colour and the
+/// alignment go back into the string rather than being left to properties it overrides, and
+/// <see cref="SetFont"/> and <see cref="SetColors"/> rebuild it — otherwise a caption would follow one
+/// property and ignore the next, which is worse than not underlining anything.
+/// </para>
+/// </remarks>
 internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
 {
+    private static readonly nint _FontKey = CocoaRuntime.Constant("NSFontAttributeName");
+    private static readonly nint _Foreground = CocoaRuntime.Constant("NSForegroundColorAttributeName");
+    private static readonly nint _Underline = CocoaRuntime.Constant("NSUnderlineStyleAttributeName");
+    private static readonly nint _Paragraph = CocoaRuntime.Constant("NSParagraphStyleAttributeName");
+
+    private string _text = string.Empty;
+    private bool _useMnemonic = true;
+    private ContentAlignment _textAlign;
+    private BorderStyle _borderStyle;
+    private CocoaImage? _image;
+
+    /// <summary>Whether the widget behind this peer is the image view rather than the field.</summary>
+    private bool _isImageView;
+
+    /// <summary>
+    /// The bitmap the image view is currently showing, so a caption property that rebuilds everything
+    /// does not also convert an icon it did not touch.
+    /// </summary>
+    private CocoaImage? _pushed;
+
     public CocoaLabelPeer()
-        : base(Create())
+        : base(CreateField())
     {
     }
 
-    private static nint Create()
+    private static nint CreateField()
     {
         var allocated = CocoaRuntime.Allocate("NSTextField");
         if (allocated == 0)
@@ -249,42 +286,299 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
         return field;
     }
 
+    /// <summary>The other widget this peer can be: what AppKit has where GTK has a <c>GtkImage</c>.</summary>
+    private static nint CreateImageView()
+    {
+        var allocated = CocoaRuntime.Allocate("NSImageView");
+        var view = allocated == 0
+            ? 0
+            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+
+        // NSImageScaleNone: the bitmap is drawn at the size it was handed over, which is what a
+        // GtkImage does and what an SS_BITMAP static does. Scaling it to the label's bounds would
+        // make the same icon a different size on one platform of three.
+        if (view != 0)
+            CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setImageScaling:"), 2);
+
+        return view;
+    }
+
+    /// <summary>Whether the peer should be showing the bitmap instead of a caption.</summary>
+    private bool IsImageOnly => _image is not null && _text.Length == 0;
+
+    /// <inheritdoc/>
+    public override void SetText(string text)
+    {
+        _text = text;
+        this.Rebuild();
+    }
+
     /// <inheritdoc/>
     public void SetTextAlign(ContentAlignment alignment)
     {
-        if (this.Handle == 0)
-            return;
-
-        // NSTextAlignment: left 0, right 1, centre 2.
-        var value = alignment switch
-        {
-            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter => 2,
-            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => 1,
-            _ => 0,
-        };
-
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAlignment:"), value);
+        _textAlign = alignment;
+        this.Apply();
     }
 
     /// <inheritdoc/>
     /// <remarks>Bezel on or off; the toolkit's three border styles collapse to AppKit's two.</remarks>
     public void SetBorderStyle(BorderStyle borderStyle)
     {
-        if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBezeled:"), borderStyle != BorderStyle.None);
+        _borderStyle = borderStyle;
+        this.Apply();
     }
 
     /// <inheritdoc/>
-    /// <remarks>Not yet: a mnemonic is underlined through an attributed string, which then owns the
-    /// font and the colour as well — so the three have to arrive together or a caption follows one
-    /// property and ignores the next.</remarks>
-    public void SetUseMnemonic(bool useMnemonic) { }
+    public void SetUseMnemonic(bool useMnemonic)
+    {
+        if (_useMnemonic == useMnemonic)
+            return;
+
+        _useMnemonic = useMnemonic;
+        this.Apply();
+    }
 
     /// <inheritdoc/>
-    /// <remarks>Not yet: a label is an <c>NSTextField</c>, which has no image of its own, so an icon
-    /// beside a caption means an attributed string with a text attachment — the same work the mnemonic
-    /// wants, and worth doing once for both.</remarks>
-    public void SetImage(IImage? image, ContentAlignment alignment) { }
+    /// <remarks>
+    /// The alignment is carried and not rendered, which is what the seam already says of the other
+    /// two: an image-only label fills its bounds with one picture and there is nothing to align it
+    /// against.
+    /// </remarks>
+    public void SetImage(IImage? image, ContentAlignment alignment)
+    {
+        var native = image as CocoaImage;
+        if (ReferenceEquals(_image, native))
+            return;
+
+        _image = native;
+        this.Rebuild();
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Both rebuild the caption, because an attributed one carries its own copy of each.</remarks>
+    public override void SetFont(Font font)
+    {
+        base.SetFont(font);
+        this.Apply();
+    }
+
+    /// <inheritdoc cref="SetFont"/>
+    public override void SetColors(Color foreColor, Color backColor)
+    {
+        base.SetColors(foreColor, backColor);
+        this.Apply();
+    }
+
+    /// <summary>
+    /// Puts the right kind of widget in place for the state the peer is in, and then applies it.
+    /// </summary>
+    /// <remarks>
+    /// The swap is the same one <see cref="CocoaTextBoxPeer"/> makes and for the same reason: AppKit
+    /// fixes a widget's class when the object is made. In practice it happens during realization,
+    /// before the peer has been handed to its container — the core flushes a peer's own state first —
+    /// so there is usually no superview to tell, and the branch that tells one is for the label that
+    /// gains or loses its picture while it is on screen.
+    /// </remarks>
+    private void Rebuild()
+    {
+        var wanted = this.IsImageOnly;
+        if (wanted == _isImageView)
+        {
+            this.Apply();
+            return;
+        }
+
+        var replacement = wanted ? CreateImageView() : CreateField();
+        if (replacement == 0)
+        {
+            this.Apply(); // keep the widget there is rather than trade a working one for nothing
+            return;
+        }
+
+        var replaced = this.Handle;
+        var superview = replaced == 0
+            ? 0
+            : CocoaRuntime.SendPointer(replaced, CocoaRuntime.sel_registerName("superview"));
+
+        this.Handle = replacement;
+        _isImageView = wanted;
+        _pushed = null; // a fresh widget shows nothing until it is given something
+
+        if (superview != 0)
+            CocoaRuntime.SendVoid(superview, CocoaRuntime.sel_registerName("replaceSubview:with:"), replaced, replacement);
+
+        this.SetBounds(this.BoundsValue);
+        this.Apply();
+    }
+
+    /// <summary>Pushes everything the current widget renders from.</summary>
+    private void Apply()
+    {
+        if (this.Handle == 0)
+            return;
+
+        if (_isImageView)
+        {
+            this.PushImage();
+            return;
+        }
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBezeled:"), _borderStyle != BorderStyle.None);
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAlignment:"), this.Alignment);
+
+        var (caption, mnemonic) = _useMnemonic ? WithoutMnemonics(_text) : (_text, -1);
+        if (mnemonic < 0 || !this.SetUnderlined(caption, mnemonic))
+            base.SetText(caption);
+    }
+
+    /// <summary>NSTextAlignment: left 0, right 1, centre 2.</summary>
+    private nint Alignment
+        => _textAlign switch
+        {
+            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter => 2,
+            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => 1,
+            _ => 0,
+        };
+
+    /// <summary>Hands the bitmap to the image view, or takes the one it has away.</summary>
+    /// <remarks>
+    /// The <c>NSImage</c> is handed over and released, exactly as a button's is: the view retains it,
+    /// so keeping a reference here would only be a second one to account for — and an animated image
+    /// arrives once per frame, where the frame before has to go away rather than pile up.
+    /// </remarks>
+    private void PushImage()
+    {
+        if (_image is not { } bitmap)
+        {
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setImage:"), 0);
+            _pushed = null;
+            return;
+        }
+
+        if (ReferenceEquals(_pushed, bitmap))
+            return;
+
+        var native = CocoaImage.CreateNSImage(bitmap.Width, bitmap.Height, bitmap.Pixels);
+        if (native == 0)
+            return;
+
+        _pushed = bitmap;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setImage:"), native);
+        CocoaRuntime.SendVoid(native, CocoaRuntime.sel_registerName("release"));
+    }
+
+    /// <summary>
+    /// Sets the caption as an attributed string with one character underlined, answering whether it
+    /// could be built.
+    /// </summary>
+    /// <remarks>
+    /// The font, the colour and the alignment are read off the widget and written back into the
+    /// string. An attributed value is what the cell draws with, in full — a property it does not carry
+    /// an attribute for is a property that stops working the moment a caption has a mnemonic in it,
+    /// which is the trap this was declined over rather than a reason to keep declining.
+    /// </remarks>
+    private bool SetUnderlined(string caption, int mnemonic)
+    {
+        if (_Underline == 0)
+            return false;
+
+        var value = CocoaRuntime.NSString(caption);
+        if (value == 0)
+            return false;
+
+        var allocated = CocoaRuntime.Allocate("NSMutableAttributedString");
+        var styled = allocated == 0
+            ? 0
+            : CocoaRuntime.SendPointer(allocated, CocoaRuntime.sel_registerName("initWithString:"), value);
+
+        CocoaNative.CFRelease(value);
+        if (styled == 0)
+            return false;
+
+        var add = CocoaRuntime.sel_registerName("addAttribute:value:range:");
+        var whole = new CocoaRuntime.NSRange { Location = 0, Length = caption.Length };
+
+        if (_FontKey != 0 && CocoaRuntime.SendPointer(this.Handle, CocoaRuntime.sel_registerName("font")) is var font && font != 0)
+            CocoaRuntime.SendAttribute(styled, add, _FontKey, font, whole);
+
+        if (_Foreground != 0 && CocoaRuntime.SendPointer(this.Handle, CocoaRuntime.sel_registerName("textColor")) is var colour && colour != 0)
+            CocoaRuntime.SendAttribute(styled, add, _Foreground, colour, whole);
+
+        if (_Paragraph != 0 && this.ParagraphStyle() is var paragraph && paragraph != 0)
+        {
+            CocoaRuntime.SendAttribute(styled, add, _Paragraph, paragraph, whole);
+            CocoaRuntime.SendVoid(paragraph, CocoaRuntime.sel_registerName("release"));
+        }
+
+        // NSUnderlineStyleSingle, boxed: an attribute's value is an object and 1 is not one.
+        var single = CocoaRuntime.SendPointer(
+            CocoaRuntime.objc_getClass("NSNumber"),
+            CocoaRuntime.sel_registerName("numberWithInteger:"),
+            1);
+
+        if (single != 0)
+            CocoaRuntime.SendAttribute(styled, add, _Underline, single, new() { Location = mnemonic, Length = 1 });
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAttributedStringValue:"), styled);
+        CocoaRuntime.SendVoid(styled, CocoaRuntime.sel_registerName("release"));
+        return true;
+    }
+
+    /// <summary>The alignment as a paragraph style, since an attributed value carries its own.</summary>
+    private nint ParagraphStyle()
+    {
+        var allocated = CocoaRuntime.Allocate("NSMutableParagraphStyle");
+        var style = allocated == 0 ? 0 : CocoaRuntime.SendPointer(allocated, CocoaRuntime.sel_registerName("init"));
+        if (style != 0)
+            CocoaRuntime.SendVoid(style, CocoaRuntime.sel_registerName("setAlignment:"), this.Alignment);
+
+        return style;
+    }
+
+    /// <summary>
+    /// The caption as it is drawn, and where the mnemonic landed in it — or -1 for a caption that
+    /// marks none.
+    /// </summary>
+    /// <remarks>
+    /// Windows Forms' own reading, which the other two backends translate rather than interpret:
+    /// <c>&amp;x</c> underlines <c>x</c>, <c>&amp;&amp;</c> is one literal ampersand, and only the
+    /// first mark counts. A trailing ampersand marks nothing and is dropped, because there is no
+    /// character after it to underline.
+    /// </remarks>
+    private static (string Caption, int Mnemonic) WithoutMnemonics(string text)
+    {
+        if (text.IndexOf('&') < 0)
+            return (text, -1);
+
+        var caption = new System.Text.StringBuilder(text.Length);
+        var mnemonic = -1;
+        for (var i = 0; i < text.Length; ++i)
+        {
+            if (text[i] != '&')
+            {
+                caption.Append(text[i]);
+                continue;
+            }
+
+            if (i + 1 >= text.Length)
+                continue;
+
+            if (text[i + 1] == '&')
+            {
+                caption.Append('&');
+                ++i;
+                continue;
+            }
+
+            if (mnemonic < 0)
+                mnemonic = caption.Length;
+
+            caption.Append(text[++i]);
+        }
+
+        return (caption.ToString(), mnemonic);
+    }
 }
 
 /// <summary>A push button: a real <c>NSButton</c>.</summary>
