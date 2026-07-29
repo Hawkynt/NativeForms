@@ -59,6 +59,26 @@ all nine too, on top of `Label`, `Button` and `TextBox`, which are always native
 else is owner-drawn. Two of the nine keep something back on that backend, and the macOS section below
 says which.
 
+**A string too tall for the box it was given fails three different ways.** `DrawTextW` clips it,
+Cairo and CoreText let it spill over whatever is underneath. A control that hands text a box smaller
+than the font needs therefore looks merely cramped on one platform, mutilated on the second and
+illegible on the third — which is what the `ZoomPanel`'s vertical ruler did until it stopped guessing
+at a line height and started measuring one. The rule that follows is worth stating once here rather
+than relearning per control: a box for text is measured, never assumed, because no backend will tell
+you it did not fit.
+
+## The Win32 backend, specifically
+
+It is complete, and one thing on it is wrong rather than different.
+
+**An em dash and an ellipsis come out as vertical bars.** `—` and `…` reach GDI and are drawn as the
+missing-glyph box in the gallery's own captions: "DataGridView — click the Task header" photographs
+as "DataGridView I click the Task header", and every button whose caption ends in `…` ends in a bar
+instead. Both characters are in Segoe UI, and the same strings are correct on GTK and on Cocoa, so
+this is a font-fallback failure inside the Win32 text path and not a missing character. It is
+recorded here rather than in a bug tracker because it is visible in every `screenshots (windows)`
+artifact and would otherwise be read as the toolkit's own punctuation.
+
 ## The macOS backend, specifically
 
 It is genuinely incomplete, and the table above says so rather than leaving you to discover it.
