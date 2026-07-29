@@ -75,6 +75,14 @@ internal abstract class CocoaControlPeer : IControlPeer
             CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("becomeFirstResponder"));
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A real AppKit control already answers most of this for itself, so what lands here refines what
+    /// the platform knows rather than inventing it.
+    /// </remarks>
+    public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+        => CocoaAccessibility.Describe(this.Handle, name, description, role);
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void SetFont(Font font) { }

@@ -17,7 +17,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
 | Native widget promotion (§12) | 9 controls | 9 controls | none yet |
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | not yet |
-| Accessibility | ATK | MSAA, borrowed from a shadow control | not yet |
+| Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; no hover |
 | Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
 | CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot, reporting; `CGEvent` injection skips — a runner grants no Accessibility permission |
@@ -67,12 +67,18 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 `NSTextView` in an `NSScrollView`, and the gallery's sixteen pages all pass the walkthrough's state
 round-trip and layout audit.
 
-Not working yet: no native-widget promotion, no accessibility, the colour and font choosers answer as
-if cancelled (both are shared modeless panels on macOS, which is a different shape from this seam's
-blocking call), and while mouse and
-keyboard events are routed into the toolkit they are not yet verified end to end the way the Win32
-backend's are. Hovering is the gap inside that gap: presses, drags and the wheel arrive, but neither
-the window nor a popup asks AppKit for mouse-moved events, so nothing highlights under the pointer.
+Not working yet: no native-widget promotion, and the colour and font choosers answer as if cancelled
+(both are shared modeless panels on macOS, which is a different shape from this seam's blocking
+call). Mouse and keyboard events are routed into the toolkit but not verified end to end the way the
+Win32 backend's are, and hovering is the gap inside that gap: presses, drags and the wheel arrive, but
+neither the window nor a popup asks AppKit for mouse-moved events, so nothing highlights under the
+pointer.
+
+Accessibility goes through `NSAccessibility`: a label, a help string and a role on the view. A real
+AppKit control already answers for itself, so this mostly refines what the platform knows — except on
+an owner-drawn canvas, which is one unlabelled rectangle of pixels to a screen reader and where it is
+the only description there will ever be. A role macOS has no word for is left alone rather than
+guessed at.
 
 Popups do light-dismiss. There is no pointer grab behind it — AppKit's own route to an event before
 dispatch is a block, which the interop rules keep out of this assembly — so the application's event

@@ -219,6 +219,11 @@ internal sealed class CocoaPopupPeer : IPopupPeer
 
     public Point PointToScreen(Point clientPoint) => new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
+    /// <inheritdoc/>
+    /// <remarks>The surface is the canvas; the window around it is chrome with nothing in it to read.</remarks>
+    public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+        => _canvas.SetAccessibleInfo(name, description, role);
+
     public void AddChild(IControlPeer child) => _canvas.AddChild(child);
 
     public void RemoveChild(IControlPeer child) => _canvas.RemoveChild(child);

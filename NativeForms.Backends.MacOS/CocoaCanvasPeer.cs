@@ -344,6 +344,15 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             CocoaRuntime.SendVoid(_view, CocoaRuntime.sel_registerName("setHidden:"), !visible);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The case the seam exists for. Nothing an owner-drawn control paints is legible to an
+    /// accessibility client — the view is one rectangle of pixels — so whatever the core says here is
+    /// the only description there will ever be.
+    /// </remarks>
+    public void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
+        => CocoaAccessibility.Describe(_view, name, description, role);
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void SetText(string text) { }

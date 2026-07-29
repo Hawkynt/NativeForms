@@ -64,6 +64,11 @@ internal static partial class CocoaRuntime
     [return: MarshalAs(UnmanagedType.U1)]
     internal static partial bool SendBool(nint receiver, nint selector);
 
+    /// <summary>Asks a yes/no question about an object, such as whether it answers a selector.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool SendBool(nint receiver, nint selector, nint argument);
+
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial double SendDoubleArm(nint receiver, nint selector);
 
