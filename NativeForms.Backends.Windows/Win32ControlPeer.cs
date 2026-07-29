@@ -244,13 +244,25 @@ internal abstract class Win32ControlPeer : IControlPeer
     /// <summary>Whether an explicit background color is buffered (drives the erase path of windows).</summary>
     private protected bool HasBackColor => !_backColor.IsEmpty;
 
-    /// <summary>Sends <c>WM_SETFONT</c> with the cached <c>HFONT</c> for the buffered font, if any.</summary>
+    /// <summary>
+    /// Sends <c>WM_SETFONT</c> with the cached <c>HFONT</c> for the buffered font, or for the
+    /// desktop's own when the application named none.
+    /// </summary>
+    /// <remarks>
+    /// A stock control that is never sent this message does not fall back to the UI font — it draws in
+    /// GDI's <c>SYSTEM_FONT</c>, the Windows 3.1 raster face, which is why every native caption in the
+    /// gallery photographed in a bitmap font while the owner-drawn ones beside it were Segoe UI, and
+    /// why an em dash and an ellipsis came out as the missing-glyph bar: that face defines nothing in
+    /// the 0x80–0x9F range where cp1252 puts both. The other two backends never showed it because a
+    /// `GtkWidget` and an `NSTextField` already wear the desktop's font unasked; only Windows keeps a
+    /// thirty-year-old default for a control nobody told otherwise.
+    /// </remarks>
     private void ApplyFont()
     {
-        if (Handle == 0 || _font is not { } font)
+        if (Handle == 0)
             return;
 
-        var hFont = Win32FontCache.Get(font, Win32FontCache.ScreenDpi);
+        var hFont = Win32FontCache.Get(_font ?? Win32Backend.DefaultUiFont, Win32FontCache.ScreenDpi);
         if (hFont != 0)
             NativeMethods.SendMessageW(Handle, NativeMethods.WM_SETFONT, hFont, 1);
     }

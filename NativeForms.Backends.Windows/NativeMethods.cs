@@ -270,6 +270,9 @@ internal static partial class NativeMethods
     /// <summary>Applies a font handle to a control; <c>lParam != 0</c> requests an immediate redraw.</summary>
     internal const uint WM_SETFONT = 0x0030;
 
+    /// <summary>Asks a control which <c>HFONT</c> it is drawing with; zero means the stock system font.</summary>
+    internal const uint WM_GETFONT = 0x0031;
+
     /// <summary>The <c>WM_SETCURSOR</c> hit-test code for the client area.</summary>
     internal const int HTCLIENT = 1;
 

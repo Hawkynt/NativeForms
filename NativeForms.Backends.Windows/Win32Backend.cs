@@ -77,6 +77,20 @@ public sealed partial class Win32Backend : IPlatformBackend
     // is dropped when the desktop announces a theme change, so the next read snapshots fresh values.
     public ITheme Theme => _theme ??= new Win32Theme();
 
+    /// <summary>
+    /// The desktop's own UI font — what a stock control wears when the application named none.
+    /// </summary>
+    /// <remarks>
+    /// Read through the same cached snapshot the painter reads, so a widget and the owner-drawn twin
+    /// beside it agree on the face; a theme change drops that snapshot, so the next widget built picks
+    /// the new one up. A peer created before any backend was constructed cannot happen — a peer comes
+    /// out of one — but the fall-back keeps the property total rather than nullable.
+    /// </remarks>
+    internal static Font DefaultUiFont => (_current?.Theme ?? (_detachedTheme ??= new Win32Theme())).DefaultFont;
+
+    /// <summary>Backs <see cref="DefaultUiFont"/> when no backend has been constructed.</summary>
+    private static Win32Theme? _detachedTheme;
+
     /// <inheritdoc/>
     public event EventHandler? ThemeChanged;
 

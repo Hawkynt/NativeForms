@@ -51,6 +51,12 @@ public sealed class Win32NativePromotionTests
         /// <summary>The theme's row height, guarded the same way.</summary>
         public int RowHeight;
 
+        /// <summary>The <c>HFONT</c> a stock control the application never gave a font is drawing with.</summary>
+        public nint WidgetFont;
+
+        /// <summary>The one the painter would use for the same control, which it must be.</summary>
+        public nint ThemeFont;
+
         /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
         public bool ColorTextAvailable;
 
@@ -249,6 +255,15 @@ public sealed class Win32NativePromotionTests
                 var theme = BackendRegistry.Resolve().Theme;
                 observed.ScrollBarSize = theme.ScrollBarSize;
                 observed.RowHeight = theme.RowHeight;
+
+                // A stock control that is never sent WM_SETFONT draws in GDI's SYSTEM_FONT, the raster
+                // face from Windows 3.1 — which is a different font from the one the painter uses two
+                // pixels away, and has no em dash and no ellipsis. Nothing in the gallery gives this
+                // button a font, so what it is wearing is what every unstyled widget wears.
+                observed.WidgetFont = tipped.Peer is Win32ControlPeer widget && widget.Handle != 0
+                    ? NativeMethods.SendMessageW(widget.Handle, NativeMethods.WM_GETFONT, 0, 0)
+                    : 0;
+                observed.ThemeFont = Win32FontCache.Get(theme.DefaultFont, Win32FontCache.ScreenDpi);
 
                 observed.ColorTextAvailable = !Win32ColorText.Unavailable;
                 observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
@@ -497,6 +512,21 @@ public sealed class Win32NativePromotionTests
     [Test]
     public void An_owner_drawn_controls_name_reaches_the_window_MSAA_will_read()
         => Assert.That(Result().CanvasAccessibleName, Is.EqualTo("Enable logging"));
+
+    /// <summary>
+    /// A stock control nobody gave a font to must still wear the desktop's, which on this platform only
+    /// happens if something sends it <c>WM_SETFONT</c>: the default is GDI's <c>SYSTEM_FONT</c>, a raster
+    /// face that defines nothing where cp1252 puts the em dash and the ellipsis. Every native caption in
+    /// the gallery drew in it, and the two characters came out as the missing-glyph bar, for as long as
+    /// the peer only applied a font the application had named.
+    /// </summary>
+    [Test]
+    public void A_widget_given_no_font_wears_the_one_the_painter_uses()
+    {
+        var observed = Result();
+        Assert.That(observed.WidgetFont, Is.Not.Zero, "the widget answered WM_GETFONT with the stock system font");
+        Assert.That(observed.WidgetFont, Is.EqualTo(observed.ThemeFont));
+    }
 
     /// <summary>
     /// The role is the half a window text cannot carry: MSAA takes it from the window class, so an

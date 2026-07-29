@@ -69,15 +69,25 @@ you it did not fit.
 
 ## The Win32 backend, specifically
 
-It is complete, and one thing on it is wrong rather than different.
+It is complete, and one thing about it has to be said out loud that the other two never need to say.
 
-**An em dash and an ellipsis come out as vertical bars.** `—` and `…` reach GDI and are drawn as the
-missing-glyph box in the gallery's own captions: "DataGridView — click the Task header" photographs
-as "DataGridView I click the Task header", and every button whose caption ends in `…` ends in a bar
-instead. Both characters are in Segoe UI, and the same strings are correct on GTK and on Cocoa, so
-this is a font-fallback failure inside the Win32 text path and not a missing character. It is
-recorded here rather than in a bug tracker because it is visible in every `screenshots (windows)`
-artifact and would otherwise be read as the toolkit's own punctuation.
+**A stock control wears the desktop's font because the toolkit sends it one.** A `GtkWidget` and an
+`NSTextField` are built already wearing the font the desktop is set to. A Win32 `EDIT`, `BUTTON` or
+`STATIC` that is never sent `WM_SETFONT` does not fall back to it — it draws in GDI's `SYSTEM_FONT`,
+the proportional raster face from Windows 3.1 — and the peer used to send one only when the
+application had named a font, which almost no application does. So every native caption in the
+gallery photographed in a bitmap face while the owner-drawn ones two pixels away were Segoe UI, and
+the characters that face has no glyph for came out as the missing-glyph bar: "DataGridView — click
+the Task header" photographed as "DataGridView I click the Task header", and every button whose
+caption ended in `…` ended in a bar instead.
+
+The two characters are the tell rather than the fault. `—` and `…` sit at 0x97 and 0x85 in cp1252, in
+the block a raster font older than that code page leaves undefined, which is exactly why the `×` in
+"150×70" standing between them was always right: it is at 0xD7, inside the range such a face does
+define. Both were in Segoe UI all along and both were correct on GTK and on Cocoa, so it read for a
+long time as a font-fallback failure somewhere in the text path — and the painter was never involved
+at all. The peer now applies the theme's own font whenever the application named none, which is the
+same font the painter resolves, so a caption and the string drawn beside it agree by construction.
 
 ## The macOS backend, specifically
 
