@@ -669,10 +669,15 @@ internal static unsafe partial class ShootMacOS
 
         backend.ThemeChanged += count;
         Color after;
+        int heard;
         try
         {
             Send(application, setter, dark);
             ShootInputMac.Drain();
+
+            // Both read before the appearance goes back, or the count would carry the return trip and
+            // the palette would be the one the switch was made from.
+            heard = raised;
             after = backend.Theme.WindowBackground;
         }
         finally
@@ -682,8 +687,8 @@ internal static unsafe partial class ShootMacOS
             backend.ThemeChanged -= count;
         }
 
-        return $"appearance: switched to dark aqua — the toolkit heard {raised} change(s) and its window "
-            + $"background went from {Hex(before)} to {Hex(after)}, then was put back";
+        return $"appearance: switched to dark aqua — the toolkit heard {heard} change(s) going in and "
+            + $"{raised - heard} coming back, and its window background went from {Hex(before)} to {Hex(after)}";
     }
 
     /// <summary>A colour as the six hex digits a palette is usually quoted in.</summary>

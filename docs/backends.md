@@ -275,6 +275,18 @@ removed while the process is being torn down is a message to objects AppKit may 
 of, where one left in place costs a pointer and cannot misfire. The snapshot is dropped before the
 event is raised, because a handler's first move is to repaint and a repaint reads the theme.
 
+Raising the event turned out to be only half of it, and the other half is the reason a first attempt
+photographed identically in both appearances. A semantic `NSColor` is not a colour, it is a rule
+evaluated against `NSAppearance`'s current one — which AppKit sets while a view is drawing and
+nothing sets while a theme is being read. Outside a draw the rule resolves against the *default*
+appearance rather than the application's, so the twelve colours came back in light mode however the
+desktop was set: a Mac already in dark mode got the light palette at startup, and a live switch
+raised the event, built a fresh theme and read the very same twelve values. The read now happens with
+the application's own appearance made current, which is `setCurrentAppearance:` — deprecated rather
+than gone, and offered with `respondsToSelector:` because its replacement,
+`performAsCurrentDrawingAppearance:`, takes an Objective-C block. What was current before is put back,
+since this is a thread-wide setting and a theme read has no business owning it.
+
 This one is witnessed. The probe pushes the application into dark aqua after the last shot — after,
 because an appearance is a property of the whole application and posing it earlier would photograph
 half a gallery in the other mode — reads the palette on both sides of the switch, counts the changes

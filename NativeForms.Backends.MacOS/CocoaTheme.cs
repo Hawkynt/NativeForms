@@ -36,32 +36,93 @@ internal sealed class CocoaTheme : ITheme
         var fallback = DefaultTheme.Instance;
         var colors = CocoaRuntime.objc_getClass("NSColor");
 
-        this.WindowBackground = Read(colors, "windowBackgroundColor", fallback.WindowBackground);
+        var pushed = PushAppearance(out var previous);
+        try
+        {
+            this.WindowBackground = Read(colors, "windowBackgroundColor", fallback.WindowBackground);
 
-        // The window's own colour again, and not controlColor, which reads like the obvious answer and
-        // is the wrong surface: it is the white a bezelled control fills itself with, so every panel,
-        // page and button at rest came out the colour of a text field. The other two backends give this
-        // and the window the same value — COLOR_BTNFACE twice on Win32, the theme background twice on
-        // GTK — because a control at rest is chrome, and chrome on this desktop is the window's grey.
-        this.ControlBackground = this.WindowBackground;
-        this.ControlText = Read(colors, "controlTextColor", fallback.ControlText);
-        this.DisabledText = Read(colors, "disabledControlTextColor", fallback.DisabledText);
-        this.FieldBackground = Read(colors, "textBackgroundColor", fallback.FieldBackground);
-        this.Accent = Read(colors, "controlAccentColor", fallback.Accent);
-        this.SelectionBackground = Read(colors, "selectedContentBackgroundColor", fallback.SelectionBackground);
-        this.SelectionText = Read(colors, "alternateSelectedControlTextColor", fallback.SelectionText);
-        this.Border = Read(colors, "separatorColor", fallback.Border);
-        this.GridLine = Read(colors, "gridColor", fallback.GridLine);
+            // The window's own colour again, and not controlColor, which reads like the obvious answer
+            // and is the wrong surface: it is the white a bezelled control fills itself with, so every
+            // panel, page and button at rest came out the colour of a text field. The other two backends
+            // give this and the window the same value — COLOR_BTNFACE twice on Win32, the theme
+            // background twice on GTK — because a control at rest is chrome, and chrome on this desktop
+            // is the window's grey.
+            this.ControlBackground = this.WindowBackground;
+            this.ControlText = Read(colors, "controlTextColor", fallback.ControlText);
+            this.DisabledText = Read(colors, "disabledControlTextColor", fallback.DisabledText);
+            this.FieldBackground = Read(colors, "textBackgroundColor", fallback.FieldBackground);
+            this.Accent = Read(colors, "controlAccentColor", fallback.Accent);
+            this.SelectionBackground = Read(colors, "selectedContentBackgroundColor", fallback.SelectionBackground);
+            this.SelectionText = Read(colors, "alternateSelectedControlTextColor", fallback.SelectionText);
+            this.Border = Read(colors, "separatorColor", fallback.Border);
+            this.GridLine = Read(colors, "gridColor", fallback.GridLine);
 
-        // A table header here is the window's own grey with a rule under it rather than a surface of
-        // its own, so it takes the window colour instead of inventing a shade the desktop does not use.
-        this.HeaderBackground = Read(colors, "windowBackgroundColor", fallback.HeaderBackground);
-        this.HeaderText = Read(colors, "headerTextColor", fallback.HeaderText);
+            // A table header here is the window's own grey with a rule under it rather than a surface of
+            // its own, so it takes the window colour instead of inventing a shade the desktop does not
+            // use.
+            this.HeaderBackground = Read(colors, "windowBackgroundColor", fallback.HeaderBackground);
+            this.HeaderText = Read(colors, "headerTextColor", fallback.HeaderText);
+        }
+        finally
+        {
+            if (pushed)
+                PopAppearance(previous);
+        }
 
         this.DefaultFont = ReadSystemFont(fallback.DefaultFont);
         this.RowHeight = ReadRowHeight(this.DefaultFont, fallback.RowHeight);
         this.DoubleClickTime = ReadDoubleClickTime(fallback.DoubleClickTime);
         this.IsHighContrast = ReadHighContrast();
+    }
+
+    /// <summary>
+    /// Makes the application's own appearance the one a dynamic colour resolves against, answering
+    /// whether it had to be pushed and what was current before.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A semantic <c>NSColor</c> is not a colour, it is a rule, and the rule is evaluated against
+    /// <c>NSAppearance</c>'s current one — which AppKit sets while a view is drawing and nothing sets
+    /// here. Read outside a draw it resolves against the default appearance rather than the
+    /// application's, so this palette came back in light mode however the desktop was set: a Mac
+    /// already in dark mode got the light twelve at startup, and the first live appearance change
+    /// raised its event, built a fresh theme and got the very same twelve back.
+    /// </para>
+    /// <para>
+    /// <c>setCurrentAppearance:</c> is deprecated rather than gone, and its replacement is
+    /// <c>performAsCurrentDrawingAppearance:</c>, which takes an Objective-C block — the one kind of
+    /// object this assembly's interop rules keep out. So it is offered with
+    /// <c>respondsToSelector:</c> instead of sent, and a system that has finally dropped it reads what
+    /// it read before rather than aborting the process over a palette.
+    /// </para>
+    /// </remarks>
+    private static bool PushAppearance(out nint previous)
+    {
+        previous = 0;
+
+        var appearances = CocoaRuntime.objc_getClass("NSAppearance");
+        if (appearances == 0 || !CocoaRuntime.Responds(appearances, "setCurrentAppearance:"))
+            return false;
+
+        var application = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        if (application == 0 || !CocoaRuntime.Responds(application, "effectiveAppearance"))
+            return false;
+
+        var effective = CocoaRuntime.SendPointer(application, CocoaRuntime.sel_registerName("effectiveAppearance"));
+        if (effective == 0)
+            return false;
+
+        previous = CocoaRuntime.SendPointer(appearances, CocoaRuntime.sel_registerName("currentAppearance"));
+        CocoaRuntime.SendVoid(appearances, CocoaRuntime.sel_registerName("setCurrentAppearance:"), effective);
+        return true;
+    }
+
+    /// <summary>Puts back whatever was current, which is nil when nothing was.</summary>
+    private static void PopAppearance(nint previous)
+    {
+        var appearances = CocoaRuntime.objc_getClass("NSAppearance");
+        if (appearances != 0)
+            CocoaRuntime.SendVoid(appearances, CocoaRuntime.sel_registerName("setCurrentAppearance:"), previous);
     }
 
     /// <inheritdoc/>
