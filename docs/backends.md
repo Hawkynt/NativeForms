@@ -52,9 +52,9 @@ rather than consistent everywhere.
 as one drawn by the platform. The shapes are ours; the values are the desktop's.
 
 **Native promotion changes what is drawn at all.** On GTK and Win32 nine controls realise onto real
-platform widgets when nothing in their state needs the painter (PRD §12) — a `Button` is a real
-`GtkButton` or `BUTTON`, until you give it an image the platform cannot draw, at which point it swaps
-to the owner-drawn twin and swaps back when you take it away. Cocoa now promotes all nine too, on top
+platform widgets when nothing in their state needs the painter (PRD §12) — a `CheckBox` is a real
+`GtkCheckButton` or `BUTTON`, until you give it an image no platform box draws beside its caption, at
+which point it swaps to the owner-drawn twin and swaps back when you take it away. Cocoa now promotes all nine too, on top
 of `Label`, `Button` and `TextBox`, which are always native there; everything else is owner-drawn. Two
 of the nine keep something back on that backend, and the macOS section below says which.
 
@@ -94,6 +94,19 @@ reason the `CGImage` is. It is computed from the straight-alpha pixels the core 
 than from the `CGImage`, whose channels are already scaled by their own alpha — weighting those would
 darken a half-transparent icon a second time. The channel weights are the ones the Cairo and GDI
 backends use, so "disabled" is one grey across all three rather than each renderer's own.
+
+A button carries its icon. That call did nothing here, which made this the one backend where an
+image-bearing button showed only its caption — and the gallery's own "Click me" is one, so the
+difference sat in every macOS shot of the first page. It is served rather than declined, because
+neither of the other two demotes such a button either: GTK hands the icon to `gtk_button_set_image`
+and places it with the button's own image position, and Win32 attaches it with `BM_SETIMAGE`.
+`NSCellImagePosition` has exactly the four places GTK's has, so `TextImageRelation` maps across one for
+one; overlay takes the left-hand place, which is what GTK does with it, because a caption printed over
+an icon on one platform of three is a difference an application cannot design around. The nine-way
+image alignment is carried and not rendered, which is what the seam already says of the other two — a
+button places its image relative to its caption, and there is no second anchor to give it. The
+`NSImage` is handed over and released, since the button retains it: an animated image arrives once per
+frame, and the frame before goes away when the button lets go of it rather than piling up.
 
 The window holds the chrome the form asked for, with one refusal. Resize limits go to `setMinSize:`
 and `setMaxSize:`, which constrain the frame rather than the content — the same measurement the
@@ -190,7 +203,8 @@ native widget's tip over from its hover timer and a native widget here delivered
 Neither half is witnessed. A tip is drawn in a window of the platform's own that a capture of the
 gallery's content view does not contain, and the pointer that would raise it is the one the window
 server drops. What the probe reads back is the wiring: how many AppKit widgets report the pointer to
-the toolkit, which on the gallery's first page is the tipped button and the tipped progress bar.
+the toolkit, which in the gallery is one — the tipped button on the first page. Every other tipped
+control there is owner-drawn, and an owner-drawn control is watched through its canvas instead.
 
 The pointer changes shape, by whichever of AppKit's two routes the widget under it leaves open. There
 is no message that sets a cursor on a view: a view declares the rectangles it wants a shape over

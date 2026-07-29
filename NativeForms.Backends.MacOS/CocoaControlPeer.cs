@@ -327,14 +327,66 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
         CocoaNative.CFRelease(equivalent);
     }
 
+    /// <summary>The bitmap last put on the face, so an unchanged one is not converted again.</summary>
+    private IImage? _image;
+
     /// <inheritdoc/>
-    /// <remarks>Not yet, and no longer for want of a <c>CGImage</c> — the painter's conversion would
-    /// serve <c>setImage:</c> directly. What is left is that a button here is always the native one:
-    /// the other backends demote an image-bearing button to the owner-drawn twin, so an icon that
-    /// <c>setImagePosition:</c> places differently from <see cref="TextImageRelation"/> would be a
-    /// difference nobody could see coming. Nothing in the gallery carries one, so it would also ship
-    /// unwitnessed.</remarks>
-    public void SetImage(IImage? image, ContentAlignment alignment, TextImageRelation relation) { }
+    /// <remarks>
+    /// <para>
+    /// Set on the widget rather than declined. Neither of the other two backends demotes an
+    /// image-bearing button — GTK hands the icon to <c>gtk_button_set_image</c> and places it with the
+    /// button's own image position, Win32 attaches it with <c>BM_SETIMAGE</c> — so a Cocoa button
+    /// showing one is what agrees with them, and refusing the promotion would have been the odd one
+    /// out rather than the careful one.
+    /// </para>
+    /// <para>
+    /// <c>NSCellImagePosition</c> has exactly the four places GTK's has, so the relation maps across
+    /// one for one. Overlay takes the left-hand place, which is what GTK does with it: AppKit does
+    /// have an overlapping position, but a caption printed over an icon on one platform of three is a
+    /// difference an application cannot design around.
+    /// </para>
+    /// <para>
+    /// The alignment is advisory here as it is there. A button places its image relative to its
+    /// caption and there is no second anchor to give it, so the nine-way value is carried and not
+    /// rendered — the same thing the seam already says of the other two.
+    /// </para>
+    /// <para>
+    /// The <c>NSImage</c> is handed over and released: the button retains it, so keeping a reference
+    /// here would only be a second one to account for. That matters most for an animated image, which
+    /// arrives once per frame — the previous image goes away when the button lets go of it rather than
+    /// piling up.
+    /// </para>
+    /// </remarks>
+    public void SetImage(IImage? image, ContentAlignment alignment, TextImageRelation relation)
+    {
+        if (this.Handle == 0 || ReferenceEquals(_image, image))
+            return;
+
+        _image = image;
+        if (image is not CocoaImage bitmap)
+        {
+            // NSNoImage, so the caption reclaims the room the icon was holding.
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setImage:"), 0);
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setImagePosition:"), 0);
+            return;
+        }
+
+        var native = CocoaImage.CreateNSImage(bitmap.Width, bitmap.Height, bitmap.Pixels);
+        if (native == 0)
+            return;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setImage:"), native);
+        CocoaRuntime.SendVoid(native, CocoaRuntime.sel_registerName("release"));
+
+        // NSCellImagePosition: left 2, right 3, below 4, above 5.
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setImagePosition:"), relation switch
+        {
+            TextImageRelation.TextBeforeImage => 3,
+            TextImageRelation.ImageAboveText => 5,
+            TextImageRelation.TextAboveImage => 4,
+            _ => 2,
+        });
+    }
 
     /// <summary>Raises <see cref="Clicked"/> once AppKit's target/action routing is wired.</summary>
     private void Unused2() => Clicked?.Invoke(this, EventArgs.Empty);
