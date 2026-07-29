@@ -24,6 +24,16 @@ internal static partial class Shoot
     /// </remarks>
     public static string? HoverWiring => OperatingSystem.IsMacOS() ? ShootMacOS.HoverWiring() : null;
 
+    /// <summary>
+    /// Which native classes the window is really made of, where the platform can be asked.
+    /// </summary>
+    /// <remarks>
+    /// Read at the end of the walkthrough rather than at the start: a tab page realizes its children
+    /// only once it has been shown, so a count taken off the first page describes one sixteenth of the
+    /// gallery and would drift with whatever else happened to have realized by then.
+    /// </remarks>
+    public static string? NativeWidgets => OperatingSystem.IsMacOS() ? ShootMacOS.NativeWidgets() : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

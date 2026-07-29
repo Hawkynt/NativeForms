@@ -148,6 +148,12 @@ several seconds — nothing competes for the focus, so nothing hurries the windo
 shot count wandered between none and fifteen of sixteen until the capture started picking the window
 out of `[NSApp windows]`, which does not depend on activation.
 
+The macOS probe closes with a census of the classes the finished window is actually built from, read
+back off the live view tree. Promotion is the one claim here a screenshot cannot settle — a promoted
+control and the owner-drawn twin it replaces are meant to look alike, since the twin is drawn from the
+same theme — so the class name is where the difference shows, and the census is taken after the last
+page because a tab page realizes its children only once it has been shown.
+
 Regenerate the comparison strips with the three artifacts side by side; the CI jobs
 `screenshots (windows)` and `macos probe` upload theirs on every push.
 

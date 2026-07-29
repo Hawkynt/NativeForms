@@ -170,6 +170,13 @@ if (shooting)
             }
 
             shutter.Stop();
+
+            // Every page has now been shown, so every page's children exist. PRD §12's promotions are
+            // invisible in a screenshot by design — the owner-drawn twin is drawn from the same theme —
+            // so the class names are the only place the difference shows.
+            if (Shoot.NativeWidgets is { } widgets)
+                Note("  " + widgets);
+
             // Say what was actually exercised, not just that nothing complained: a run that injected
             // nothing and reported a pass would be the same lie as a blank screenshot reporting success.
             var injected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()

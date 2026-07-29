@@ -34,6 +34,14 @@ internal static unsafe partial class ShootMacOS
     [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
     private static partial nint sel_registerName(string name);
 
+    /// <summary>The class an object actually is, which is how a promotion is read back off a live tree.</summary>
+    [LibraryImport(_ObjC)]
+    private static partial nint object_getClass(nint instance);
+
+    /// <summary>A class's name as a C string; read manually rather than marshalled, as every import here is.</summary>
+    [LibraryImport(_ObjC)]
+    private static partial nint class_getName(nint cls);
+
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial nint Send(nint receiver, nint selector);
 
@@ -164,6 +172,58 @@ internal static unsafe partial class ShootMacOS
 
         return $"hover: the window {(accepts ? "accepts" : "DROPS")} moved events, "
             + $"{tracked} of {views} view(s) carry a tracking area";
+    }
+
+    /// <summary>
+    /// What the running window is actually built from: every view under the content view, counted by
+    /// the Objective-C class it really is.
+    /// </summary>
+    /// <remarks>
+    /// A promotion is the one claim in this backend that a screenshot cannot settle. An
+    /// <c>NSTableView</c> and the owner-drawn list it replaces are meant to look alike — that is the
+    /// point of drawing the twin from the platform's own theme — so the picture is the same either way
+    /// and only the class name differs. Reading it back off the live tree is therefore the difference
+    /// between "PRD §12 says this is promoted" and "this window holds one".
+    /// </remarks>
+    public static string NativeWidgets()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "native widgets: no window to ask";
+
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        CountClasses(Send(window, sel_registerName("contentView")), counts);
+        if (counts.Count == 0)
+            return "native widgets: the window has no views";
+
+        var listed = counts
+            .OrderByDescending(entry => entry.Value)
+            .ThenBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => $"{entry.Key}x{entry.Value}");
+
+        return "native widgets: " + string.Join(", ", listed);
+    }
+
+    /// <summary>Tallies the class of every view under one, itself included.</summary>
+    private static void CountClasses(nint view, Dictionary<string, int> counts)
+    {
+        if (view == 0)
+            return;
+
+        var name = class_getName(object_getClass(view)) is var raw && raw != 0
+            ? Marshal.PtrToStringUTF8(raw)
+            : null;
+
+        if (!string.IsNullOrEmpty(name))
+            counts[name] = counts.TryGetValue(name, out var seen) ? seen + 1 : 1;
+
+        var children = Send(view, sel_registerName("subviews"));
+        var count = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+            CountClasses(Send(children, sel_registerName("objectAtIndex:"), i), counts);
     }
 
     /// <summary>Counts the views under one, and how many of them track the pointer.</summary>
