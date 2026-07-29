@@ -8,6 +8,12 @@ namespace Hawkynt.NativeForms.Demo;
 /// </summary>
 internal static partial class Shoot
 {
+    /// <summary>
+    /// Why the last capture produced nothing, where the platform route can say. A shoot runs where
+    /// nobody is watching, so a failure that names only itself costs a whole round trip to diagnose.
+    /// </summary>
+    public static string? Diagnosis => OperatingSystem.IsMacOS() ? ShootMacOS.Diagnosis : null;
+
     /// <summary>Captures a form to a PNG, returning the size written or <see langword="null"/>.</summary>
     public static Size? Window(Form form, string path)
     {

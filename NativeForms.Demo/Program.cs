@@ -133,7 +133,7 @@ if (shooting)
 
                 Note(size is { } written
                     ? $"shot: {name} ({written.Width}x{written.Height})"
-                    : $"shot failed: {name} - no capture route produced pixels");
+                    : $"shot failed: {name} - {Shoot.Diagnosis ?? "no capture route produced pixels"}");
             }
             catch (Exception e)
             {
