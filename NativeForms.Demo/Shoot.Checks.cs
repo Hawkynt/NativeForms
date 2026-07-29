@@ -49,6 +49,18 @@ internal static partial class Shoot
     private static bool InjectClick(Point screen)
         => OperatingSystem.IsWindows() ? ShootInput.Click(screen) : ShootInputMac.Click(screen);
 
+    /// <summary>
+    /// What the platform says is under a screen point, or an empty string where nothing asks.
+    /// </summary>
+    /// <remarks>
+    /// Only macOS answers, and only because a miss there had to be explained: a click that changes
+    /// nothing is the same observation whether the point was over the wrong widget, over no widget, or
+    /// over the right one in a part of it the platform does not treat as sensitive. Naming the view
+    /// separates the first two from the third without guessing.
+    /// </remarks>
+    private static string InjectAt(Point screen)
+        => OperatingSystem.IsMacOS() ? ShootInputMac.ViewAt(screen) : string.Empty;
+
     /// <summary>Types one character through whichever injector this platform has.</summary>
     private static bool InjectType(char character)
         => OperatingSystem.IsWindows() ? ShootInput.Type(character) : ShootInputMac.Type(character);
@@ -135,8 +147,32 @@ internal static partial class Shoot
                     ++Clicks;
                 else
                 {
-                    note($"    input: a real click at {centre.X},{centre.Y} never reached CheckBox \"{target.Text}\"");
-                    failed += Fatal;
+                    // The centre of a check box need not be on the check box. A control given more width
+                    // than its caption needs carries empty space to the right of it, and whether that
+                    // space belongs to the widget is the platform's answer rather than the toolkit's — so
+                    // the same gesture is aimed at the box glyph before anything is called a failure.
+                    // The two readings separate an input path that does not work from an aim that was
+                    // never over anything, which the old single line could not tell apart.
+                    var onBox = target.PointToScreen(new(Math.Min(8, target.Width / 2), target.Height / 2));
+                    if (InjectClick(onBox))
+                        InjectDrain();
+
+                    var described = $"{target.Width}x{target.Height}, "
+                        + (target.IsNativeWidget ? "a platform widget" : "owner-drawn")
+                        + (InjectAt(centre) is { Length: > 0 } under ? $", {under} under the centre" : string.Empty);
+
+                    if (target.Checked != before)
+                    {
+                        ++Clicks;
+                        note($"    input: CheckBox \"{target.Text}\" ({described}) took a click at "
+                            + $"{onBox.X},{onBox.Y} over its box and ignored one at {centre.X},{centre.Y}");
+                    }
+                    else
+                    {
+                        note($"    input: a real click at {centre.X},{centre.Y} never reached CheckBox "
+                            + $"\"{target.Text}\" ({described}), nor did one at {onBox.X},{onBox.Y} over its box");
+                        failed += Fatal;
+                    }
                 }
 
                 target.Checked = before;

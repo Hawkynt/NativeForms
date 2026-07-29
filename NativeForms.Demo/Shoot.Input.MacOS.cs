@@ -95,6 +95,16 @@ internal static partial class ShootInputMac
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial CGPoint SendPoint(nint receiver, nint selector, CGPoint point);
 
+    /// <summary>Asks a point-taking message for an object, which is <c>hitTest:</c> and nothing else here.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    private static partial nint SendHitTest(nint receiver, nint selector, CGPoint point);
+
+    [LibraryImport(_ObjC, EntryPoint = "object_getClass")]
+    private static partial nint object_getClass(nint instance);
+
+    [LibraryImport(_ObjC, EntryPoint = "class_getName")]
+    private static partial nint class_getName(nint cls);
+
     /// <summary>Reads a point-valued property, such as where an event landed in its window.</summary>
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial CGPoint SendPoint(nint receiver, nint selector);
@@ -244,6 +254,34 @@ internal static partial class ShootInputMac
         SendVoid(app, sel_registerName("activateIgnoringOtherApps:"), true);
         if (TargetWindow() is var window and not 0)
             Send(window, sel_registerName("makeKeyAndOrderFront:"), 0);
+    }
+
+    /// <summary>
+    /// The class of the view a press at this screen point would be delivered to, or a word saying why
+    /// there is none.
+    /// </summary>
+    /// <remarks>
+    /// The same question AppKit asks itself in <c>sendEvent:</c>, asked out loud. <c>hitTest:</c> takes
+    /// its point in the receiver's <em>superview</em> coordinates, and a content view's superview is the
+    /// window's own space — which is what <see cref="InWindow"/> already answers in, so the point an
+    /// injected event carries is the point that is asked about, with no second conversion to get wrong.
+    /// </remarks>
+    public static string ViewAt(Point screen)
+    {
+        var window = TargetWindow();
+        if (window == 0)
+            return "no window";
+
+        var content = Send(window, sel_registerName("contentView"));
+        if (content == 0)
+            return "no content view";
+
+        var view = SendHitTest(content, sel_registerName("hitTest:"), InWindow(window, screen));
+        if (view == 0)
+            return "no view";
+
+        var raw = class_getName(object_getClass(view));
+        return raw == 0 ? "an unnamed class" : Marshal.PtrToStringUTF8(raw) ?? "an unnamed class";
     }
 
     /// <summary>Clicks at a screen point, reporting whether the events were built and posted.</summary>
