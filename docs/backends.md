@@ -169,6 +169,29 @@ much of the tab strip has realized by the time the shutter arms.) What it cannot
 window server drops this job's injected pointer for want of an Accessibility grant, so hover is stated
 here as wired rather than as witnessed.
 
+A native widget hears the pointer as well, which it did not before. A canvas hears it because its
+class carries the methods, and an `NSButton` is AppKit's class and can be given none — so its tracking
+area is owned by a run-time object instead, which turns `mouseMoved:` and `mouseExited:` into the
+peer's hover channel. That area goes on at the first subscriber rather than in the constructor: the
+core subscribes to a peer's hover channel only for a control something is watching, which today means
+a control with a tooltip, so a window of three hundred widgets grows a handful of tracking areas
+instead of three hundred.
+
+The tooltip is the platform's own, and arrives on the platform's own timing. An `NSView` carries a
+`toolTip` and AppKit draws it when it judges the pointer has rested long enough; there is no message
+that raises one now, which is what the toolkit's seam asks for. So the text is handed over once the
+toolkit's own delay has elapsed and the desktop decides the moment after that — late on the hover that
+asked for it, prompt on every hover after. Both other backends show it on the hover that triggered
+them: GTK is asked to re-run its tooltip query at once, and the Win32 tool is registered with
+`TTF_SUBCLASS` and activated. An empty text is `setToolTip:nil`, which is what the seam means by
+hiding one. None of this could be reached until the paragraph above existed, because the core hands a
+native widget's tip over from its hover timer and a native widget here delivered no hover at all.
+
+Neither half is witnessed. A tip is drawn in a window of the platform's own that a capture of the
+gallery's content view does not contain, and the pointer that would raise it is the one the window
+server drops. What the probe reads back is the wiring: how many AppKit widgets report the pointer to
+the toolkit, which on the gallery's first page is the tipped button and the tipped progress bar.
+
 The pointer changes shape, by whichever of AppKit's two routes the widget under it leaves open. There
 is no message that sets a cursor on a view: a view declares the rectangles it wants a shape over
 inside `resetCursorRects`, which AppKit calls when it decides they are stale — so the toolkit's wish is

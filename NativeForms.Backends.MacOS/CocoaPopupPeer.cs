@@ -258,7 +258,9 @@ internal sealed class CocoaPopupPeer : IPopupPeer
 
     public void Focus() { }
 
-    public void ShowToolTip(string? text) { }
+    /// <inheritdoc/>
+    /// <remarks>The surface is the canvas; a tip belongs to the view, not to the window round it.</remarks>
+    public void ShowToolTip(string? text) => _canvas.ShowToolTip(text);
 
     public void SetFocusable(bool focusable) { }
 

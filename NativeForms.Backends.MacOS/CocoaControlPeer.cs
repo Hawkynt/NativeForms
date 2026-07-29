@@ -31,9 +31,46 @@ internal abstract class CocoaControlPeer : IControlPeer
 
     public event EventHandler? GotFocus;
     public event EventHandler? LostFocus;
-    public event EventHandler<MouseEventArgs>? PointerMove;
-    public event EventHandler? PointerLeave;
     public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
+
+    private EventHandler<MouseEventArgs>? _pointerMove;
+    private EventHandler? _pointerLeave;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The tracking area that feeds this is installed by the first subscriber rather than by the
+    /// constructor. AppKit charges for one whether or not anybody is listening, and the core
+    /// subscribes only for a control something watches — which today is a control with a tooltip.
+    /// </remarks>
+    public event EventHandler<MouseEventArgs>? PointerMove
+    {
+        add
+        {
+            _pointerMove += value;
+            CocoaPointerTarget.Track(this);
+        }
+
+        remove => _pointerMove -= value;
+    }
+
+    /// <inheritdoc cref="PointerMove"/>
+    public event EventHandler? PointerLeave
+    {
+        add
+        {
+            _pointerLeave += value;
+            CocoaPointerTarget.Track(this);
+        }
+
+        remove => _pointerLeave -= value;
+    }
+
+    /// <summary>Reports the pointer at a point of this widget; called from the tracking area's target.</summary>
+    internal void RaisePointerMove(int x, int y)
+        => _pointerMove?.Invoke(this, new(MouseButtons.None, x, y, 0));
+
+    /// <summary>Reports the pointer leaving this widget — the counterpart of <see cref="RaisePointerMove"/>.</summary>
+    internal void RaisePointerLeave() => _pointerLeave?.Invoke(this, EventArgs.Empty);
 
     public virtual void SetBounds(Rectangle bounds)
     {
@@ -149,19 +186,29 @@ internal abstract class CocoaControlPeer : IControlPeer
         CocoaCursor.Apply(this.Handle, cursor);
     }
 
-    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The platform's own tip, which is <c>NSView</c>'s <c>toolTip</c> — there is nothing else here, and
+    /// no message that raises one now. So this hands the text over and AppKit decides when to draw it,
+    /// on its own hover timing, which is a real difference from the other two backends: GTK is asked to
+    /// re-run its tooltip query at once, and the Win32 tool is registered with <c>TTF_SUBCLASS</c> and
+    /// activated. Here the toolkit's own delay elapses first and AppKit's runs after it, so the tip
+    /// arrives late on the hover that asked for it and promptly on every one after. Clearing is
+    /// <c>setToolTip:nil</c>, which is what the seam means by an empty text.
+    /// </remarks>
+    public void ShowToolTip(string? text) => CocoaToolTip.Apply(this.Handle, text);
 
-    public void ShowToolTip(string? text) { }
-
-    public virtual void Dispose() => CocoaCursor.Forget(this.Handle);
+    public virtual void Dispose()
+    {
+        CocoaCursor.Forget(this.Handle);
+        CocoaPointerTarget.Forget(this.Handle);
+    }
 
     /// <summary>Keeps the events referenced until AppKit's routing feeds them.</summary>
     private protected void Unused()
     {
         GotFocus?.Invoke(this, EventArgs.Empty);
         LostFocus?.Invoke(this, EventArgs.Empty);
-        PointerMove?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
-        PointerLeave?.Invoke(this, EventArgs.Empty);
         ContextMenuRequested?.Invoke(this, new(Point.Empty));
     }
 }

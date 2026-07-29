@@ -192,8 +192,12 @@ internal static unsafe partial class ShootMacOS
         var views = 0;
         CountTrackedViews(content, ref views, ref tracked);
 
+        var reporting = 0;
+        CountTrackingOwners(content, "NativeFormsPointerTarget", ref reporting);
+
         return $"hover: the window {(accepts ? "accepts" : "DROPS")} moved events, "
-            + $"{tracked} of {views} view(s) carry a tracking area";
+            + $"{tracked} of {views} view(s) carry a tracking area, "
+            + $"{reporting} AppKit widget(s) report the pointer to the toolkit";
     }
 
     /// <summary>
@@ -341,7 +345,7 @@ internal static unsafe partial class ShootMacOS
             && class_getInstanceMethod(canvas, selector) != class_getInstanceMethod(view, selector);
 
         var watched = 0;
-        CountCursorTargets(Send(window, sel_registerName("contentView")), ref watched);
+        CountTrackingOwners(Send(window, sel_registerName("contentView")), "NativeFormsCursorTarget", ref watched);
 
         return $"cursors: the canvas class {(overridden ? "claims" : "does NOT claim")} its own cursor rects, "
             + $"{watched} AppKit widget(s) carry the toolkit's cursor-update target "
@@ -352,8 +356,8 @@ internal static unsafe partial class ShootMacOS
     [LibraryImport(_ObjC)]
     private static partial nint class_getInstanceMethod(nint cls, nint selector);
 
-    /// <summary>Counts the views under one watched by a cursor-update target of this toolkit's.</summary>
-    private static void CountCursorTargets(nint view, ref int watched)
+    /// <summary>Counts the views under one whose tracking areas report to a named class of this toolkit's.</summary>
+    private static void CountTrackingOwners(nint view, string className, ref int watched)
     {
         if (view == 0)
             return;
@@ -366,7 +370,7 @@ internal static unsafe partial class ShootMacOS
             if (owner != 0
                 && class_getName(object_getClass(owner)) is var raw
                 && raw != 0
-                && Marshal.PtrToStringUTF8(raw) == "NativeFormsCursorTarget")
+                && Marshal.PtrToStringUTF8(raw) == className)
             {
                 ++watched;
                 break;
@@ -376,7 +380,7 @@ internal static unsafe partial class ShootMacOS
         var children = Send(view, sel_registerName("subviews"));
         var childCount = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
         for (var i = 0; i < childCount; ++i)
-            CountCursorTargets(Send(children, sel_registerName("objectAtIndex:"), i), ref watched);
+            CountTrackingOwners(Send(children, sel_registerName("objectAtIndex:"), i), className, ref watched);
     }
 
     /// <summary>Counts the views under one whose delegate is the toolkit's link target.</summary>

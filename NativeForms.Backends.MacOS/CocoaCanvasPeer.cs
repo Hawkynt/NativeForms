@@ -215,7 +215,7 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     private static byte AcceptsFirstResponder(nint self, nint selector) => 1;
 
     /// <summary>Where an event landed, in the view's own (flipped) coordinates.</summary>
-    private static Point LocationOf(nint view, nint theEvent)
+    internal static Point LocationOf(nint view, nint theEvent)
     {
         var inWindow = CocoaRuntime.SendPoint(theEvent, CocoaRuntime.sel_registerName("locationInWindow"));
         var local = CocoaRuntime.SendConvert(view, CocoaRuntime.sel_registerName("convertPoint:fromView:"), inWindow, 0);
@@ -459,6 +459,15 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     /// rather than being told.</remarks>
     public void SetCursor(Cursor cursor) => CocoaCursor.Apply(_view, cursor);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Served the same way a native widget's is, though the core does not come here for it: an
+    /// owner-drawn control is watched through its canvas mouse pipeline and floats the toolkit's own
+    /// popup. The seam is <c>IControlPeer</c>'s, so a caller that reaches it gets the platform's tip
+    /// rather than silence.
+    /// </remarks>
+    public void ShowToolTip(string? text) => CocoaToolTip.Apply(_view, text);
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void SetText(string text) { }
@@ -470,8 +479,6 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     public void SetColors(Color foreColor, Color backColor) { }
 
     public void Focus() { }
-
-    public void ShowToolTip(string? text) { }
 
     public void SetFocusable(bool focusable) { }
 

@@ -214,6 +214,15 @@ internal sealed class CocoaWindowPeer : IWindowPeer
             CocoaCursor.Apply(CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView")), cursor);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>A window has no hover text of its own here either, so the form's goes to the view
+    /// that fills it — the same place its cursor goes.</remarks>
+    public void ShowToolTip(string? text)
+    {
+        if (_window != 0)
+            CocoaToolTip.Apply(CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView")), text);
+    }
+
     // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
 
     public void SetEnabled(bool enabled) { }
@@ -223,8 +232,6 @@ internal sealed class CocoaWindowPeer : IWindowPeer
     public void SetColors(Color foreColor, Color backColor) { }
 
     public void Focus() { }
-
-    public void ShowToolTip(string? text) { }
 
     /// <summary>
     /// Puts a child's view into the window's content view, which is what makes it appear at all.
