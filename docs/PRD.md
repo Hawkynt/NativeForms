@@ -159,7 +159,9 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
 ## 5. Owner-draw & theming (the "looks native even when we draw it" layer)
 
 - [x] `IGraphics` surface: lines, rects, text (native font, aligned), images/icons, clip stack.
-      Backed by **GDI** (Win32) and **Cairo/Pango** (GTK); CoreGraphics (Cocoa) pending.
+      Backed by **GDI** (Win32), **Cairo/Pango** (GTK) and **CoreGraphics/CoreText** (Cocoa), the last
+      of which draws text in the colour and the weight it was asked for — CoreText reads neither off
+      the context, so both are stated on the string's attributes and the font's traits.
 - [x] Colour emoji in any control's `Text`, on both rendering paths and both platforms. GTK gets it for
       free (`pango_cairo_show_layout` is colour-glyph-capable and picks up the system emoji font). On Win32
       the native widgets get it from the OS, and the owner-drawn path diverts the strings that need it to
@@ -167,7 +169,8 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       the scan that decides costs one pass and no allocation.
 - [x] `ITheme`: accent, window/control/field background, text/disabled/selection colors, default font,
       row height, scrollbar size — queried from the OS (`GetSysColor`/`SPI_GETNONCLIENTMETRICS` on
-      Win32; `GtkStyleContext`/`gtk-font-name` on GTK); `DefaultTheme` fallback for headless/tests.
+      Win32; `GtkStyleContext`/`gtk-font-name` on GTK; `NSColor`'s semantic colours and
+      `systemFontOfSize:` on Cocoa); `DefaultTheme` fallback for headless/tests.
 - [x] `ICanvasPeer` + `OwnerDrawnControl`: one paintable/focusable native surface per backend, so
       every custom control is written once and runs on any backend. Mouse/key/focus + paint plumbed.
 - [x] Decoder-free `IImage` (32-bit ARGB) so controls show icons without an image library.
