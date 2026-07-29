@@ -202,12 +202,15 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
     }
 
     /// <inheritdoc/>
-    /// <remarks>Not yet: AppKit underlines a mnemonic through an attributed title, which wants the
-    /// text-drawing work that has not landed.</remarks>
+    /// <remarks>Not yet: a mnemonic is underlined through an attributed string, which then owns the
+    /// font and the colour as well — so the three have to arrive together or a caption follows one
+    /// property and ignores the next.</remarks>
     public void SetUseMnemonic(bool useMnemonic) { }
 
     /// <inheritdoc/>
-    /// <inheritdoc cref="SetUseMnemonic"/>
+    /// <remarks>Not yet: a label is an <c>NSTextField</c>, which has no image of its own, so an icon
+    /// beside a caption means an attributed string with a text attachment — the same work the mnemonic
+    /// wants, and worth doing once for both.</remarks>
     public void SetImage(IImage? image, ContentAlignment alignment) { }
 }
 
@@ -263,8 +266,12 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
     }
 
     /// <inheritdoc/>
-    /// <remarks>Not yet: an NSButton takes an NSImage, which wants the CGImage work images have not
-    /// had, since nothing draws them either.</remarks>
+    /// <remarks>Not yet, and no longer for want of a <c>CGImage</c> — the painter's conversion would
+    /// serve <c>setImage:</c> directly. What is left is that a button here is always the native one:
+    /// the other backends demote an image-bearing button to the owner-drawn twin, so an icon that
+    /// <c>setImagePosition:</c> places differently from <see cref="TextImageRelation"/> would be a
+    /// difference nobody could see coming. Nothing in the gallery carries one, so it would also ship
+    /// unwitnessed.</remarks>
     public void SetImage(IImage? image, ContentAlignment alignment, TextImageRelation relation) { }
 
     /// <summary>Raises <see cref="Clicked"/> once AppKit's target/action routing is wired.</summary>
