@@ -223,15 +223,41 @@ internal sealed class CocoaWindowPeer : IWindowPeer
             CocoaToolTip.Apply(CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView")), text);
     }
 
-    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A window takes the keyboard by becoming the key window, which on this desktop also brings it
+    /// forward — there is no way to be key and behind, and pretending otherwise would leave a form
+    /// that answers the keyboard from underneath another window.
+    /// </remarks>
+    public void Focus()
+    {
+        if (_window != 0)
+            CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("makeKeyAndOrderFront:"), 0);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Only the background. A window has a colour of its own — what shows through wherever no view
+    /// paints — and that is exactly what a form's <c>BackColor</c> means here. A foreground has
+    /// nothing to apply to: a window draws no text, and the ambient colour reaches the children that
+    /// do through the core rather than through this call.
+    /// </remarks>
+    public void SetColors(Color foreColor, Color backColor)
+    {
+        if (_window != 0 && CocoaRuntime.NSColorOf(backColor) is var back and not 0)
+            CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setBackgroundColor:"), back);
+    }
+
+    // --- Not applicable to a window on this desktop ----------------------------------------------
+    //
+    // There is no disabled window here. Windows is asked to grey one out while a modal dialog is up;
+    // AppKit runs a modal session instead, which withholds events from every other window of the
+    // application without any of them being told. And a window has no font: the caption is drawn by
+    // the desktop in the desktop's own, which is the point of it looking like every other window.
 
     public void SetEnabled(bool enabled) { }
 
     public void SetFont(Font font) { }
-
-    public void SetColors(Color foreColor, Color backColor) { }
-
-    public void Focus() { }
 
     /// <summary>
     /// Puts a child's view into the window's content view, which is what makes it appear at all.

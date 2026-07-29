@@ -210,9 +210,20 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     private static void Add(nint cls, string selector, nint implementation)
         => CocoaRuntime.class_addMethod(cls, CocoaRuntime.sel_registerName(selector), implementation, "v@:@");
 
-    /// <summary>Answers YES, so the view can take the keyboard.</summary>
+    /// <summary>Whether this surface will take the keyboard when it is offered.</summary>
+    private bool _focusable = true;
+
+    /// <summary>
+    /// Whether the view can take the keyboard, which is the peer's own answer where it has one.
+    /// </summary>
+    /// <remarks>
+    /// A view without a canvas behind it — a window's content view, a group box's host — answers yes,
+    /// which is what it did before this question existed and what keeps a container out of the way of
+    /// the children it holds.
+    /// </remarks>
     [System.Runtime.InteropServices.UnmanagedCallersOnly]
-    private static byte AcceptsFirstResponder(nint self, nint selector) => 1;
+    private static byte AcceptsFirstResponder(nint self, nint selector)
+        => CanvasOf(self) is { } canvas && !canvas._focusable ? (byte)0 : (byte)1;
 
     /// <summary>Where an event landed, in the view's own (flipped) coordinates.</summary>
     internal static Point LocationOf(nint view, nint theEvent)
@@ -468,7 +479,34 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     /// </remarks>
     public void ShowToolTip(string? text) => CocoaToolTip.Apply(_view, text);
 
-    // --- Not yet, and deliberately not fatal (docs/PRD.md §2) ------------------------------------
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The window is what holds the keyboard, and it is told which of its views has it. A canvas that
+    /// is not in a window yet has nothing to ask, which is the same shape every other late-binding
+    /// call in this backend has.
+    /// </remarks>
+    public void Focus()
+    {
+        if (_view == 0)
+            return;
+
+        var window = CocoaRuntime.SendPointer(_view, CocoaRuntime.sel_registerName("window"));
+        if (window != 0)
+            CocoaRuntime.SendVoid(window, CocoaRuntime.sel_registerName("makeFirstResponder:"), _view);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Read back by the class's own <c>acceptsFirstResponder</c>, because AppKit asks the view
+    /// rather than being told — the same asking-not-telling shape the cursor takes.</remarks>
+    public void SetFocusable(bool focusable) => _focusable = focusable;
+
+    // --- Not applicable to a surface the toolkit paints itself -----------------------------------
+    //
+    // A canvas is a rectangle of pixels the control draws into. Its caption, its font, its colours and
+    // its enabled look are all things the control's own OnPaint puts there, from the core's state and
+    // the platform's theme — so a view told any of them would either draw nothing with it or draw it
+    // twice. The core keeps every one of these and hands them to the painter; there is nothing here to
+    // forward them to.
 
     public void SetText(string text) { }
 
@@ -477,10 +515,6 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     public void SetFont(Font font) { }
 
     public void SetColors(Color foreColor, Color backColor) { }
-
-    public void Focus() { }
-
-    public void SetFocusable(bool focusable) { }
 
     public void Dispose()
     {

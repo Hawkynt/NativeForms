@@ -244,6 +244,23 @@ internal sealed class CocoaPopupPeer : IPopupPeer
             this.Hide();
     }
 
+    /// <inheritdoc/>
+    /// <remarks>The surface is the canvas; the window around it has nothing under the pointer.</remarks>
+    public void SetCursor(Cursor cursor) => _canvas.SetCursor(cursor);
+
+    /// <inheritdoc/>
+    /// <remarks>The keyboard belongs to the view inside, not to the borderless window round it.</remarks>
+    public void Focus() => _canvas.Focus();
+
+    /// <inheritdoc cref="Focus"/>
+    public void SetFocusable(bool focusable) => _canvas.SetFocusable(focusable);
+
+    // --- Not applicable to a surface with no chrome ----------------------------------------------
+    //
+    // A popup is a borderless window whose whole content is one canvas, so it has no caption to set,
+    // no disabled look to wear, and no font or colours of its own: whatever is on it was painted by
+    // the control that put it up, from the core's state and the platform's theme.
+
     public void SetText(string text) { }
 
     public void SetEnabled(bool enabled) { }
@@ -253,16 +270,8 @@ internal sealed class CocoaPopupPeer : IPopupPeer
     public void SetColors(Color foreColor, Color backColor) { }
 
     /// <inheritdoc/>
-    /// <remarks>The surface is the canvas; the window around it has nothing under the pointer.</remarks>
-    public void SetCursor(Cursor cursor) => _canvas.SetCursor(cursor);
-
-    public void Focus() { }
-
-    /// <inheritdoc/>
     /// <remarks>The surface is the canvas; a tip belongs to the view, not to the window round it.</remarks>
     public void ShowToolTip(string? text) => _canvas.ShowToolTip(text);
-
-    public void SetFocusable(bool focusable) { }
 
     public void Dispose()
     {

@@ -69,7 +69,8 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 gallery's sixteen pages all pass the walkthrough's state round-trip and layout audit.
 
 Not working yet: mouse and keyboard events are routed into the toolkit but not verified end to end the
-way the Win32 backend's are.
+way the Win32 backend's are. Everything else this backend still declines is listed at the end of this
+section, split into what the platform does not have and what has not been written.
 
 An owner-drawn icon reaches the screen. It did not until now — every control that shows a picture it
 draws itself, which is the toolbar buttons, the list and tree rows, the grid cells, the tab headers
@@ -116,11 +117,13 @@ already AppKit's own minimum, and the maximum goes back to the enormous value it
 to zero, which would pin the window shut. The minimize and maximize boxes grey their traffic lights
 rather than removing them, because the lights are three and always in that order and a window missing
 one reads as broken instead of as restricted; both flags are buffered, since a border-style change
-rewrites the style mask and AppKit rebuilds the caption from it. `SetIcon` is refused: a window has no
-icon on this desktop — the caption shows a proxy icon only for a window standing for a file on disk,
+rewrites the style mask and AppKit rebuilds the caption from it. `SetIcon` is not a gap here, it is a
+property this desktop does not have: a window has no
+icon on it — the caption shows a proxy icon only for a window standing for a file on disk,
 and the only icon a running process can set is the application's own in the Dock, which is one per
 process where the property is one per window, so a second form would silently replace the first
-form's. The probe reads all of it back off the live window, and because the gallery sets a minimum
+form's. There is nothing to implement and nothing being put off; an application that wants an icon on
+macOS ships one in its bundle. The probe reads all of the rest back off the live window, and because the gallery sets a minimum
 size of its own that line is a round trip rather than a statement of wiring.
 
 A native widget wears the font and the colours the application gave it. Those two calls did nothing
@@ -401,6 +404,34 @@ and a formatter that answered nothing for it would display an empty box.
 That delegate is the one the link clicks arrive at as well, because a text view has one delegate and a
 second one attached would silently unhook the first. It is therefore named for the text view rather
 than for either job, and the probe counts it as what it is.
+
+### What this backend still refuses, and why
+
+Nothing on it does nothing without appearing here. The list is in two halves, because "this platform
+has no such thing" and "this is not written yet" are different answers and reading them as one is how
+a page like this becomes reassuring instead of useful.
+
+**Not applicable on this platform.** A window has no icon (above), no font — the desktop draws the
+caption in its own, which is the whole point of a window looking like every other one — and no
+disabled state: Windows greys a window out while a dialog is up, where AppKit withholds events from
+the application's other windows through a modal session without telling any of them. A canvas has no
+caption, font, colours or disabled look either: it is a rectangle a control paints, from the core's
+state and the platform's theme, so a view told any of those would draw nothing with them or draw them
+twice. A popup is a borderless window whose entire content is one canvas, and inherits that same list.
+An `NSSlider` has no small or large change, and an `NSTextField` no title colour; both are set out
+where they arise, as is the pair of `RichTextBox` limits that come down to Objective-C blocks.
+
+**Written down rather than written.** A `Label` shows no image and underlines no mnemonic. An
+`NSTextField` has neither, and both mean an attributed string carrying a text attachment, which then
+owns the font and the colour as well — one piece of work serving both, and not done. `Form.ShowDialog`
+does not block here: `RunModal` shows the window and returns, so a caller gets `DialogResult.Cancel`
+back immediately and the form is disposed underneath them. The native dialogs do not go through it —
+`NSAlert` and the four panels each run a session of their own — so the message box and the file,
+colour and font pickers are unaffected, and it is a `Form` shown modally that is missing. And the
+plain widgets still carry events nothing raises: a `Button` reports no click and a `TextBox` no edit
+of its own, because neither has been given the target/action and delegate wiring the promoted controls
+already have. Those are the next things to do on this backend, and they are named here so that a
+screenshot that looks finished is not read as one.
 
 ## How the screenshots are produced
 
