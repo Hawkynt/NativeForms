@@ -44,7 +44,7 @@ internal static partial class Shoot
     private static void InjectDrain()
     {
         if (OperatingSystem.IsWindows())
-            InjectDrain();
+            ShootInput.Drain();
         else
             ShootInputMac.Drain();
     }
@@ -104,6 +104,7 @@ internal static partial class Shoot
 
         if (OperatingSystem.IsWindows())
             ShootInput.Activate(windowTitle);
+
         var failed = 0;
 
         if (target is not null)
