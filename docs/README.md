@@ -42,6 +42,7 @@ Interaction states: [docking drag overlays](screenshots/docking-drag.png),
 | [Architecture](architecture.md) | Core/peer split, backends, realization lifecycle, containers, popups, timers, modal loops, AOT rules |
 | [MVVM & data binding](mvvm.md) | `ObservableObject`, `RelayCommand`, `PropertyBinding<T>`, `ObservableList<T>`, command wiring |
 | [Custom controls](custom-controls.md) | Authoring owner-drawn controls: `OwnerDrawnControl`, `IGraphics`, `ITheme`, shared paint primitives |
+| [Backends compared](backends.md) | What differs between GTK, Win32 and Cocoa — capabilities, painting, promotion — with the same gallery pages photographed side by side |
 | [Images, animation & cursors](imaging.md) | Supported formats (PNG/BMP/JPEG/PCX/GIF/ICO/CUR/ANI), `AnimatedImage` + the shared clock, custom cursors from a `.cur`/`.ani` |
 | [PRD](PRD.md) | The authoritative feature checklist and roadmap |
 
