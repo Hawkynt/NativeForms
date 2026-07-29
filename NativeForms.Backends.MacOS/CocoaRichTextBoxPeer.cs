@@ -402,12 +402,31 @@ internal sealed unsafe class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextB
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Not wired: a text view scales by transforming its unit square, which is a relative operation
-    /// applied to whatever scale it already carries, so serving an absolute factor here means tracking
-    /// the accumulated one. Nothing in the toolkit asks for it yet, and a zoom that drifts would be
-    /// worse than none.
+    /// <para>
+    /// Through the scroll view rather than the text view. <c>scaleUnitSquareToSize:</c> is the obvious
+    /// call and the wrong one: it multiplies whatever scale the view already carries, so an absolute
+    /// factor would have to be divided by an accumulated one that nothing can read back reliably, and
+    /// the error compounds with every call. A scroll view's magnification is absolute — it is what the
+    /// pinch gesture sets — so setting it twice to the same number is setting it once.
+    /// </para>
+    /// <para>
+    /// The limits are widened because AppKit's defaults stop at a quarter and four times, and a
+    /// caller asking for more would silently get less. This is the same thing <c>EM_SETZOOM</c> does
+    /// on Windows: the rendering scales, the document does not change.
+    /// </para>
     /// </remarks>
-    public void SetZoom(float factor) { }
+    public void SetZoom(float factor)
+    {
+        // The scroll view is the peer's own handle; a box that is not multiline has none, and a rich
+        // text box always is.
+        if (!this.IsMultiline || this.Handle == 0 || factor <= 0)
+            return;
+
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAllowsMagnification:"), true);
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setMinMagnification:"), 0.05);
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setMaxMagnification:"), 20.0);
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setMagnification:"), (double)factor);
+    }
 
     /// <summary>Raises <see cref="LinkClicked"/> once the text view's delegate reports activations.</summary>
     private void Unused4() => LinkClicked?.Invoke(this, string.Empty);

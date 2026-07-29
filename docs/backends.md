@@ -118,7 +118,10 @@ and bullets all reach that storage. Two limits are worth stating rather than dis
 applied with nothing selected does nothing (Windows Forms would hold it for the next characters
 typed), and a selection spanning two typefaces takes the one it starts in, because walking the runs
 means `enumerateAttribute:…usingBlock:` and a block is exactly the Objective-C object this backend's
-interop rules keep out. Zoom and the link-activation event are still unwired.
+interop rules keep out. Zoom goes through the enclosing scroll view's magnification, which is
+absolute — the text view's own `scaleUnitSquareToSize:` multiplies whatever scale it already carries,
+so an absolute factor served that way would drift with every call. The link-activation event is still
+unwired.
 
 The class-at-construction rule no longer shows anywhere in the text box. AppKit picks between
 `NSTextField`, `NSSecureTextField` and an `NSTextView` in an `NSScrollView` when the object is made, so
