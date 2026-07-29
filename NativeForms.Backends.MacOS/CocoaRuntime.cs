@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
@@ -87,6 +88,28 @@ internal static partial class CocoaRuntime
         => RuntimeInformation.ProcessArchitecture == Architecture.X64
             ? SendDoubleIntel(receiver, selector)
             : SendDoubleArm(receiver, selector);
+
+    /// <summary>
+    /// An <c>NSTextAlignment</c> for a toolkit alignment, in the numbering this process's architecture
+    /// actually uses.
+    /// </summary>
+    /// <remarks>
+    /// The one enumeration on this platform whose values depend on the ABI rather than on the OS
+    /// version: AppKit's original order is left, right, centre, and 10.12 renumbered it to UIKit's
+    /// left, centre, right for every target where <c>TARGET_ABI_USES_IOS_VALUES</c> holds — which is
+    /// everything except 64-bit Intel. Sending one number for both swaps right with centre on exactly
+    /// one of the two architectures, and the wrong one is the one nearly every Mac now is.
+    /// </remarks>
+    internal static nint TextAlignment(ContentAlignment alignment)
+    {
+        var centred = alignment is ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter;
+        var trailing = alignment is ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight;
+        if (!centred && !trailing)
+            return 0; // left, which both numberings agree on
+
+        var legacy = RuntimeInformation.ProcessArchitecture == Architecture.X64;
+        return centred ? (legacy ? 2 : 1) : (legacy ? 1 : 2);
+    }
 
     /// <summary>Sends a parameterless message by selector name to a class found by name.</summary>
     internal static nint SendToClass(string className, string selector)

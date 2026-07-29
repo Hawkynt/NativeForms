@@ -329,15 +329,7 @@ internal sealed unsafe class CocoaRichTextBoxPeer : CocoaTextBoxPeer, IRichTextB
         if (this.Paragraph() is not var (storage, range, style))
             return;
 
-        // NSTextAlignment: left 0, right 1, centre 2.
-        var value = alignment switch
-        {
-            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter => 2,
-            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => 1,
-            _ => 0,
-        };
-
-        CocoaRuntime.SendVoid(style, CocoaRuntime.sel_registerName("setAlignment:"), value);
+        CocoaRuntime.SendVoid(style, CocoaRuntime.sel_registerName("setAlignment:"), CocoaRuntime.TextAlignment(alignment));
         CocoaRuntime.SendAttribute(storage, CocoaRuntime.sel_registerName("addAttribute:value:range:"), _Paragraph, style, range);
         CocoaRuntime.SendVoid(style, CocoaRuntime.sel_registerName("release"));
     }

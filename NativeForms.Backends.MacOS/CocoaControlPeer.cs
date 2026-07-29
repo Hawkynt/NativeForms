@@ -431,14 +431,7 @@ internal sealed class CocoaLabelPeer : CocoaControlPeer, ILabelPeer
             base.SetText(caption);
     }
 
-    /// <summary>NSTextAlignment: left 0, right 1, centre 2.</summary>
-    private nint Alignment
-        => _textAlign switch
-        {
-            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter => 2,
-            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => 1,
-            _ => 0,
-        };
+    private nint Alignment => CocoaRuntime.TextAlignment(_textAlign);
 
     /// <summary>Hands the bitmap to the image view, or takes the one it has away.</summary>
     /// <remarks>
