@@ -310,9 +310,10 @@ public interface ILabelPeer : IControlPeer
 /// </summary>
 /// <remarks>
 /// <see cref="SetMultiline"/> may recreate the native widget — some toolkits use different widgets
-/// (or creation-time style bits) for single-line and multiline editing. Peers buffer their state, so
-/// tearing the widget down and re-flushing the buffer into a fresh one is legal and invisible to the
-/// core.
+/// (or creation-time style bits) for single-line and multiline editing. So may
+/// <see cref="SetPasswordChar"/>, for the same reason: AppKit masks with a different class rather than
+/// with a property. Peers buffer their state, so tearing the widget down and re-flushing the buffer
+/// into a fresh one is legal and invisible to the core.
 /// </remarks>
 public interface ITextBoxPeer : IControlPeer
 {

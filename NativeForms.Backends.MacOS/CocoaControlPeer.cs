@@ -235,13 +235,14 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
 /// AppKit fixes the class at construction — there is no "make this one a password field" message and
 /// no "make this one multiline" one either — so a state change the class cannot express is served by
 /// building the other object and swapping it into the superview. That is the recreation
-/// <see cref="ITextBoxPeer.SetMultiline"/> allows: the text and the frame move across, the parent's
-/// child order is preserved, and the core never learns that the widget it holds is a different one.
+/// <see cref="ITextBoxPeer.SetMultiline"/> and <see cref="ITextBoxPeer.SetPasswordChar"/> allow: the
+/// text and the frame move across, the parent's child order is preserved, and the core never learns
+/// that the widget it holds is a different one.
 /// </para>
 /// <para>
-/// Masking is the exception, because the two classes differ in what they show rather than in what they
-/// are: a box told its mask character after realization keeps the plain field rather than silently
-/// showing the characters it promised to hide, which is why the wish is remembered and reported.
+/// One box cannot be both, and the multiline one wins: AppKit's secure editing lives in the field
+/// rather than in the text view, so a masked multiline box is not a thing there is a class for. The
+/// wish is kept rather than dropped, and applied if the box ever goes back to a single line.
 /// </para>
 /// </remarks>
 internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
@@ -258,6 +259,7 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     private bool _readOnly;
     private bool _hasFrame = true;
     private bool _enabled = true;
+    private string _placeholder = string.Empty;
 
     public CocoaTextBoxPeer()
         : base(Create(secure: false))
@@ -350,6 +352,7 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     /// <remarks>Single-line only: a text view has no placeholder, and AppKit offers none for one.</remarks>
     public void SetPlaceholder(string placeholder)
     {
+        _placeholder = placeholder;
         if (this.Handle == 0 || _textView != 0)
             return;
 
@@ -362,12 +365,28 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
     }
 
     /// <inheritdoc/>
-    /// <remarks>Remembered rather than applied: see the class remarks on why the class is fixed at
-    /// construction.</remarks>
-    public void SetPasswordChar(char passwordChar) => _secure = passwordChar != '\0';
+    /// <remarks>
+    /// Served the same way multiline is, and it has to be: AppKit has no "start masking" message —
+    /// <c>NSSecureTextField</c> is a different class, chosen when the object is made. So the other
+    /// object is built and swapped into the superview, which is what turns "remembered and reported"
+    /// into a box that actually hides what it was told to hide. A box that showed the characters it
+    /// promised to mask is not a missing feature, it is the wrong one.
+    /// </remarks>
+    public void SetPasswordChar(char passwordChar)
+    {
+        var secure = passwordChar != '\0';
+        if (secure == _secure)
+            return;
 
-    /// <summary>Whether this field was asked to mask its content but could not.</summary>
-    internal bool WantsMasking => _secure;
+        _secure = secure;
+
+        // A multiline box has no secure form to swap to — AppKit's secure editing lives in the field,
+        // not in the text view — so the wish is kept for whenever the box goes back to one line.
+        if (_textView != 0)
+            return;
+
+        this.Replace(Create(secure), 0);
+    }
 
     /// <inheritdoc/>
     /// <remarks>
@@ -416,6 +435,20 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
             return;
 
         var (host, editor) = multiline ? CreateScrolled(this.BoundsValue) : (Create(_secure), 0);
+        this.Replace(host, editor);
+    }
+
+    /// <summary>
+    /// Puts a freshly built object where the current one stands, carrying across everything the core
+    /// will not send again.
+    /// </summary>
+    /// <remarks>
+    /// The core flushes a peer's buffered state once and then hands the peer to its container, so a
+    /// widget built after that point is never told any of it a second time — which is why the text,
+    /// the frame and every remembered flag are re-applied here rather than left to the caller.
+    /// </remarks>
+    private void Replace(nint host, nint editor)
+    {
         if (host == 0)
             return; // keep the widget there is rather than trade a working one for nothing
 
@@ -433,6 +466,7 @@ internal class CocoaTextBoxPeer : CocoaControlPeer, ITextBoxPeer
         this.SetEnabled(_enabled);
         this.SetReadOnly(_readOnly);
         this.SetHasFrame(_hasFrame);
+        this.SetPlaceholder(_placeholder);
     }
 
     /// <summary>

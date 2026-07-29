@@ -120,11 +120,13 @@ typed), and a selection spanning two typefaces takes the one it starts in, becau
 means `enumerateAttribute:…usingBlock:` and a block is exactly the Objective-C object this backend's
 interop rules keep out. Zoom and the link-activation event are still unwired.
 
-A password `TextBox` is the one place the class-at-construction rule still shows: AppKit picks between
-`NSTextField` and `NSSecureTextField` when the object is made, and the toolkit sets the mask before
-realization in practice, so a box told to mask afterwards stays plain rather than silently showing
-what it promised to hide. Multiline no longer has that problem — the peer builds the other object and
-swaps it into the superview.
+The class-at-construction rule no longer shows anywhere in the text box. AppKit picks between
+`NSTextField`, `NSSecureTextField` and an `NSTextView` in an `NSScrollView` when the object is made, so
+a box told to mask or to go multiline after realization gets the other object built and swapped into
+its superview, carrying its text, frame, placeholder and flags across — the parent's child order is
+kept and the core never learns that the widget it holds is a different one. The one combination with
+no class behind it is a masked multiline box: AppKit's secure editing lives in the field rather than
+in the text view, so the wish is kept and applied if the box ever goes back to a single line.
 
 ## How the screenshots are produced
 
