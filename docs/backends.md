@@ -16,7 +16,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Owner-drawn painting | Cairo | GDI | CoreGraphics |
 | Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
 | Native widget promotion (§12) | 9 controls | 9 controls | 3: check box, radio, progress |
-| Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | not yet |
+| Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
 | Mouse & keyboard | complete | complete | press, drag, wheel, keys; no hover |
 | Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
@@ -81,6 +81,11 @@ purpose — a combo box, a list box, a group box, a track bar, a hyperlink and a
 enough state that a half-answer would show, and the seam is built so that returning nothing keeps the
 owner-drawn twin, which already works. Grouping for radios stays in the core; AppKit's own rule is the
 same one (buttons sharing a superview), so the two cannot reach different answers.
+
+Colour emoji need nothing: `CTLineDraw` renders them in colour on the same path as every other
+glyph, so the bell in the gallery's toggle-switch caption arrives without the second text engine the
+Win32 backend has to reach for. That is worth stating because this page claimed otherwise for as long
+as nobody looked at a macOS screenshot closely enough to notice.
 
 Accessibility goes through `NSAccessibility`: a label, a help string and a role on the view. A real
 AppKit control already answers for itself, so this mostly refines what the platform knows — except on
