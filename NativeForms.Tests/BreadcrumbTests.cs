@@ -344,4 +344,34 @@ internal sealed class BreadcrumbTests
             Assert.That(sub?.Item.Text, Is.EqualTo("Pictures"), "SubItemSelected reports the chosen child");
         });
     }
+
+    [Test]
+    public void A_root_segment_does_not_double_the_separator()
+    {
+        // The first crumb of the most ordinary POSIX path there is: "/" then "home" then "user".
+        // A plain join produces "//home/user", which is what the path field would then be seeded
+        // with the moment the bar is clicked.
+        var crumb = new Breadcrumb();
+        crumb.Items.AddRange("/", "home", "user");
+
+        Assert.That(crumb.FullPath, Is.EqualTo("/home/user"));
+    }
+
+    [Test]
+    public void A_windows_root_does_not_double_its_separator_either()
+    {
+        var crumb = new Breadcrumb { PathSeparator = "\\" };
+        crumb.Items.AddRange("C:\\", "Users", "hawky");
+
+        Assert.That(crumb.FullPath, Is.EqualTo("C:\\Users\\hawky"));
+    }
+
+    [Test]
+    public void An_ordinary_path_still_joins_with_one_separator()
+    {
+        var crumb = new Breadcrumb();
+        crumb.Items.AddRange("Home", "Docs", "Sub");
+
+        Assert.That(crumb.FullPath, Is.EqualTo("Home/Docs/Sub"));
+    }
 }

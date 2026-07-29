@@ -109,12 +109,39 @@ public class Breadcrumb : OwnerDrawnControl
     {
         get
         {
-            var parts = new string[this.Items.Count];
-            for (var i = 0; i < this.Items.Count; ++i)
-                parts[i] = this.Items[i].Text;
+            // Not a plain join: a segment that already carries the separator must not get a second
+            // one. A POSIX root is "/", so joining it with "home" naively yields "//home"; a Windows
+            // root is "C:\\" and yields "C:\\\\x". Both are the first crumb of the most ordinary
+            // path there is, so the composition has to account for them.
+            var separator = this.PathSeparator;
+            var path = new System.Text.StringBuilder();
+            foreach (var item in this.Items)
+            {
+                var text = item.Text;
+                if (path.Length > 0
+                    && separator.Length > 0
+                    && !EndsWith(path, separator)
+                    && !text.StartsWith(separator, StringComparison.Ordinal))
+                    path.Append(separator);
 
-            return string.Join(this.PathSeparator, parts);
+                path.Append(text);
+            }
+
+            return path.ToString();
         }
+    }
+
+    /// <summary>Whether the composed path already ends with the separator.</summary>
+    private static bool EndsWith(System.Text.StringBuilder path, string separator)
+    {
+        if (path.Length < separator.Length)
+            return false;
+
+        for (var i = 0; i < separator.Length; ++i)
+            if (path[path.Length - separator.Length + i] != separator[i])
+                return false;
+
+        return true;
     }
 
     /// <summary>Whether the bar is currently showing its edit field rather than the crumbs.</summary>
