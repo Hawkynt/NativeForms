@@ -67,13 +67,73 @@ internal sealed class CocoaGraphics(nint context) : IGraphics, IDisposable
         CocoaNative.CGContextStrokeEllipseInRect(_context, Rect(bounds));
     }
 
-    /// <remarks>Square corners for now: the rounded path wants an arc-by-arc build, and a wrong-shaped
-    /// rectangle is a cosmetic gap where a missing one is a hole in the picture.</remarks>
-    public void FillRoundedRectangle(Color color, Rectangle bounds, int radius) => this.FillRectangle(color, bounds);
+    public void FillRoundedRectangle(Color color, Rectangle bounds, int radius)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        radius = ClampRadius(radius, bounds);
+        if (radius <= 0)
+        {
+            this.FillRectangle(color, bounds);
+            return;
+        }
+
+        this.SetColor(color, fill: true);
+        this.AddRoundedRectPath(bounds, radius);
+        CocoaNative.CGContextFillPath(_context);
+    }
 
     /// <inheritdoc cref="FillRoundedRectangle"/>
     public void DrawRoundedRectangle(Color color, Rectangle bounds, int radius, int thickness = 1)
-        => this.DrawRectangle(color, bounds, thickness);
+    {
+        if (thickness <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        radius = ClampRadius(radius, bounds);
+        if (radius <= 0)
+        {
+            this.DrawRectangle(color, bounds, thickness);
+            return;
+        }
+
+        this.SetColor(color, fill: false);
+        CocoaNative.CGContextSetLineWidth(_context, thickness);
+
+        // The edges sit exactly where DrawRectangle's do, without the half-pixel nudge DrawLine uses,
+        // so an outlined pill lines up with the filled one underneath it.
+        this.AddRoundedRectPath(bounds, radius);
+        CocoaNative.CGContextStrokePath(_context);
+    }
+
+    /// <summary>Limits a corner radius to half the rectangle's smaller dimension.</summary>
+    /// <remarks>The same clamp the Cairo backend applies, so a pill asked for a radius larger than it
+    /// can hold is the same shape on both — a capsule, not a shape CoreGraphics had to invent.</remarks>
+    private static int ClampRadius(int radius, Rectangle bounds)
+        => Math.Min(radius, Math.Min(bounds.Width, bounds.Height) / 2);
+
+    /// <summary>
+    /// Lays down a rounded rectangle as four corner arcs joined by the straight runs between them.
+    /// </summary>
+    /// <remarks>
+    /// <c>CGContextAddArcToPoint</c> takes the corner it is cutting and where the path goes next, and
+    /// fits the arc of the given radius tangent to both — so the path is described by the rectangle's
+    /// own corners rather than by four centres and eight angles worked out by hand. It also needs a
+    /// current point to start from, which is why the run begins on the top edge past the first corner
+    /// and not at the corner itself.
+    /// </remarks>
+    private void AddRoundedRectPath(Rectangle bounds, int radius)
+    {
+        double left = bounds.X, top = bounds.Y, right = bounds.Right, bottom = bounds.Bottom;
+
+        CocoaNative.CGContextBeginPath(_context);
+        CocoaNative.CGContextMoveToPoint(_context, left + radius, top);
+        CocoaNative.CGContextAddArcToPoint(_context, right, top, right, bottom, radius);
+        CocoaNative.CGContextAddArcToPoint(_context, right, bottom, left, bottom, radius);
+        CocoaNative.CGContextAddArcToPoint(_context, left, bottom, left, top, radius);
+        CocoaNative.CGContextAddArcToPoint(_context, left, top, right, top, radius);
+        CocoaNative.CGContextClosePath(_context);
+    }
 
     public void DrawLine(Color color, int x1, int y1, int x2, int y2, int thickness = 1)
     {

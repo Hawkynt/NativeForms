@@ -85,6 +85,16 @@ is right in CoreGraphics' coordinates and upside down in this one, so the painte
 about the destination rectangle inside a saved state rather than flipping the context, which would
 put every string on its head as well.
 
+A rounded rectangle is round here too. It was square until now — the two calls forwarded to their
+square siblings, which is why the toggle switch's pill, the toast, the info bar and the progress tiles
+photographed with corners the other two backends do not draw. CoreGraphics has no rounded-rectangle
+primitive below the path layer, so the path is built from four corner arcs:
+`CGContextAddArcToPoint` is given the corner being cut and where the path goes next, and fits an arc
+tangent to both, which describes the shape by the rectangle's own corners instead of by four centres
+and eight angles worked out by hand. The radius is clamped to half the shorter side exactly as the
+Cairo backend clamps it, so a pill asked for more radius than it can hold is a capsule on both rather
+than whatever each renderer would invent.
+
 The colour and font choosers now answer, and the shape of the answer is worth reading before relying
 on it. Both are shared modeless panels here — the platform keeps exactly one of each and shows it —
 so neither has an OK, a Cancel, or any notion of being dismissed with a result. What makes them fit a

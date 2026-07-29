@@ -182,7 +182,7 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       0 bytes (asserted) after de-allocating the GDI/Pango paint paths (cached brushes/pens/
       fonts/layouts, reused graphics + event args).
 - [x] `DrawEllipse`/`FillEllipse` and `Draw`/`FillRoundedRectangle` (GDI `RoundRect`,
-      Cairo arc paths) — ToggleSwitch pill is one rounded rect.
+      Cairo arc paths, CoreGraphics `CGContextAddArcToPoint`) — ToggleSwitch pill is one rounded rect.
 - [x] Native-style primitives drawn via theme (`GlyphRenderer`): push button face, check/radio,
       progress fill, sort arrow, row marker, combo arrow, header cell, focus ring, selection
       highlight — adopted across the owner-drawn controls; scrollbars via the shared renderers.
