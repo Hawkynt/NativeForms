@@ -150,6 +150,10 @@ internal static partial class CocoaRuntime
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     internal static partial ushort SendUShort(nint receiver, nint selector);
 
+    /// <summary>Reads one element of an ordered collection.</summary>
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    internal static partial nint SendIndex(nint receiver, nint selector, nint index);
+
     /// <summary>Allocates an instance of a class, ready for an <c>init…</c> message.</summary>
     internal static nint Allocate(string className)
     {

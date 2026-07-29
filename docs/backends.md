@@ -19,7 +19,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | not yet |
 | Accessibility | ATK | MSAA, borrowed from a shadow control | not yet |
 | Mouse & keyboard | complete | complete | routed; injection checked in CI |
-| Dialogs (message box, file, colour, font) | complete | complete | message box native (`NSAlert`); file, colour, font answer as if cancelled |
+| Dialogs (message box, file, colour, font) | complete | complete | message box and file chooser native (`NSAlert`, `NSOpen`/`NSSavePanel`); colour and font answer as if cancelled |
 | CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + real `CGEvent`, reporting |
 
 ## Side by side
@@ -66,9 +66,9 @@ the event loop runs, owner-drawn painting and text render through CoreGraphics a
 and text measurement work, the clipboard works both ways, and the gallery's sixteen pages all pass
 the walkthrough's state round-trip and layout audit.
 
-Not working yet: no native-widget promotion, no accessibility, the file, colour and font choosers
-answer as if cancelled rather than opening, multiline text is a single-line field, rich text shows its
-plain text, popups do not
+Not working yet: no native-widget promotion, no accessibility, the colour and font choosers answer as
+if cancelled (both are shared modeless panels on macOS, which is a different shape from this seam's
+blocking call), multiline text is a single-line field, rich text shows its plain text, popups do not
 light-dismiss, and while mouse and keyboard events are routed into the toolkit they are not yet
 verified end to end the way the Win32 backend's are.
 

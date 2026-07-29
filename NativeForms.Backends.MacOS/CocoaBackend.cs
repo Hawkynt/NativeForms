@@ -162,6 +162,17 @@ public sealed class CocoaBackend : IPlatformBackend
         }
     }
 
+    /// <summary>The file-system path behind an <c>NSURL</c>, or null.</summary>
+    private static string? PathOf(nint url)
+    {
+        if (url == 0)
+            return null;
+
+        var path = CocoaRuntime.SendPointer(url, CocoaRuntime.sel_registerName("path"));
+        var text = path == 0 ? null : CocoaNative.ReadString(path);
+        return string.IsNullOrEmpty(text) ? null : text;
+    }
+
     /// <summary>Sends a message taking one string, releasing the string afterwards.</summary>
     private static void SetString(nint target, string selector, string value)
     {
@@ -174,9 +185,62 @@ public sealed class CocoaBackend : IPlatformBackend
     }
 
     /// <inheritdoc/>
-    public string[]? ShowFileDialog(in FileDialogOptions options) => null;
+    /// <remarks>
+    /// <c>NSOpenPanel</c> for opening and choosing a folder, <c>NSSavePanel</c> for saving — the same
+    /// object family the rest of the platform uses, so the sidebar, tags, recents and every keyboard
+    /// habit come for free rather than being reimplemented badly.
+    /// </remarks>
+    public string[]? ShowFileDialog(in FileDialogOptions options)
+    {
+        var saving = options.Kind == FileDialogKind.Save;
+        var panel = CocoaRuntime.SendToClass(saving ? "NSSavePanel" : "NSOpenPanel", saving ? "savePanel" : "openPanel");
+        if (panel == 0)
+            return null;
+
+        if (options.Title.Length > 0)
+            SetString(panel, "setMessage:", options.Title);
+
+        if (options.FileName.Length > 0)
+            SetString(panel, "setNameFieldStringValue:", options.FileName);
+
+        if (!saving)
+        {
+            var folders = options.Kind == FileDialogKind.SelectFolder;
+            CocoaRuntime.SendVoid(panel, CocoaRuntime.sel_registerName("setCanChooseFiles:"), !folders);
+            CocoaRuntime.SendVoid(panel, CocoaRuntime.sel_registerName("setCanChooseDirectories:"), folders);
+            CocoaRuntime.SendVoid(panel, CocoaRuntime.sel_registerName("setAllowsMultipleSelection:"), options.Multiselect);
+        }
+
+        // NSModalResponseOK
+        if (CocoaRuntime.SendInteger(panel, CocoaRuntime.sel_registerName("runModal")) != 1)
+            return null;
+
+        // An open panel answers with every URL chosen; a save panel has exactly one.
+        if (saving || !options.Multiselect)
+            return PathOf(CocoaRuntime.SendPointer(panel, CocoaRuntime.sel_registerName("URL"))) is { } single
+                ? [single]
+                : null;
+
+        var urls = CocoaRuntime.SendPointer(panel, CocoaRuntime.sel_registerName("URLs"));
+        if (urls == 0)
+            return null;
+
+        var count = (int)CocoaRuntime.SendInteger(urls, CocoaRuntime.sel_registerName("count"));
+        var chosen = new List<string>(count);
+        for (var i = 0; i < count; ++i)
+            if (PathOf(CocoaRuntime.SendIndex(urls, CocoaRuntime.sel_registerName("objectAtIndex:"), i)) is { } path)
+                chosen.Add(path);
+
+        return chosen.Count > 0 ? [.. chosen] : null;
+    }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// <c>NSColorPanel</c> is a shared, modeless panel — the platform keeps one and shows it — so it
+    /// has no modal answer to wait for. Running it properly means opening it and reporting changes as
+    /// they happen, which is a different shape from the blocking call this seam offers; until that is
+    /// wired the panel is not shown at all rather than shown and ignored.
+    /// </remarks>
     public Color? ShowColorDialog(Color color) => null;
 
     /// <inheritdoc/>
