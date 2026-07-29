@@ -79,9 +79,11 @@ holds the keyboard rather than to the one under the pointer — so each canvas c
 active-always because a menu surface is never the key window. The same area is what delivers
 `mouseEntered:`/`mouseExited:`, so a highlight goes out again. What the probe can show is the wiring:
 it reads back off the running window whether moved events are accepted and how many views carry a
-tracking area — 191 of 443 on the gallery, the rest being AppKit's own controls, which track
-themselves. What it cannot show is delivery: the window server drops this job's injected pointer for
-want of an Accessibility grant, so hover is stated here as wired rather than as witnessed.
+tracking area — 187 of the gallery's, one per owner-drawn canvas; the rest are AppKit's own controls,
+which track themselves. (Only the tracked count is worth reading: the total moves run to run with how
+much of the tab strip has realized by the time the shutter arms.) What it cannot show is delivery: the
+window server drops this job's injected pointer for want of an Accessibility grant, so hover is stated
+here as wired rather than as witnessed.
 
 Four of PRD §12's nine promotions are served: `CheckBox` and `RadioButton` become an `NSButton` in
 its switch and radio types, `ProgressBar` an `NSProgressIndicator`, and `GroupBox` an `NSBox` filling a
