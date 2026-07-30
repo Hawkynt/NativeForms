@@ -492,18 +492,24 @@ active-always because a menu surface is never the key window. The same area is w
 it reads back off the running window whether moved events are accepted and how many views carry a
 tracking area — 187 of the gallery's, one per owner-drawn canvas; the rest are AppKit's own controls,
 which track themselves. (Only the tracked count is worth reading: the total moves run to run with how
-much of the tab strip has realized by the time the shutter arms.) What it does not show is delivery, and the
-reason is now known rather than merely unattempted. The probe posts a move on its own, at an
-owner-drawn control with no children — which makes its canvas the deepest view at its own centre, and
-therefore the one AppKit would hand the move to — and the control's `MouseMove` never fires, on any
-page, while a press at the same point reaches the same canvas every time. That is the injection route's
-limit rather than the wiring's: an event handed to `sendEvent:` is dispatched to a view, and a tracking
-area is not dispatched to at all — AppKit works entered, exited and moved out from where the window
-server says the pointer is, and a posted event does not move it. Witnessing hover would therefore need
-a `CGEvent` at the HID tap, which is exactly the route this probe gave up because macOS gates it behind
-an Accessibility grant a hosted runner does not give. So hover stays stated as wired; the check stays
-in place, because it costs one posted event and would light up the moment either half of that changed;
-and the closing line's move count says plainly that it is nought.
+much of the tab strip has realized by the time the shutter arms.) What it does not show is delivery.
+The probe posts a move of its own at an owner-drawn control with no children — which makes its canvas
+the deepest view at its own centre, and therefore the one AppKit would hand the move to — and the
+control's `MouseMove` has never fired, on any page, while a press at the same point reaches the same
+canvas every time.
+
+The check now asks a sharper question about that than "did anything arrive", because three different
+things could be the reason and only one of them is the platform's. It posts two moves rather than one,
+from outside the control to its middle, since what a tracking area answers is a *crossing* and a lone
+move to a point AppKit already believes the pointer to be at is not one. Every event it builds now
+carries the machine's own clock instead of a timestamp of nought — routing never cared, a press is
+delivered by window number and location, but anything AppKit works out by comparing one event against
+the last one might, and the pointer's history is exactly that sort of thing. And when the move still
+reaches nothing, it is posted once more with the canvas holding the keyboard: a window sends
+`mouseMoved:` to its first responder as well as to the areas that asked for it, so that route reaching
+the control would say the toolkit's own plumbing is live and the tracking area is the half a posted
+event does not drive, where reaching it by neither would say no moved event is delivered on this route
+at all. The closing line's move count says plainly which it was.
 
 A native widget hears the pointer as well, which it did not before. A canvas hears it because its
 class carries the methods, and an `NSButton` is AppKit's class and can be given none — so its tracking

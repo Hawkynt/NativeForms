@@ -342,11 +342,9 @@ internal static partial class Shoot
         // hearing nothing, which is correct behaviour read as a failure. macOS only, because this is the
         // gap that is macOS's: the Win32 pointer is already driven end to end by SendInput.
         //
-        // It has never once landed, and the reason is the injection route rather than the wiring: an
-        // event handed to sendEvent: is dispatched to a view, and tracking areas are not dispatched at
-        // all — AppKit works entered, exited and moved out from where the window server says the pointer
-        // is, which a posted event does not move. The check stays because it costs one event and would
-        // light up the moment either half of that changed, and it says so once rather than once a page.
+        // Two moves rather than one, from outside the control to its middle, because what a tracking
+        // area answers is a crossing: a lone move to a point AppKit already believes the pointer to be
+        // at is not one, and entering is the half that lights a highlight up.
         if (OperatingSystem.IsMacOS()
             && Walk(page).OfType<OwnerDrawnControl>()
                 .FirstOrDefault(c => !c.IsNativeWidget && c.Controls.Count == 0 && OnScreen(c)) is { } hovered)
@@ -356,20 +354,40 @@ internal static partial class Shoot
             hovered.MouseMove += seen;
             try
             {
+                var outside = hovered.PointToScreen(new(hovered.Width / 2, -8));
                 var centre = hovered.PointToScreen(new(hovered.Width / 2, hovered.Height / 2));
-                if (ShootInputMac.Move(centre))
+                ShootInputMac.Move(outside);
+                if (!ShootInputMac.Move(centre))
+                    return failed;
+
+                InjectDrain();
+                if (moved > 0)
+                    ++Hovers;
+                else if (!_moveReported)
                 {
+                    _moveReported = true;
+
+                    // Once, and only when the first attempt found nothing. The question worth an
+                    // answer is not "does hover work" but "which half of it did not run", and the two
+                    // are told apart by taking the tracking area out of it: a window sends
+                    // mouseMoved: to whichever view holds the keyboard as well as to the areas that
+                    // asked for it, so a canvas given the keyboard hears the move by AppKit's other
+                    // route. Reaching it that way says the toolkit's own plumbing is live and the
+                    // tracking area is what a posted event does not drive; reaching it by neither says
+                    // no moved event is delivered on this route at all.
+                    var before = moved;
+                    hovered.Focus();
+                    ShootInputMac.Move(centre);
                     InjectDrain();
-                    if (moved > 0)
-                        ++Hovers;
-                    else if (!_moveReported)
-                    {
-                        _moveReported = true;
-                        note($"    input: a posted move to {centre.X},{centre.Y} did not reach "
-                            + $"{hovered.GetType().Name}, whose {InjectAt(centre)} is the view under the "
-                            + "point — a tracking area is driven by the window server's pointer, not by "
-                            + "an event handed to sendEvent:, so this route cannot witness hover at all");
-                    }
+
+                    note($"    input: a posted move to {centre.X},{centre.Y} did not reach "
+                        + $"{hovered.GetType().Name}, whose {InjectAt(centre)} is the view under the point"
+                        + (moved > before
+                            ? " — but the same move reached it once the canvas held the keyboard, so the "
+                                + "toolkit's own mouse plumbing is live and it is the tracking area that "
+                                + "a posted event does not drive"
+                            : $" — nor with the canvas holding the keyboard (Focused={hovered.Focused}), "
+                                + "so no moved event is delivered on this route at all"));
                 }
             }
             finally

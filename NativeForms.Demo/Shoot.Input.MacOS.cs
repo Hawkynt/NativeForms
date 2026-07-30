@@ -79,6 +79,36 @@ internal static partial class ShootInputMac
     private static partial bool SendBool(nint receiver, nint selector);
 
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    private static partial double SendDoubleArm(nint receiver, nint selector);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend_fpret")]
+    private static partial double SendDoubleIntel(nint receiver, nint selector);
+
+    /// <summary>Sends a message answering a <c>double</c>, through this architecture's entry point.</summary>
+    private static double SendDouble(nint receiver, nint selector)
+        => RuntimeInformation.ProcessArchitecture == Architecture.X64
+            ? SendDoubleIntel(receiver, selector)
+            : SendDoubleArm(receiver, selector);
+
+    /// <summary>
+    /// The clock an <c>NSEvent</c> is stamped with: seconds since this machine started.
+    /// </summary>
+    /// <remarks>
+    /// Every event this probe built used to carry a timestamp of zero, which is older than the process
+    /// and older than every event before it. Routing does not care — a press is delivered by window
+    /// number and location — but anything AppKit works out by comparing one event against the last one
+    /// might, and the pointer's own history is exactly that sort of thing. So the events are stamped
+    /// with the same clock the window server stamps real ones with, which costs a message send per
+    /// event and removes one way for a synthetic gesture to be told from a real one.
+    /// </remarks>
+    private static double Timestamp()
+    {
+        var info = objc_getClass("NSProcessInfo");
+        var process = info == 0 ? 0 : Send(info, sel_registerName("processInfo"));
+        return process == 0 ? 0 : SendDouble(process, sel_registerName("systemUptime"));
+    }
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial ushort SendUShort(nint receiver, nint selector);
 
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
@@ -535,7 +565,7 @@ internal static partial class ShootInputMac
             type,
             default,
             shifted ? _Shift : 0,
-            0,
+            Timestamp(),
             windowNumber,
             0, // the graphics context argument is ignored on every OS that still has this selector
             typed,
@@ -560,7 +590,7 @@ internal static partial class ShootInputMac
                 type,
                 at,
                 0,
-                0,
+                Timestamp(),
                 windowNumber,
                 0,
                 0,
