@@ -823,13 +823,24 @@ which is resolved back to the field through that editor's delegate, the same fac
 link label are both built on. A widget the peer holds a scroll view around — a promoted list's
 `NSTableView`, a multiline box's text view — is found by climbing the responder's superviews instead,
 four deep and no further, because an unbounded walk climbs out of the control and finds the window's
-content view, which answers for the whole form. And only a change the platform accepted is reported:
-`makeFirstResponder:` answers NO when whatever holds the keyboard refuses to give it up, and reading a
-refusal as a move would tell the toolkit that focus had left a control the user is still typing in.
-The one holder is a single field for the process, which is what `Control.Focused` is — and what makes
-the reporting idempotent, since `makeFirstResponder:` nests: a field's own `becomeFirstResponder` asks
-the window again for the field editor, so the outer call would otherwise report the same arrival
-twice.
+content view, which answers for the whole form. And that walk is guarded rather than sent, because a
+first responder is not always a view at all: a window answers for itself whenever nothing else holds
+the keyboard, which is where every form starts and where AppKit parks the responder while it takes an
+editor apart — and `NSWindow` has no `superview`, so asking it for one aborts the process rather than
+answering nil.
+
+The last of it is the nesting, which goes deeper than it looks and is why the report is made from the
+outermost turn only. Moving the keyboard off a field runs the whole of AppKit's end-of-editing dance:
+the text view resigns, which posts a notification, which has the field end its cell's editing, which
+takes the field editor out of the view hierarchy, which asks the window to end editing for it, which
+moves the responder again. One call from the toolkit therefore arrives four deep, each inner turn with
+the responder somewhere between the two states a user would recognise. Waiting for the outermost turn
+reports the one that settled, and — the part that matters more — keeps the toolkit's own handlers,
+which repaint and may move focus again, out of the middle of a transition the platform has not
+finished making. What is read there is the window's own account rather than the argument or the return
+value: `makeFirstResponder:` answers NO when whatever holds the keyboard refuses to give it up and
+installs something other than what it was asked for when the target edits through a borrowed editor, so
+only the window is right in both cases and a refusal simply reads as no change.
 
 `Focus()` was the other half, and it was wrong in a way nothing could show. It sent
 `becomeFirstResponder` to the widget — the message AppKit sends a view to *tell* it the keyboard has

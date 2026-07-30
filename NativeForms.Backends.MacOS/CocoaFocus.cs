@@ -140,6 +140,12 @@ internal static unsafe class CocoaFocus
     }
 
     /// <summary>A view or its nearest watched ancestor, within <see cref="_Depth"/> steps.</summary>
+    /// <remarks>
+    /// The step is guarded rather than sent, because a first responder is not always a view: a window
+    /// answers for itself whenever nothing else holds the keyboard, which is where every form starts
+    /// and where AppKit parks the responder while it takes an editor apart. <c>NSWindow</c> has no
+    /// <c>superview</c>, and an unrecognized selector aborts the process rather than answering nil.
+    /// </remarks>
     private static ICocoaFocusTarget? Climb(nint view)
     {
         var superview = CocoaRuntime.sel_registerName("superview");
@@ -147,6 +153,9 @@ internal static unsafe class CocoaFocus
         {
             if (_targets.TryGetValue(view, out var target))
                 return target;
+
+            if (!CocoaRuntime.Responds(view, "superview"))
+                return null;
 
             view = CocoaRuntime.SendPointer(view, superview);
         }
@@ -208,23 +217,52 @@ internal static unsafe class CocoaFocus
         _windowClass = created;
     }
 
+    /// <summary>How deep AppKit currently is inside this override.</summary>
+    /// <remarks>
+    /// It nests, and further than it looks. Moving the keyboard off a field runs the whole of AppKit's
+    /// end-of-editing dance — the text view resigns, which posts a notification, which has the field
+    /// end its cell's editing, which takes the field editor out of the view hierarchy, which asks the
+    /// window to end editing for it, which moves the responder again — so one call from the toolkit
+    /// arrives here three or four times over, each of the inner ones with the responder somewhere in
+    /// between the two the user would recognize.
+    /// </remarks>
+    private static int _depth;
+
     /// <summary>
-    /// AppKit is moving the keyboard: let it, then say where it went.
+    /// AppKit is moving the keyboard: let it finish, then say where it went.
     /// </summary>
     /// <remarks>
-    /// Only a change the platform accepted is reported. <c>makeFirstResponder:</c> answers NO when the
-    /// responder that has the keyboard refuses to give it up — a field holding text its formatter will
-    /// not accept does exactly that — and treating a refusal as a move would tell the toolkit focus had
-    /// left a control the user is still typing in.
+    /// <para>
+    /// Reported from the outermost turn only, which does two things. It reports the responder that
+    /// settled rather than one of the transient ones AppKit passes through, and it keeps the toolkit's
+    /// own handlers — which repaint, and may move focus again — out of the middle of a responder
+    /// transition the platform has not finished making.
+    /// </para>
+    /// <para>
+    /// The answer is read back off the window rather than taken from the argument or from the return
+    /// value. <c>makeFirstResponder:</c> answers NO when whatever holds the keyboard refuses to give it
+    /// up, and installs something other than what it was asked for when the target is a field that
+    /// edits through a borrowed editor — so the window's own account is the only one that is true in
+    /// both cases, and a refusal simply reads as no change.
+    /// </para>
     /// </remarks>
     [UnmanagedCallersOnly]
     private static byte MakeFirstResponder(nint self, nint selector, nint responder)
     {
-        var accepted = ((delegate* unmanaged<nint, nint, nint, byte>)_base)(self, selector, responder);
-        if (accepted == 0)
-            return 0;
+        byte accepted;
+        ++_depth;
+        try
+        {
+            accepted = ((delegate* unmanaged<nint, nint, nint, byte>)_base)(self, selector, responder);
+        }
+        finally
+        {
+            --_depth;
+        }
 
-        Moved(CocoaRuntime.SendPointer(self, CocoaRuntime.sel_registerName("firstResponder")));
-        return 1;
+        if (_depth == 0)
+            Moved(CocoaRuntime.SendPointer(self, CocoaRuntime.sel_registerName("firstResponder")));
+
+        return accepted;
     }
 }
