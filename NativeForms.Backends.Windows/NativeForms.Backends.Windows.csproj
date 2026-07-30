@@ -4,8 +4,14 @@
     <AssemblyName>Hawkynt.NativeForms.Backends.Windows</AssemblyName>
     <RootNamespace>Hawkynt.NativeForms.Backends.Windows</RootNamespace>
     <PackageId>Hawkynt.NativeForms.Backends.Windows</PackageId>
+    <Version>1.0.0</Version>
     <Description>The Windows (Win32) backend for NativeForms. A thin, reflection-free, source-generated P/Invoke layer that renders NativeForms controls through native USER32 window classes (top-level windows, BUTTON, STATIC). Trim- and NativeAOT-compatible: it compiles on any OS but only runs on Windows.</Description>
     <PackageTags>ui;winforms;gui;native;pinvoke;win32;user32;aot;trimming</PackageTags>
+
+    <!-- Ships a .snupkg to nuget.org's symbol server, which needs a real portable PDB; this
+         overrides the repo-wide Release DebugType=none (see Directory.Build.props). -->
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
 
     <!-- Headline goal of this repo: consumers can trim and NativeAOT-compile against us. -->
     <IsAotCompatible>true</IsAotCompatible>

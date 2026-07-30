@@ -12,7 +12,12 @@
     <Deterministic>true</Deterministic>
   </PropertyGroup>
 
-  <!-- Package / authorship metadata (LGPL, same as every Hawkynt repo). -->
+  <!-- Package / authorship metadata (LGPL, same as every Hawkynt repo). Deliberately NO Version
+       here: each shipping package declares its own MAJOR.MINOR.PATCH in its own csproj, and
+       .github/workflows/scripts/version.pl (stamp mode) appends the commit count of THAT project's
+       folder as the BUILD field. A package whose folder did not change therefore composes the
+       identical version on the next release, so a push with skip-duplicate re-uses what is already
+       published instead of republishing every backend because Core moved. -->
   <PropertyGroup>
     <Authors>Hawkynt</Authors>
     <Company>Hawkynt</Company>
@@ -25,10 +30,18 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
-  <!-- Release builds ship a single clean binary: no loose PDBs, symbols embedded nowhere. -->
+  <!-- Release builds ship a single clean binary: no loose PDBs, symbols embedded nowhere. The four
+       NuGet packages override this back to portable PDBs in their own csproj, because their symbols
+       are published to nuget.org's symbol server as a .snupkg; the demo publishes in _build.yml pass
+       -p:DebugType=none on the command line, so the downloadable artifacts stay PDB-free regardless. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
+
+    <!-- And no PDBs arriving sideways either. Those four packages produce a real PDB now, and it
+         travels with the assembly into every project that references it — so without this the demo
+         and the trim probe publish four stray .pdb files next to their single binary. -->
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
 
 </Project>

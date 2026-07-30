@@ -13,6 +13,10 @@
 [![Code Size](https://img.shields.io/github/languages/code-size/Hawkynt/NativeForms)](https://github.com/Hawkynt/NativeForms)
 [![Repo Size](https://img.shields.io/github/repo-size/Hawkynt/NativeForms)](https://github.com/Hawkynt/NativeForms)
 
+[![NuGet](https://img.shields.io/nuget/v/Hawkynt.NativeForms?label=NativeForms)](https://www.nuget.org/packages/Hawkynt.NativeForms/)
+[![NuGet Windows](https://img.shields.io/nuget/v/Hawkynt.NativeForms.Backends.Windows?label=Backends.Windows)](https://www.nuget.org/packages/Hawkynt.NativeForms.Backends.Windows/)
+[![NuGet Gtk](https://img.shields.io/nuget/v/Hawkynt.NativeForms.Backends.Gtk?label=Backends.Gtk)](https://www.nuget.org/packages/Hawkynt.NativeForms.Backends.Gtk/)
+
 > A fast, tiny, trim/AOT-compatible UI toolkit with a Windows Forms-shaped API. Windows, buttons,
 > labels and text boxes are real platform widgets (Win32, GTK) driven via P/Invoke; every other
 > control is owner-drawn in the host platform's own visual style.
@@ -85,6 +89,20 @@ single-platform build.
 an actionable message. Nothing renders on macOS yet. The Cocoa/AppKit implementation (`NSApplication`,
 `NSWindow`, `NSButton`, `NSTextField` over `objc_msgSend`) is planned in
 [PRD §10, milestone M9](docs/PRD.md#10-milestones-the-completion-roadmap).
+
+## 📦 Install
+
+```sh
+dotnet add package Hawkynt.NativeForms                     # controls, layout, binding, theming
+dotnet add package Hawkynt.NativeForms.Backends.Windows    # add the platforms you ship on
+dotnet add package Hawkynt.NativeForms.Backends.Gtk
+```
+
+Each backend is its own package, so an app carries only the platforms it targets — and a backend it
+references but never registers is dropped again by the trimmer. The core package brings the
+`[GridEditable]` source generator with it as a compile-time analyzer; nothing to reference, and no
+reflection reaches the running app. `Hawkynt.NativeForms.Backends.MacOS` is published for the same
+completeness, but every entry point still throws (see [Status](#-status)).
 
 ## 🚀 Quick start
 

@@ -4,7 +4,14 @@
     <AssemblyName>Hawkynt.NativeForms.Backends.MacOS</AssemblyName>
     <RootNamespace>Hawkynt.NativeForms.Backends.MacOS</RootNamespace>
     <PackageId>Hawkynt.NativeForms.Backends.MacOS</PackageId>
-    <Description>The macOS (Cocoa) backend for NativeForms. Placeholder: the peer surface is wired but the native implementation is still on the roadmap (see docs/PRD.md).</Description>
+    <Version>1.0.0</Version>
+    <Description>The macOS (Cocoa) backend for NativeForms. Placeholder: the peer surface is wired but every entry point throws PlatformNotSupportedException, so nothing renders yet — it exists to keep the backend contract honest and the roadmap slot reserved (see docs/PRD.md).</Description>
+    <PackageTags>ui;winforms;gui;cross-platform;native;pinvoke;macos;cocoa;aot;trimming</PackageTags>
+
+    <!-- Ships a .snupkg to nuget.org's symbol server, which needs a real portable PDB; this
+         overrides the repo-wide Release DebugType=none (see Directory.Build.props). -->
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
     <IsAotCompatible>true</IsAotCompatible>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

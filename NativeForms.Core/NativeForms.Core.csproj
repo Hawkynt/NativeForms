@@ -4,8 +4,14 @@
     <AssemblyName>Hawkynt.NativeForms</AssemblyName>
     <RootNamespace>Hawkynt.NativeForms</RootNamespace>
     <PackageId>Hawkynt.NativeForms</PackageId>
+    <Version>1.0.0</Version>
     <Description>A fast, low-footprint, trim/AOT-compatible UI toolkit with a Windows Forms-shaped API that renders through platform-native widgets (Win32, GTK, Cocoa) via P/Invoke. This is the platform-agnostic core: public controls plus the backend abstraction.</Description>
     <PackageTags>ui;winforms;gui;cross-platform;native;pinvoke;gtk;win32;aot;trimming</PackageTags>
+
+    <!-- Ships a .snupkg to nuget.org's symbol server, which needs a real portable PDB; this
+         overrides the repo-wide Release DebugType=none (see Directory.Build.props). -->
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
 
     <!-- Headline goal of this repo: consumers can trim and NativeAOT-compile against us.
          IsAotCompatible turns on the trim + AOT + single-file analyzers so any reflection or

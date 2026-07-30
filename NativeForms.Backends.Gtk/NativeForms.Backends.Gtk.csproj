@@ -4,8 +4,14 @@
     <AssemblyName>Hawkynt.NativeForms.Backends.Gtk</AssemblyName>
     <RootNamespace>Hawkynt.NativeForms.Backends.Gtk</RootNamespace>
     <PackageId>Hawkynt.NativeForms.Backends.Gtk</PackageId>
+    <Version>1.0.0</Version>
     <Description>The Linux (GTK 3) backend for NativeForms. A thin, reflection-free P/Invoke layer that realizes NativeForms controls as native GTK widgets through libgtk-3, staying fully trim- and NativeAOT-compatible.</Description>
     <PackageTags>ui;winforms;gui;cross-platform;native;pinvoke;gtk;gtk3;linux;aot;trimming</PackageTags>
+
+    <!-- Ships a .snupkg to nuget.org's symbol server, which needs a real portable PDB; this
+         overrides the repo-wide Release DebugType=none (see Directory.Build.props). -->
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
 
     <!-- Headline goal: consumers can trim and NativeAOT-compile against us. Every P/Invoke here is
          source-generated (LibraryImport) and every GTK callback is an UnmanagedCallersOnly function

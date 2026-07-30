@@ -1,0 +1,26 @@
+<Project>
+
+  <!-- Packaging settings that can only be decided AFTER a project has said whether it ships.
+       Directory.Build.props is imported before the project body, where <IsPackable> has not been
+       written yet, so anything keyed on it has to live here: this file is imported afterwards.
+       Non-shipping projects (demo, tests, benchmarks, trim probe, generator) set IsPackable=false
+       and are skipped by every condition below. -->
+
+  <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+    <!-- nuget.org shows this on the package page; without it every pack emits NU5039-adjacent
+         "package is missing a readme" advice and consumers land on a blank description. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Symbols are published to nuget.org's symbol server as a .snupkg. The matching
+         DebugType=portable cannot live here: the SDK derives _DebugSymbolsProduced from DebugType
+         while importing its own targets, which happens before this file is read, so a PDB written
+         here would never reach the output folder. Each shipping csproj sets it instead. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>
