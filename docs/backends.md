@@ -24,15 +24,100 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 
 ## Side by side
 
-Left to right: GTK 3, Win32, Cocoa.
+Every page of the gallery, left to right: GTK 3, Win32, Cocoa. Nothing is scaled — each panel is that
+backend's own capture at its own pixels, padded to a common height — so a control that comes out a
+different width is one the platform measured differently rather than one a resize moved. The GTK
+window is the largest of the three, which is why its column shows more of whatever fills the space it
+is given.
 
-### DataGridView
+### Basics
+
+![The Basics page on all three backends](screenshots/backends/00-basics.png)
+
+The mnemonic's underline is drawn on macOS and on neither of the other two. GTK and Windows hide it
+until Alt is held, which is their desktops' convention; this one has no such convention and no
+message that reports the modifier, so the line is simply drawn.
+
+### Input
+
+![The Input page on all three backends](screenshots/backends/01-input.png)
+
+Only GTK shows the multiline placeholder: `EM_SETCUEBANNER` is a single-line message a multiline
+`EDIT` ignores, `NSTextView` carries no placeholder at all, and painting one over an editor whose
+caret and selection belong to the platform is a fight both backend sections below decline. The
+standalone scroll bars are the second tell — Windows 11 draws a themed scroll bar as a hairline until
+the pointer is over it, and nothing is hovering while a capture is taken.
+
+### Lists
+
+![The Lists page on all three backends](screenshots/backends/02-lists.png)
+
+### Grid
 
 ![The Grid page on all three backends](screenshots/backends/03-grid.png)
+
+### Layout
+
+![The Layout page on all three backends](screenshots/backends/04-layout.png)
+
+### Dock
+
+![The Dock page on all three backends](screenshots/backends/05-dock.png)
+
+### Pickers
+
+![The Pickers page on all three backends](screenshots/backends/06-pickers.png)
+
+### Ribbon
+
+![The Ribbon page on all three backends](screenshots/backends/07-ribbon.png)
+
+### Calendar
+
+![The Calendar page on all three backends](screenshots/backends/08-calendar.png)
+
+### Menus
+
+![The Menus page on all three backends](screenshots/backends/09-menus.png)
+
+No menu is open in any of the three, and none is missing: a menu is a borderless window of its own,
+and what is photographed is the page that opens it.
+
+### Tools
+
+![The Tools page on all three backends](screenshots/backends/10-tools.png)
+
+### Date/Time
+
+![The Date and Time page on all three backends](screenshots/backends/11-datetime.png)
+
+### Images
+
+![The Images page on all three backends](screenshots/backends/12-images.png)
+
+The six size modes are the one thing in the gallery that is arithmetic rather than judgement, and the
+three columns agree row for row: the 150×70 source stands 70 rows tall against the top of its 150×100
+box under `Normal`, the same 70 rows centred under `CenterImage`, `Zoom` and `FitToWidth`, the whole
+box under `StretchImage`, and a 214-wide scale clipped to the box's width under `FitToHeight`.
 
 ### Widgets
 
 ![The Widgets page on all three backends](screenshots/backends/13-widgets.png)
+
+### Editors
+
+![The Editors page on all three backends](screenshots/backends/14-editors.png)
+
+### Native
+
+![The Native page on all three backends](screenshots/backends/15-native.png)
+
+The promotion page reads down its three groups rather than across the three columns: the first is
+realised onto the platform's own widget, the second is the owner-drawn twin carrying the same
+properties, and the third is what no platform offers and the toolkit therefore paints. The group box
+is the clearest tell, and the difference is between desktops rather than between the two renderings —
+GTK and Win32 both break the frame around the caption, where AppKit sets the caption above a rounded
+`NSBox`.
 
 ## Where the differences come from
 
