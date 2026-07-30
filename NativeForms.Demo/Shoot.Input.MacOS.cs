@@ -75,6 +75,10 @@ internal static partial class ShootInputMac
     private static partial void SendVoid(nint receiver, nint selector, [MarshalAs(UnmanagedType.U1)] bool argument);
 
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static partial bool SendBool(nint receiver, nint selector);
+
+    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial ushort SendUShort(nint receiver, nint selector);
 
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
@@ -310,14 +314,21 @@ internal static partial class ShootInputMac
     }
 
     /// <summary>Clicks at a screen point, reporting whether the events were built and posted.</summary>
+    /// <remarks>
+    /// Aimed at whichever window is under the point rather than at the run's target window, because a
+    /// posted event names the window it is going to and AppKit routes it there without consulting the
+    /// geometry: a press aimed at a menu but addressed to the window behind it is delivered to the
+    /// window behind it. That is invisible while nothing overlaps — every gallery page has exactly one
+    /// window under every point — and it is the whole question the moment a popup is open.
+    /// </remarks>
     public static bool Click(Point screen)
     {
-        var window = TargetWindow();
+        var window = WindowAt(screen);
         if (window == 0)
             return false;
 
         var at = InWindow(window, screen);
-        var number = WindowNumber();
+        var number = Send(window, sel_registerName("windowNumber"));
 
         // The whole gesture is queued before anything is dispatched, because a control that tracks the
         // pointer runs its own loop from mouseDown: and pulls the release out of the queue itself — a
@@ -337,8 +348,9 @@ internal static partial class ShootInputMac
     /// </remarks>
     public static bool Move(Point screen)
     {
-        var window = TargetWindow();
-        return window != 0 && Post(MouseEvent(_MouseMoved, InWindow(window, screen), WindowNumber()));
+        var window = WindowAt(screen);
+        return window != 0
+            && Post(MouseEvent(_MouseMoved, InWindow(window, screen), Send(window, sel_registerName("windowNumber"))));
     }
 
     /// <summary>Types one character, reporting whether the events were built and posted.</summary>
@@ -439,6 +451,58 @@ internal static partial class ShootInputMac
     {
         var window = TargetWindow();
         return window == 0 ? 0 : Send(window, sel_registerName("windowNumber"));
+    }
+
+    /// <summary>
+    /// The frontmost window of this application whose content covers a screen point, or the run's
+    /// target window where none does.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked by hit-testing each window's content view rather than by comparing frames, which needs no
+    /// struct-returning message send and no second opinion about where a window's chrome ends:
+    /// <c>hitTest:</c> takes its point in the receiver's superview coordinates, and a content view's
+    /// superview is the window's own space — exactly what <see cref="InWindow"/> already answers in.
+    /// A point outside gets nil, which is the containment test.
+    /// </para>
+    /// <para>
+    /// Front-most by <c>orderedIndex</c>, where zero is the window nearest the viewer, so a menu
+    /// standing over the dialog that opened it takes the press rather than the dialog underneath.
+    /// </para>
+    /// </remarks>
+    private static nint WindowAt(Point screen)
+    {
+        var app = SharedApplication();
+        var windows = app == 0 ? 0 : Send(app, sel_registerName("windows"));
+        var count = windows == 0 ? 0 : (int)Send(windows, sel_registerName("count"));
+        var height = CGDisplayPixelsHigh(CGMainDisplayID());
+        var onScreen = new CGPoint { X = screen.X, Y = height - screen.Y };
+
+        var found = (nint)0;
+        var frontmost = int.MaxValue;
+        for (var i = 0; i < count; ++i)
+        {
+            var window = Send(windows, sel_registerName("objectAtIndex:"), i);
+            if (window == 0 || !SendBool(window, sel_registerName("isVisible")))
+                continue;
+
+            var content = Send(window, sel_registerName("contentView"));
+            if (content == 0)
+                continue;
+
+            var local = SendPoint(window, sel_registerName("convertPointFromScreen:"), onScreen);
+            if (SendHitTest(content, sel_registerName("hitTest:"), local) == 0)
+                continue;
+
+            var order = (int)Send(window, sel_registerName("orderedIndex"));
+            if (order >= frontmost)
+                continue;
+
+            found = window;
+            frontmost = order;
+        }
+
+        return found != 0 ? found : TargetWindow();
     }
 
     /// <summary>A toolkit screen point in a window's own coordinates, which is where an event lands.</summary>

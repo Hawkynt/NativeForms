@@ -932,13 +932,25 @@ toolkit can consume — a left, right or other mouse press, and a key going down
 else without disturbing it, which is exactly what an `NSButton`'s own tracking loop does while it
 waits for a release.
 
-One thing about a popup inside a dialog is still the platform's rule rather than ours: a session
-withholds events from every window but the modal one, and a toolkit popup is a borderless window of
-its own rather than a child of the dialog. So a press *outside* the popup reaches the toolkit, because
-the pump sees the whole queue, and a press *inside* it does not, because the session declines to
-dispatch it and the toolkit has no reason to swallow it. Light dismiss works; picking an item out of a
-menu opened inside a dialog does not. That is the child-window question again, and it is written down
-here rather than answered with a reparenting nobody can watch.
+A popup inside a dialog needed one more thing, and the platform had it. A session withholds events
+from every window but the modal one, so a press *outside* the popup reached the toolkit — the pump
+sees the whole queue — and a press *inside* it did not, because the session declined to dispatch it
+and the toolkit had no reason to swallow it. Light dismiss worked; picking an item out of a menu
+opened inside a dialog did not, which made a dialog carrying a combo box or a context menu something
+an application could put up and nobody could use.
+
+The route taken is not the reparenting this page used to name as the untried one. Making every popup a
+child window of the dialog would have the toolkit rearranging window hierarchies to work around a rule
+of the platform's, and would have to be undone when the dialog closes. A panel is the platform's own
+exception to that rule: `NSPanel` answers `worksWhenModal`, and a panel that answers YES receives
+keyboard and mouse events while something else is modal. It is how the font and colour panels keep
+working during a modal session, and it is set rather than worked around — so a toolkit popup is an
+`NSPanel` here, and nothing about modality has been reimplemented.
+
+One thing comes with the class and has to be turned back off. An `NSPanel` hides itself when the
+application is deactivated where an `NSWindow` does not, and a menu that vanished because another
+application took the focus would be a behaviour neither of the other two backends has — both keep
+their popups up — so `hidesOnDeactivate` is set to NO.
 
 This one is witnessed. The probe puts a real form up modally at the end of its run, with a `Timer` set
 to close it, and reports how long `ShowDialog` took and what it answered. That is two claims in one
@@ -949,11 +961,24 @@ open. It runs on macOS alone, because a check whose failure mode is a wait belon
 bounded at three minutes and advisory rather than in the gating Windows one, which has no step timeout
 at all.
 
-The popup inside it is witnessed the same way, and it took three visits rather than one to arrange.
-The dialog's timer opens a context menu on the first tick, posts a press at a corner of the dialog on
-the second, and reads the menu's own `IsOpen` on the third — because the press has to be delivered by
-the modal pump, and the modal pump is not turning while a tick is inside it. The log says which of the
-three it got to, so a run that never opened the menu cannot be read as one that dismissed it.
+The popup inside it is witnessed the same way, and it takes a visit per gesture to arrange. The
+dialog's timer opens a context menu on the first tick, posts a press on its first row on the second,
+reads whether the item's `Click` fired on the third and opens the menu again, posts a press at a corner
+of the dialog on the fourth and reads the menu's own `IsOpen` on the fifth — a tick each, because every
+press has to be delivered by the modal pump and the modal pump is not turning while a tick is inside
+it. The log says which of the five it got to, so a run that never opened the menu cannot be read as one
+that dismissed it.
+
+Two details make the aim answerable rather than approximate. The press goes at the middle of the first
+row, which the drop-down's own layout defines — a one-pixel border above it and the theme's row height
+for the row — so a miss cannot be a press that landed on the border. And the injector now aims at
+whichever window is under the point rather than at the run's target window: a posted `NSEvent` names
+the window it is going to and AppKit routes it there without consulting the geometry, so a press aimed
+at a menu but addressed to the dialog behind it is delivered to the dialog. That was invisible for as
+long as nothing overlapped — every gallery page has one window under every point — and it is the whole
+question the moment a popup is open. The window is found by hit-testing each of the application's
+content views, which needs no struct-returning message send, and ties are broken by `orderedIndex`, so
+the menu standing over the dialog takes the press.
 
 A label carries a picture and underlines its mnemonic, which are the last two calls on this backend
 that did nothing. Neither is a new idea: the other two do not draw an icon beside a caption either, so
@@ -1030,9 +1055,9 @@ where they arise, as is the pair of `RichTextBox` limits that come down to Objec
 **Written down rather than written.** Nothing. This half of the list is empty, and it is worth saying
 so out loud rather than quietly deleting the heading: everything this backend does not do is now
 either something the platform does not have, listed above and argued for, or a limit set out where it
-arises — an `NSSlider`'s step sizes, a drop-down that opens modally, a menu item that cannot be chosen
-inside a dialog, a hover that is wired and not witnessed, a multiline box with no placeholder. What is
-left is a backend that is honest rather than one that is finished.
+arises — an `NSSlider`'s step sizes, a drop-down that opens modally, a hover that is wired and not
+witnessed, a multiline box with no placeholder. What is left is a backend that is honest rather than
+one that is finished.
 
 That last one is the Win32 paragraph's argument in another accent, and it belongs on this page rather
 than in a screenshot nobody reads closely. `NSTextField` carries a `placeholderString` and

@@ -344,6 +344,10 @@ internal static partial class Shoot
     /// </remarks>
     private static string _popupInDialog = "not reached";
 
+    /// <summary>What a press on an item of that popup did — the other half, and the harder one.</summary>
+    /// <inheritdoc cref="_popupInDialog"/>
+    private static string _itemInDialog = "not reached";
+
     /// <summary>
     /// Shows a form modally and reports whether the call actually blocked, or <see langword="null"/>
     /// where this is not the platform that needed asking.
@@ -386,22 +390,36 @@ internal static partial class Shoot
         var menu = new ContextMenuStrip();
         menu.Items.AddRange(new ToolStripMenuItem("One"), new ToolStripMenuItem("Two"));
 
+        var chosen = 0;
+        menu.Items[0].Click += (_, _) => ++chosen;
+
+        // Where the first row is, rather than where the menu roughly is. A drop-down puts a one-pixel
+        // border above its first item and gives every item the theme's row height, so the middle of
+        // row one is a point the layout defines rather than one this check guesses at — and a press
+        // that landed on the border instead would report "the item was not chosen" for a reason that
+        // has nothing to do with what is being asked.
+        const int menuX = 200;
+        const int menuY = 100;
+        var row = Hawkynt.NativeForms.Backends.BackendRegistry.Resolve().Theme.RowHeight;
+        var onFirstItem = new Point(menuX + 12, menuY + 1 + (row / 2));
+
         // Started before the dialog goes up, because ShowDialog does not come back until it comes
-        // down: there is no later moment to arm anything from. Three ticks rather than one, because
-        // the press that dismisses the popup has to be delivered by the modal loop and the modal loop
-        // is not turning while this handler is inside it — so opening, pressing and reading the answer
-        // are three separate visits.
+        // down: there is no later moment to arm anything from. One tick per gesture, because every
+        // press has to be delivered by the modal loop and the modal loop is not turning while this
+        // handler is inside it — so opening, pressing and reading the answer are separate visits, and
+        // there are two presses to make.
         var step = 0;
-        var posted = false;
+        var pickPosted = false;
+        var outsidePosted = false;
         var closer = new Timer { Interval = 200 };
         closer.Tick += (_, _) =>
         {
             switch (++step)
             {
                 case 1:
-                    menu.Show(dialog, new(200, 100));
+                    menu.Show(dialog, new(menuX, menuY));
                     if (!menu.IsOpen)
-                        _popupInDialog = "a popup opened inside the dialog did not report itself open";
+                        _itemInDialog = "a popup opened inside the dialog did not report itself open";
 
                     return;
 
@@ -412,14 +430,38 @@ internal static partial class Shoot
                     if (!menu.IsOpen)
                         return;
 
-                    posted = ShootInputMac.Click(dialog.PointToScreen(new(10, 10)));
-                    if (!posted)
+                    pickPosted = ShootInputMac.Click(dialog.PointToScreen(onFirstItem));
+                    if (!pickPosted)
+                        _itemInDialog = "a press on the popup's first item could not be posted";
+
+                    return;
+
+                case 3:
+                    if (pickPosted)
+                        _itemInDialog = chosen > 0
+                            ? "an item of a popup opened inside the dialog was chosen by a press on it"
+                            : "an item of a popup opened inside the dialog was NOT chosen by a press on it "
+                                + $"(the menu is {(menu.IsOpen ? "still open" : "closed")})";
+
+                    // The second half needs the surface back: choosing an item closes the cascade.
+                    menu.Show(dialog, new(menuX, menuY));
+                    if (!menu.IsOpen)
+                        _popupInDialog = "the popup would not open a second time";
+
+                    return;
+
+                case 4:
+                    if (!menu.IsOpen)
+                        return;
+
+                    outsidePosted = ShootInputMac.Click(dialog.PointToScreen(new(10, 10)));
+                    if (!outsidePosted)
                         _popupInDialog = "a press outside the popup could not be posted";
 
                     return;
 
                 default:
-                    if (posted)
+                    if (outsidePosted)
                         _popupInDialog = menu.IsOpen
                             ? "a popup opened inside the dialog was NOT dismissed by a press outside it"
                             : "a popup opened inside the dialog dismissed on a press outside it";
@@ -447,6 +489,7 @@ internal static partial class Shoot
                 + "(so the session ran, and the timer that ended it was drained inside it)"
             : $"modal dialog: ShowDialog returned after {elapsed} ms with {result} — it did NOT block, "
                 + "so a caller would have its answer before the user saw the window")
+            + Environment.NewLine + "  modal dialog: " + _itemInDialog
             + Environment.NewLine + "  modal dialog: " + _popupInDialog;
     }
 

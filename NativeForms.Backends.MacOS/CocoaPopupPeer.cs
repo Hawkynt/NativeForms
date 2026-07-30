@@ -39,11 +39,11 @@ internal sealed class CocoaPopupPeer : IPopupPeer
 
     public CocoaPopupPeer()
     {
-        // The same subclass a form's window is, and for the same reason: a canvas inside a popup takes
-        // the keyboard through its window, so a stock NSWindow here would be a surface whose focus
-        // changes nothing hears (see CocoaFocus).
-        var windows = CocoaFocus.WindowClass;
-        var allocated = windows == 0 ? 0 : CocoaRuntime.SendPointer(windows, CocoaRuntime.sel_registerName("alloc"));
+        // An NSPanel rather than an NSWindow, and a runtime subclass of one for the reason a form's
+        // window is: a canvas inside a popup takes the keyboard through its window, so a stock class
+        // here would be a surface whose focus changes nothing hears (see CocoaFocus).
+        var panels = CocoaFocus.PanelClass;
+        var allocated = panels == 0 ? 0 : CocoaRuntime.SendPointer(panels, CocoaRuntime.sel_registerName("alloc"));
         _window = allocated == 0
             ? 0
             : CocoaRuntime.SendRect(
@@ -61,6 +61,20 @@ internal sealed class CocoaPopupPeer : IPopupPeer
         // to. This one is never the key window either, which is why the canvas asks for its tracking
         // area with NSTrackingActiveAlways.
         CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setAcceptsMouseMovedEvents:"), true);
+
+        // The whole reason this is a panel. A modal session withholds events from every window but the
+        // one it was begun for, so a menu opened inside a dialog could be dismissed from outside — the
+        // loop sees the whole queue — and could not have an item picked out of it, because the session
+        // declined to dispatch the press that would have chosen one. A panel is the platform's own
+        // exception to that rule, which is how the font and colour panels keep working while something
+        // is modal, and it is the answer AppKit has for this rather than one of ours.
+        if (CocoaRuntime.Responds(_window, "setWorksWhenModal:"))
+            CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setWorksWhenModal:"), true);
+
+        // An NSPanel hides itself when the application is deactivated, where an NSWindow does not, and
+        // a menu that vanished because something else took the focus would be a behaviour change none
+        // of the three backends has. The other two keep their popups up, and so does this one.
+        CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setHidesOnDeactivate:"), false);
 
         if (_canvas.Handle != 0)
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setContentView:"), _canvas.Handle);

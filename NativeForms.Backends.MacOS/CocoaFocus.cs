@@ -166,55 +166,73 @@ internal static unsafe class CocoaFocus
     /// <summary>The runtime <c>NSWindow</c> subclass, built on first use.</summary>
     private static nint _windowClass;
 
+    /// <summary>The runtime <c>NSPanel</c> subclass a popup is, built on first use.</summary>
+    private static nint _panelClass;
+
     /// <summary>
-    /// <c>NSWindow</c>'s own <c>makeFirstResponder:</c>, so the override can run the real one.
+    /// Each superclass's own <c>makeFirstResponder:</c>, so the override can run the real one.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Looked up once and called as a function pointer rather than sent with
     /// <c>objc_msgSendSuper</c>. Both reach the same code; this one needs no <c>objc_super</c> struct
     /// and, more to the point, does not have to work out the receiver's superclass at call time — a
     /// class AppKit has swizzled underneath us (KVO builds one silently) would make that answer point
     /// back at this class and turn the call into recursion.
+    /// </para>
+    /// <para>
+    /// Two of them, and therefore two overrides that do nothing but name one. <c>NSPanel</c> inherits
+    /// this method rather than defining one, so today both hold the same address — but a shared
+    /// implementation would have to pick a superclass without being told which object it is answering
+    /// for, and the version of AppKit where that assumption stops holding would not announce itself.
+    /// </para>
     /// </remarks>
-    private static nint _base;
+    private static nint _windowBase, _panelBase;
 
     /// <summary>The class a window peer allocates: an <c>NSWindow</c> that reports responder changes.</summary>
     internal static nint WindowClass
-    {
-        get
-        {
-            EnsureWindowClass();
-            return _windowClass;
-        }
-    }
+        => Ensure(
+            ref _windowClass,
+            ref _windowBase,
+            "NSWindow",
+            "NativeFormsWindow",
+            (nint)(delegate* unmanaged<nint, nint, nint, byte>)&WindowMakeFirstResponder);
 
-    private static void EnsureWindowClass()
-    {
-        if (_windowClass != 0 || !CocoaRuntime.Available)
-            return;
+    /// <summary>
+    /// The class a popup allocates: the same reporting, on an <c>NSPanel</c> so it can be told to work
+    /// while a dialog is modal.
+    /// </summary>
+    internal static nint PanelClass
+        => Ensure(
+            ref _panelClass,
+            ref _panelBase,
+            "NSPanel",
+            "NativeFormsPanel",
+            (nint)(delegate* unmanaged<nint, nint, nint, byte>)&PanelMakeFirstResponder);
 
-        var superclass = CocoaRuntime.objc_getClass("NSWindow");
+    /// <summary>Builds one of the two runtime classes, or answers zero where AppKit is not here.</summary>
+    private static nint Ensure(ref nint cls, ref nint baseImplementation, string superName, string name, nint implementation)
+    {
+        if (cls != 0 || !CocoaRuntime.Available)
+            return cls;
+
+        var superclass = CocoaRuntime.objc_getClass(superName);
         if (superclass == 0)
-            return;
+            return 0;
 
         var selector = CocoaRuntime.sel_registerName("makeFirstResponder:");
-        _base = CocoaRuntime.class_getMethodImplementation(superclass, selector);
-        if (_base == 0)
-            return;
+        baseImplementation = CocoaRuntime.class_getMethodImplementation(superclass, selector);
+        if (baseImplementation == 0)
+            return 0;
 
-        var created = CocoaRuntime.objc_allocateClassPair(superclass, "NativeFormsWindow", 0);
+        var created = CocoaRuntime.objc_allocateClassPair(superclass, name, 0);
         if (created == 0)
-            return;
+            return 0;
 
         // "c@:@": answers a BOOL, takes self, _cmd and the responder being installed.
-        CocoaRuntime.class_addMethod(
-            created,
-            selector,
-            (nint)(delegate* unmanaged<nint, nint, nint, byte>)&MakeFirstResponder,
-            "c@:@");
-
+        CocoaRuntime.class_addMethod(created, selector, implementation, "c@:@");
         CocoaRuntime.objc_registerClassPair(created);
-        _windowClass = created;
+        return cls = created;
     }
 
     /// <summary>How deep AppKit currently is inside this override.</summary>
@@ -247,13 +265,22 @@ internal static unsafe class CocoaFocus
     /// </para>
     /// </remarks>
     [UnmanagedCallersOnly]
-    private static byte MakeFirstResponder(nint self, nint selector, nint responder)
+    private static byte WindowMakeFirstResponder(nint self, nint selector, nint responder)
+        => Forward(_windowBase, self, selector, responder);
+
+    /// <inheritdoc cref="WindowMakeFirstResponder"/>
+    [UnmanagedCallersOnly]
+    private static byte PanelMakeFirstResponder(nint self, nint selector, nint responder)
+        => Forward(_panelBase, self, selector, responder);
+
+    /// <inheritdoc cref="WindowMakeFirstResponder"/>
+    private static byte Forward(nint implementation, nint self, nint selector, nint responder)
     {
         byte accepted;
         ++_depth;
         try
         {
-            accepted = ((delegate* unmanaged<nint, nint, nint, byte>)_base)(self, selector, responder);
+            accepted = ((delegate* unmanaged<nint, nint, nint, byte>)implementation)(self, selector, responder);
         }
         finally
         {
