@@ -386,8 +386,9 @@ internal static partial class Shoot
                             ? " — but the same move reached it once the canvas held the keyboard, so the "
                                 + "toolkit's own mouse plumbing is live and it is the tracking area that "
                                 + "a posted event does not drive"
-                            : $" — nor with the canvas holding the keyboard (Focused={hovered.Focused}), "
-                                + "so no moved event is delivered on this route at all"));
+                            : $" — nor with the canvas holding the keyboard (Focused={hovered.Focused}, "
+                                + $"{ShootInputMac.Activation()}), so no moved event is delivered on "
+                                + "this route at all"));
                 }
             }
             finally

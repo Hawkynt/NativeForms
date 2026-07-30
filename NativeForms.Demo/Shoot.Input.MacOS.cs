@@ -339,6 +339,30 @@ internal static partial class ShootInputMac
         return raw == 0 ? "an unnamed class" : Marshal.PtrToStringUTF8(raw) ?? "an unnamed class";
     }
 
+    /// <summary>
+    /// Whether the application is active and whether the window a gesture is aimed at holds the key
+    /// status.
+    /// </summary>
+    /// <remarks>
+    /// The last thing on this route that could account for a moved event reaching nothing. AppKit
+    /// hands a mouse-moved event to a window's first responder, and whether it does so for a window
+    /// that is not key is not something a header states — so a report that the canvas held the
+    /// keyboard and heard nothing anyway is only conclusive alongside this. A runner has nothing
+    /// competing for the focus, which is precisely why it cannot be assumed either way.
+    /// </remarks>
+    public static string Activation()
+    {
+        var app = SharedApplication();
+        if (app == 0)
+            return "there is no application to ask";
+
+        var active = SendBool(app, sel_registerName("isActive"));
+        var key = Send(app, sel_registerName("keyWindow"));
+        var target = TargetWindow();
+        return $"the application is {(active ? "active" : "INACTIVE")} and the window is "
+            + (key == 0 ? "not key, and nothing is" : key == target ? "the key one" : "not key, another is");
+    }
+
     /// <summary>Clicks at a screen point, reporting whether the events were built and posted.</summary>
     /// <remarks>
     /// Aimed at whichever window is under the point rather than at the run's target window, because a
