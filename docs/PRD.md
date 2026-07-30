@@ -945,6 +945,17 @@ strategy (may differ per platform; note exceptions inline).
 - [x] **Reference documentation**: every shipped control/subsystem has a page under `docs/`
       (usage example + API tables + notes + WinForms deltas); both READMEs link into the docs and
       carry the control index (coverage tracked in §11).
+- [x] **Distribution**: `dotnet pack NativeForms.sln` produces exactly four packages —
+      `Hawkynt.NativeForms` (Core, carrying the `[GridEditable]` source generator at
+      `analyzers/dotnet/cs` so a consumer gets `PopulateGrid` with no extra reference) and one per
+      backend, so an app takes only the platform it targets. Each carries the README, an
+      LGPL-3.0-or-later expression, and a `.snupkg` of portable symbols; each is versioned
+      MAJOR.MINOR.PATCH from its own csproj with `version.pl --stamp` appending the commit count of
+      that project's own folder, so an untouched package composes the version it already published
+      and `--skip-duplicate` leaves it alone. `release.yml` (manual dispatch only) publishes them to
+      nuget.org with a Trusted Publishing OIDC key, falling back to a stored token, and fails the
+      release if a pushed package never becomes available. Demo, tests, benchmarks, trim probe and
+      the generator itself are `IsPackable=false` and produce nothing.
 
 ---
 

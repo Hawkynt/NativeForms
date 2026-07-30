@@ -31,8 +31,136 @@ jobs:
     needs: ci
     uses: ./.github/workflows/_build.yml
 
+  nuget:
+    # Publishes the four packages _build.yml already packed (Core + the three backends, each with its
+    # own version.pl-stamped version and a .snupkg of symbols). Nightly builds the same packages but
+    # deliberately never pushes them — this job is the only path to nuget.org.
+    needs: [ci, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the job ask GitHub for the short-lived OIDC token that nuget.org's Trusted Publishing
+      # exchanges for a one-hour API key. Without this the login step below cannot mint a token at
+      # all, and the push falls back to the stored NUGET_TOKEN.
+      id-token: write
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-artifacts
+          path: dist
+
+      # All four packages have to exist before anything is pushed. `dotnet pack` can succeed while
+      # producing nothing for a project (IsPackable off, a renamed PackageId, an analyzer whose
+      # prebuilt DLL was not there yet) and the push loop below globs — so a missing package would
+      # push the other three and finish green.
+      - name: Verify every package was produced
+        run: |
+          ls -la dist/ || { echo "::error::the build artifact carried no dist directory"; exit 1; }
+          for id in Hawkynt.NativeForms \
+                    Hawkynt.NativeForms.Backends.Windows \
+                    Hawkynt.NativeForms.Backends.Gtk \
+                    Hawkynt.NativeForms.Backends.MacOS; do
+            for ext in nupkg snupkg; do
+              if ! ls dist/"$id".*."$ext" >/dev/null 2>&1; then
+                echo "::error::no .$ext was produced for $id"
+                exit 1
+              fi
+            done
+          done
+
+      # Trusted Publishing: nuget.org exchanges a GitHub OIDC token for an API key valid one hour,
+      # so no long-lived secret has to exist. It needs a policy on nuget.org (your username ▸ Trusted
+      # Publishing) naming owner `Hawkynt`, repository `NativeForms` and workflow file `release.yml`,
+      # plus the NUGET_USER repository secret holding that nuget.org account name. Until the policy
+      # exists this step fails and the push below falls back to NUGET_TOKEN, so adopting it is a
+      # nuget.org-side change that needs no second commit here.
+      - name: NuGet login (OIDC → short-lived key)
+        id: nugetlogin
+        continue-on-error: true
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet.org
+        env:
+          OIDC_KEY: ${{ steps.nugetlogin.outputs.NUGET_API_KEY }}
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+        run: |
+          if [ -n "$OIDC_KEY" ]; then
+            echo "Publishing with a short-lived Trusted Publishing key."
+            KEY="$OIDC_KEY"
+          elif [ -n "$NUGET_TOKEN" ]; then
+            echo "::warning::Trusted Publishing is not configured; falling back to the stored NUGET_TOKEN."
+            KEY="$NUGET_TOKEN"
+          else
+            # This workflow is manual-dispatch only, so there is no PR or fork case to skip for: no
+            # credential means the release is about to be cut with nothing published, which is the
+            # failure this step exists to prevent rather than to wave through.
+            echo "::error::No publishing credential — configure Trusted Publishing or set NUGET_TOKEN."
+            exit 1
+          fi
+
+          # skip-duplicate is load-bearing, not defensive: version.pl derives each package's BUILD
+          # field from the commit count of ITS OWN folder, so a backend nobody touched composes the
+          # version it already published and is meant to be left alone.
+          for pkg in dist/*.nupkg; do
+            echo "Pushing $(basename "$pkg")"
+            dotnet nuget push "$pkg" \
+              --api-key "$KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+          # The client pushes a .snupkg sitting next to its .nupkg on its own, but symbols that
+          # silently did not ship are indistinguishable from symbols that did — so ask explicitly and
+          # let skip-duplicate absorb the ones already accepted above.
+          for sym in dist/*.snupkg; do
+            echo "Pushing $(basename "$sym")"
+            dotnet nuget push "$sym" \
+              --api-key "$KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+      # "Your package was pushed" only means nuget.org accepted it for validation. A package can be
+      # accepted and then never become available, and nothing downstream notices because the push
+      # itself exited 0.
+      - name: Wait for the packages to become available
+        run: |
+          fail=0
+          for pkg in dist/*.nupkg; do
+            base=$(basename "$pkg" .nupkg)
+            # "Id.1.2.3.4" -> id, version. The version is the trailing dotted-numeric run.
+            version=$(echo "$base" | grep -oE '[0-9]+(\.[0-9]+)*$')
+            id=${base%.$version}
+            lower=$(echo "$id" | tr '[:upper:]' '[:lower:]')
+
+            echo "Waiting for $id $version…"
+            found=0
+            for _ in $(seq 1 60); do
+              if curl -sf "https://api.nuget.org/v3-flatcontainer/$lower/index.json" \
+                   | grep -q "\"$version\""; then
+                echo "  available"
+                found=1
+                break
+              fi
+              sleep 15
+            done
+
+            if [ "$found" -ne 1 ]; then
+              echo "::error::$id $version was pushed but never became available on nuget.org — it likely failed validation. Check the rejection mail on the nuget.org account."
+              fail=1
+            fi
+          done
+          exit $fail
+
   release:
-    needs: build
+    # Also waits on nuget: a release tagged vyyyyMMdd whose packages never reached nuget.org is a
+    # release in name only.
+    needs: [build, nuget]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
