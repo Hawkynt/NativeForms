@@ -27,8 +27,13 @@
        ProjectReference (which would drag the netstandard2.0 analyzer into a consumer's NativeAOT publish
        graph and trip NETSDK1207); instead its prebuilt DLL is packed under analyzers/dotnet/cs. Referencing
        the Hawkynt.NativeForms package therefore turns on `[GridEditable]` → PopulateGrid automatically, while
-       the typed AddRow<T> builders keep working with no attributes and no analyzer at all. -->
-  <Target Name="_BuildPropertyGridGenerator" BeforeTargets="Pack">
+       the typed AddRow<T> builders keep working with no attributes and no analyzer at all.
+
+       The hook is on GenerateNuspec, not Pack: GenerateNuspec is where the PackTask actually copies
+       the file, and MSBuild runs a target's DependsOnTargets (which is how Pack reaches GenerateNuspec)
+       BEFORE any BeforeTargets="Pack" hook — so hooking Pack built the generator too late and the pack
+       only found a DLL that some earlier build had happened to leave in bin. -->
+  <Target Name="_BuildPropertyGridGenerator" BeforeTargets="GenerateNuspec">
     <MSBuild Projects="..\NativeForms.Generators\NativeForms.Generators.csproj" Properties="Configuration=$(Configuration)" Targets="Build" />
   </Target>
 

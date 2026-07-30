@@ -7,7 +7,13 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
+
+    <!-- This generator has no package of its own: it travels inside Hawkynt.NativeForms under
+         analyzers/dotnet/cs (see NativeForms.Core.csproj). Without this, the solution-wide
+         `dotnet pack` tries to pack it too and fails with NU5017 — an analyzer contributes no lib/
+         output, and its only PackageReference is PrivateAssets=all, so the package would be empty. -->
+    <IsPackable>false</IsPackable>
+
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsAotCompatible>false</IsAotCompatible>
