@@ -224,11 +224,13 @@ and text measurement work, the clipboard works both ways, a multiline `TextBox` 
 `NSTextView` in an `NSScrollView`, a `NotifyIcon` is a real `NSStatusItem` in the menu bar, and the
 gallery's sixteen pages all pass the walkthrough's state round-trip and layout audit.
 
-Not working yet: hover is routed into the toolkit but not verified end to end the way the Win32
-backend's is. Presses and keys now are — the probe posts them and reports how many arrived, which on
-the last run was two clicks toggling a control and seven keystrokes reaching a focused editor.
-Everything else this backend still declines is listed at the end of this section, split into what the
-platform does not have and what has not been written.
+Not verified end to end the way the Win32 backend's is: hover, which is routed into the toolkit and
+cannot be watched arriving from inside the process — the paragraph on it below sets out what was ruled
+out before saying so. Presses, keys and focus are — the probe posts them and reports what arrived,
+which on the last run was five clicks toggling a control, seven keystrokes reaching a focused editor,
+seven of those clicks moving the keyboard onto one, and two named keys arriving under the names the
+key table gives them. Everything else this backend still declines is listed at the end of this
+section, split into what the platform does not have and what has not been written.
 
 An owner-drawn icon reaches the screen. It did not until now — every control that shows a picture it
 draws itself, which is the toolbar buttons, the list and tree rows, the grid cells, the tab headers
@@ -498,18 +500,30 @@ the deepest view at its own centre, and therefore the one AppKit would hand the 
 control's `MouseMove` has never fired, on any page, while a press at the same point reaches the same
 canvas every time.
 
-The check now asks a sharper question about that than "did anything arrive", because three different
-things could be the reason and only one of them is the platform's. It posts two moves rather than one,
-from outside the control to its middle, since what a tracking area answers is a *crossing* and a lone
-move to a point AppKit already believes the pointer to be at is not one. Every event it builds now
-carries the machine's own clock instead of a timestamp of nought — routing never cared, a press is
-delivered by window number and location, but anything AppKit works out by comparing one event against
-the last one might, and the pointer's history is exactly that sort of thing. And when the move still
-reaches nothing, it is posted once more with the canvas holding the keyboard: a window sends
-`mouseMoved:` to its first responder as well as to the areas that asked for it, so that route reaching
-the control would say the toolkit's own plumbing is live and the tracking area is the half a posted
-event does not drive, where reaching it by neither would say no moved event is delivered on this route
-at all. The closing line's move count says plainly which it was.
+The check asks a sharper question about that than "did anything arrive", because several things could
+account for it and only one of them is the platform's — and it has now eliminated all of the others.
+It posts two moves rather than one, from outside the control to its middle, since what a tracking area
+answers is a *crossing* and a lone move to a point AppKit already believes the pointer to be at is not
+one. Every event it builds carries the machine's own clock instead of a timestamp of nought — routing
+never cared, a press is delivered by window number and location, but anything AppKit works out by
+comparing one event against the last one might, and the pointer's history is exactly that sort of
+thing. When the move still reaches nothing it is posted once more with the canvas holding the
+keyboard, because a window hands `mouseMoved:` to its first responder as well as to the areas that
+asked for one. And the same line reports whether the application is active and whether the window is
+the key one, since whether AppKit delivers a moved event to a window that is not key is not something
+a header states and a runner has nothing competing for the focus.
+
+The artifact answers all of it at once, and the answer is flat: *the application is active, the window
+is the key one and accepts moved events, the canvas under the point holds the keyboard and carries a
+tracking area — and neither route delivers anything.* So the earlier reading of this, that a tracking
+area is driven by the window server's pointer rather than by an event handed to `sendEvent:`, was true
+and not the whole of it: a synthesized mouse-moved event is not delivered on this route by any path
+AppKit has, first responder included. Witnessing hover would therefore need a `CGEvent` at the HID
+tap, which is exactly the route this probe gave up because macOS gates it behind an Accessibility
+grant a hosted runner does not give. That is a limit of the runner rather than of the backend, and it
+is where this one stops: hover stays stated as wired, the check stays in place because it costs three
+posted events and would light up the moment any of that changed, and the closing line's move count
+says plainly that it is nought.
 
 A native widget hears the pointer as well, which it did not before. A canvas hears it because its
 class carries the methods, and an `NSButton` is AppKit's class and can be given none — so its tracking
@@ -1074,9 +1088,10 @@ where they arise, as is the pair of `RichTextBox` limits that come down to Objec
 **Written down rather than written.** Nothing. This half of the list is empty, and it is worth saying
 so out loud rather than quietly deleting the heading: everything this backend does not do is now
 either something the platform does not have, listed above and argued for, or a limit set out where it
-arises — an `NSSlider`'s step sizes, a drop-down that opens modally, a hover that is wired and not
-witnessed, a multiline box with no placeholder. What is left is a backend that is honest rather than
-one that is finished.
+arises — an `NSSlider`'s step sizes, a drop-down that opens modally, a multiline box with no
+placeholder. One entry on that list is neither: hover is written and works, and what cannot be done is
+witnessing it from inside the process, which is the runner's limit rather than the backend's and is
+argued where it arises. What is left is a backend that is honest rather than one that is finished.
 
 That last one is the Win32 paragraph's argument in another accent, and it belongs on this page rather
 than in a screenshot nobody reads closely. `NSTextField` carries a `placeholderString` and
