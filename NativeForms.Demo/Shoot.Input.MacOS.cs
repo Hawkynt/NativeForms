@@ -284,6 +284,31 @@ internal static partial class ShootInputMac
         return raw == 0 ? "an unnamed class" : Marshal.PtrToStringUTF8(raw) ?? "an unnamed class";
     }
 
+    /// <summary>
+    /// The class of whatever currently holds the keyboard in the target window, or a word saying why
+    /// there is nothing to name.
+    /// </summary>
+    /// <remarks>
+    /// What a focus check has to be able to say when it fails. "The control does not report itself
+    /// focused" reads the same whether the press landed somewhere else, whether the widget declined the
+    /// keyboard, or whether it took it and the toolkit did not hear — and the responder's class
+    /// separates the three: a field that is being typed in answers with the window's shared field
+    /// editor rather than with itself, which is the one case a naive check would call a miss.
+    /// </remarks>
+    public static string FirstResponder()
+    {
+        var window = TargetWindow();
+        if (window == 0)
+            return "no window";
+
+        var responder = Send(window, sel_registerName("firstResponder"));
+        if (responder == 0)
+            return "nothing";
+
+        var raw = class_getName(object_getClass(responder));
+        return raw == 0 ? "an unnamed class" : Marshal.PtrToStringUTF8(raw) ?? "an unnamed class";
+    }
+
     /// <summary>Clicks at a screen point, reporting whether the events were built and posted.</summary>
     public static bool Click(Point screen)
     {

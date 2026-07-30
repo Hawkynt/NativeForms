@@ -83,9 +83,23 @@ internal static partial class Shoot
     /// <summary>Pointer moves that were injected through the OS and observed arriving.</summary>
     public static int Hovers { get; private set; }
 
+    /// <summary>Editors an injected click moved the keyboard onto, as the toolkit reported it.</summary>
+    /// <remarks>
+    /// A separate count from <see cref="Clicks"/> because it is a separate claim, and on macOS it was
+    /// a false one until now: no peer there raised the peer-level focus events at all, so
+    /// <c>Control.Focused</c> was false however the keyboard had actually moved and everything in the
+    /// toolkit that reasons about focus — a spin box committing its edit, a form's
+    /// <c>ActiveControl</c> — was reasoning from it.
+    /// </remarks>
+    public static int Focuses { get; private set; }
+
     /// <summary>Whether the run has already said why a posted move reaches nothing.</summary>
     /// <remarks>Once is a finding; sixteen times is a log that buries the fifteen lines around it.</remarks>
     private static bool _moveReported;
+
+    /// <summary>Whether the run has already said why a click focused nothing the toolkit heard about.</summary>
+    /// <inheritdoc cref="_moveReported"/>
+    private static bool _focusReported;
 
     /// <summary>Every control in the tree rooted at <paramref name="control"/>, itself included.</summary>
     private static IEnumerable<Control> Walk(Control control)
@@ -182,21 +196,35 @@ internal static partial class Shoot
             var original = box.Text;
             box.Text = string.Empty;
             var centre = box.PointToScreen(new(box.Width / 2, box.Height / 2));
+
+            // The event as well as the flag. A control can only be focused because its peer said so,
+            // but the flag alone would also be satisfied by a control that was focused before this
+            // click — the event is what says the arrival happened now, from this press.
+            var arrived = 0;
+            EventHandler gained = (_, _) => ++arrived;
+            box.GotFocus += gained;
+
             if (InjectClick(centre))
             {
                 InjectDrain();
 
-                // Only a box the click actually focused can be typed into. A editor hosted inside a
+                if (box.Focused && arrived > 0)
+                    ++Focuses;
+                else if (OperatingSystem.IsMacOS() && !_focusReported)
+                {
+                    // Named rather than guessed at, for the reason FirstResponder gives: a field being
+                    // typed in answers with the window's borrowed field editor rather than with itself.
+                    _focusReported = true;
+                    note($"    input: a real click at {centre.X},{centre.Y} left {box.GetType().Name} "
+                        + $"reporting Focused={box.Focused} after {arrived} GotFocus event(s), while the "
+                        + $"window's first responder is {ShootInputMac.FirstResponder()}");
+                }
+
+                // Only a box the click actually focused can be typed into. An editor hosted inside a
                 // composite — a search field, a token box — may hand focus to its shell instead, and
                 // asserting a keystroke into something that never took focus invents a failure rather
                 // than finding one. Said out loud so a skip is visible rather than silent.
-                //
-                // Except on macOS, where nothing raises the peer's focus events at all — so the gate
-                // would skip every keystroke on the one platform the injector was rewritten for. The
-                // key is posted there regardless and the box is asked afterwards, which is the same
-                // evidence by a different route: a character that arrived is a character the first
-                // responder took.
-                if (!box.Focused && !OperatingSystem.IsMacOS())
+                if (!box.Focused)
                     note($"    input: the click did not focus this {box.GetType().Name}, so the keystroke was skipped");
                 else if (InjectType('Z'))
                 {
@@ -221,6 +249,7 @@ internal static partial class Shoot
                 }
             }
 
+            box.GotFocus -= gained;
             box.Text = original;
         }
 

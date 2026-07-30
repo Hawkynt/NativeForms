@@ -238,6 +238,7 @@ if (shooting)
                 ? $", {Shoot.Clicks} real click(s) and {Shoot.Keystrokes} real keystroke(s)"
                     + (OperatingSystem.IsMacOS() ? $" and {Shoot.Hovers} real move(s)" : string.Empty)
                     + " delivered through the OS input queue"
+                    + $", {Shoot.Focuses} of them moving the keyboard onto an editor the toolkit heard about"
                 : string.Empty;
 
             Note(shootFailures == 0

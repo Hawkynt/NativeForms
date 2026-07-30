@@ -39,7 +39,11 @@ internal sealed class CocoaPopupPeer : IPopupPeer
 
     public CocoaPopupPeer()
     {
-        var allocated = CocoaRuntime.Allocate("NSWindow");
+        // The same subclass a form's window is, and for the same reason: a canvas inside a popup takes
+        // the keyboard through its window, so a stock NSWindow here would be a surface whose focus
+        // changes nothing hears (see CocoaFocus).
+        var windows = CocoaFocus.WindowClass;
+        var allocated = windows == 0 ? 0 : CocoaRuntime.SendPointer(windows, CocoaRuntime.sel_registerName("alloc"));
         _window = allocated == 0
             ? 0
             : CocoaRuntime.SendRect(
@@ -120,8 +124,22 @@ internal sealed class CocoaPopupPeer : IPopupPeer
         remove => _canvas.KeyPress -= value;
     }
 
-    public event EventHandler? GotFocus;
-    public event EventHandler? LostFocus;
+    /// <inheritdoc/>
+    /// <remarks>Forwarded to the canvas like every other input event, because the canvas is what takes
+    /// the keyboard: the window around it is chrome and never becomes a responder.</remarks>
+    public event EventHandler? GotFocus
+    {
+        add => _canvas.GotFocus += value;
+        remove => _canvas.GotFocus -= value;
+    }
+
+    /// <inheritdoc cref="GotFocus"/>
+    public event EventHandler? LostFocus
+    {
+        add => _canvas.LostFocus += value;
+        remove => _canvas.LostFocus -= value;
+    }
+
     public event EventHandler<MouseEventArgs>? PointerMove;
     public event EventHandler? PointerLeave;
     public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
@@ -279,11 +297,16 @@ internal sealed class CocoaPopupPeer : IPopupPeer
         _canvas.Dispose();
     }
 
-    /// <summary>Keeps the surface events referenced until AppKit's routing feeds them.</summary>
+    /// <summary>
+    /// Keeps the three events a popup never raises referenced, so the compiler does not report them as
+    /// dead.
+    /// </summary>
+    /// <remarks>
+    /// The surface's own hover channel and context-menu request, which nothing asks a popup for: what
+    /// is on a popup was painted by the control that put it up, and that control watches its canvas.
+    /// </remarks>
     private void Unused()
     {
-        GotFocus?.Invoke(this, EventArgs.Empty);
-        LostFocus?.Invoke(this, EventArgs.Empty);
         PointerMove?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
         PointerLeave?.Invoke(this, EventArgs.Empty);
         ContextMenuRequested?.Invoke(this, new(Point.Empty));

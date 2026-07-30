@@ -21,7 +21,7 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// the same name fails, and a gallery has dozens of canvases.
 /// </para>
 /// </remarks>
-internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
+internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer, ICocoaFocusTarget
 {
     /// <summary>The runtime class, built on first use.</summary>
     private static nint _viewClass;
@@ -44,6 +44,7 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             return;
 
         _canvases[_view] = this;
+        CocoaFocus.Watch(_view, this);
         InstallTrackingArea(_view);
     }
 
@@ -567,6 +568,14 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
     /// rather than being told — the same asking-not-telling shape the cursor takes.</remarks>
     public void SetFocusable(bool focusable) => _focusable = focusable;
 
+    /// <inheritdoc/>
+    /// <remarks>Raised by <see cref="CocoaFocus"/> from the window's own <c>makeFirstResponder:</c>,
+    /// which is the one call every focus change on this platform passes through.</remarks>
+    void ICocoaFocusTarget.RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc cref="ICocoaFocusTarget.RaiseGotFocus"/>
+    void ICocoaFocusTarget.RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
+
     // --- Not applicable to a surface the toolkit paints itself -----------------------------------
     //
     // A canvas is a rectangle of pixels the control draws into. Its caption, its font, its colours and
@@ -589,24 +598,22 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer
             return;
 
         _canvases.TryRemove(_view, out _);
+        CocoaFocus.Forget(_view);
         CocoaCursor.Forget(_view);
     }
 
-    /// <summary>Keeps the input events referenced until AppKit's event routing feeds them.</summary>
+    /// <summary>
+    /// Keeps the two events a canvas never raises referenced, so the compiler does not report them as
+    /// dead.
+    /// </summary>
+    /// <remarks>
+    /// Both of them and no others. An owner-drawn control is watched through its own mouse pipeline
+    /// rather than through the peer's hover channel, so nothing here ever reports the pointer that way
+    /// — the channel exists because <c>IControlPeer</c> has it, and a native widget is what uses it.
+    /// </remarks>
     private void Unused()
     {
-        MouseDown?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
-        MouseUp?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
-        MouseMove?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
-        MouseWheel?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
-        MouseLeave?.Invoke(this, EventArgs.Empty);
-        KeyDown?.Invoke(this, new(Keys.None, KeyModifiers.None));
-        KeyUp?.Invoke(this, new(Keys.None, KeyModifiers.None));
-        KeyPress?.Invoke(this, new(' '));
-        GotFocus?.Invoke(this, EventArgs.Empty);
-        LostFocus?.Invoke(this, EventArgs.Empty);
         PointerMove?.Invoke(this, new(MouseButtons.None, 0, 0, 0));
         PointerLeave?.Invoke(this, EventArgs.Empty);
-        ContextMenuRequested?.Invoke(this, new(Point.Empty));
     }
 }

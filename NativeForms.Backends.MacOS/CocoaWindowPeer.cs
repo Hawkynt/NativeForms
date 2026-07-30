@@ -62,7 +62,12 @@ internal sealed class CocoaWindowPeer : IWindowPeer
     public CocoaWindowPeer(CocoaBackend backend)
     {
         _backend = backend;
-        var allocated = CocoaRuntime.Allocate("NSWindow");
+
+        // The toolkit's own NSWindow subclass rather than the stock one: a first responder only ever
+        // changes because something asked the window to change it, so that is where this backend hears
+        // about focus (see CocoaFocus). Nothing else about the window differs.
+        var windows = CocoaFocus.WindowClass;
+        var allocated = windows == 0 ? 0 : CocoaRuntime.SendPointer(windows, CocoaRuntime.sel_registerName("alloc"));
         _window = allocated == 0
             ? 0
             : CocoaRuntime.SendRect(

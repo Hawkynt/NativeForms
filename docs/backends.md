@@ -18,7 +18,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Native widget promotion (§12)             | 9 controls                    | 9 controls                               | 9 controls; a slider keeps no step sizes and a drop-down opens modally                                                                       |
 | Colour emoji in owner-drawn text          | via Pango                     | via Direct2D/DirectWrite                 | via CoreText                                                                                                                                 |
 | Accessibility                             | ATK                           | MSAA, borrowed from a shadow control     | NSAccessibility                                                                                                                              |
-| Mouse & keyboard                          | complete                      | complete                                 | press, drag, wheel, keys; CI witnesses posted clicks toggling controls and posted keys reaching editors, hover only wired                     |
+| Mouse & keyboard                          | complete                      | complete                                 | press, drag, wheel, keys, focus; CI witnesses posted clicks toggling and focusing controls and posted keys reaching editors, hover only wired |
 | Dialogs (message box, file, colour, font) | complete                      | complete                                 | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
 | CI verification                           | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + `NSEvent`s posted into the application's own queue (no Accessibility grant needed), reporting                                 |
 
@@ -800,6 +800,59 @@ loop, and the probe drains the queue itself — the checks run from a timer tick
 fetching events while one runs — so the keys it posts are dispatched straight to AppKit and never
 pass the seam that would name them. Proving the table would mean the probe pumping through the
 toolkit's interception rather than around it.
+
+Focus is the window's business here, which is why it was the last of the four to arrive.
+`Control.Focused` was false on macOS however the keyboard had actually moved: no peer raised the pair
+of events the core adopts it from, and the two lines naming them existed only to keep the compiler
+from calling them dead. AppKit reports a responder change to the responders themselves, through
+`becomeFirstResponder` and `resignFirstResponder`, which are methods on the view's class — and most of
+the views here are AppKit's own, which this backend cannot add a method to. What all of them share is
+the window: a first responder only ever changes because something asked the window to change it,
+whether that was a click, the key loop moving on, or the toolkit's own `Focus()`. So the window is
+what is subclassed, and one override covers a canvas, an `NSTextField` and an `NSTableView` alike.
+`NSWindow`'s own implementation is looked up once and called as a function pointer rather than sent
+with `objc_msgSendSuper`, which would have to work out the receiver's superclass while the message is
+in flight — and a class the runtime has swizzled underneath ours, which is what KVO builds silently,
+would make that answer point back at ours and turn the call into recursion.
+
+Three details are the difference between that working and merely looking as though it does. The
+responder is read back off the window afterwards rather than taken from the argument, because the two
+differ for exactly the widget that matters most: a field does not edit itself, it borrows the window's
+shared field editor, so asking for the field to take the keyboard leaves an `NSTextView` holding it —
+which is resolved back to the field through that editor's delegate, the same fact the key seam and the
+link label are both built on. A widget the peer holds a scroll view around — a promoted list's
+`NSTableView`, a multiline box's text view — is found by climbing the responder's superviews instead,
+four deep and no further, because an unbounded walk climbs out of the control and finds the window's
+content view, which answers for the whole form. And only a change the platform accepted is reported:
+`makeFirstResponder:` answers NO when whatever holds the keyboard refuses to give it up, and reading a
+refusal as a move would tell the toolkit that focus had left a control the user is still typing in.
+The one holder is a single field for the process, which is what `Control.Focused` is — and what makes
+the reporting idempotent, since `makeFirstResponder:` nests: a field's own `becomeFirstResponder` asks
+the window again for the field editor, so the outer call would otherwise report the same arrival
+twice.
+
+`Focus()` was the other half, and it was wrong in a way nothing could show. It sent
+`becomeFirstResponder` to the widget — the message AppKit sends a view to *tell* it the keyboard has
+arrived, not the one that moves it. The window's responder did not change, keys carried on going where
+they were going, and the only thing that moved was a return value nobody read. It goes to the window
+now, which is also where the change is heard from, so a programmatic focus and a clicked one report
+identically.
+
+One difference from the other two backends is worth stating rather than discovering. A window losing
+key status does not resign its first responder here, so a form whose application goes to the
+background keeps its focused control, where Win32 sends that control `WM_KILLFOCUS`. That is this
+desktop's model — the keyboard is still aimed at that view and goes back to it when the window is key
+again — and following Win32 would mean raising a loss the platform has not had.
+
+This one is witnessed. The probe's click on a text box is now asked what it did to the keyboard as
+well as what it did to the text: the toolkit's own `GotFocus` is counted and `Control.Focused` read
+back, and both are required, because the flag alone would also be satisfied by a box that was already
+focused before the press. The keystroke that follows is gated on the answer rather than posted
+regardless, which is what this backend alone used to do — the gate would otherwise have skipped every
+keystroke on the one platform the injector was built for. A miss names the window's first responder
+rather than only reporting a miss, since "the control does not report itself focused" reads the same
+whether the press landed elsewhere, whether the widget declined the keyboard, or whether it took it
+and the toolkit did not hear.
 
 The probe reports all of this the way it reports the tracking areas and the cursor targets: read back
 off the running window rather than claimed. The button figure is a pair, and has to be — a push

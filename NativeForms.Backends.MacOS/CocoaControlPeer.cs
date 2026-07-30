@@ -14,18 +14,38 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// frame, hidden state and enablement, so those live here once rather than in each peer. What differs
 /// — a label's alignment, a button's action — belongs to the subclass.
 /// </remarks>
-internal abstract class CocoaControlPeer : IControlPeer
+internal abstract class CocoaControlPeer : IControlPeer, ICocoaFocusTarget
 {
     private Rectangle _bounds;
 
     private protected CocoaControlPeer(nint handle) => this.Handle = handle;
+
+    private nint _handle;
 
     /// <summary>
     /// The underlying AppKit object. A peer may swap it — AppKit fixes a control's class at
     /// construction, so a state change the class cannot express is served by building the other object
     /// and replacing this one in its superview.
     /// </summary>
-    internal nint Handle { get; private protected set; }
+    /// <remarks>
+    /// The focus registration follows the object rather than the peer, which is why it lives in the
+    /// setter: a box that goes multiline is a different widget afterwards, and one that kept answering
+    /// for the object it used to be would report focus for a view no longer in the window.
+    /// </remarks>
+    internal nint Handle
+    {
+        get => _handle;
+
+        private protected set
+        {
+            if (_handle == value)
+                return;
+
+            CocoaFocus.Forget(_handle);
+            _handle = value;
+            CocoaFocus.Watch(_handle, this);
+        }
+    }
 
     /// <summary>Where the widget was last put, so a replacement can be given the same frame.</summary>
     private protected Rectangle BoundsValue => _bounds;
@@ -126,10 +146,23 @@ internal abstract class CocoaControlPeer : IControlPeer
             ? screen
             : new(_bounds.X + clientPoint.X, _bounds.Y + clientPoint.Y);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Asked of the window, never of the widget. <c>becomeFirstResponder</c> is what AppKit sends a
+    /// view to <em>tell</em> it the keyboard has arrived, so sending it directly changed nothing the
+    /// window knew about: the responder stayed where it was, the key events kept going there, and the
+    /// only thing the call moved was a return value nobody read. <c>makeFirstResponder:</c> is the
+    /// window's own, and it is also where this backend hears the change from
+    /// (<see cref="CocoaFocus"/>), so a programmatic focus and a clicked one report identically.
+    /// </remarks>
     public virtual void Focus()
     {
-        if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("becomeFirstResponder"));
+        if (this.Handle == 0)
+            return;
+
+        var window = CocoaRuntime.SendPointer(this.Handle, CocoaRuntime.sel_registerName("window"));
+        if (window != 0)
+            CocoaRuntime.SendVoid(window, CocoaRuntime.sel_registerName("makeFirstResponder:"), this.Handle);
     }
 
     /// <inheritdoc/>
@@ -220,17 +253,30 @@ internal abstract class CocoaControlPeer : IControlPeer
 
     public virtual void Dispose()
     {
+        CocoaFocus.Forget(this.Handle);
         CocoaCursor.Forget(this.Handle);
         CocoaPointerTarget.Forget(this.Handle);
     }
 
-    /// <summary>Keeps the events referenced until AppKit's routing feeds them.</summary>
-    private protected void Unused()
-    {
-        GotFocus?.Invoke(this, EventArgs.Empty);
-        LostFocus?.Invoke(this, EventArgs.Empty);
-        ContextMenuRequested?.Invoke(this, new(Point.Empty));
-    }
+    /// <inheritdoc/>
+    /// <remarks>Raised by <see cref="CocoaFocus"/> from the window's own <c>makeFirstResponder:</c>,
+    /// which is the one call every focus change on this platform passes through — and the only route
+    /// available for a widget whose class AppKit owns and this backend cannot add a method to.</remarks>
+    void ICocoaFocusTarget.RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc cref="ICocoaFocusTarget.RaiseGotFocus"/>
+    void ICocoaFocusTarget.RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Keeps the one event a native widget never raises referenced, so the compiler does not report it
+    /// as dead.
+    /// </summary>
+    /// <remarks>
+    /// A right-click on an AppKit control opens the control's own menu, and there is no message that
+    /// asks the toolkit first — the seam is served on the owner-drawn side, where the canvas raises it
+    /// out of <c>rightMouseDown:</c>.
+    /// </remarks>
+    private protected void Unused() => ContextMenuRequested?.Invoke(this, new(Point.Empty));
 }
 
 /// <summary>A caption: a non-editable, borderless <c>NSTextField</c>, which is what AppKit calls a label.</summary>

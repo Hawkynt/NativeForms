@@ -496,6 +496,19 @@ internal static partial class CocoaRuntime
     internal static partial bool class_addMethod(nint cls, nint selector, nint implementation, string types);
 
     /// <summary>
+    /// The function a class would run for a selector, which is how an override reaches the
+    /// implementation it replaced.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the superclass and kept, rather than sending with <c>objc_msgSendSuper</c> at each
+    /// call. The two reach the same code; this one does not have to work out the receiver's superclass
+    /// while the message is in flight, and a class the runtime has swizzled underneath ours — which is
+    /// what KVO does, silently — would make that answer point back at ours and recurse.
+    /// </remarks>
+    [LibraryImport(_ObjC)]
+    internal static partial nint class_getMethodImplementation(nint cls, nint selector);
+
+    /// <summary>
     /// Whether Objective-C messaging is usable, having first made sure AppKit is in the process.
     /// </summary>
     /// <remarks>
