@@ -10,17 +10,17 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 
 ## At a glance
 
-| | **GTK 3** (Linux) | **Win32** (Windows) | **Cocoa** (macOS) |
-|---|---|---|---|
-| Status | Complete | Complete | **Under construction** |
-| Owner-drawn painting | Cairo | GDI | CoreGraphics |
-| Text measurement & drawing | Pango | GDI, DirectWrite for colour glyphs | CoreText |
-| Native widget promotion (§12) | 9 controls | 9 controls | 9 controls; a slider keeps no step sizes and a drop-down opens modally |
-| Colour emoji in owner-drawn text | via Pango | via Direct2D/DirectWrite | via CoreText |
-| Accessibility | ATK | MSAA, borrowed from a shadow control | NSAccessibility |
-| Mouse & keyboard | complete | complete | press, drag, wheel, keys; CI witnesses posted clicks toggling controls and posted keys reaching editors, hover only wired |
-| Dialogs (message box, file, colour, font) | complete | complete | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
-| CI verification | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + `NSEvent`s posted into the application's own queue (no Accessibility grant needed), reporting |
+|                                           | **GTK 3** (Linux)             | **Win32** (Windows)                      | **Cocoa** (macOS)                                                                                                                            |
+| ----------------------------------------- | ----------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status                                    | Complete                      | Complete                                 | **Under construction**                                                                                                                       |
+| Owner-drawn painting                      | Cairo                         | GDI                                      | CoreGraphics                                                                                                                                 |
+| Text measurement & drawing                | Pango                         | GDI, DirectWrite for colour glyphs       | CoreText                                                                                                                                     |
+| Native widget promotion (§12)             | 9 controls                    | 9 controls                               | 9 controls; a slider keeps no step sizes and a drop-down opens modally                                                                       |
+| Colour emoji in owner-drawn text          | via Pango                     | via Direct2D/DirectWrite                 | via CoreText                                                                                                                                 |
+| Accessibility                             | ATK                           | MSAA, borrowed from a shadow control     | NSAccessibility                                                                                                                              |
+| Mouse & keyboard                          | complete                      | complete                                 | press, drag, wheel, keys; CI witnesses posted clicks toggling controls and posted keys reaching editors, hover only wired                     |
+| Dialogs (message box, file, colour, font) | complete                      | complete                                 | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
+| CI verification                           | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + `NSEvent`s posted into the application's own queue (no Accessibility grant needed), reporting                                 |
 
 ## Side by side
 
