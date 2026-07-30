@@ -278,9 +278,12 @@ captures and fell out of counting ink instead. What is taken now is `NSBezelStyl
 renamed `NSBezelStyleFlexiblePush` in macOS 14 for exactly what it is: the same push button drawn to
 whatever frame it has. Every button takes it rather than only the ones the fixed bezel cannot hold,
 because the alternative is a control whose drawn size depends on how tall it was asked to be — the
-same button two pixels shorter would jump to the other bezel and to a different inset. The probe
-counts the bordered buttons carrying it, which is the one part of this a capture cannot settle by
-itself.
+same button two pixels shorter would jump to the other bezel and to a different inset. The same
+button now measures 156×26 centred in its 160×30, against Win32's 158×28: what is left is the margin
+AppKit keeps for the focus ring, which is the desktop's and not the toolkit's to spend. The probe
+counts the bordered buttons carrying the bezel — 58 of 58 on the last run, the promoted check boxes
+and radio buttons excluded because they are `NSButton` here too and carry no bezel at all — which is
+the one part of this a capture cannot settle by itself.
 
 The window holds the chrome the form asked for, with one refusal. Resize limits go to `setMinSize:`
 and `setMaxSize:`, which constrain the frame rather than the content — the same measurement the
