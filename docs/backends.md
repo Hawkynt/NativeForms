@@ -793,13 +793,26 @@ key means — and mapped by the same arithmetic the GTK backend uses, since `Key
 virtual-key numbering and letters and digits carry their own ASCII there. The function keys are listed
 one by one rather than as a range: they are contiguous on the other two platforms and here F1 is 0x7A,
 F2 is 0x78 and F3 is 0x63, so a range over them would answer with whatever key sits at the arithmetic.
-What CI now witnesses is the half below this one: a posted key reaches the focused editor and the
-character comes back out of the peer. The mapping itself is still unwitnessed, and the reason is
-worth stating exactly rather than waving at. The toolkit stands ahead of the editor in the event
-loop, and the probe drains the queue itself — the checks run from a timer tick and the loop is not
-fetching events while one runs — so the keys it posts are dispatched straight to AppKit and never
-pass the seam that would name them. Proving the table would mean the probe pumping through the
-toolkit's interception rather than around it.
+CI witnesses both halves of that now, and getting to the second one meant moving the probe rather than
+the backend. A posted key reaching the focused editor was never in doubt — the character comes back
+out of the peer — but the mapping was, because the probe drained the queue itself: its checks run from
+a timer tick and the loop is not fetching events while one runs, so it made the platform's own
+fetch-and-dispatch pair and every key it counted went to AppKit without passing the code that names
+one. The loop is asked to take a turn instead. `CocoaBackend.PumpEvents` is that turn — the same
+interception first, then `sendEvent:` — and it is public for the same reason the problem existed:
+work posted into the loop runs inside it, so anything that needs what it just asked for to have
+happened has to make the turn itself, and making it by hand means making the platform's half and
+skipping the toolkit's.
+
+What the probe then asks is what the toolkit *called* two keys, which no count of arriving characters
+can say. Down and Home, at the first focused editor of the run. Not Tab and not Escape, which are the
+two that come to mind and are both spoken for: the form's dialog-key chain takes a Tab for focus
+navigation and an Escape for the cancel button before either reaches `Control.KeyDown`, so a check
+watching there would see nothing and could not say whether the table or the chain was the reason.
+Nothing consumes an arrow or Home, and both are named off the key code — which is the half of the
+table a letter never exercises, since a letter comes from `charactersIgnoringModifiers` instead. Both
+are marked handled, which is the rest of the seam's promise read back: a key the toolkit consumed is
+one the native editor never sees, so nothing is typed and the caret does not move.
 
 Focus is the window's business here, which is why it was the last of the four to arrive.
 `Control.Focused` was false on macOS however the keyboard had actually moved: no peer raised the pair

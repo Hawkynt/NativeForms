@@ -199,6 +199,12 @@ if (shooting)
             if (Shoot.ButtonBezels is { } bezels)
                 Note("  " + bezels);
 
+            // Written after the walk although it is measured during it, because it is one fact about
+            // the run rather than one per page: the first focused editor the walkthrough reaches is
+            // asked what the toolkit calls two named keys, and every page after that would repeat it.
+            if (Shoot.KeyTable is { } table)
+                Note("  " + table);
+
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 

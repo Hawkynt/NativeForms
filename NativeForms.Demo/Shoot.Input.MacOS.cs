@@ -84,10 +84,6 @@ internal static partial class ShootInputMac
     [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
     private static partial ushort SendUShort(nint receiver, nint selector, nint index);
 
-    /// <summary>Pulls the next event out of the application's queue — the call the toolkit's loop makes.</summary>
-    [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
-    private static partial nint SendNextEvent(nint receiver, nint selector, nint mask, nint until, nint mode, [MarshalAs(UnmanagedType.U1)] bool dequeue);
-
     /// <summary>A point in Cocoa's coordinates: two doubles, passed in the floating registers.</summary>
     [StructLayout(LayoutKind.Sequential)]
     private struct CGPoint
@@ -224,7 +220,7 @@ internal static partial class ShootInputMac
         if (!Available)
             return "input route: no NSApplication in this process, so nothing can be posted";
 
-        var key = KeyEvent(_KeyDown, 'Z', WindowNumber());
+        var key = KeyEvent(_KeyDown, KeyCodeOf('Z'), 'Z', WindowNumber());
         if (key == 0)
             return "input route: NSEvent refused to build a key event";
 
@@ -354,11 +350,23 @@ internal static partial class ShootInputMac
     }
 
     /// <summary>Types one character, reporting whether the events were built and posted.</summary>
-    public static bool Type(char character)
+    public static bool Type(char character) => Press(KeyCodeOf(character), character);
+
+    /// <summary>
+    /// Presses one key by the number this platform gives its <em>place</em>, reporting whether the
+    /// events were built and posted.
+    /// </summary>
+    /// <remarks>
+    /// The named keys are the ones worth posting this way. A Mac key code is a position rather than a
+    /// letter, so <see cref="Type"/> has to look one up for a character it was handed — but Tab, the
+    /// arrows and the function keys sit where they sit on every layout, which is exactly why the
+    /// backend reads them off the key code and not off what they type.
+    /// </remarks>
+    public static bool Press(ushort keyCode, char character)
     {
         var number = WindowNumber();
-        var down = KeyEvent(_KeyDown, character, number);
-        var up = KeyEvent(_KeyUp, character, number);
+        var down = KeyEvent(_KeyDown, keyCode, character, number);
+        var up = KeyEvent(_KeyUp, keyCode, character, number);
         return down != 0 && up != 0 && Post(down) && Post(up);
     }
 
@@ -389,9 +397,10 @@ internal static partial class ShootInputMac
     /// <remarks>
     /// The queue has to be drained here rather than left to the toolkit's loop, because this runs
     /// <em>inside</em> that loop: the checks are driven from a timer tick, and a tick is work the loop
-    /// posted to itself, so the loop is not fetching events for as long as the tick is running. The
-    /// same fetch-and-dispatch pair the loop makes is therefore made here — which is also what keeps
-    /// this from being a synthetic call into a view, since the window is still what routes the event.
+    /// posted to itself, so the loop is not fetching events for as long as the tick is running. So the
+    /// loop is asked to take a turn — <see cref="Pump"/> — rather than having its fetch-and-dispatch
+    /// pair copied, which is what keeps this from being a synthetic call into a view: the window still
+    /// routes the event, and the toolkit still stands where it stands in front of it.
     /// </remarks>
     public static void Deliver()
     {
@@ -400,33 +409,19 @@ internal static partial class ShootInputMac
         Pump();
     }
 
-    /// <summary>Fetches and dispatches everything waiting, exactly as the toolkit's own loop does.</summary>
+    /// <summary>Runs everything waiting through one turn of the toolkit's own loop.</summary>
+    /// <remarks>
+    /// Asked of the backend rather than made here, and the difference is the point. Fetching with
+    /// <c>nextEventMatchingMask:</c> and dispatching with <c>sendEvent:</c> is only the platform's half
+    /// of a turn: the toolkit stands ahead of AppKit in <c>CocoaBackend.Intercept</c>, which is where a
+    /// popup's light dismiss and the text box's key seam both live. A probe that made the pair itself
+    /// was therefore posting keys that went straight to the editor without ever passing the code that
+    /// names them, so the key table could not be witnessed however many keystrokes arrived.
+    /// </remarks>
     private static void Pump()
     {
-        var app = SharedApplication();
-        var dates = objc_getClass("NSDate");
-        if (app == 0 || dates == 0)
-            return;
-
-        var next = sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:");
-        var send = sel_registerName("sendEvent:");
-        var past = Send(dates, sel_registerName("distantPast"));
-        var mode = CFStringCreateWithCString(0, "kCFRunLoopDefaultMode", _Utf8);
-        if (mode == 0)
-            return;
-
-        // Bounded, because dispatching an event can produce another one and a probe must not be able
-        // to spin here forever.
-        for (var i = 0; i < 200; ++i)
-        {
-            var pending = SendNextEvent(app, next, unchecked((nint)ulong.MaxValue), past, mode, true);
-            if (pending == 0)
-                break;
-
-            Send(app, send, pending);
-        }
-
-        CFRelease(mode);
+        if (Hawkynt.NativeForms.Backends.BackendRegistry.Resolve() is Hawkynt.NativeForms.Backends.MacOS.CocoaBackend cocoa)
+            cocoa.PumpEvents(200);
     }
 
     /// <summary>
@@ -519,7 +514,7 @@ internal static partial class ShootInputMac
     }
 
     /// <summary>Builds one key event, or zero.</summary>
-    private static nint KeyEvent(nint type, char character, nint windowNumber)
+    private static nint KeyEvent(nint type, ushort keyCode, char character, nint windowNumber)
     {
         var events = objc_getClass("NSEvent");
         if (events == 0)
@@ -546,7 +541,7 @@ internal static partial class ShootInputMac
             typed,
             unshifted,
             false,
-            KeyCodeOf(character));
+            keyCode);
 
         CFRelease(typed);
         CFRelease(unshifted);

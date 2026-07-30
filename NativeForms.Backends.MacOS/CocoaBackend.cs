@@ -599,6 +599,62 @@ public sealed class CocoaBackend : IPlatformBackend
     }
 
     /// <summary>
+    /// Runs whatever is waiting in the application's queue through one turn of this loop — the
+    /// toolkit's interception first, then AppKit's own dispatch — and answers how many events it
+    /// handled.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Public because the loop is not always the thing turning. Work posted through <see cref="Post"/>
+    /// runs <em>inside</em> <see cref="Run"/>, so for as long as one of those callbacks is executing
+    /// the loop is not fetching events — and a caller that needs what it just asked for to have
+    /// happened has to make this turn itself. That is what the macOS probe does: its checks are driven
+    /// from a timer tick, which is exactly such a callback.
+    /// </para>
+    /// <para>
+    /// It exists rather than the caller making the fetch-and-dispatch pair itself because that pair is
+    /// not the whole of a turn. <see cref="Intercept"/> is where the toolkit stands ahead of AppKit —
+    /// a popup's light dismiss and the text box's key seam both live there — so a caller that pumped
+    /// with <c>nextEventMatchingMask:</c> and <c>sendEvent:</c> would be running the platform's half of
+    /// the loop and skipping the toolkit's, which is precisely the half a check would be trying to
+    /// exercise.
+    /// </para>
+    /// </remarks>
+    /// <param name="limit">How many events to take at most, so a caller cannot spin here forever:
+    /// dispatching one event can produce another.</param>
+    public int PumpEvents(int limit = 64)
+    {
+        var app = CocoaRuntime.SendToClass("NSApplication", "sharedApplication");
+        var distantPast = CocoaRuntime.SendToClass("NSDate", "distantPast");
+        var mode = CocoaRuntime.NSString("kCFRunLoopDefaultMode");
+        if (app == 0 || mode == 0)
+            return 0;
+
+        var nextEvent = CocoaRuntime.sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:");
+        var sendEvent = CocoaRuntime.sel_registerName("sendEvent:");
+        var handled = 0;
+
+        try
+        {
+            for (; handled < limit; ++handled)
+            {
+                var next = CocoaRuntime.SendEvent(app, nextEvent, unchecked((nint)ulong.MaxValue), distantPast, mode, true);
+                if (next == 0)
+                    break;
+
+                if (!Intercept(next))
+                    CocoaRuntime.SendVoid(app, sendEvent, next);
+            }
+        }
+        finally
+        {
+            CocoaNative.CFRelease(mode);
+        }
+
+        return handled;
+    }
+
+    /// <summary>
     /// Offers an event to the toolkit before AppKit dispatches it, answering whether it was consumed.
     /// </summary>
     /// <remarks>

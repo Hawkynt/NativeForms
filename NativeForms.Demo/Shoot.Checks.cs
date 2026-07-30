@@ -101,6 +101,80 @@ internal static partial class Shoot
     /// <inheritdoc cref="_moveReported"/>
     private static bool _focusReported;
 
+    /// <summary>
+    /// What the key table made of two named keys posted at a focused editor, or
+    /// <see langword="null"/> where the run never got to ask.
+    /// </summary>
+    /// <remarks>
+    /// The seam this covers had never been exercised. A Mac numbers its keys by where they are, so
+    /// <c>CocoaCanvasPeer.KeyOf</c> reads the named ones off the key code and everything else off what
+    /// the key types — and the toolkit only gets to name a key at all because the backend's own loop
+    /// stands ahead of the editor. The probe used to drain the queue itself, dispatching straight to
+    /// AppKit, so every keystroke it counted had gone round that code rather than through it.
+    /// </remarks>
+    public static string? KeyTable { get; private set; }
+
+    /// <summary>
+    /// Posts two named keys at a focused editor and reports what the toolkit called them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Down and Home rather than Tab or Escape, which are the obvious two and are both spoken for: the
+    /// form's dialog-key chain takes a Tab for focus navigation and an Escape for the cancel button
+    /// before either reaches <c>Control.KeyDown</c>, so a check watching there would see nothing and be
+    /// unable to say whether the table or the chain was the reason. Nothing consumes an arrow or Home,
+    /// and both are named off the key code, which is the half of <c>KeyOf</c> that a letter never
+    /// exercises.
+    /// </para>
+    /// <para>
+    /// The character each key types is handed over as well as its position, because that is what a real
+    /// event carries — AppKit spells an arrow with a code out of the Unicode private-use block — and the
+    /// keys are marked handled, which is the other half of the seam's promise: a key the toolkit
+    /// consumed is one the native editor never sees, so the caret does not move and nothing is typed.
+    /// </para>
+    /// </remarks>
+    private static string NameKeys(TextBox box)
+    {
+        // NSDownArrowFunctionKey and NSHomeFunctionKey, with the key codes those keys have here.
+        (ushort Code, char Types, Keys Expected)[] keys =
+        [
+            (0x7D, '', Keys.Down),
+            (0x73, '', Keys.Home),
+        ];
+
+        var reports = new List<string>(keys.Length);
+        foreach (var key in keys)
+        {
+            var arrived = Keys.None;
+            var count = 0;
+            EventHandler<KeyEventArgs> watch = (_, e) =>
+            {
+                arrived = e.KeyCode;
+                ++count;
+                e.Handled = true;
+            };
+
+            box.KeyDown += watch;
+            var posted = ShootInputMac.Press(key.Code, key.Types);
+            if (posted)
+                InjectDrain();
+
+            box.KeyDown -= watch;
+
+            reports.Add(!posted
+                ? $"key code 0x{key.Code:X2} could not be posted"
+                : count == 0
+                    ? $"key code 0x{key.Code:X2} reached the box as nothing (expected Keys.{key.Expected})"
+                    : arrived == key.Expected
+                        ? $"key code 0x{key.Code:X2} arrived as Keys.{arrived}"
+                        : $"key code 0x{key.Code:X2} arrived as Keys.{arrived}, NOT Keys.{key.Expected}");
+        }
+
+        return "key table: " + string.Join(", ", reports)
+            + " — posted through the backend's own interception, which is the only place on this "
+            + "platform that names a key before the native editor acts on it";
+    }
+
     /// <summary>Every control in the tree rooted at <paramref name="control"/>, itself included.</summary>
     private static IEnumerable<Control> Walk(Control control)
     {
@@ -248,6 +322,12 @@ internal static partial class Shoot
                     }
                 }
             }
+
+            // Once per run, and only into a box the keyboard is actually on. This is the check the
+            // character keystroke above cannot make: a letter that arrives in the editor says the
+            // event reached the first responder and nothing at all about how the toolkit named it.
+            if (KeyTable is null && OperatingSystem.IsMacOS() && box.Focused)
+                KeyTable = NameKeys(box);
 
             box.GotFocus -= gained;
             box.Text = original;
