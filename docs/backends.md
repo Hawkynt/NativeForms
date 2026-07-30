@@ -267,6 +267,21 @@ button places its image relative to its caption, and there is no second anchor t
 `NSImage` is handed over and released, since the button retains it: an animated image arrives once per
 frame, and the frame before goes away when the button lets go of it rather than piling up.
 
+A button also fills the box it was given, which is the sort of defect a picture hides rather than
+shows. AppKit builds an `NSButton` in `NSBezelStyleRounded`, whose height is fixed: hand it anything
+taller and it draws its own height, centred, insetting the ends as well. The gallery's "Show a toast"
+is laid out at 160×30 and photographed as a bezel of 148×20 floating inside those bounds, six pixels
+in from each end and four down from the top, where the same button measures 160×30 on GTK and 158×28
+on Win32. Nothing looks broken in the shot, because the caption stays centred in the frame the
+toolkit gave and only the box under it moved — which is why this survived a page of side-by-side
+captures and fell out of counting ink instead. What is taken now is `NSBezelStyleRegularSquare`,
+renamed `NSBezelStyleFlexiblePush` in macOS 14 for exactly what it is: the same push button drawn to
+whatever frame it has. Every button takes it rather than only the ones the fixed bezel cannot hold,
+because the alternative is a control whose drawn size depends on how tall it was asked to be — the
+same button two pixels shorter would jump to the other bezel and to a different inset. The probe
+counts the bordered buttons carrying it, which is the one part of this a capture cannot settle by
+itself.
+
 The window holds the chrome the form asked for, with one refusal. Resize limits go to `setMinSize:`
 and `setMaxSize:`, which constrain the frame rather than the content — the same measurement the
 toolkit states its bounds in here, so the number a caller gives is the number the user drags against,

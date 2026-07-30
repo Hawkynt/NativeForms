@@ -634,6 +634,8 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
         if (this.Handle == 0)
             return;
 
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setBezelStyle:"), _BezelFlexible);
+
         _target = CocoaAction.Create(this.OnClicked);
         if (_target == 0)
             return;
@@ -652,6 +654,31 @@ internal sealed class CocoaButtonPeer : CocoaControlPeer, IButtonPeer
             ? 0
             : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
     }
+
+    /// <summary>
+    /// The bezel a button is drawn in: <c>NSBezelStyleRegularSquare</c>, renamed
+    /// <c>NSBezelStyleFlexiblePush</c> in macOS 14 for what it is — the push button drawn to whatever
+    /// frame it has.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one AppKit builds a button with instead is <c>NSBezelStyleRounded</c>, whose height is
+    /// fixed: given anything taller it draws its own height, centred, and insets the ends as well. So a
+    /// button the toolkit laid out at 160×30 arrived as a bezel of 148×20 floating inside its own
+    /// bounds, where the Win32 and GTK peers fill theirs — the gallery's "Show a toast" measured
+    /// exactly that on every macOS run. The caption stays centred in the frame the toolkit gave while
+    /// the box under it is neither the size nor the place the application asked for, and no seam
+    /// reports it.
+    /// </para>
+    /// <para>
+    /// Taken for every button rather than only for the ones the fixed bezel cannot hold, because the
+    /// alternative is a control whose drawn size depends on how tall it was asked to be — the same
+    /// button, laid out two pixels shorter, would jump to a different bezel and a different inset. This
+    /// is still AppKit's own push button and still the desktop's drawing; what it drops is the one
+    /// bezel that refuses the bounds it is given.
+    /// </para>
+    /// </remarks>
+    private const nint _BezelFlexible = 2;
 
     /// <summary>A button carries its caption as a title, not as a string value.</summary>
     public override void SetText(string text)

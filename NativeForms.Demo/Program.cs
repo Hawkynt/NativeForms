@@ -196,6 +196,9 @@ if (shooting)
             if (Shoot.NativeInput is { } native)
                 Note("  " + native);
 
+            if (Shoot.ButtonBezels is { } bezels)
+                Note("  " + bezels);
+
             if (Shoot.LinkWiring is { } links)
                 Note("  " + links);
 

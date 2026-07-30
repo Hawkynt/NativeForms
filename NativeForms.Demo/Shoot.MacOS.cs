@@ -355,6 +355,66 @@ internal static unsafe partial class ShootMacOS
             + "report their edits to it";
     }
 
+    /// <summary>
+    /// Which bezel the window's push buttons carry, read back off the running window.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A bezel is the one part of a button's geometry a capture cannot settle by itself, because the
+    /// caption stays centred in the frame however small the box under it is drawn. AppKit's fixed
+    /// bezel has a height of its own and centres itself in anything taller, so the gallery's 160×30
+    /// button photographed as 148×20 for as long as nobody measured the ink rather than reading the
+    /// picture. The resizable one is drawn to the frame it is given, which is what the Win32 and GTK
+    /// peers do with theirs.
+    /// </para>
+    /// <para>
+    /// Only the bordered buttons are counted. A promoted check box and radio button are
+    /// <c>NSButton</c> here as well and carry no bezel at all, so counting every one of them would
+    /// bury the figure this line exists to watch under seventy that cannot regress.
+    /// </para>
+    /// </remarks>
+    public static string ButtonBezels()
+    {
+        var app = objc_getClass("NSApplication") is var application && application != 0
+            ? Send(application, sel_registerName("sharedApplication"))
+            : 0;
+        var window = app == 0 ? 0 : Gallery(app);
+        if (window == 0)
+            return "button bezels: no window to ask";
+
+        var bordered = 0;
+        var resizable = 0;
+        CountBezels(Send(window, sel_registerName("contentView")), ref bordered, ref resizable);
+
+        return $"button bezels: {resizable} of {bordered} bordered NSButton(s) carry the resizable bezel, "
+            + "so a button is drawn at the size the toolkit gave it rather than at AppKit's own";
+    }
+
+    /// <summary>Tallies the bordered buttons under one view and how many carry the resizable bezel.</summary>
+    private static void CountBezels(nint view, ref int bordered, ref int resizable)
+    {
+        if (view == 0)
+            return;
+
+        var name = class_getName(object_getClass(view)) is var raw && raw != 0
+            ? Marshal.PtrToStringUTF8(raw)
+            : null;
+
+        if (name == "NSButton" && SendBool(view, sel_registerName("isBordered")))
+        {
+            ++bordered;
+
+            // NSBezelStyleRegularSquare, which macOS 14 renamed NSBezelStyleFlexiblePush.
+            if (Send(view, sel_registerName("bezelStyle")) == 2)
+                ++resizable;
+        }
+
+        var children = Send(view, sel_registerName("subviews"));
+        var count = children == 0 ? 0 : (int)Send(children, sel_registerName("count"));
+        for (var i = 0; i < count; ++i)
+            CountBezels(Send(children, sel_registerName("objectAtIndex:"), i), ref bordered, ref resizable);
+    }
+
     /// <summary>What one walk of the view tree found about the widgets that report to the toolkit.</summary>
     private struct NativeInputCounts
     {

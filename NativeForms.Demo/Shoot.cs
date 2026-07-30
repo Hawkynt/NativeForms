@@ -68,6 +68,15 @@ internal static partial class Shoot
     public static string? NativeInput => OperatingSystem.IsMacOS() ? ShootMacOS.NativeInput() : null;
 
     /// <summary>
+    /// Which bezel the gallery's push buttons carry, where the platform can be asked.
+    /// </summary>
+    /// <remarks>
+    /// Geometry rather than wiring, and read at the end of the walk for the reason every other line
+    /// here is: a button on a tab page has no widget behind it until the page has been shown.
+    /// </remarks>
+    public static string? ButtonBezels => OperatingSystem.IsMacOS() ? ShootMacOS.ButtonBezels() : null;
+
+    /// <summary>
     /// Whether the rich text box's link activation reaches the toolkit, where the platform can be asked.
     /// </summary>
     /// <remarks>Wiring, not delivery — for the reason <see cref="HoverWiring"/> gives.</remarks>
