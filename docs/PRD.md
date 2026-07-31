@@ -347,15 +347,17 @@ strategy (may differ per platform; note exceptions inline).
         pointer, and a press frames either, since a pressed rectangle that only changed colour says
         nothing
   - [x] Image (`Image`/`ImageAlign`/`TextImageRelation`). An image on its own stays on the widget —
-        every platform centres a bare bitmap on a button, so all three agree (GTK
-        `gtk_button_set_image`, Win32 `BM_SETIMAGE`/`BS_BITMAP`, AppKit's image cell). An image
-        **with a caption beside it** is the promotion gate: no platform button draws both the same
-        way, and a classic Win32 `BUTTON` drops the caption outright, so that face gives up the widget
-        and is painted through the same `ContentLayout` geometry `Label`, `CheckBox` and `GroupBox`
-        use. The painted half carries what the widget was doing for it — focus ring, pressed face,
-        default-button emphasis, mnemonic underline, Space/Enter on the key release, a press cancelled
-        by sliding off the face, the `DialogResult` walk — and the swap runs both ways on a live
-        control, invisibly to the application
+        every platform centres a bare bitmap on a button (GTK `gtk_button_set_image`, Win32
+        `BM_SETIMAGE`/`BS_BITMAP`, AppKit's image cell). An image **with a caption beside it** is
+        asked of the backend (`IPlatformBackend.ButtonRendersImageWithText`) rather than ruled on
+        here, because the answer differs and the widget is the faster path wherever it can say yes:
+        GTK places the image beside the label and AppKit has `imagePosition`, so both keep the
+        widget; a classic Win32 `BUTTON` drops the caption outright, so only there does the face fall
+        back to the owner-drawn half. The painted half carries what the widget was doing for it —
+        focus ring, pressed face, default-button emphasis, mnemonic underline, Space/Enter on the key
+        release, a press cancelled by sliding off the face, the `DialogResult` walk — and the swap
+        runs both ways on a live control, invisibly to the application. `FlatStyle.Flat`/`Popup` are
+        painted everywhere, since no platform button offers either
 - [x] `CheckBox` (native, or owner-drawn — §12) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark;
       image + text via `ContentLayout`; tri-state `CheckState`/`ThreeState`/`CheckStateChanged`
       (`Indeterminate` reads as `Checked`, the Windows Forms rule; the click cycle only reaches it with

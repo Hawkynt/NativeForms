@@ -167,27 +167,39 @@ public class Button : OwnerDrawnControl
     public override bool IsNativeWidget => _buttonPeer is not null;
 
     /// <summary>
-    /// Whether the configured properties stay inside what a platform button can express. Everything
-    /// does except an image with a caption beside it — see <see cref="Image"/>.
+    /// Whether the configured properties stay inside what <em>this desktop's</em> button can express.
     /// </summary>
-    private bool IsNativeEligible
-        => (this.Image is null || this.Text.Length == 0)
+    /// <remarks>
+    /// The image-with-a-caption question is put to the backend rather than answered here, because the
+    /// answer is not the same on all three and the widget is the faster path wherever it can say yes
+    /// (see <see cref="IPlatformBackend.ButtonRendersImageWithText"/>). Two native buttons already
+    /// look different on two desktops — that is what native means — so making one of them give up a
+    /// rendering it has, to match one that does not, buys a uniformity this toolkit never promised
+    /// and costs the platform behaviour it does.
+    /// </remarks>
+    /// <param name="backend">
+    /// Taken as an argument rather than read from <see cref="Control.Backend"/>, which is still null
+    /// while the peer is being created — the one moment this question is actually asked.
+    /// </param>
+    private bool IsNativeEligible(IPlatformBackend? backend)
+        => (this.Image is null || this.Text.Length == 0 || (backend?.ButtonRendersImageWithText ?? false))
         && this.FlatStyle is FlatStyle.Standard or FlatStyle.System;
 
     /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
-    private bool WouldBeNative => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible;
+    private bool WouldBeNative(IPlatformBackend? backend)
+        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible(backend);
 
     /// <summary>Moves the button between the widget and the canvas when a property change crossed the
     /// gate. The swap runs both ways and is invisible to the application.</summary>
     private void ReconsiderPromotion()
     {
-        if (this.IsRealized && this.IsNativeWidget != this.WouldBeNative)
+        if (this.IsRealized && this.IsNativeWidget != this.WouldBeNative(this.Backend))
             this.RerealizePeer();
     }
 
     /// <inheritdoc/>
     private protected override IControlPeer CreatePeer(IPlatformBackend backend)
-        => this.WouldBeNative ? backend.CreateButton() : base.CreatePeer(backend);
+        => this.WouldBeNative(backend) ? backend.CreateButton() : base.CreatePeer(backend);
 
     /// <inheritdoc/>
     private protected override void OnRealized(IControlPeer peer)

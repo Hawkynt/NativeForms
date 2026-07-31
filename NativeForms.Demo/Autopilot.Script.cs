@@ -161,13 +161,12 @@ internal sealed partial class Autopilot
             var before = this.Read(() => viewModel.Count);
             var landed = this.Click(click, 60, 15);
 
-            // A GtkFixed, not a GtkButton: this one carries an image beside its caption, which is the
-            // face no platform button draws the same way, so it is owner-drawn (PRD §12), and a canvas
-            // peer is a GtkFixed with its own GDK window. That a real GtkButton still takes real OS
-            // input is asserted by the flowed buttons on the Layout page, which are text-only. Every
-            // button on this page that keeps its widget opens a dialog when clicked, so this is the
-            // one that can be pressed for the answer.
-            this.Expect("the press landed on", landed, "GtkFixed");
+            // A GtkButton even though this one carries an image beside its caption: whether that face
+            // needs the owner-drawn half is the backend's answer, and GTK renders both through
+            // gtk_button_set_image, so it keeps the widget (PRD §12). The same button is painted on
+            // Windows, where a classic BUTTON would drop the caption — which is why this expectation
+            // belongs in the GTK walkthrough rather than in a shared assertion.
+            this.Expect("the press landed on", landed, "GtkButton");
             this.Expect("CounterViewModel.Count", this.Read(() => viewModel.Count), before + 1);
             this.Expect("the bound label", this.Read(() => counterLabel.Text), this.Read(() => viewModel.Display));
             this.Expect("the bound progress bar", this.Read(() => counterBar.Value), (before + 1) * 10);

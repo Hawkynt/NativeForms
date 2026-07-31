@@ -1,4 +1,5 @@
 using Hawkynt.NativeForms;
+using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
 
@@ -6,11 +7,17 @@ namespace Hawkynt.NativeForms.Tests;
 
 /// <summary>
 /// <see cref="Button.Image"/> (with <see cref="Button.ImageAlign"/> and
-/// <see cref="Button.TextImageRelation"/>) on both halves of the button: buffered and forwarded to the
-/// peer as one <c>SetImage</c> triple while the widget can express the face, and painted through the
-/// shared <see cref="ContentLayout"/> once it cannot — an image with a caption beside it, which is the
-/// promotion gate (PRD §12).
+/// <see cref="Button.TextImageRelation"/>) on both halves of the button: forwarded to the peer as one
+/// <c>SetImage</c> triple wherever the widget can express the face, and painted through the shared
+/// <see cref="ContentLayout"/> only where it cannot (PRD §12).
 /// </summary>
+/// <remarks>
+/// Whether a captioned image needs the painted half is the <em>backend's</em> answer
+/// (<see cref="IPlatformBackend.ButtonRendersImageWithText"/>), not one rule for all three: GTK and
+/// AppKit render both and keep the widget, a classic Win32 <c>BUTTON</c> drops the caption and falls
+/// back. The fake says no by default, which is the Win32 shape and so the one whose fallback needs
+/// covering.
+/// </remarks>
 [TestFixture]
 internal sealed class ButtonImageTests
 {
@@ -25,7 +32,7 @@ internal sealed class ButtonImageTests
 
     private static HeadlessCanvasPeer RealizeDrawn(Button button, out HeadlessBackend backend)
     {
-        backend = new HeadlessBackend();
+        backend = new HeadlessBackend(); // says no to image+text, like the classic Win32 button
         var form = new Form();
         form.Controls.Add(button);
         Application.Run(form, backend);
@@ -91,7 +98,7 @@ internal sealed class ButtonImageTests
     // --- The gate ----------------------------------------------------------------------------------
 
     [Test]
-    public void An_image_beside_a_caption_gives_up_the_widget()
+    public void An_image_beside_a_caption_gives_up_the_widget_only_where_the_widget_cannot_draw_it()
     {
         var button = new Button { Text = "Go", Image = new HeadlessImage(16, 16) };
 
@@ -99,13 +106,47 @@ internal sealed class ButtonImageTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(button.IsNativeWidget, Is.False, "no platform button draws both the same way");
-            Assert.That(backend.Created.OfType<HeadlessButtonPeer>(), Is.Empty, "so no widget was asked for");
+            Assert.That(button.IsNativeWidget, Is.False, "this backend's button drops the caption, so the face is painted instead");
+            Assert.That(backend.Created.OfType<HeadlessButtonPeer>(), Is.Empty, "and no widget was asked for");
         });
     }
 
     [Test]
-    public void Adding_a_caption_to_an_image_button_moves_it_onto_the_canvas()
+    public void A_backend_whose_button_draws_both_keeps_the_widget()
+    {
+        var image = new HeadlessImage(16, 16);
+        var button = new Button { Text = "Go", Image = image };
+        var backend = new HeadlessBackend { OfferButtonImageWithText = true };
+        var form = new Form();
+        form.Controls.Add(button);
+        Application.Run(form, backend);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(button.IsNativeWidget, Is.True, "the widget is the faster path and this one can say it — GTK and AppKit both do");
+            Assert.That(backend.Created.OfType<HeadlessCanvasPeer>(), Is.Empty, "so nothing was painted");
+            Assert.That(backend.Created.OfType<HeadlessButtonPeer>().Single().Image, Is.SameAs(image));
+        });
+    }
+
+    [Test]
+    public void The_same_button_takes_different_halves_on_different_desktops()
+    {
+        Assert.That(Native(canDrawBoth: true), Is.True);
+        Assert.That(Native(canDrawBoth: false), Is.False, "one control, one configuration, and the answer is the backend's");
+
+        static bool Native(bool canDrawBoth)
+        {
+            var button = new Button { Text = "Go", Image = new HeadlessImage(16, 16) };
+            var form = new Form();
+            form.Controls.Add(button);
+            Application.Run(form, new HeadlessBackend { OfferButtonImageWithText = canDrawBoth });
+            return button.IsNativeWidget;
+        }
+    }
+
+    [Test]
+    public void Adding_a_caption_to_an_image_button_moves_it_onto_the_canvas_where_the_widget_cannot_hold_both()
     {
         var button = new Button { Image = new HeadlessImage(16, 16) };
         Realize(button);

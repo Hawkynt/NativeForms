@@ -172,6 +172,10 @@ public sealed class CocoaBackend : IPlatformBackend
     /// cannot express is refused in the peer and written down in <c>docs/backends.md</c> rather than
     /// approximated.
     /// </remarks>
+    /// <inheritdoc/>
+    /// <remarks><c>NSButton</c> draws its image and its title together, placed by <c>imagePosition</c>.</remarks>
+    public bool ButtonRendersImageWithText => true;
+
     public ICheckBoxPeer CreateCheckBox() => new CocoaCheckBoxPeer();
 
     /// <inheritdoc/>

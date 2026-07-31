@@ -63,6 +63,21 @@ public interface IPlatformBackend
     /// </summary>
     ICheckBoxPeer? CreateCheckBox() => null;
 
+    /// <summary>
+    /// Whether this backend's button widget can render an image <em>and</em> a caption on one face.
+    /// </summary>
+    /// <remarks>
+    /// A capability question rather than a rendering rule, because the answer differs per platform and
+    /// only the backend knows it: GTK places the image beside the label
+    /// (<c>gtk_button_set_image</c>), AppKit has <c>imagePosition</c>, and a classic Win32
+    /// <c>BUTTON</c> renders the bitmap alone and drops the caption outright. A backend that says yes
+    /// keeps the widget, which is faster than painting and is what makes the control feel native;
+    /// only the one that says no falls back to the owner-drawn face (PRD §12). Defaulting to
+    /// <see langword="false"/> keeps a backend that has not been asked this question correct rather
+    /// than silently dropping half of what it was told to show.
+    /// </remarks>
+    bool ButtonRendersImageWithText => false;
+
     /// <summary>Creates a native progress-indicator peer, or <see langword="null"/> to decline (PRD §12).</summary>
     IProgressBarPeer? CreateProgressBar() => null;
 

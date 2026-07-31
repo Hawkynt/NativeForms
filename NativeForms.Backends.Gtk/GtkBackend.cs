@@ -159,6 +159,13 @@ public sealed partial class GtkBackend : IPlatformBackend
 
     /// <inheritdoc />
     /// <remarks>GTK has a real check button, so this backend accepts the promotion (PRD §12).</remarks>
+    /// <inheritdoc />
+    /// <remarks>
+    /// <c>gtk_button_set_image</c> puts the image beside the label and honours the position, so the
+    /// widget renders the whole face and there is nothing for the owner-drawn half to add.
+    /// </remarks>
+    public bool ButtonRendersImageWithText => true;
+
     public ICheckBoxPeer? CreateCheckBox()
     {
         EnsureInitialized();

@@ -218,6 +218,15 @@ internal sealed class HeadlessBackend : IPlatformBackend
     }
 
     public IWindowPeer CreateWindow() => this.Track(new HeadlessWindowPeer(this));
+    /// <summary>
+    /// Whether this fake claims a button widget that renders an image beside a caption. Off by
+    /// default, which models the classic Win32 button — the backend that cannot, and therefore the
+    /// one whose painted fallback needs testing.
+    /// </summary>
+    public bool OfferButtonImageWithText { get; set; }
+
+    public bool ButtonRendersImageWithText => this.OfferButtonImageWithText;
+
     public IButtonPeer CreateButton() => this.Track(new HeadlessButtonPeer());
     public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
     public ITextBoxPeer CreateTextBox() => this.Track(new HeadlessTextBoxPeer());
