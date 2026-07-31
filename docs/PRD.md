@@ -871,23 +871,25 @@ strategy (may differ per platform; note exceptions inline).
       With the shutter fixed, `01-input` arrives on the Windows runner and the Win32 `RICHEDIT50W` paint
       path renders bold, italic and coloured runs correctly.
       What that page did reveal is new and is tracked as its own line below rather than folded in here.
-- [x] **A promoted `ScrollBar` photographs as a hairline on Windows, and the widget is not the problem.**
-      The Input page shows both bars as a one-pixel trough with a short dash where the thumb belongs,
-      while the `TrackBar` two rows above them — promoted the same way — draws in full and the GTK shot of
-      the same page draws a proper trough and thumb. Two explanations fitted those pixels and they led
-      opposite ways: a window collapsed along its cross axis, or a window that is the right size and did
-      not reach the capture. Both halves are now measured rather than argued.
+- [~] **A promoted `ScrollBar` photographs as a hairline on Windows.** The Input page shows both bars as
+      a one-pixel trough with a short dash where the thumb belongs, while the `TrackBar` two rows above
+      them — promoted the same way — draws in full, and the GTK shot of the same page draws a proper
+      trough and thumb. **The widget is not the problem**, which is the half now settled:
       `Win32NativePromotionTests` reads `GetClientRect` off each bar's own window and asserts it is the
-      rectangle the control was given; it answers 200×16 and 16×180 under wine **and on the
-      `windows-latest` runner**, so the widget is intact. The shoot log now records the capture route, and
-      it is `PrintWindow(client)` — which reaches child windows through `WM_PRINTCLIENT`, a message the
-      older stock classes implement only partly. `msctls_trackbar32` is a common control and answers it;
-      USER32's `SCROLLBAR` predates the convention and draws almost nothing for it.
-      So: the Windows artifact cannot be used to judge how a stock scroll bar renders, and a reader who
-      takes it at face value will go looking in the paint path for a defect that is not there. That is
-      what the route line in the log is for. The other two routes are already tried on every shot and
-      lose on detail; making one of them win would trade this gap for a blank page, which is the worse
-      failure — a capture that claims success having drawn nothing.
+      rectangle the control was given, and it answers 200×16 and 16×180 under wine *and* on the
+      `windows-latest` runner. So the bar is full size and something between it and the PNG is not.
+      Two candidates remain and neither is proven. `docs/backends.md` already records one: Windows 11
+      draws a themed scroll bar as a hairline rail until the pointer is over it, and nothing hovers
+      during a capture. The other arrived with the capture route now printed into the artifact — it is
+      `PrintWindow(client)`, which reaches child windows through `WM_PRINTCLIENT`, a message the older
+      stock classes implement only partly; `msctls_trackbar32` is a common control and answers it, and
+      USER32's `SCROLLBAR` predates the convention. Against the second: the multiline `EDIT` on the same
+      page draws its own scroll bar in full through the same capture. Against the first: so does that
+      one, unhovered.
+      Telling them apart needs a shot taken with the pointer resting on a bar, or one taken by a route
+      that is a real screen grab — neither of which the runner offers today. Until then the artifact
+      cannot be used to judge how a stock scroll bar renders, which is what the route line in the log is
+      there to warn the next reader about.
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
       `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect
       `Panel` was fixed for.
