@@ -29,4 +29,5 @@ internal sealed class StubTheme : ITheme
     public int RowHeight { get; set; } = _defaults.RowHeight;
     public int ScrollBarSize { get; set; } = _defaults.ScrollBarSize;
     public int DoubleClickTime { get; set; } = _defaults.DoubleClickTime;
+    public int ButtonCornerRadius { get; set; } = _defaults.ButtonCornerRadius;
 }

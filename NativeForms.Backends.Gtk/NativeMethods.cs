@@ -862,6 +862,22 @@ internal static partial class NativeMethods
     internal static partial void gtk_style_context_get_color(nint context, uint state, out GdkRGBA color);
 
     /// <summary>
+    /// Reads one CSS property of a style context into a <c>GValue</c> (declared with the other
+    /// <c>g_value_*</c> plumbing). The non-variadic sibling of <c>gtk_style_context_get</c>, which
+    /// takes a NULL-terminated argument list no source generator can express.
+    /// </summary>
+    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial void gtk_style_context_get_property(nint context, string property, uint state, out GValue value);
+
+    /// <summary>Reads an integer out of a <c>GValue</c>.</summary>
+    [LibraryImport(GObject)]
+    internal static partial int g_value_get_int(ref GValue value);
+
+    /// <summary>Creates a <c>GtkButton</c> with no caption — a style probe, never shown.</summary>
+    [LibraryImport(Gtk)]
+    internal static partial nint gtk_button_new();
+
+    /// <summary>
     /// Looks up a named theme color (for example <c>"theme_bg_color"</c>) in the style context,
     /// writing it to <paramref name="color"/> and returning <c>TRUE</c> (1) when the name resolves.
     /// </summary>

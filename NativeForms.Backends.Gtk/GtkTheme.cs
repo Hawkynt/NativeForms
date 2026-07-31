@@ -43,6 +43,7 @@ internal sealed class GtkTheme : ITheme
         this.DefaultFont = ReadDefaultFont();
         this.IsHighContrast = ReadIsHighContrast();
         this.DoubleClickTime = ReadDoubleClickTime();
+        this.ButtonCornerRadius = ReadButtonCornerRadius();
 
         NativeMethods.gtk_widget_destroy(widget);
     }
@@ -97,6 +98,9 @@ internal sealed class GtkTheme : ITheme
 
     /// <inheritdoc />
     public int DoubleClickTime { get; }
+
+    /// <inheritdoc />
+    public int ButtonCornerRadius { get; }
 
     /// <summary>Reads a named theme color, or returns <paramref name="fallback"/> if the name is unknown.</summary>
     private static Color ReadColor(nint context, string name, Color fallback)
@@ -163,6 +167,33 @@ internal sealed class GtkTheme : ITheme
         NativeMethods.g_object_get_int(settings, "gtk-double-click-time", out var time, 0);
         return time > 0 ? time : _fallback.DoubleClickTime;
     }
+
+    /// <summary>
+    /// The corner radius the running theme rounds a button to, read from a real <c>GtkButton</c>'s own
+    /// style context so it follows the user's theme rather than a number chosen here. Falls back to
+    /// square, which is what every theme that does not set the property draws.
+    /// </summary>
+    private static int ReadButtonCornerRadius()
+    {
+        var button = NativeMethods.gtk_button_new();
+        if (button == 0)
+            return _fallback.ButtonCornerRadius;
+
+        var context = NativeMethods.gtk_widget_get_style_context(button);
+        var radius = _fallback.ButtonCornerRadius;
+        if (context != 0)
+        {
+            NativeMethods.gtk_style_context_get_property(context, "border-radius", _NormalState, out var value);
+            radius = Math.Max(0, NativeMethods.g_value_get_int(ref value));
+            NativeMethods.g_value_unset(ref value);
+        }
+
+        NativeMethods.gtk_widget_destroy(button);
+        return radius;
+    }
+
+    /// <summary>GTK_STATE_FLAG_NORMAL — the resting state a button's own metrics are read from.</summary>
+    private const uint _NormalState = 0;
 
     /// <summary>Whether <c>gtk-theme-name</c> names a high-contrast theme (GNOME ships "HighContrast").</summary>
     private static bool ReadIsHighContrast()

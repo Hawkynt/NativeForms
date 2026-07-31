@@ -61,4 +61,8 @@ public sealed class DefaultTheme : ITheme
 
     /// <inheritdoc/>
     public int DoubleClickTime => 500;
+
+    /// <inheritdoc/>
+    /// <remarks>Square, which is what a desktop that does not say otherwise draws.</remarks>
+    public int ButtonCornerRadius => 0;
 }

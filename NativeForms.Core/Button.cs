@@ -216,11 +216,13 @@ public class Button : OwnerDrawnControl
         var font = this.Font;
         var face = new Rectangle(0, 0, this.Width - 1, this.Height - 1);
 
-        g.FillRectangle(_pressed ? theme.SelectionBackground : theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+        g.FillRectangle(this.Parent?.BackColor ?? theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+        GlyphRenderer.DrawButtonFace(g, theme, face, this.Enabled, _pressed ? theme.SelectionBackground : null);
 
         // The default button carries the accent border the platform would give it; that emphasis is
         // what tells the user which button Enter works, so the painted half cannot drop it.
-        g.DrawRectangle(_isDefault ? theme.Accent : theme.Border, face);
+        if (_isDefault)
+            g.DrawRoundedRectangle(theme.Accent, face, theme.ButtonCornerRadius);
 
         var caption = Mnemonics.Strip(this.Text);
         var color = this.Enabled ? this.ForeColor : theme.DisabledText;
@@ -253,7 +255,11 @@ public class Button : OwnerDrawnControl
         g.DrawText(caption, font, color, bounds, alignment);
 
         if (this.Focused)
-            GlyphRenderer.DrawFocusRing(g, this.Theme, new(2, 2, Math.Max(0, this.Width - 5), Math.Max(0, this.Height - 5)));
+            GlyphRenderer.DrawFocusRing(
+                g,
+                this.Theme,
+                new(2, 2, Math.Max(0, this.Width - 5), Math.Max(0, this.Height - 5)),
+                Math.Max(0, this.Theme.ButtonCornerRadius - 2)); // inset by the same amount as the ring
 
         Mnemonics.Underline(g, this.Text, caption, font, color, bounds, alignment);
     }

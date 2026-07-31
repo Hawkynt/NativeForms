@@ -83,9 +83,33 @@ internal static class GlyphRenderer
     /// greyed text when disabled) into <paramref name="bounds"/>.</summary>
     public static void DrawButtonFace(IGraphics g, ITheme theme, Rectangle bounds, string text, bool enabled)
     {
-        g.FillRectangle(theme.ControlBackground, bounds);
-        g.DrawRectangle(theme.Border, bounds);
+        DrawButtonFace(g, theme, bounds, enabled);
         g.DrawText(text, theme.DefaultFont, enabled ? theme.ControlText : theme.DisabledText, bounds, ContentAlignment.MiddleCenter);
+    }
+
+    /// <summary>
+    /// Draws the button face alone — fill and frame, rounded to <see cref="ITheme.ButtonCornerRadius"/>
+    /// — leaving the content to the caller.
+    /// </summary>
+    /// <remarks>
+    /// The radius is what keeps a painted face from giving itself away beside a real one: the gallery
+    /// puts an owner-drawn button next to a widget button on its first page, and on a desktop that
+    /// rounds its buttons a square frame is the tell. A theme that reports 0 takes the plain
+    /// rectangle, which is the same drawing this always did.
+    /// </remarks>
+    public static void DrawButtonFace(IGraphics g, ITheme theme, Rectangle bounds, bool enabled, Color? fill = null)
+    {
+        var face = fill ?? theme.ControlBackground;
+        var radius = theme.ButtonCornerRadius;
+        if (radius <= 0)
+        {
+            g.FillRectangle(face, bounds);
+            g.DrawRectangle(theme.Border, bounds);
+            return;
+        }
+
+        g.FillRoundedRectangle(face, bounds, radius);
+        g.DrawRoundedRectangle(theme.Border, bounds, radius);
     }
 
     /// <summary>Draws a small sort-direction triangle centered in <paramref name="bounds"/>, pointing
@@ -156,11 +180,14 @@ internal static class GlyphRenderer
     /// halfway toward the control background) — the modern take on the classic dotted marquee, and
     /// arithmetic rather than alpha so it renders identically on GDI. Under high contrast the blend
     /// is skipped and the full accent is used.</summary>
-    public static void DrawFocusRing(IGraphics g, ITheme theme, Rectangle bounds)
+    public static void DrawFocusRing(IGraphics g, ITheme theme, Rectangle bounds, int radius = 0)
     {
         var accent = theme.Accent;
         var color = theme.IsHighContrast ? accent : Blend(accent, theme.ControlBackground);
-        g.DrawRectangle(color, bounds);
+        if (radius > 0)
+            g.DrawRoundedRectangle(color, bounds, radius);
+        else
+            g.DrawRectangle(color, bounds);
     }
 
     /// <summary>Fills the themed selected-item highlight behind an item, row or cell.</summary>

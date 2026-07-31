@@ -336,14 +336,22 @@ strategy (may differ per platform; note exceptions inline).
       children scrolled via the logical→peer bounds mapping seam (`AutoScrollPosition`)
 
 ### 7.3 Buttons & simple inputs
-- [~] `Button` (native) — click, text *(done: click/text/bounds/enable/visible)*
+- [~] `Button` (native, with an owner-drawn half — §12) — click, text *(done: click/text/bounds/enable/visible)*
   - [~] [x] `DialogResult` (click walks to the owning Form, closes modal); [x] default/accept styling
         — `Form.AcceptButton` marks the button on its peer (`IButtonPeer.SetDefault`), painted by the
         platform (Win32 `BS_DEFPUSHBUTTON`, GTK `gtk_widget_grab_default` when the window chain is
-        ready — theme-dependent emphasis); [ ] `FlatStyle` pending
-  - [~] Image (`Image`/`ImageAlign`/`TextImageRelation` peer surface): GTK full image+text
-        (`gtk_button_set_image` + position); Win32 `BM_SETIMAGE`/`BS_BITMAP` image-only (classic
-        BUTTON cannot render both — documented); owner-drawn image+text fallback pending
+        ready — theme-dependent emphasis) and by the painted half as the accent frame; [ ] `FlatStyle`
+        pending
+  - [x] Image (`Image`/`ImageAlign`/`TextImageRelation`). An image on its own stays on the widget —
+        every platform centres a bare bitmap on a button, so all three agree (GTK
+        `gtk_button_set_image`, Win32 `BM_SETIMAGE`/`BS_BITMAP`, AppKit's image cell). An image
+        **with a caption beside it** is the promotion gate: no platform button draws both the same
+        way, and a classic Win32 `BUTTON` drops the caption outright, so that face gives up the widget
+        and is painted through the same `ContentLayout` geometry `Label`, `CheckBox` and `GroupBox`
+        use. The painted half carries what the widget was doing for it — focus ring, pressed face,
+        default-button emphasis, mnemonic underline, Space/Enter on the key release, a press cancelled
+        by sliding off the face, the `DialogResult` walk — and the swap runs both ways on a live
+        control, invisibly to the application
 - [x] `CheckBox` (native, or owner-drawn — §12) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark;
       image + text via `ContentLayout`; tri-state `CheckState`/`ThreeState`/`CheckStateChanged`
       (`Indeterminate` reads as `Checked`, the Windows Forms rule; the click cycle only reaches it with

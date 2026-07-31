@@ -73,4 +73,17 @@ public interface ITheme
     /// <c>gtk-double-click-time</c> setting on GTK), 500 in the fallback theme.
     /// </summary>
     int DoubleClickTime { get; }
+
+    /// <summary>
+    /// The corner radius the desktop rounds a push button to, in logical pixels; 0 for square corners.
+    /// </summary>
+    /// <remarks>
+    /// Queried rather than chosen, and defaulted so a backend that has not been taught it keeps the
+    /// square face it drew before. An owner-drawn button face sits next to real ones — the gallery has
+    /// a painted button and a widget button side by side on its first page — and a square frame beside
+    /// a rounded one is the tell that gives an owner-drawn control away. It is on <see cref="ITheme"/>
+    /// rather than in the renderer because the answer belongs to the desktop: GTK reads it from the
+    /// button's own style context, so it follows the user's theme rather than a number picked here.
+    /// </remarks>
+    int ButtonCornerRadius => 0;
 }

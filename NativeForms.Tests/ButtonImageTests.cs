@@ -266,4 +266,33 @@ internal sealed class ButtonImageTests
 
         Assert.That(form.DialogResult, Is.EqualTo(DialogResult.OK), "the dialog contract belongs to the control, not to the peer");
     }
+
+    // --- The face itself ---------------------------------------------------------------------------
+
+    [Test]
+    public void A_desktop_that_rounds_its_buttons_gets_a_rounded_painted_face()
+    {
+        var square = FaceOps(0);
+        var rounded = FaceOps(6);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(square.Any(static op => op.StartsWith("round ")), Is.False, "a theme reporting 0 keeps the plain rectangle");
+            Assert.That(rounded.Any(static op => op.Contains("r6")), Is.True, "and one reporting a radius is drawn to it");
+            Assert.That(
+                rounded.Any(static op => op.StartsWith("rect ")),
+                Is.False,
+                "nothing square is left on a rounded face — a square focus ring inside a rounded frame is the same tell");
+        });
+
+        static List<string> FaceOps(int radius)
+        {
+            var button = new Button { Bounds = new(0, 0, 120, 30), Text = "Go", Image = new HeadlessImage(16, 16) };
+            var backend = new HeadlessBackend { Theme = new StubTheme { ButtonCornerRadius = radius } };
+            var form = new Form();
+            form.Controls.Add(button);
+            Application.Run(form, backend);
+            return backend.Created.OfType<HeadlessCanvasPeer>().Single().RaisePaint().Operations;
+        }
+    }
 }

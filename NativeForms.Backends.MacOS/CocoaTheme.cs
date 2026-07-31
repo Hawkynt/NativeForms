@@ -190,6 +190,15 @@ internal sealed class CocoaTheme : ITheme
     /// <inheritdoc/>
     public int DoubleClickTime { get; }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// AppKit rounds a push button's bezel and offers no metric for it — there is no
+    /// <c>NSButtonCell</c> query that answers "what radius", the shape is drawn by the bezel itself.
+    /// So the figure is measured from the standard rounded bezel rather than read, and it is here
+    /// rather than in the shared fallback because it is a statement about this desktop only.
+    /// </remarks>
+    public int ButtonCornerRadius => 6;
+
     /// <summary>
     /// One of <c>NSColor</c>'s semantic colours in sRGB, composited onto <paramref name="surface"/>, or
     /// <paramref name="fallback"/>.
