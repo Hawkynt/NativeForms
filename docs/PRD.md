@@ -647,7 +647,10 @@ strategy (may differ per platform; note exceptions inline).
         popup; its slot paints a recessed placeholder box instead, while the live control stays put
         under the expanded ribbon
   - [ ] KeyTips (deferred — a `MenuStrip` above the ribbon already covers the application-menu case)
-- [~] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`; in-editor Enter commit pending a peer key seam
+- [x] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`, and
+      `SearchCommitted` on Enter from either surface: the seam this waited for is
+      `ITextBoxPeer.KeyDown`, which claims Enter back from the hosted editor before the editor sees it,
+      so the key commits the search rather than reaching the form's `AcceptButton`
 - [x] Badge/overlay support on `ImageList` images (`AddBadged`: integer alpha-over composition, corner anchoring)
 - [x] `FilePicker` / `FolderPicker` (owner-drawn shell + hosted native TextBox) — shared `PathPickerBase`
       over the existing common dialogs: `SelectedPath`, `PathChanged`, `ReadOnlyText`, `PlaceholderText`,
@@ -841,20 +844,16 @@ strategy (may differ per platform; note exceptions inline).
       tab stop after any visibility push (all backends, headless-tested), and the GTK peer clears the
       toplevel focus when it unmaps the widget that held it so the move lands reliably. The Pickers
       walkthrough workaround was removed and the text-entry sweep passes across repeated runs.
-- [~] Per-platform smoke tests / screenshots for owner-drawn controls. Linux is covered by the autopilot's
-      in-process captures; Windows now has a manual route but no automation — the gallery comes up under
-      wine (with the one `Rtf` swapped for plain text, see below) and a window is captured by its own
-      drawable, because `:1` is a rootless Xwayland whose root grabs black and ImageMagick 7 here has no
-      X11 delegate:
+- [x] Per-platform smoke tests / screenshots for owner-drawn controls. All three platforms are automated
+      and gating: `--shoot` walks the sixteen gallery pages in-process on each backend and publishes them
+      as CI artifacts (`autopilot (linux/gtk)`, `screenshots (windows)`, `macos probe`), alongside the
+      state round-trips, the layout audit and the real-OS input checks. The Linux and Windows jobs fail
+      the build on a failed check rather than only publishing pixels.
 
-      ```py
-      from Xlib import display, X            # python-xlib; walk the tree for the window by WM name,
-      raw = win.get_image(0, 0, w, h, X.ZPixmap, 0xffffffff)   # then BGRX -> a binary PPM that
-      # ...                                  # `magick out.ppm out.png` converts without a delegate.
-      ```
-
-      Automating it needs the autopilot's injection and capture behind a backend seam — see the
-      interactive-verification entry below, which is the same gap.
+      The wine route this entry used to describe was the manual predecessor and is no longer the way in:
+      it is still useful for behaviour when a Windows runner is a push away rather than to hand, but the
+      pixels to trust are the artifact's, since `PrintWindow` under wine returns success having drawn
+      nothing.
 - [x] **The Win32 rendering findings from the wine run had one cause**, and it was not the `ToolStrip`.
       `SM_CXVSCROLL` was declared as `0`, which is `SM_CXSCREEN`, so `ITheme.ScrollBarSize` answered the
       width of the display — 3840 here. Everything that reserves room for a scroll bar therefore had none

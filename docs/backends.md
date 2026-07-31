@@ -503,9 +503,11 @@ holds the keyboard rather than to the one under the pointer — so each canvas c
 active-always because a menu surface is never the key window. The same area is what delivers
 `mouseEntered:`/`mouseExited:`, so a highlight goes out again. What the probe can show is the wiring:
 it reads back off the running window whether moved events are accepted and how many views carry a
-tracking area — 187 of the gallery's, one per owner-drawn canvas; the rest are AppKit's own controls,
-which track themselves. (Only the tracked count is worth reading: the total moves run to run with how
-much of the tab strip has realized by the time the shutter arms.) What it does not show is delivery.
+tracking area — 176 of the gallery's 487 views on the run this was last read, one per owner-drawn
+canvas; the rest are AppKit's own controls, which track themselves. (Neither figure is a constant to
+assert against: the total moves run to run with how much of the tab strip has realized by the time the
+shutter arms, and the tracked count moves with the gallery as pages gain owner-drawn controls. What the
+probe is for is the ratio staying plausible and the wiring being there at all.) What it does not show is delivery.
 The probe posts a move of its own at an owner-drawn control with no children — which makes its canvas
 the deepest view at its own centre, and therefore the one AppKit would hand the move to — and the
 control's `MouseMove` has never fired, on any page, while a press at the same point reaches the same
