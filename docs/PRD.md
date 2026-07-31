@@ -344,8 +344,16 @@ strategy (may differ per platform; note exceptions inline).
   - [~] Image (`Image`/`ImageAlign`/`TextImageRelation` peer surface): GTK full image+text
         (`gtk_button_set_image` + position); Win32 `BM_SETIMAGE`/`BS_BITMAP` image-only (classic
         BUTTON cannot render both — documented); owner-drawn image+text fallback pending
-- [~] `CheckBox` (native, or owner-drawn — §12) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark done;
-      image + text via `ContentLayout` done; tri-state `CheckState` pending
+- [x] `CheckBox` (native, or owner-drawn — §12) — `Checked` + `CheckedChanged`, click/Space toggle, themed checkmark;
+      image + text via `ContentLayout`; tri-state `CheckState`/`ThreeState`/`CheckStateChanged`
+      (`Indeterminate` reads as `Checked`, the Windows Forms rule; the click cycle only reaches it with
+      `ThreeState`, but a box assigned it directly still clears on the next click rather than trapping
+      the user). The mixed mark is a filled square, not a dimmed check, which would read as disabled.
+      Each backend keeps its own indicator: `BS_AUTO3STATE`, `gtk_toggle_button_set_inconsistent`,
+      `allowsMixedState`. Win32 and AppKit run the three-step click cycle themselves and the core
+      mirrors what the widget reached; GTK has no such cycle and paints inconsistent as presentation
+      only, so its peer takes the third step itself rather than letting one desktop out of three skip
+      from checked straight back to unchecked
 - [~] `RadioButton` (native, or owner-drawn — §12) — themed ring + accent dot, grouping by container, click/Space,
       `CheckedChanged`, image + text via `ContentLayout` done
 - [x] `Label` (native, with an owner-drawn half for the case no platform static can express)

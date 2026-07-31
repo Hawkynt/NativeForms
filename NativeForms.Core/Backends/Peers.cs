@@ -480,6 +480,24 @@ public interface ICheckBoxPeer : IControlPeer
     /// <summary>The widget's current state, read when it reports a change so the core mirrors what the
     /// platform actually did rather than inferring a flip.</summary>
     bool GetChecked();
+
+    /// <summary>
+    /// Tells the widget whether it must offer the third (indeterminate) state — Win32's
+    /// <c>BS_AUTO3STATE</c>, GTK's <c>inconsistent</c> flag, AppKit's <c>allowsMixedState</c>.
+    /// </summary>
+    /// <remarks>
+    /// Default-implemented as a no-op so a backend that has not been taught the third state still
+    /// satisfies the contract; such a peer simply never reports <see cref="CheckState.Indeterminate"/>,
+    /// and <see cref="CheckBox"/> keeps its own state authoritative either way.
+    /// </remarks>
+    void SetThreeState(bool value) { }
+
+    /// <summary>Pushes the three-valued state into the widget without raising
+    /// <see cref="CheckedChanged"/>; the two-valued <see cref="SetChecked"/> is the fallback.</summary>
+    void SetCheckState(CheckState value) => this.SetChecked(value is not CheckState.Unchecked);
+
+    /// <summary>The widget's current three-valued state, read when it reports a change.</summary>
+    CheckState GetCheckState() => this.GetChecked() ? CheckState.Checked : CheckState.Unchecked;
 }
 
 

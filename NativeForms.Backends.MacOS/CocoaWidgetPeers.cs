@@ -82,26 +82,60 @@ internal class CocoaCheckBoxPeer : CocoaControlPeer, ICheckBoxPeer
     }
 
     /// <inheritdoc/>
-    /// <remarks>NSControlStateValue: off 0, on 1.</remarks>
-    public void SetChecked(bool value)
+    public void SetChecked(bool value) => this.SetCheckState(value ? CheckState.Checked : CheckState.Unchecked);
+
+    /// <inheritdoc/>
+    public bool GetChecked() => this.GetCheckState() is not CheckState.Unchecked;
+
+    /// <inheritdoc/>
+    /// <remarks>NSControlStateValue: mixed −1, off 0, on 1.</remarks>
+    public void SetCheckState(CheckState value)
     {
-        _checked = value;
+        _state = value;
         if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setState:"), value ? 1 : 0);
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setState:"), ToNative(value));
     }
 
     /// <inheritdoc/>
-    public bool GetChecked()
-        => this.Handle == 0 ? _checked : CocoaRuntime.SendInteger(this.Handle, CocoaRuntime.sel_registerName("state")) != 0;
+    public CheckState GetCheckState()
+        => this.Handle == 0
+            ? _state
+            : CocoaRuntime.SendInteger(this.Handle, CocoaRuntime.sel_registerName("state")) switch
+            {
+                1 => CheckState.Checked,
+                -1 => CheckState.Indeterminate,
+                _ => CheckState.Unchecked,
+            };
 
-    private bool _checked;
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <c>allowsMixedState</c> makes AppKit's own click cycle three-stepped — off, on, mixed — which is
+    /// the cycle <see cref="CheckBox"/> runs, so the state read back after a click keeps agreeing with
+    /// the core rather than needing to be corrected.
+    /// </remarks>
+    public void SetThreeState(bool value)
+    {
+        if (this.Handle != 0)
+            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAllowsMixedState:"), value ? 1 : 0);
+    }
+
+    private CheckState _state;
 
     /// <summary>The widget reporting that the user worked it.</summary>
     private void OnToggled()
     {
-        _checked = this.GetChecked();
+        _state = this.GetCheckState();
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Maps a state onto the <c>NSControlStateValue</c> carrying it.</summary>
+    private static nint ToNative(CheckState state)
+        => state switch
+        {
+            CheckState.Checked => 1,
+            CheckState.Indeterminate => -1,
+            _ => 0,
+        };
 
     /// <inheritdoc/>
     public override void Dispose()

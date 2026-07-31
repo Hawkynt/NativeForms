@@ -10,13 +10,23 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// assistive technology, none of which the owner-drawn fallback gets.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The "toggled" signal fires for programmatic changes as well as user ones, so
-/// <see cref="SetChecked"/> suppresses the callback while it pushes a value in. Without that, assigning
-/// <c>Checked</c> from a <c>CheckedChanged</c> handler would recurse through the widget.
+/// <see cref="SetCheckState"/> suppresses the callback while it pushes a value in. Without that,
+/// assigning <c>Checked</c> from a <c>CheckedChanged</c> handler would recurse through the widget.
+/// </para>
+/// <para>
+/// GTK's indeterminate ("inconsistent") state is presentation only — the widget paints the dash but
+/// will not cycle into it, unlike Win32's <c>BS_AUTO3STATE</c> and AppKit's mixed state. So this peer
+/// runs the third step of the cycle itself, reporting the state the other two backends reach on their
+/// own. Getting that wrong is invisible in a screenshot and obvious in use: the box would skip straight
+/// from checked back to unchecked on one desktop out of three.
+/// </para>
 /// </remarks>
 internal sealed class GtkCheckBoxPeer : GtkControlPeer, ICheckBoxPeer
 {
-    private bool _checked;
+    private CheckState _state;
+    private bool _threeState;
     private bool _suppressToggle;
 
     /// <inheritdoc />
@@ -29,16 +39,22 @@ internal sealed class GtkCheckBoxPeer : GtkControlPeer, ICheckBoxPeer
     protected override void ApplyText(string text) => NativeMethods.gtk_button_set_label(_widget, text);
 
     /// <inheritdoc />
-    public void SetChecked(bool value)
+    public void SetChecked(bool value) => this.SetCheckState(value ? CheckState.Checked : CheckState.Unchecked);
+
+    /// <inheritdoc />
+    public bool GetChecked() => this.GetCheckState() is not CheckState.Unchecked;
+
+    /// <inheritdoc />
+    public void SetCheckState(CheckState value)
     {
-        _checked = value;
+        _state = value;
         if (_widget == 0)
             return;
 
         _suppressToggle = true;
         try
         {
-            NativeMethods.gtk_toggle_button_set_active(_widget, value ? 1 : 0);
+            this.Apply(value);
         }
         finally
         {
@@ -47,13 +63,30 @@ internal sealed class GtkCheckBoxPeer : GtkControlPeer, ICheckBoxPeer
     }
 
     /// <inheritdoc />
-    public bool GetChecked() => _widget == 0 ? _checked : NativeMethods.gtk_toggle_button_get_active(_widget) != 0;
+    /// <remarks>
+    /// Answered from the peer's own field rather than from <c>gtk_toggle_button_get_active</c>, which
+    /// cannot distinguish checked from indeterminate — both are active widgets.
+    /// </remarks>
+    public CheckState GetCheckState() => _state;
+
+    /// <inheritdoc />
+    public void SetThreeState(bool value) => _threeState = value;
+
+    /// <summary>
+    /// Pushes a state onto the widget. Indeterminate is drawn as an inconsistent <em>active</em> button:
+    /// GTK dims the dash on an inactive one, which reads as disabled rather than as mixed.
+    /// </summary>
+    private void Apply(CheckState state)
+    {
+        NativeMethods.gtk_toggle_button_set_active(_widget, state is CheckState.Unchecked ? 0 : 1);
+        NativeMethods.gtk_toggle_button_set_inconsistent(_widget, state is CheckState.Indeterminate ? 1 : 0);
+    }
 
     /// <inheritdoc />
     protected override void OnWidgetRealized()
     {
         // Flush the state buffered before the widget existed, then start listening.
-        NativeMethods.gtk_toggle_button_set_active(_widget, _checked ? 1 : 0);
+        this.Apply(_state);
 
         var data = this.PinSelf();
         unsafe
@@ -63,13 +96,22 @@ internal sealed class GtkCheckBoxPeer : GtkControlPeer, ICheckBoxPeer
         }
     }
 
-    /// <summary>Raises <see cref="CheckedChanged"/> unless the change came from <see cref="SetChecked"/>.</summary>
+    /// <summary>Raises <see cref="CheckedChanged"/> unless the change came from <see cref="SetCheckState"/>.</summary>
     private void RaiseToggled()
     {
         if (_suppressToggle)
             return;
 
-        _checked = this.GetChecked();
+        // The widget has already flipped its own active flag, which for a two-state box is the answer.
+        // For the third step it is not: GTK has no cycle through inconsistent, so the state the other
+        // backends would have reached is worked out here and pushed back onto the widget.
+        this.SetCheckState(_state switch
+        {
+            CheckState.Unchecked => CheckState.Checked,
+            CheckState.Checked when _threeState => CheckState.Indeterminate,
+            _ => CheckState.Unchecked,
+        });
+
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
 

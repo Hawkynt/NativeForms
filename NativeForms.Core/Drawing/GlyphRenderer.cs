@@ -24,18 +24,35 @@ internal static class GlyphRenderer
     /// <summary>Draws a themed check box (field-colored box, themed border, accent checkmark when
     /// checked) scaled into <paramref name="box"/>.</summary>
     public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, bool isChecked)
+        => DrawCheckBox(g, theme, box, isChecked ? CheckState.Checked : CheckState.Unchecked);
+
+    /// <summary>Draws a themed check box in any of its three states, scaled into
+    /// <paramref name="box"/>.</summary>
+    /// <remarks>
+    /// The indeterminate mark is a filled square rather than a greyed check: it has to read as "neither"
+    /// at a glance and at 14 pixels, and a dimmed checkmark reads as a disabled checked box instead.
+    /// Every desktop draws mixed this way for the same reason.
+    /// </remarks>
+    public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, CheckState state)
     {
         g.FillRectangle(theme.FieldBackground, box);
-        g.DrawRectangle(isChecked ? theme.Accent : theme.Border, box);
-        if (!isChecked)
-            return;
+        g.DrawRectangle(state is CheckState.Unchecked ? theme.Border : theme.Accent, box);
 
-        // A check mark: two strokes from the lower-left to the upper-right, in 14ths of the box.
         var w = box.Width;
         var h = box.Height;
-        var thickness = Math.Max(1, w / 7);
-        g.DrawLine(theme.Accent, box.X + (3 * w / 14), box.Y + (7 * h / 14), box.X + (6 * w / 14), box.Y + (10 * h / 14), thickness);
-        g.DrawLine(theme.Accent, box.X + (6 * w / 14), box.Y + (10 * h / 14), box.X + (11 * w / 14), box.Y + (3 * h / 14), thickness);
+        switch (state)
+        {
+            case CheckState.Checked:
+                // A check mark: two strokes from the lower-left to the upper-right, in 14ths of the box.
+                var thickness = Math.Max(1, w / 7);
+                g.DrawLine(theme.Accent, box.X + (3 * w / 14), box.Y + (7 * h / 14), box.X + (6 * w / 14), box.Y + (10 * h / 14), thickness);
+                g.DrawLine(theme.Accent, box.X + (6 * w / 14), box.Y + (10 * h / 14), box.X + (11 * w / 14), box.Y + (3 * h / 14), thickness);
+                break;
+
+            case CheckState.Indeterminate:
+                g.FillRectangle(theme.Accent, new(box.X + (4 * w / 14), box.Y + (4 * h / 14), Math.Max(1, 6 * w / 14), Math.Max(1, 6 * h / 14)));
+                break;
+        }
     }
 
     /// <summary>Draws a themed progress bar (field-colored track, accent fill proportional to

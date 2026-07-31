@@ -19,6 +19,13 @@ internal static partial class NativeMethods
     /// <summary>A check box that toggles itself on click.</summary>
     internal const uint BS_AUTOCHECKBOX = 0x00000003;
 
+    /// <summary>A check box that cycles unchecked → checked → indeterminate on click.</summary>
+    internal const uint BS_AUTO3STATE = 0x00000006;
+
+    /// <summary>The bits <c>BS_AUTOCHECKBOX</c> and <c>BS_AUTO3STATE</c> occupy, cleared before either
+    /// is written back over the other.</summary>
+    internal const uint BS_TYPEMASK = 0x0000000F;
+
     /// <summary>A radio button that checks itself and clears its group siblings on click.</summary>
     internal const uint BS_AUTORADIOBUTTON = 0x00000009;
 
@@ -45,6 +52,9 @@ internal static partial class NativeMethods
 
     /// <summary>Checked.</summary>
     internal const nint BST_CHECKED = 1;
+
+    /// <summary>Neither checked nor unchecked — the mixed state of a three-state box.</summary>
+    internal const nint BST_INDETERMINATE = 2;
 
     // --- Common controls ---------------------------------------------------------------------------
 

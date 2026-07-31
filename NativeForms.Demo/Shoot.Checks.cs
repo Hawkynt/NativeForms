@@ -639,15 +639,30 @@ internal static partial class Shoot
 
                 case CheckBox { Enabled: true } check:
                 {
-                    var original = check.Checked;
-                    check.Checked = !original;
-                    if (check.Checked == original)
+                    var original = check.CheckState;
+                    var wasChecked = check.Checked;
+                    check.Checked = !wasChecked;
+                    if (check.Checked == wasChecked)
                     {
-                        note($"    check: CheckBox \"{check.Text}\" ignored being set to {!original}");
+                        note($"    check: CheckBox \"{check.Text}\" ignored being set to {!wasChecked}");
                         ++failed;
                     }
 
-                    check.Checked = original;
+                    // The third state is the one a promoted widget can quietly refuse to hold: Win32
+                    // only keeps it under BS_AUTO3STATE, and a peer that dropped it would read back as
+                    // plain checked. Asking the control for it and reading it back goes through the
+                    // real widget on every backend, which is where that would show.
+                    if (check.ThreeState)
+                    {
+                        check.CheckState = CheckState.Indeterminate;
+                        if (check.CheckState is not CheckState.Indeterminate)
+                        {
+                            note($"    check: CheckBox \"{check.Text}\" lost the indeterminate state, reading back {check.CheckState}");
+                            ++failed;
+                        }
+                    }
+
+                    check.CheckState = original;
                     break;
                 }
 

@@ -1304,18 +1304,37 @@ internal sealed class RecordingGraphics : IGraphics
 /// <summary>A stand-in for a real platform check box, so the promoted path is testable headlessly.</summary>
 internal sealed class HeadlessCheckBoxPeer : HeadlessPeer, ICheckBoxPeer
 {
-    private bool _checked;
+    private CheckState _state;
 
     public event EventHandler? CheckedChanged;
 
-    public void SetChecked(bool value) => _checked = value;
+    public void SetChecked(bool value) => this.SetCheckState(value ? CheckState.Checked : CheckState.Unchecked);
 
-    public bool GetChecked() => _checked;
+    public bool GetChecked() => _state is not CheckState.Unchecked;
 
-    /// <summary>Simulates the user toggling the widget itself.</summary>
+    public void SetCheckState(CheckState value) => _state = value;
+
+    public CheckState GetCheckState() => _state;
+
+    /// <summary>Whether the widget has been told to offer the third state.</summary>
+    public bool ThreeState { get; private set; }
+
+    public void SetThreeState(bool value) => this.ThreeState = value;
+
+    /// <summary>
+    /// Simulates the user working the widget itself, modelling a platform that runs the cycle on its own
+    /// (Win32's <c>BS_AUTO3STATE</c>, AppKit's mixed state) — the widget reaches the next state and then
+    /// reports, which is the order the core has to survive.
+    /// </summary>
     public void RaiseUserToggle()
     {
-        _checked = !_checked;
+        _state = _state switch
+        {
+            CheckState.Unchecked => CheckState.Checked,
+            CheckState.Checked when this.ThreeState => CheckState.Indeterminate,
+            _ => CheckState.Unchecked,
+        };
+
         CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
 }

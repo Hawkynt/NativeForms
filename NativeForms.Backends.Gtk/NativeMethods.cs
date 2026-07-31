@@ -554,6 +554,14 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial int gtk_toggle_button_get_active(nint toggleButton);
 
+    /// <summary>
+    /// Draws the toggle button in its "inconsistent" state — GTK's name for indeterminate, a dash in
+    /// place of the check. It is orthogonal to <c>active</c>: the flag decides what is painted, the
+    /// active state is what the widget still reports.
+    /// </summary>
+    [LibraryImport(Gtk)]
+    internal static partial void gtk_toggle_button_set_inconsistent(nint toggleButton, int isInconsistent);
+
     /// <summary>Creates a push button carrying the given label text (UTF-8).</summary>
     [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint gtk_button_new_with_label(string label);

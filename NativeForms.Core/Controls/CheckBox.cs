@@ -39,8 +39,47 @@ public class CheckBox : OwnerDrawnControl
     private bool WouldBeNative
         => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
 
-    /// <summary>Whether the box is checked.</summary>
+    /// <summary>
+    /// Whether the box is checked. <see cref="CheckState.Indeterminate"/> reads as
+    /// <see langword="true"/> — the Windows Forms rule — so an application that only asks the boolean
+    /// question never mistakes "mixed" for "off". Assigning projects back onto the two plain states.
+    /// </summary>
     public bool Checked
+    {
+        get => this.CheckState is not CheckState.Unchecked;
+        set => this.CheckState = value ? CheckState.Checked : CheckState.Unchecked;
+    }
+
+    /// <summary>
+    /// The three-valued state. Setting it raises <see cref="CheckStateChanged"/>, and
+    /// <see cref="CheckedChanged"/> as well whenever the change moved <see cref="Checked"/> — a box
+    /// going from checked to indeterminate has changed state without changing that answer.
+    /// </summary>
+    public CheckState CheckState
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            var wasChecked = this.Checked;
+            field = value;
+            _native?.SetCheckState(value); // silent: the peer must not re-raise what we are about to raise
+            this.Invalidate();
+            this.OnCheckStateChanged(EventArgs.Empty);
+            if (this.Checked != wasChecked)
+                this.OnCheckedChanged(EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Whether clicking cycles through <see cref="CheckState.Indeterminate"/> as well. Off by default,
+    /// so a plain box keeps toggling between two states; the third can still be assigned directly, which
+    /// is how a box that summarises a set shows the set disagreeing without inviting the user to pick
+    /// "mixed" by hand.
+    /// </summary>
+    public bool ThreeState
     {
         get => field;
         set
@@ -49,9 +88,7 @@ public class CheckBox : OwnerDrawnControl
                 return;
 
             field = value;
-            _native?.SetChecked(value); // silent: the peer must not re-raise what we are about to raise
-            this.Invalidate();
-            this.OnCheckedChanged(EventArgs.Empty);
+            _native?.SetThreeState(value);
         }
     }
 
@@ -98,7 +135,8 @@ public class CheckBox : OwnerDrawnControl
             if (offered is { } peer)
             {
                 _native = peer;
-                peer.SetChecked(this.Checked);
+                peer.SetThreeState(this.ThreeState); // before the state: the widget must be able to hold it
+                peer.SetCheckState(this.CheckState);
                 peer.CheckedChanged += this.OnNativeCheckedChanged;
                 return peer;
             }
@@ -124,11 +162,15 @@ public class CheckBox : OwnerDrawnControl
     private void OnNativeCheckedChanged(object? sender, EventArgs e)
     {
         if (_native is { } peer)
-            this.Checked = peer.GetChecked();
+            this.CheckState = peer.GetCheckState();
     }
 
     /// <summary>Raised when <see cref="Checked"/> changes.</summary>
     public event EventHandler? CheckedChanged;
+
+    /// <summary>Raised when <see cref="CheckState"/> changes, including the moves between checked and
+    /// indeterminate that leave <see cref="Checked"/> alone.</summary>
+    public event EventHandler? CheckStateChanged;
 
     /// <inheritdoc/>
     protected override bool Focusable => true;
@@ -136,15 +178,30 @@ public class CheckBox : OwnerDrawnControl
     /// <summary>Raises <see cref="CheckedChanged"/>.</summary>
     protected virtual void OnCheckedChanged(EventArgs e) => this.CheckedChanged?.Invoke(this, e);
 
+    /// <summary>Raises <see cref="CheckStateChanged"/>.</summary>
+    protected virtual void OnCheckStateChanged(EventArgs e) => this.CheckStateChanged?.Invoke(this, e);
+
     /// <summary>Toggles the checked state and raises <see cref="Control.Click"/>.</summary>
     protected void Toggle() => this.OnClick(EventArgs.Empty);
 
-    /// <summary>Toggles <see cref="Checked"/>, then raises <see cref="Control.Click"/> — the
+    /// <summary>Advances <see cref="CheckState"/>, then raises <see cref="Control.Click"/> — the
     /// Windows Forms order (<see cref="CheckedChanged"/> first), shared by mouse, Space and
     /// <see cref="Control.PerformClick"/>.</summary>
+    /// <remarks>
+    /// A two-state box flips; a <see cref="ThreeState"/> one walks unchecked → checked → indeterminate
+    /// → unchecked. A box left indeterminate without <see cref="ThreeState"/> clears on the next click
+    /// rather than sticking, which is the only way out an application that assigned the state directly
+    /// leaves the user.
+    /// </remarks>
     protected override void OnClick(EventArgs e)
     {
-        this.Checked = !this.Checked;
+        this.CheckState = this.CheckState switch
+        {
+            CheckState.Unchecked => CheckState.Checked,
+            CheckState.Checked when this.ThreeState => CheckState.Indeterminate,
+            _ => CheckState.Unchecked,
+        };
+
         base.OnClick(e);
     }
 
@@ -189,7 +246,7 @@ public class CheckBox : OwnerDrawnControl
             alignment = RtlLayout.Mirror(alignment);
         }
 
-        GlyphRenderer.DrawCheckBox(g, theme, box, this.Checked);
+        GlyphRenderer.DrawCheckBox(g, theme, box, this.CheckState);
 
         var textColor = this.Enabled ? this.ForeColor : theme.DisabledText;
         if (this.Image is { } image)
