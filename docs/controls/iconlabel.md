@@ -1,6 +1,6 @@
 # IconLabel
 
-> A caption that renders an image **and** text together, owner-drawn in the platform theme — the pairing the native [`Label`](label.md) widget cannot do.
+> A caption that renders an image **and** text together, owner-drawn in the platform theme — always, whatever it happens to be showing.
 
 ![IconLabel in the NativeForms demo](../screenshots/20-toolbars.png)
 
@@ -49,7 +49,7 @@ Inherits the common members of [`Control`](control.md) plus the owner-drawn surf
 
 ## Notes
 
-- **Why this exists.** [`Label`](label.md) is backed by the platform's native static widget, and no toolkit renders both parts in one of those: Win32's `SS_BITMAP` static is image-only and GTK swaps the whole widget for a `GtkImage`. A captioned `Label` therefore keeps its text and drops its image. `IconLabel` gives up the native widget to get both.
+- **Why this exists.** [`Label`](label.md) renders both parts too, but it keeps the platform's native static widget whenever it can and only leaves it for an image — the right default for a caption, and it means the label's rendering strategy follows its content. `IconLabel` never has a widget to lose, so a caller who wants one answer on every backend regardless of what the label is showing asks for this one. It also predates `Label` learning the trick, which is why the two exist side by side.
 - Layout goes through the shared `ContentLayout` helper (PRD §5) — the same geometry [`Button`](button.md), [`CheckBox`](checkbox.md) and [`GroupBox`](groupbox.md) use — so an icon sits beside a caption identically everywhere, with a 4 px gap.
 - `TextAlign` anchors the combined block; `ImageAlign` only applies when there is no text, matching how Windows Forms places an image-only label.
 - Right-to-left mirrors which side the icon leads on and mirrors the block anchor, like the `CheckBox` face.
@@ -60,4 +60,4 @@ Inherits the common members of [`Control`](control.md) plus the owner-drawn surf
 
 ## Differences from WinForms
 
-Windows Forms renders image and text in one `Label` because GDI+ draws the whole control. Here that is a separate type rather than a mode on `Label`, so the plain `Label` keeps its cheap native widget and only the labels that need both pay for a canvas. `TextImageRelation` is offered on the label itself, which WinForms exposes only on button-family controls.
+Windows Forms renders image and text in one `Label` because GDI+ draws the whole control, and so does this toolkit's `Label` — but only for the labels that need it, so a plain caption keeps its cheap native widget and never pays for a canvas. This type is the always-painted sibling for callers who want the strategy fixed rather than inferred. `TextImageRelation` is offered on the label itself, which WinForms exposes only on button-family controls.

@@ -113,11 +113,19 @@ internal sealed partial class MainForm
 
         // The two label properties nothing else in the gallery asks for. A mnemonic is drawn very
         // differently by the three platforms — a style bit, a markup convention, an attributed string —
-        // and an image on a label is the one case where two of them stop being a label at all and
-        // become an image widget, so both want a control on a page somebody photographs.
+        // and an image on a label is the case where none of them can keep the widget at all, so the
+        // label is painted instead and has to come out the same on all three. Both want a control on a
+        // page somebody photographs.
         var mnemonicLabel = new Label { Bounds = new(340, 370, 190, 22), Text = "&Underlined mnemonic" };
         var literalLabel = new Label { Bounds = new(536, 370, 104, 22), Text = "&Literal", UseMnemonic = false };
         var imageLabel = new Label { Bounds = new(340, 398, 24, 24), Image = this.DiscImage(Color.MediumOrchid) };
+        var captionedImageLabel = new Label
+        {
+            Bounds = new(340, 426, 300, 24),
+            Text = "…and one with a &caption beside it",
+            Image = this.DiscImage(Color.SeaGreen),
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
 
         page.Controls.AddRange(
             Caption("Label", 340, 12),
@@ -130,7 +138,8 @@ internal sealed partial class MainForm
             toggle,
             Caption("Label: mnemonic and image", 340, 346),
             mnemonicLabel, literalLabel, imageLabel,
-            new Label { Bounds = new(372, 400, 268, 20), Text = "…a picture, and no caption at all" });
+            new Label { Bounds = new(372, 400, 268, 20), Text = "…a picture, and no caption at all" },
+            captionedImageLabel);
 
         // --- Column 3: grouped radios, progress bars, picture box -------------------------------
 

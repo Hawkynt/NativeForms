@@ -74,7 +74,7 @@ internal static class ContentLayout
     }
 
     /// <summary>Anchors a box of <paramref name="size"/> at one of the nine alignment points of <paramref name="bounds"/>.</summary>
-    private static Rectangle Anchor(Rectangle bounds, Size size, ContentAlignment alignment)
+    public static Rectangle Anchor(Rectangle bounds, Size size, ContentAlignment alignment)
     {
         var x = alignment switch
         {

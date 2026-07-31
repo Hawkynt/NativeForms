@@ -1,3 +1,4 @@
+using System.Drawing;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
 
@@ -5,10 +6,20 @@ namespace Hawkynt.NativeForms;
 
 /// <summary>
 /// A non-interactive line of static text, backed by the platform's native label widget. Supports
-/// WinForms-style <see cref="AutoSize"/>, <see cref="TextAlign"/>, <see cref="BorderStyle"/> and
-/// mnemonic rendering (<see cref="UseMnemonic"/>).
+/// WinForms-style <see cref="AutoSize"/>, <see cref="TextAlign"/>, <see cref="BorderStyle"/>,
+/// mnemonic rendering (<see cref="UseMnemonic"/>) and an <see cref="Image"/> beside the caption.
 /// </summary>
-public class Label : Control
+/// <remarks>
+/// The widget is used whenever it can express what the label is showing, which is every label without
+/// an image (PRD §12). No platform static renders a bitmap and a caption together — Win32's
+/// <c>SS_BITMAP</c> is image-only, GTK swaps the whole widget for a <c>GtkImage</c>, Cocoa for an
+/// <c>NSImageView</c> — so a label carrying an image gives up the widget and is drawn instead, through
+/// the same <see cref="Drawing.ContentLayout"/> geometry <see cref="Button"/>, <see cref="CheckBox"/>
+/// and <see cref="GroupBox"/> use. The gate is the image alone, not the image-with-a-caption case: an
+/// image-only label would otherwise be a native widget on one backend and a painted surface on the
+/// next, and the same control has to look the same everywhere.
+/// </remarks>
+public class Label : OwnerDrawnControl
 {
     private ILabelPeer? _labelPeer;
 
@@ -16,7 +27,7 @@ public class Label : Control
     protected override bool Focusable => false;
 
     /// <summary>
-    /// When <see langword="true"/>, the label sizes itself to fit its text in the theme's default
+    /// When <see langword="true"/>, the label sizes itself to fit its content in the theme's default
     /// font. The size is computed through the backend's text measurement on realization and again on
     /// every <see cref="Control.Text"/> change; before realization the wish is simply buffered.
     /// Defaults to <see langword="false"/>, matching Windows Forms.
@@ -36,7 +47,8 @@ public class Label : Control
 
     /// <summary>
     /// Where the text sits within the label's bounds. Win32 static controls honor the horizontal
-    /// component plus a coarse vertical centering only; GTK honors all nine anchors.
+    /// component plus a coarse vertical centering only; GTK honors all nine anchors. A label carrying
+    /// an image is painted, and honors all nine everywhere.
     /// </summary>
     public ContentAlignment TextAlign
     {
@@ -48,13 +60,15 @@ public class Label : Control
 
             field = value;
             _labelPeer?.SetTextAlign(value);
+            this.Invalidate();
         }
     }
 
     /// <summary>
     /// The border drawn around the label — <see cref="BorderStyle.None"/> or
     /// <see cref="BorderStyle.FixedSingle"/>. Rendered natively on Win32 (<c>WS_BORDER</c>); GTK has
-    /// no native label frame, so the value is not rendered there.
+    /// no native label frame, so the value is not rendered there. A painted label draws it from the
+    /// theme on every backend.
     /// </summary>
     public BorderStyle BorderStyle
     {
@@ -66,6 +80,7 @@ public class Label : Control
 
             field = value;
             _labelPeer?.SetBorderStyle(value);
+            this.Invalidate();
         }
     } = BorderStyle.None;
 
@@ -86,14 +101,15 @@ public class Label : Control
 
             field = value;
             _labelPeer?.SetUseMnemonic(value);
+            this.Invalidate();
         }
     } = true;
 
     /// <summary>
-    /// The image shown by the label, or <see langword="null"/>. Rendered natively only while
-    /// <see cref="Control.Text"/> is empty (Win32 shows an <c>SS_BITMAP</c> static, GTK swaps in a
-    /// <c>GtkImage</c>) — no toolkit renders image and text in one static widget, so a captioned
-    /// label keeps its text and the image stays pending there (see <c>docs/PRD.md</c> §7.3).
+    /// The image shown beside the caption, or <see langword="null"/>. Assigning one moves the label off
+    /// the platform's static widget and onto the painter, because no platform static renders a bitmap
+    /// and a caption together; clearing it moves the label back. The swap is invisible to the
+    /// application — every property keeps its value across it.
     /// </summary>
     public IImage? Image
     {
@@ -104,15 +120,23 @@ public class Label : Control
                 return;
 
             field = value;
-            this.TrackImageAnimation(value, this.PushImage);
+
+            // The image is what the gate is on, so assigning or clearing one is exactly the change that
+            // can move this control between a widget and the painter.
+            if (this.IsRealized && this.IsNativeWidget != this.WouldBeNative)
+                this.RerealizePeer();
+
+            this.TrackImageAnimation(value, this.OnImageFrame);
             this.PushImage();
+            this.ApplyAutoSize();
+            this.Invalidate();
         }
     }
 
     /// <summary>
-    /// Where the image anchors within the label's bounds. Advisory for now: the native image-only
-    /// renderings ignore it (Win32 pins the bitmap top-left, GTK centers it). Defaults to
-    /// <see cref="ContentAlignment.MiddleCenter"/>, matching Windows Forms.
+    /// Where the image anchors within the label's bounds when it is the only content — a caption-less
+    /// label places its image by this rather than by <see cref="TextAlign"/>, matching Windows Forms.
+    /// Defaults to <see cref="ContentAlignment.MiddleCenter"/>.
     /// </summary>
     public ContentAlignment ImageAlign
     {
@@ -124,54 +148,78 @@ public class Label : Control
 
             field = value;
             this.PushImage();
+            this.Invalidate();
         }
     } = ContentAlignment.MiddleCenter;
+
+    /// <summary>
+    /// How the image sits relative to the caption. Defaults to
+    /// <see cref="TextImageRelation.ImageBeforeText"/> — the icon leads, the caption follows.
+    /// </summary>
+    public TextImageRelation TextImageRelation
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.ApplyAutoSize();
+            this.Invalidate();
+        }
+    } = TextImageRelation.ImageBeforeText;
+
+    /// <summary>Whether this label is currently rendered by a real platform widget.</summary>
+    public override bool IsNativeWidget => _labelPeer is not null;
+
+    /// <summary>
+    /// Whether the current property values are all expressible by a platform static. Everything is
+    /// except an <see cref="Image"/>: none of the three renders a bitmap and a caption in one widget,
+    /// and the image-only renderings they do offer disagree with each other about placement.
+    /// </summary>
+    private bool IsNativeEligible => this.Image is null;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible;
 
     /// <summary>
     /// The label's uppercased mnemonic character — the one after a single <c>&amp;</c> in
     /// <see cref="Control.Text"/> (<c>&amp;&amp;</c> escapes) — or <c>'\0'</c> when there is none or
     /// <see cref="UseMnemonic"/> is off.
     /// </summary>
-    internal char Mnemonic
+    internal char Mnemonic => this.UseMnemonic ? Mnemonics.CharOf(this.Text) : '\0';
+
+    /// <inheritdoc/>
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
     {
-        get
+        if (this.WouldBeNative)
         {
-            if (!this.UseMnemonic)
-                return '\0';
-
-            var text = this.Text;
-            for (var i = 0; i < text.Length - 1; ++i)
-            {
-                if (text[i] != '&')
-                    continue;
-
-                if (text[i + 1] == '&')
-                {
-                    ++i;
-                    continue;
-                }
-
-                return char.ToUpperInvariant(text[i + 1]);
-            }
-
-            return '\0';
+            var peer = backend.CreateLabel();
+            _labelPeer = peer;
+            return peer;
         }
-    }
 
-    private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateLabel();
+        return base.CreatePeer(backend);
+    }
 
     /// <inheritdoc/>
     private protected override void OnRealized(IControlPeer peer)
     {
-        if (peer is not ILabelPeer label)
-            return;
+        base.OnRealized(peer);
 
-        _labelPeer = label;
-        label.SetTextAlign(this.TextAlign);
-        label.SetBorderStyle(this.BorderStyle);
-        label.SetUseMnemonic(this.UseMnemonic);
+        if (peer is ILabelPeer label)
+        {
+            label.SetTextAlign(this.TextAlign);
+            label.SetBorderStyle(this.BorderStyle);
+            label.SetUseMnemonic(this.UseMnemonic);
+        }
+
         this.PushImage();
-        this.TrackImageAnimation(this.Image, this.PushImage); // subscribe now that a backend exists
+
+        // After the base, which unsubscribes on the way in: a backend now exists, so an animated image
+        // assigned before realization can finally subscribe — to whichever half is going to draw it.
+        this.TrackImageAnimation(this.Image, this.OnImageFrame);
         this.ApplyAutoSize();
     }
 
@@ -179,8 +227,22 @@ public class Label : Control
     /// shared clock calls this again as the frame advances.</summary>
     private void PushImage() => _labelPeer?.SetImage(this.CurrentFrameOf(this.Image), this.ImageAlign);
 
+    /// <summary>One frame of an animated image has come round: the widget half is re-pushed, the
+    /// painted half is repainted, and the label is only ever one of the two.</summary>
+    private void OnImageFrame()
+    {
+        if (_labelPeer is not null)
+            this.PushImage();
+        else
+            this.Invalidate();
+    }
+
     /// <inheritdoc/>
-    private protected override void OnUnrealized() => _labelPeer = null;
+    private protected override void OnUnrealized()
+    {
+        _labelPeer = null;
+        base.OnUnrealized();
+    }
 
     /// <inheritdoc/>
     protected override void OnTextChanged(EventArgs e)
@@ -189,16 +251,102 @@ public class Label : Control
         this.ApplyAutoSize();
     }
 
-    /// <summary>Resizes the label to its measured text when <see cref="AutoSize"/> is on and a backend exists.</summary>
+    /// <inheritdoc/>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var theme = this.Theme;
+        var font = this.Font;
+        var client = this.DisplayRectangle;
+        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
+
+        if (this.BorderStyle == BorderStyle.FixedSingle)
+            g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+
+        var text = this.Text;
+        var caption = this.UseMnemonic ? Mnemonics.Strip(text) : text;
+        var color = this.Enabled ? this.ForeColor : theme.DisabledText;
+        var alignment = this.IsRightToLeft ? RtlLayout.Mirror(this.TextAlign) : this.TextAlign;
+        if (this.Image is not { } image)
+        {
+            this.PaintCaption(g, font, color, text, caption, client, alignment);
+            return;
+        }
+
+        // Right-to-left mirrors which side the icon leads on, exactly like the CheckBox face.
+        var relation = this.IsRightToLeft ? Mirror(this.TextImageRelation) : this.TextImageRelation;
+        ContentLayout.Arrange(
+            client,
+            new Size(image.Width, image.Height),
+            caption.Length == 0 ? Size.Empty : g.MeasureText(caption, font),
+            relation,
+            caption.Length == 0 ? this.ImageAlign : alignment,
+            out var imageRect,
+            out var textRect);
+
+        g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
+        if (caption.Length > 0)
+            this.PaintCaption(g, font, color, text, caption, textRect, ContentAlignment.MiddleCenter);
+    }
+
+    /// <summary>
+    /// Draws the caption with its mnemonic underlined, in the box the layout gave it. The ampersand is
+    /// a mark-up character, so it is removed before measuring as well as before drawing — measuring the
+    /// raw string would reserve room for a glyph nobody ever sees.
+    /// </summary>
+    private void PaintCaption(IGraphics g, Font font, Color color, string text, string caption, Rectangle bounds, ContentAlignment alignment)
+    {
+        g.DrawText(caption, font, color, bounds, alignment);
+        if (!this.UseMnemonic)
+            return;
+
+        var index = Mnemonics.IndexOf(text);
+        if (index < 0)
+            return;
+
+        // The underline is placed by measuring the run before the marked character, which is how the
+        // strip surfaces do it — the alternative is asking the backend for a glyph position, which not
+        // every text engine here offers.
+        var size = g.MeasureText(caption, font);
+        var prefix = index > 0 ? g.MeasureText(caption[..index], font).Width : 0;
+        var width = g.MeasureText(caption.Substring(index, 1), font).Width;
+        var origin = ContentLayout.Anchor(bounds, size, alignment);
+        var y = origin.Y + size.Height - 1;
+        g.DrawLine(color, origin.X + prefix, y, origin.X + prefix + width - 1, y);
+    }
+
+    /// <summary>Swaps the leading side of a horizontal relation; vertical ones are unaffected.</summary>
+    private static TextImageRelation Mirror(TextImageRelation relation) => relation switch
+    {
+        TextImageRelation.ImageBeforeText => TextImageRelation.TextBeforeImage,
+        TextImageRelation.TextBeforeImage => TextImageRelation.ImageBeforeText,
+        _ => relation,
+    };
+
+    /// <summary>Resizes the label to its measured content when <see cref="AutoSize"/> is on and a
+    /// backend exists.</summary>
     private void ApplyAutoSize()
     {
-        if (!this.AutoSize)
+        if (!this.AutoSize || this.Backend is not { } backend)
             return;
 
-        var backend = this.Backend;
-        if (backend is null)
+        var caption = this.Text;
+        var textSize = backend.MeasureText(caption, backend.Theme.DefaultFont);
+        if (this.Image is not { } image)
+        {
+            this.Size = textSize;
             return;
+        }
 
-        this.Size = backend.MeasureText(this.Text, backend.Theme.DefaultFont);
+        var imageSize = new Size(image.Width, image.Height);
+        if (caption.Length == 0)
+        {
+            this.Size = imageSize;
+            return;
+        }
+
+        this.Size = this.TextImageRelation is TextImageRelation.ImageBeforeText or TextImageRelation.TextBeforeImage
+            ? new(imageSize.Width + ContentLayout.Gap + textSize.Width, Math.Max(imageSize.Height, textSize.Height))
+            : new(Math.Max(imageSize.Width, textSize.Width), imageSize.Height + ContentLayout.Gap + textSize.Height);
     }
 }

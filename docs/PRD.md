@@ -195,10 +195,11 @@ realization, `Rectangle`/`Point`/`Size` value types for geometry, and no reflect
       progress fill, sort arrow, row marker, combo arrow, header cell, focus ring, selection
       highlight — adopted across the owner-drawn controls; scrollbars via the shared renderers.
 - [~] Shared icon+text content layout helper (`ContentLayout` + `TextImageRelation`): pure
-      geometry, matrix-tested; adopted by CheckBox/RadioButton/GroupBox caption/PictureBox and
-      the native Button/Label peers (platform limits documented: Win32 button/label and GTK label
-      render image-only or text-only, not both); mnemonic-aware layout and item-cell adoption
-      pending.
+      geometry, matrix-tested; adopted by CheckBox/RadioButton/GroupBox caption/PictureBox/IconLabel,
+      by `Label` — which leaves its native widget for the painter rather than dropping the image, and
+      is the first caller to lay out a *mnemonic-aware* caption through it, underline and all — and by
+      the native Button peers (platform limit documented: a Win32 button renders image-only or
+      text-only, not both). Item-cell adoption is still pending.
 
 ---
 
@@ -347,14 +348,21 @@ strategy (may differ per platform; note exceptions inline).
       image + text via `ContentLayout` done; tri-state `CheckState` pending
 - [~] `RadioButton` (native, or owner-drawn — §12) — themed ring + accent dot, grouping by container, click/Space,
       `CheckedChanged`, image + text via `ContentLayout` done
-- [~] `Label` (native) — polish done, images pending
+- [x] `Label` (native, with an owner-drawn half for the case no platform static can express)
   - [x] Text
   - [x] `AutoSize` (canvas-free `IPlatformBackend.MeasureText`), `TextAlign`, `BorderStyle`
         (Win32 style bit; GTK documented no-op), mnemonic rendering (`&x` underline, GTK `_x`
         translation)
   - [x] Mnemonic activation focuses the next control in tab order
-  - [~] `Image` + `ImageAlign`: peer surface done — Win32 `SS_BITMAP` and GTK widget-swap render
-        image-only when the caption is empty (image+text is platform-limited, documented)
+  - [x] `Image` + `ImageAlign` + `TextImageRelation`, on every backend and looking the same on each.
+        No platform static renders a bitmap and a caption in one widget — Win32's `SS_BITMAP` is
+        image-only, GTK swaps in a `GtkImage`, Cocoa in an `NSImageView` — so the image is the label's
+        promotion gate (§12): a label carrying one gives up the widget and is painted through the same
+        `ContentLayout` geometry `Button`, `CheckBox` and `GroupBox` use, mnemonic underline included.
+        The gate is the image alone rather than image-with-a-caption, because the image-only case the
+        three widgets *do* offer is three different placements — the same control would look different
+        on each backend, which is the one thing this toolkit does not do. The swap runs both ways and
+        is invisible to the application; `AutoSize` measures the block rather than the caption
 - [~] `LinkLabel` (native `SysLink`/`GtkLinkButton`, or owner-drawn — §12) — whole-text link: accent color + underline, hover + `Visited` states,
       click/Space → `LinkClicked`; per-character `LinkArea` ranges pending
 - [~] `TextBox` (native: Win32 EDIT / GTK GtkEntry + GtkTextView-in-ScrolledWindow)
@@ -645,8 +653,11 @@ strategy (may differ per platform; note exceptions inline).
       directory)
 - [x] `IconLabel` (owner) — image **and** text in one caption through the shared `ContentLayout`
       (`TextImageRelation`, `TextAlign`, `ImageAlign`, `AutoSize`, ambient font/fore colour, RTL
-      mirroring). Exists because no platform static widget renders both: Win32 `SS_BITMAP` is
-      image-only and GTK swaps in a `GtkImage`, so a captioned `Label` drops its image (§7.3)
+      mirroring). It predates `Label` learning the same trick and is now the always-painted sibling:
+      `Label` keeps the platform widget whenever it can and only leaves it for an image, which is the
+      right default for a caption but means its rendering strategy depends on its content. `IconLabel`
+      never has a widget to lose, so a caller who wants one answer on every backend regardless of what
+      the label happens to be showing asks for this one
 - [x] `ProgressTile` (owner) — Explorer-style tile: icon, caption, optional `SecondaryText` and a
       usage bar reusing `GlyphRenderer.DrawProgressBar`, switching to `WarningColor` past
       `WarningThreshold`; `Clickable` gates focus/hover/`Click`, `Selected` paints the selection face;
