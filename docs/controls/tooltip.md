@@ -5,8 +5,9 @@
 ![ToolTip in the NativeForms demo](../screenshots/01-basics.png)
 > near the cursor after `InitialDelay`, hiding again on leave, press or `AutoPopDelay`.
 
-`Hawkynt.NativeForms.ToolTip` · strategy: **owner-drawn** (native theme) · component, no peer of its
-own — one shared `IPopupPeer` plus a `Timer`
+`Hawkynt.NativeForms.ToolTip` · strategy: **the platform's tooltip over a widget, owner-drawn
+(native theme) over a canvas** · component, no peer of its own — one shared `IPopupPeer` plus a
+`Timer`
 
 ## Usage
 
@@ -41,10 +42,19 @@ controls through a per-control text map, a single shared popup and a single dela
   the text plus 4 px padding, and the timer re-arms with `AutoPopDelay`. The tip hides when the
   pointer leaves, a mouse button goes down, the auto-pop delay elapses, or the popup is dismissed.
   Leaving before the delay cancels the pending tip without ever creating a popup.
-- **Owner-drawn controls only, for now.** Registration hooks the owner-drawn canvas mouse
-  pipeline. Native-widget controls (Button, TextBox, …) register their text, but showing it needs
-  either hover events on their peers or the platform tooltip API — tracked in
-  [docs/PRD.md](../PRD.md) §7.6, as are per-item tips in lists, trees and grids.
+- **Every control, on either half.** Registration hooks `Control.PointerMove`, which every peer
+  feeds — a canvas as well as a widget — so a registration never silently does nothing, and a
+  control that moves between the two halves ([PRD §12](../PRD.md)) keeps its tip across the swap.
+  An owner-drawn surface is hooked for its clicks as well, the one channel a canvas has and a
+  widget does not.
+- **Which surface shows the tip is decided by the half the control is on right now**, not by its
+  type: a native widget gets the platform's own tooltip (`IControlPeer.ShowToolTip`), so the tip
+  carries the desktop's shape, shadow and animation, while only an owner-drawn surface — which has
+  no platform tip of its own — is worth floating a toolkit popup for. Asking the type instead is a
+  bug this once had: a promoted `CheckBox`, `ComboBox`, `Label` or `Button` is an
+  `OwnerDrawnControl` wearing a real widget, and its tip was hooked to a canvas that does not
+  exist. Per-item tips in lists, trees and grids are still tracked in
+  [docs/PRD.md](../PRD.md) §7.6.
 - The popup paints with the theme's field background, border and control-text colors, so it matches
   the host desktop.
 - Testable headlessly: `ToolTipTests` drive the delays through the test backend's controllable
@@ -58,4 +68,5 @@ controls through a per-control text map, a single shared popup and a single dela
 - **`SetToolTip` holds a strong reference to the control** in its text map. A `ToolTip` outliving
   its controls keeps them alive until you unregister (`SetToolTip(control, null)`) or `Dispose()` —
   dispose the component with the form it serves.
-- Tips currently show over owner-drawn controls only (see Notes).
+- **The tip's pixels belong to whoever owns them**: over a native widget it is the platform's own
+  tooltip, so `Active` means "a tip was raised", not a promise about what was drawn.

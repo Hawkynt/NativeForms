@@ -33,6 +33,7 @@ Plain values work without any selector: the default `DisplaySelector` calls `ToS
 
 | Name | Type | Default | Description |
 |---|---|---|---|
+| `AutoCompleteMode` | `AutoCompleteMode` | `None` | How the editable style completes what is typed against the items: `Suggest` narrows the drop-down to the matches, `Append` fills the rest of the first match into the field and leaves it selected, `SuggestAppend` does both. Candidates are the combo's own items — Windows Forms' `AutoCompleteSource.ListItems` — because committing one sets `SelectedIndex`, and a candidate from anywhere else has no index to commit. A `DropDownList` combo ignores this: with no editor there is nothing to complete. |
 | `DataSource` | `IEnumerable?` (set) | — | Clears `Items` and copies the sequence in (one-way snapshot, not a live view). |
 | `SetDataSource<T>(IEnumerable<T>, string?, string?)` | Replaces the items and resolves `displayMember`/`valueMember` names through the `[Bindable]` generator — the Windows Forms shape, without reflection. See [MVVM](../mvvm.md#binding-a-list-by-member-name--bindable). |
 | `DisplaySelector` | `Func<object?, string>` | `ToString()` | Produces the display text for an item. Setting `null` restores the default. |
@@ -96,8 +97,9 @@ showing should not change its rendering out from under the user. See [PRD §12](
 - **The popup is a light-dismiss surface** (`IPopupPeer`): a click outside, grab loss or Escape dismisses it without changing the selection. Committing (click or Enter) closes first, then sets `SelectedIndex` — one `SelectedIndexChanged` per commit.
 - The editable `DropDown` style hosts a native `TextBox` over the field area (the arrow-button zone stays free), so caret, clipboard and IME are platform-native; its text mirrors into `Text`/`TextChanged`, and selecting an item pushes the display text into the editor.
 - Icons come from `ImageSelector` or `ImageList` + `ImageIndexSelector` and are painted by the shared `ListBox` row painter in both the closed field and the popup rows.
-- `ComboBoxTests` pin the whole surface headlessly: popup geometry, hover/commit, dismissal, the keyboard model, value binding, and the hosted editor.
-- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.4): the `Simple` style and autocomplete (needs key events on `ITextBoxPeer`).
+- **Autocomplete.** A suggestion filter narrows the drop-down to the matching items and the list re-fits itself *in place* rather than re-showing — on a backend with a pointer grab, re-showing would hand the grab round and dismiss the list mid-edit. No match closes the list instead of opening an empty box under the field, and an empty field is no filter at all rather than every row. A deletion never completes, or the text could not be shortened; it is told from an insertion by comparing against what was **typed** rather than what the field shows, since typing over a selected completion makes the field shorter and a field-length comparison would read every second keystroke as a backspace. While a filter is up, hover, hit-testing, paint and the commit all run in row space, so a click lands on the item the filter left under the pointer rather than the one that position holds unfiltered.
+- `ComboBoxTests` pin the whole surface headlessly: popup geometry, hover/commit, dismissal, the keyboard model, value binding, and the hosted editor. `ComboBoxAutoCompleteTests` pin the completion rules above.
+- Not yet implemented (see [docs/PRD.md](../PRD.md) §7.4): the `Simple` style.
 
 ## Differences from System.Windows.Forms.ComboBox
 
