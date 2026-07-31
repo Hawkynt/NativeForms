@@ -1,3 +1,5 @@
+using System.Drawing;
+
 namespace Hawkynt.NativeForms.Drawing;
 
 /// <summary>
@@ -86,6 +88,38 @@ internal static class Mnemonics
         }
 
         return -1;
+    }
+
+    /// <summary>
+    /// Underlines the marked character of a caption that has already been drawn into
+    /// <paramref name="bounds"/> under <paramref name="alignment"/>. A no-op when the caption marks
+    /// nothing, which is the common case and costs one scan.
+    /// </summary>
+    /// <remarks>
+    /// The underline is placed by measuring the run before the marked character rather than by asking
+    /// the backend where a glyph landed, which not every text engine here can answer. Shared for the
+    /// same reason as the rest of this type: two surfaces placing the same line from the same rule is
+    /// one rule, and two copies of it drift.
+    /// </remarks>
+    public static void Underline(
+        IGraphics g,
+        string text,
+        string caption,
+        Font font,
+        Color color,
+        Rectangle bounds,
+        ContentAlignment alignment)
+    {
+        var index = IndexOf(text);
+        if (index < 0 || index >= caption.Length)
+            return;
+
+        var size = g.MeasureText(caption, font);
+        var prefix = index > 0 ? g.MeasureText(caption[..index], font).Width : 0;
+        var width = g.MeasureText(caption.Substring(index, 1), font).Width;
+        var origin = ContentLayout.Anchor(bounds, size, alignment);
+        var y = origin.Y + size.Height - 1;
+        g.DrawLine(color, origin.X + prefix, y, origin.X + prefix + width - 1, y);
     }
 
     /// <summary>The index of the marking <c>&amp;</c> in the raw caption, or -1 when there is none.</summary>

@@ -274,7 +274,7 @@ public class Label : OwnerDrawnControl
         }
 
         // Right-to-left mirrors which side the icon leads on, exactly like the CheckBox face.
-        var relation = this.IsRightToLeft ? Mirror(this.TextImageRelation) : this.TextImageRelation;
+        var relation = this.IsRightToLeft ? RtlLayout.Mirror(this.TextImageRelation) : this.TextImageRelation;
         ContentLayout.Arrange(
             client,
             new Size(image.Width, image.Height),
@@ -297,31 +297,9 @@ public class Label : OwnerDrawnControl
     private void PaintCaption(IGraphics g, Font font, Color color, string text, string caption, Rectangle bounds, ContentAlignment alignment)
     {
         g.DrawText(caption, font, color, bounds, alignment);
-        if (!this.UseMnemonic)
-            return;
-
-        var index = Mnemonics.IndexOf(text);
-        if (index < 0)
-            return;
-
-        // The underline is placed by measuring the run before the marked character, which is how the
-        // strip surfaces do it — the alternative is asking the backend for a glyph position, which not
-        // every text engine here offers.
-        var size = g.MeasureText(caption, font);
-        var prefix = index > 0 ? g.MeasureText(caption[..index], font).Width : 0;
-        var width = g.MeasureText(caption.Substring(index, 1), font).Width;
-        var origin = ContentLayout.Anchor(bounds, size, alignment);
-        var y = origin.Y + size.Height - 1;
-        g.DrawLine(color, origin.X + prefix, y, origin.X + prefix + width - 1, y);
+        if (this.UseMnemonic)
+            Mnemonics.Underline(g, text, caption, font, color, bounds, alignment);
     }
-
-    /// <summary>Swaps the leading side of a horizontal relation; vertical ones are unaffected.</summary>
-    private static TextImageRelation Mirror(TextImageRelation relation) => relation switch
-    {
-        TextImageRelation.ImageBeforeText => TextImageRelation.TextBeforeImage,
-        TextImageRelation.TextBeforeImage => TextImageRelation.ImageBeforeText,
-        _ => relation,
-    };
 
     /// <summary>Resizes the label to its measured content when <see cref="AutoSize"/> is on and a
     /// backend exists.</summary>

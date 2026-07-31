@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Windows.Input;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
@@ -6,18 +7,27 @@ namespace Hawkynt.NativeForms;
 
 /// <summary>
 /// A push button. Backed by the platform's native button widget, so it looks and behaves exactly
-/// like every other button on the user's desktop.
+/// like every other button on the user's desktop — and owner-drawn in that platform's own theme for
+/// the one face no platform button can express, an image beside a caption (PRD §12).
 /// </summary>
-public class Button : Control
+public class Button : OwnerDrawnControl
 {
+    /// <inheritdoc/>
+    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.PushButton;
+
     private IButtonPeer? _buttonPeer;
 
+    /// <summary>Whether a press that started on this button is still down, which is what the painted
+    /// face shows sunken.</summary>
+    private bool _pressed;
+
     /// <summary>
-    /// The image shown on the button face, or <see langword="null"/> for a text-only button. Rendered
-    /// natively: GTK shows image and text side by side; a plain Win32 button renders the bitmap alone
-    /// while <see cref="Control.Text"/> is empty and needs themed common controls (a visual-styles
-    /// manifest) to draw image and text together — with classic rendering a captioned button keeps
-    /// its text only.
+    /// The image shown on the button face, or <see langword="null"/> for a text-only button. An image
+    /// on its own is rendered by the widget, which centres it on all three platforms. An image
+    /// <em>beside a caption</em> is the promotion gate (§12): none of the three draws both the same
+    /// way — GTK places the image, a classic Win32 button renders the bitmap alone and drops the
+    /// caption, AppKit has its own idea — so a captioned image gives up the widget and is painted
+    /// through the shared <see cref="ContentLayout"/>, which comes out identical everywhere.
     /// </summary>
     public IImage? Image
     {
@@ -28,16 +38,21 @@ public class Button : Control
                 return;
 
             field = value;
-            this.TrackImageAnimation(value, this.PushImage);
+            this.UpdateImageAnimation();
+            this.ReconsiderPromotion();
             this.PushImage();
+            this.Invalidate();
         }
     }
 
+    /// <inheritdoc/>
+    private protected override IImage? AnimatedImageSlot => this.Image;
+
     /// <summary>
-    /// Where the image anchors within the button face. Advisory for now: neither the Win32 button nor
-    /// the GTK button offers free image placement, so no backend renders it; the value is forwarded
-    /// so a capable backend can honor it. Defaults to <see cref="ContentAlignment.MiddleCenter"/>,
-    /// matching Windows Forms.
+    /// Where the image anchors within the button face. Honoured exactly by the painted face; advisory
+    /// on the widget, which offers no free placement on any backend but is handed the value anyway so
+    /// a capable one can use it. Defaults to <see cref="ContentAlignment.MiddleCenter"/>, matching
+    /// Windows Forms.
     /// </summary>
     public ContentAlignment ImageAlign
     {
@@ -49,14 +64,16 @@ public class Button : Control
 
             field = value;
             this.PushImage();
+            this.Invalidate();
         }
     } = ContentAlignment.MiddleCenter;
 
     /// <summary>
-    /// How image and text share the button face. GTK honors the four directional values through the
-    /// button's image position (<see cref="TextImageRelation.Overlay"/> renders as
-    /// <see cref="TextImageRelation.ImageBeforeText"/>); Win32 push buttons offer no placement
-    /// control, so the image sits wherever the theme puts it.
+    /// How image and text share the button face. Honoured exactly by the painted face — which is the
+    /// half that draws whenever there is both an image and a caption to arrange. On the widget it is
+    /// advisory: GTK maps the four directional values onto the button's image position
+    /// (<see cref="TextImageRelation.Overlay"/> renders as
+    /// <see cref="TextImageRelation.ImageBeforeText"/>), and Win32 offers no placement control at all.
     /// </summary>
     public TextImageRelation TextImageRelation
     {
@@ -68,6 +85,7 @@ public class Button : Control
 
             field = value;
             this.PushImage();
+            this.Invalidate();
         }
     } = TextImageRelation.ImageBeforeText;
 
@@ -121,27 +139,170 @@ public class Button : Control
         }
     }
 
-    private protected override IControlPeer CreatePeer(IPlatformBackend backend) => backend.CreateButton();
+    /// <inheritdoc/>
+    public override bool IsNativeWidget => _buttonPeer is not null;
 
-    private protected override void OnRealized(IControlPeer peer)
+    /// <summary>
+    /// Whether the configured properties stay inside what a platform button can express. Everything
+    /// does except an image with a caption beside it — see <see cref="Image"/>.
+    /// </summary>
+    private bool IsNativeEligible => this.Image is null || this.Text.Length == 0;
+
+    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+    private bool WouldBeNative => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible;
+
+    /// <summary>Moves the button between the widget and the canvas when a property change crossed the
+    /// gate. The swap runs both ways and is invisible to the application.</summary>
+    private void ReconsiderPromotion()
     {
-        if (peer is not IButtonPeer button)
-            return;
-
-        _buttonPeer = button;
-        button.Clicked += (_, _) => this.OnClick(EventArgs.Empty);
-        this.PushImage();
-        this.TrackImageAnimation(this.Image, this.PushImage); // subscribe now that a backend exists
-        if (_isDefault)
-            button.SetDefault(true);
+        if (this.IsRealized && this.IsNativeWidget != this.WouldBeNative)
+            this.RerealizePeer();
     }
 
     /// <inheritdoc/>
-    private protected override void OnUnrealized() => _buttonPeer = null;
+    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
+        => this.WouldBeNative ? backend.CreateButton() : base.CreatePeer(backend);
+
+    /// <inheritdoc/>
+    private protected override void OnRealized(IControlPeer peer)
+    {
+        base.OnRealized(peer);
+
+        if (peer is IButtonPeer button)
+        {
+            _buttonPeer = button;
+            button.Clicked += (_, _) => this.OnClick(EventArgs.Empty);
+            this.PushImage();
+            if (_isDefault)
+                button.SetDefault(true);
+        }
+
+        // After the base, which unsubscribes on the way in: a backend now exists, so an animated image
+        // assigned before realization can finally subscribe — to whichever half is going to draw it.
+        this.UpdateImageAnimation();
+    }
+
+    /// <inheritdoc/>
+    private protected override void OnUnrealized()
+    {
+        _buttonPeer = null;
+        base.OnUnrealized();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        this.ReconsiderPromotion(); // a caption arriving beside an image crosses the gate
+    }
 
     /// <summary>Forwards the buffered image triple to the realized peer, resolving an animated image to
     /// its current frame — the shared clock calls this again as the frame advances.</summary>
     private void PushImage() => _buttonPeer?.SetImage(this.CurrentFrameOf(this.Image), this.ImageAlign, this.TextImageRelation);
+
+    // --- The painted half --------------------------------------------------------------------------
+
+    /// <summary>A button takes the keyboard on either path.</summary>
+    protected override bool Focusable => true;
+
+    /// <summary>Space and Enter work the button rather than reaching the form's accept routing.</summary>
+    protected override bool IsInputKey(Keys keyData) => keyData is Keys.Space or Keys.Enter;
+
+    /// <inheritdoc/>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var theme = this.Theme;
+        var font = this.Font;
+        var face = new Rectangle(0, 0, this.Width - 1, this.Height - 1);
+
+        g.FillRectangle(_pressed ? theme.SelectionBackground : theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+
+        // The default button carries the accent border the platform would give it; that emphasis is
+        // what tells the user which button Enter works, so the painted half cannot drop it.
+        g.DrawRectangle(_isDefault ? theme.Accent : theme.Border, face);
+
+        var caption = Mnemonics.Strip(this.Text);
+        var color = this.Enabled ? this.ForeColor : theme.DisabledText;
+        var client = this.DisplayRectangle;
+        if (this.Image is not { } image)
+        {
+            this.PaintCaption(g, font, color, caption, client, ContentAlignment.MiddleCenter);
+            return;
+        }
+
+        // Right-to-left mirrors which side the icon leads on, exactly like the CheckBox face.
+        var relation = this.IsRightToLeft ? RtlLayout.Mirror(this.TextImageRelation) : this.TextImageRelation;
+        ContentLayout.Arrange(
+            client,
+            new Size(image.Width, image.Height),
+            caption.Length == 0 ? Size.Empty : g.MeasureText(caption, font),
+            relation,
+            caption.Length == 0 ? this.ImageAlign : ContentAlignment.MiddleCenter,
+            out var imageRect,
+            out var textRect);
+
+        g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
+        if (caption.Length > 0)
+            this.PaintCaption(g, font, color, caption, textRect, ContentAlignment.MiddleCenter);
+    }
+
+    /// <summary>Draws the caption with its mnemonic underlined, in the box the layout gave it.</summary>
+    private void PaintCaption(IGraphics g, Font font, Color color, string caption, Rectangle bounds, ContentAlignment alignment)
+    {
+        g.DrawText(caption, font, color, bounds, alignment);
+
+        if (this.Focused)
+            GlyphRenderer.DrawFocusRing(g, this.Theme, new(2, 2, Math.Max(0, this.Width - 5), Math.Max(0, this.Height - 5)));
+
+        Mnemonics.Underline(g, this.Text, caption, font, color, bounds, alignment);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left)
+            return;
+
+        _pressed = true;
+        this.Invalidate();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left || !_pressed)
+            return;
+
+        _pressed = false;
+        this.Invalidate();
+
+        // A press that wandered off the face before it was released is a cancelled click, which is
+        // what every platform button does and what a user expects to be able to do.
+        if (HitTest.ClientContains(this, e.Location))
+            this.OnClick(EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        if (!_pressed)
+            return;
+
+        _pressed = false;
+        this.Invalidate();
+    }
+
+    /// <summary>Space and Enter activate on the key <em>release</em>, like the Windows Forms button
+    /// base — a held key must not auto-repeat the click.</summary>
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        if (e.KeyCode is not (Keys.Space or Keys.Enter))
+            return;
+
+        this.OnClick(EventArgs.Empty);
+        e.Handled = true;
+    }
 
     private bool _isDefault;
 
@@ -157,6 +318,7 @@ public class Button : Control
 
         _isDefault = isDefault;
         _buttonPeer?.SetDefault(isDefault);
+        this.Invalidate(); // the painted half draws the emphasis itself
     }
 
     /// <summary>The guard's answer may have changed; re-apply it to <see cref="Control.Enabled"/>.</summary>

@@ -224,7 +224,8 @@ internal sealed class AnimatedImageTests
     [Test]
     public void An_animated_image_on_a_native_button_pushes_a_resolved_frame_to_the_peer()
     {
-        var button = new Button { Bounds = new(0, 0, 80, 26), Text = "Go", Image = ThreeFrames(0) };
+        // No caption: an image beside one is the button's promotion gate, and this is the widget path.
+        var button = new Button { Bounds = new(0, 0, 80, 26), Image = ThreeFrames(0) };
         var backend = new HeadlessBackend();
         var form = new Form();
         form.Controls.Add(button);

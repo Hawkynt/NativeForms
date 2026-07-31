@@ -70,9 +70,10 @@ public sealed class ToolTip : Component
 
     /// <summary>
     /// Registers (or, with an empty text, removes) the hover text for a control. Every control is
-    /// hooked immediately — owner-drawn ones through their canvas, native-widget ones through their
-    /// peer's pointer channel — so a registration never silently does nothing. The registration
-    /// itself is backend-free and may happen long before the control is realized.
+    /// hooked immediately through <see cref="Control.PointerMove"/>, which every peer feeds — a canvas
+    /// as well as a widget — so a registration never silently does nothing, and a control that moves
+    /// between the two halves (PRD §12) keeps its tip across the swap. An owner-drawn surface is hooked
+    /// for its clicks as well, which is the one channel a canvas has and a widget does not.
     /// </summary>
     public void SetToolTip(Control control, string? text)
     {
@@ -92,16 +93,10 @@ public sealed class ToolTip : Component
         if (hooked)
             return;
 
-        if (control is OwnerDrawnControl target)
-        {
-            target.CanvasMouseMove += this.OnControlMouseMove;
-            target.CanvasMouseLeave += this.OnControlMouseLeave;
-            target.CanvasMouseDown += this.OnControlMouseDown;
-            return;
-        }
-
         control.PointerMove += this.OnControlMouseMove;
         control.PointerLeave += this.OnControlMouseLeave;
+        if (control is OwnerDrawnControl target)
+            target.CanvasMouseDown += this.OnControlMouseDown;
     }
 
     /// <summary>The registered hover text for <paramref name="control"/>, or an empty string.</summary>
@@ -121,7 +116,7 @@ public sealed class ToolTip : Component
             return;
 
         _shown = false;
-        if (control is not null and not OwnerDrawnControl)
+        if (control is { IsNativeWidget: true })
             control.Peer?.ShowToolTip(null);
 
         _popup?.Hide();
@@ -182,8 +177,11 @@ public sealed class ToolTip : Component
             return;
 
         // A native widget gets the platform's own tip; only an owner-drawn surface, which has no
-        // platform tip of its own, is worth floating a toolkit popup for. See ShowNativeTip.
-        if (control is OwnerDrawnControl)
+        // platform tip of its own, is worth floating a toolkit popup for. The question is which half
+        // the control is on right now, not which type it is: a promoted CheckBox, ComboBox, Label or
+        // Button is an OwnerDrawnControl wearing a real widget, and asking the type would float a
+        // grabbing popup over a control that has a platform tip going spare. See ShowNativeTip.
+        if (!control.IsNativeWidget)
             this.ShowPopup(backend, control, control.PointToScreen(new(_hoverPoint.X, _hoverPoint.Y + control.LogicalToDevice(CursorOffset))), text);
         else if (!this.ShowNativeTip(control, text))
             return;
@@ -285,17 +283,10 @@ public sealed class ToolTip : Component
     /// mirroring whichever channel <see cref="SetToolTip"/> hooked it through.</summary>
     private void Unhook(Control control)
     {
+        control.PointerMove -= this.OnControlMouseMove;
+        control.PointerLeave -= this.OnControlMouseLeave;
         if (control is OwnerDrawnControl ownerDrawn)
-        {
-            ownerDrawn.CanvasMouseMove -= this.OnControlMouseMove;
-            ownerDrawn.CanvasMouseLeave -= this.OnControlMouseLeave;
             ownerDrawn.CanvasMouseDown -= this.OnControlMouseDown;
-        }
-        else
-        {
-            control.PointerMove -= this.OnControlMouseMove;
-            control.PointerLeave -= this.OnControlMouseLeave;
-        }
 
         if (ReferenceEquals(_hoverControl, control))
             this.Hide();

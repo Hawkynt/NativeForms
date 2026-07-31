@@ -25,4 +25,14 @@ internal static class RtlLayout
             ContentAlignment.BottomRight => ContentAlignment.BottomLeft,
             _ => alignment,
         };
+
+    /// <summary>Swaps the leading side of a horizontal image/text relation; vertical ones and
+    /// <see cref="TextImageRelation.Overlay"/> pass through.</summary>
+    public static TextImageRelation Mirror(TextImageRelation relation)
+        => relation switch
+        {
+            TextImageRelation.ImageBeforeText => TextImageRelation.TextBeforeImage,
+            TextImageRelation.TextBeforeImage => TextImageRelation.ImageBeforeText,
+            _ => relation,
+        };
 }
