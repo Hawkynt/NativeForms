@@ -29,6 +29,9 @@ public class Accordion : OwnerDrawnControl
     private int _focusedIndex;
     private int _hotIndex = -1;
     private int _pressedIndex = -1;
+    private int _dragIndex = -1;
+    private int _dragOriginY;
+    private bool _dragging;
 
     /// <summary>Creates an empty accordion.</summary>
     public Accordion() => this.Panes = new(this);
@@ -110,6 +113,23 @@ public class Accordion : OwnerDrawnControl
         }
     }
 
+    /// <summary>
+    /// Whether dragging a header up or down the stack reorders the sections (PRD §14). Off by default,
+    /// for the reason <see cref="ToolStrip.AllowUserToOrderItems"/> is: a navigation pane whose sections
+    /// move when you brush past a header is worse than one that cannot be rearranged.
+    /// </summary>
+    /// <remarks>
+    /// The section moves in <see cref="Panes"/>, so the new order is the one an application saves and
+    /// restores — a pane stack's order <em>is</em> its model, exactly as a tool strip's is. The drag
+    /// crosses the same four-pixel threshold the marquee uses, and a header that was dragged is not also
+    /// toggled on release: opening whatever section the pointer happened to land on would be a second
+    /// gesture the user never made.
+    /// </remarks>
+    public bool AllowUserToOrderPanes { get; set; }
+
+    /// <summary>Raised after a drag moved a section, with the index it landed on.</summary>
+    public event EventHandler<int>? PaneOrderChanged;
+
     /// <summary>Raised after <see cref="SelectedIndex"/> changes.</summary>
     public event EventHandler? SelectedIndexChanged;
 
@@ -142,6 +162,9 @@ public class Accordion : OwnerDrawnControl
 
     /// <summary>Raises <see cref="PaneCollapsed"/>.</summary>
     protected virtual void OnPaneCollapsed(AccordionPaneEventArgs e) => this.PaneCollapsed?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="PaneOrderChanged"/>.</summary>
+    protected virtual void OnPaneOrderChanged(int index) => this.PaneOrderChanged?.Invoke(this, index);
 
     // --- Expansion --------------------------------------------------------------------------------
 
@@ -414,6 +437,34 @@ public class Accordion : OwnerDrawnControl
         base.OnChildAdded(child);
     }
 
+    /// <summary>
+    /// Called by <see cref="AccordionPaneCollection.Move"/> after the list itself was reordered. The
+    /// selection and the keyboard both address a pane by index, so they follow the pane they were on
+    /// rather than staying on the position it vacated.
+    /// </summary>
+    internal void OnPanesReordered(int from, int to)
+    {
+        _selectedIndex = Remap(_selectedIndex, from, to);
+        _focusedIndex = Remap(_focusedIndex, from, to);
+        this.ApplyPaneState();
+    }
+
+    /// <summary>Where an index lands once the pane at <paramref name="from"/> has moved to
+    /// <paramref name="to"/>; a negative index (an empty selection) is left alone.</summary>
+    private static int Remap(int index, int from, int to)
+    {
+        if (index < 0)
+            return index;
+
+        if (index == from)
+            return to;
+
+        if (from < to)
+            return index > from && index <= to ? index - 1 : index;
+
+        return index >= to && index < from ? index + 1 : index;
+    }
+
     /// <summary>Called by <see cref="AccordionPaneCollection"/> after the pane left the list.</summary>
     internal void OnPaneRemoved(AccordionPane pane, int index)
     {
@@ -462,6 +513,12 @@ public class Accordion : OwnerDrawnControl
 
         _pressedIndex = hit;
         _focusedIndex = hit;
+        if (this.AllowUserToOrderPanes)
+        {
+            _dragIndex = hit;
+            _dragOriginY = e.Y;
+        }
+
         this.Invalidate();
     }
 
@@ -473,20 +530,53 @@ public class Accordion : OwnerDrawnControl
             return;
 
         _pressedIndex = -1;
+        var dragged = _dragging;
+        _dragIndex = -1;
+        _dragging = false;
         this.Invalidate();
-        if (e.Button == MouseButtons.Left && this.HitTestHeader(e.Y) == pressed)
+
+        // A drag that moved a section is not also a click on its header: the section ends up where the
+        // pointer is by having been dragged there, and opening it as well would be a second gesture.
+        if (!dragged && e.Button == MouseButtons.Left && this.HitTestHeader(e.Y) == pressed)
             this.ToggleHeader(pressed);
     }
 
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        if (_dragIndex >= 0 && this.DragPane(e.Y))
+            return;
+
         var hit = this.HitTestHeader(e.Y);
         if (hit == _hotIndex)
             return;
 
         _hotIndex = hit;
         this.Invalidate();
+    }
+
+    /// <summary>
+    /// Slides the armed section to whatever header the pointer is over, reporting whether the drag owns
+    /// the move. One position per crossing, like the tool strip: the section takes the place of the
+    /// header under the pointer, so a slow drag walks it along rather than teleporting it to the end.
+    /// A pointer inside an open body is over no header at all and moves nothing, which is what keeps a
+    /// drag past a tall expanded section from oscillating.
+    /// </summary>
+    private bool DragPane(int y)
+    {
+        if (!_dragging && Math.Abs(y - _dragOriginY) < MarqueeDrag.Threshold)
+            return false; // still a click
+
+        _dragging = true;
+        var target = this.HitTestHeader(y);
+        if (target < 0 || target == _dragIndex)
+            return true;
+
+        this.Panes.Move(_dragIndex, target);
+        _dragIndex = target;
+        _pressedIndex = target;
+        this.OnPaneOrderChanged(target);
+        return true;
     }
 
     /// <inheritdoc/>
@@ -663,6 +753,27 @@ public sealed class AccordionPaneCollection : IReadOnlyList<AccordionPane>
         ArgumentNullException.ThrowIfNull(panes);
         foreach (var pane in panes)
             this.Add(pane);
+    }
+
+    /// <summary>
+    /// Moves the pane at <paramref name="from"/> to <paramref name="to"/>, keeping it parented and
+    /// keeping its open/closed state. This list <em>is</em> the order an application saves, so a section
+    /// the user dragged and one the program placed arrive here by the same route.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Either index is outside the stack.</exception>
+    public void Move(int from, int to)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(from);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(from, _panes.Count);
+        ArgumentOutOfRangeException.ThrowIfNegative(to);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(to, _panes.Count);
+        if (from == to)
+            return;
+
+        var pane = _panes[from];
+        _panes.RemoveAt(from);
+        _panes.Insert(to, pane);
+        _owner.OnPanesReordered(from, to);
     }
 
     /// <summary>Removes a pane, disposing its peer tree. Returns whether it was present.</summary>

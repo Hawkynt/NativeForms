@@ -38,12 +38,21 @@ Letting several panes stand open at once is one property:
 accordion.ExpandMode = AccordionExpandMode.Multiple;
 ```
 
+Letting the user rearrange the sections by dragging their headers is another. It is off by default,
+and the order it produces is `Panes` itself, which is what an application saves:
+
+```csharp
+accordion.AllowUserToOrderPanes = true;
+accordion.PaneOrderChanged += (_, index) => Save(accordion.Panes.Select(p => p.Text));
+```
+
 ## API
 
 ### Properties
 
 | Property | Type | Default | Description |
 |---|---|---|---|
+| `AllowUserToOrderPanes` | `bool` | `false` | Whether dragging a header up or down the stack reorders the sections. Off by default: a navigation pane whose sections move when you brush past a header is worse than one that cannot be rearranged. |
 | `ExpandMode` | `AccordionExpandMode` | `Single` | Whether opening a pane closes the others. Switching back to `Single` folds down to the selected pane. |
 | `HeaderHeight` | `int` (get) | theme row height | Pixel height of one header row. |
 | `ImageList` | `ImageList?` | `null` | The icons referenced by each pane's `ImageIndex` (or its `ImageKey` string; index wins). |
@@ -63,11 +72,14 @@ accordion.ExpandMode = AccordionExpandMode.Multiple;
 |---|---|
 | `PaneCollapsed` | Raised after a pane has closed, including the pane `Single` mode closed to make room. |
 | `PaneExpanded` | Raised after a pane has opened and the stack has been laid out again. |
+| `PaneOrderChanged` | Raised after a drag moved a section, with the index it landed on. |
 | `PaneExpanding` | Raised **before** a pane opens. Setting `Cancel` leaves the whole stack untouched — no sibling is collapsed on the cancelled pane's behalf. |
 | `SelectedIndexChanged` | Raised after `SelectedIndex` changes. |
 
-`AccordionPaneCollection` is an `IReadOnlyList<AccordionPane>` with `Add`, `AddRange`, `Remove`,
-`Clear` and `IndexOf`. Inherits the common members of [`Control`](control.md), plus the owner-drawn
+`AccordionPaneCollection` is an `IReadOnlyList<AccordionPane>` with `Add`, `AddRange`, `Move`,
+`Remove`, `Clear` and `IndexOf`. `Move(from, to)` keeps the pane parented and keeps it open or closed,
+and takes the selection with it — a section the user dragged and one the program placed arrive by the
+same route. Inherits the common members of [`Control`](control.md), plus the owner-drawn
 surface of `OwnerDrawnControl` (`Invalidate`, `Focus`).
 
 ### AccordionPane
@@ -103,6 +115,11 @@ the pane body. Constructors: `AccordionPane()` and `AccordionPane(string text)`.
 - Under `Single` a click on the already-open header is ignored — an Outlook stack never closes its
   last drawer that way. Under `Multiple` the same click closes it. Assigning `Expanded = false`
   always works.
+- Dragging a header (with `AllowUserToOrderPanes`) crosses the same four-pixel threshold the marquee
+  and the tool strip use, and moves the section onto the header under the pointer — one position per
+  crossing, so a slow drag walks it along. A pointer inside an open body is over no header at all and
+  moves nothing, which is what keeps a drag past a tall expanded section from oscillating. A header
+  that was dragged is not also toggled on release.
 - Keyboard (the control is focusable): Up/Down move the header focus, Home/End jump to the ends, and
   Enter or Space toggles the focused pane. The focused header carries a themed focus ring.
 - Header captions are drawn straight into their row, so nothing on the pointer path measures text —
