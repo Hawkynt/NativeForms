@@ -182,6 +182,12 @@ if (shooting)
                 Note(size is { } written
                     ? $"shot: {name} ({written.Width}x{written.Height})"
                     : $"shot failed: {name} - {Shoot.Diagnosis ?? "no capture route produced pixels"}");
+
+                // Once, and only after a capture has run, because the route is not chosen until then.
+                // It belongs in the artifact rather than on the console: which route won decides what a
+                // stock control looks like in the pixels beside it.
+                if (page == 0 && Shoot.CaptureRoute is { } capture)
+                    Note($"  capture route: {capture}");
             }
             catch (Exception e)
             {

@@ -37,6 +37,18 @@ internal static partial class Shoot
     public static string? InputRoute => OperatingSystem.IsMacOS() ? ShootInputMac.Route() : null;
 
     /// <summary>
+    /// How the last shot was actually taken, where more than one route exists to take it.
+    /// </summary>
+    /// <remarks>
+    /// Only Windows answers, because only there does the choice change what a stock control looks
+    /// like: <c>PrintWindow</c> reaches child windows through <c>WM_PRINTCLIENT</c>, which several of
+    /// the older control classes implement only partly, so a widget can be perfectly alive and still
+    /// photograph as a stub. Which route won therefore belongs beside the pixels it produced — the
+    /// line already went to the console and stopped there, which is not where the artifact keeps it.
+    /// </remarks>
+    public static string? CaptureRoute => OperatingSystem.IsWindows() ? ShootWindows.Route : null;
+
+    /// <summary>
     /// Which native classes the window is really made of, where the platform can be asked.
     /// </summary>
     /// <remarks>
