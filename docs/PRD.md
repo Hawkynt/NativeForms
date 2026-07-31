@@ -1324,15 +1324,29 @@ evidence rather than intent: each line is something a real program wanted and di
       to the item) and on any row in a grid, where rows span the full width and only the vertical extent
       decides. Only visible rows are tested, so a band over a virtual list of a million rows costs a
       screenful.
-- [~] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
+- [x] **Drag to reorder, and drag to split.** Toolbar items, sidebar sections and pane splitting all had to
       move from drag gestures onto context menus. The gestures are the affordance users know; the menus are
-      a workaround. `DockPanel` already has drag-to-dock, so the pattern exists to build on.
-      **Toolbar items done**: `ToolStrip.AllowUserToOrderItems` drags an item along the strip, swapping it
-      with the neighbour under the pointer so a slow drag walks it rather than teleporting it, past the same
-      four-pixel threshold the marquee uses. The item moves in `Items`, because a tool strip's order *is*
-      its model — there is no display-order indirection as there is for grid columns. A drag does not also
-      click the item it left under the cursor, which would be a second gesture the user never made.
-      Still open: sidebar sections and pane splitting.
+      a workaround. All three are gestures again, and all three obey one set of rules: the four-pixel
+      threshold the marquee uses keeps a click a click, the move happens one position per crossing so a
+      slow drag walks rather than teleports, and a drag never also fires the click of whatever it left
+      under the cursor — that would be a second gesture the user never made.
+      **Toolbar items**: `ToolStrip.AllowUserToOrderItems` drags an item along the strip, swapping it with
+      the neighbour under the pointer. The item moves in `Items`, because a tool strip's order *is* its
+      model — there is no display-order indirection as there is for grid columns.
+      **Sidebar sections**: `Accordion.AllowUserToOrderPanes` drags a header up or down the stack, and the
+      section moves in `Panes` for the same reason. The pointer resolves to a *header*, so a drag across a
+      tall open body moves nothing until it reaches the next header — which is what keeps a stack of
+      unequal sections from oscillating under a held pointer. The selection follows the pane rather than
+      the position it left, and `Panes.Move` is the same writer the gesture uses, so restoring a saved
+      order and dragging one land in the same place. Both are opt-in and default off: a toolbar or a
+      navigation pane whose contents move when you brush past them is worse than one that cannot be
+      rearranged at all.
+      **Pane splitting**: `DockPanel`'s directional guides already did it — dropping a pane on the inner
+      third of a group replaces that group with a split node and a real draggable splitter, rather than
+      adding a tab to it. That half was implemented and unproven; `DockPanelTests` now drives it through
+      the mouse path and asserts what separates a split from a tab: two groups, two side-by-side regions,
+      and a divider between them that resizes both. The centre guide still tabs, so nothing splits by
+      accident.
 - [x] **Type-to-filter menus.** `ContextMenuStrip.ShowSearchBox` opens a menu with a search field as its
       first row, narrowing the items below it as you type — matched case-insensitively anywhere in the
       caption, with Backspace widening again, Escape clearing the filter before it closes the menu, and the

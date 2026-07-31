@@ -201,6 +201,94 @@ internal sealed class DockPanelTests
         Assert.That(b.DockState, Is.EqualTo(DockState.Document)); // still a document
     }
 
+    /// <summary>
+    /// Drag to split (PRD §14): dropping a pane on the inner third of another group divides that
+    /// group's rectangle in two rather than adding a tab to it, which is the gesture a port had to
+    /// replace with a "split pane" menu command.
+    /// </summary>
+    [Test]
+    public void Dragging_a_tab_onto_a_groups_edge_splits_the_region()
+    {
+        var dock = new DockPanel();
+        var a = Pane("a");
+        var b = Pane("b");
+        var (_, _, canvas) = Realize(dock);
+        dock.AddDocument(a);
+        dock.AddDocument(b); // one well, two tabs: the panes share a rectangle
+
+        Assert.That(dock.GroupOf(a), Is.SameAs(dock.GroupOf(b)), "the panes start out sharing one region");
+
+        // The left third of the well, clear of the panel's own edge band, so this is a split of the
+        // group rather than a dock against the panel border.
+        canvas.RaiseMouseDown(200, 400 - 5); // tab b
+        canvas.RaiseMouseMove(100, 200);
+        canvas.RaiseMouseUp(100, 200);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dock.GroupOf(b), Is.Not.SameAs(dock.GroupOf(a)), "a split makes a second group");
+            Assert.That(b.Bounds.Right, Is.LessThanOrEqualTo(a.Bounds.Left), "the dropped pane takes the leading half");
+            Assert.That(b.Bounds.Width, Is.GreaterThan(0));
+            Assert.That(a.Bounds.Width, Is.GreaterThan(0));
+        });
+    }
+
+    /// <summary>The half a tab drop cannot make on its own: the divider it leaves behind is draggable,
+    /// which is what makes the result a split region rather than two panes that happen to fit.</summary>
+    [Test]
+    public void The_split_a_drag_made_is_resizable()
+    {
+        var dock = new DockPanel();
+        var a = Pane("a");
+        var b = Pane("b");
+        var (_, _, canvas) = Realize(dock);
+        dock.AddDocument(a);
+        dock.AddDocument(b);
+
+        canvas.RaiseMouseDown(200, 400 - 5);
+        canvas.RaiseMouseMove(100, 200);
+        canvas.RaiseMouseUp(100, 200);
+
+        var before = b.Bounds.Width;
+        var band = (b.Bounds.Right + a.Bounds.Left) / 2; // the splitter sits between the two regions
+
+        canvas.RaiseMouseDown(band, 200);
+        canvas.RaiseMouseMove(band + 60, 200);
+        canvas.RaiseMouseUp(band + 60, 200);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(b.Bounds.Width, Is.EqualTo(before + 60).Within(2));
+            Assert.That(a.Bounds.Left, Is.GreaterThan(b.Bounds.Right - 1));
+        });
+    }
+
+    /// <summary>The centre of a group is the tab drop, so a split needs an edge and nothing else does
+    /// it by accident.</summary>
+    [Test]
+    public void Dragging_a_tab_onto_a_groups_middle_tabs_it_instead()
+    {
+        var dock = new DockPanel();
+        var a = Pane("a");
+        var b = Pane("b");
+        var c = Pane("c");
+        var (_, _, canvas) = Realize(dock);
+        dock.AddDocument(a);
+        dock.Add(c, DockState.Docked, DockEdge.Right);
+        dock.AddDocument(b);
+
+        var well = dock.GroupOf(a);
+        canvas.RaiseMouseDown(200, 400 - 5); // tab b in the document well
+        canvas.RaiseMouseMove(c.Bounds.X + (c.Bounds.Width / 2), c.Bounds.Y + (c.Bounds.Height / 2));
+        canvas.RaiseMouseUp(c.Bounds.X + (c.Bounds.Width / 2), c.Bounds.Y + (c.Bounds.Height / 2));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dock.GroupOf(b), Is.SameAs(dock.GroupOf(c)), "the centre guide joins the group");
+            Assert.That(dock.GroupOf(b), Is.Not.SameAs(well));
+        });
+    }
+
     // --- Keyboard -----------------------------------------------------------------------------
 
     [Test]
