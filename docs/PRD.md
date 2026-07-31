@@ -340,8 +340,12 @@ strategy (may differ per platform; note exceptions inline).
   - [~] [x] `DialogResult` (click walks to the owning Form, closes modal); [x] default/accept styling
         — `Form.AcceptButton` marks the button on its peer (`IButtonPeer.SetDefault`), painted by the
         platform (Win32 `BS_DEFPUSHBUTTON`, GTK `gtk_widget_grab_default` when the window chain is
-        ready — theme-dependent emphasis) and by the painted half as the accent frame; [ ] `FlatStyle`
-        pending
+        ready — theme-dependent emphasis) and by the painted half as the accent frame; [x] `FlatStyle`
+        — `Standard`/`System` are the platform's own button and keep the widget (this toolkit never
+        draws over one, so the two are the same thing here); `Flat` and `Popup` are faces no platform
+        button offers, so they join the image gate: flat carries no frame, popup grows one under the
+        pointer, and a press frames either, since a pressed rectangle that only changed colour says
+        nothing
   - [x] Image (`Image`/`ImageAlign`/`TextImageRelation`). An image on its own stays on the widget —
         every platform centres a bare bitmap on a button, so all three agree (GTK
         `gtk_button_set_image`, Win32 `BM_SETIMAGE`/`BS_BITMAP`, AppKit's image cell). An image

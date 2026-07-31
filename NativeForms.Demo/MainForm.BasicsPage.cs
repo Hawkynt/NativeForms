@@ -63,13 +63,24 @@ internal sealed partial class MainForm
             dialogResultLabel.Text = choice >= 0 ? $"Result: button {choice}" : "Result: dismissed";
         };
 
+        // The two faces no platform button offers, so both are painted (PRD §12). They want to be on a
+        // page somebody photographs, and next to the two widget buttons above them, because the point
+        // of the painted half is that the difference is the one the style asks for and nothing else.
+        var flatButton = new Button { Bounds = new(16, 266, 145, 30), Text = "FlatStyle.Flat", FlatStyle = FlatStyle.Flat };
+        var popupButton = new Button { Bounds = new(171, 266, 145, 30), Text = "Popup (hover me)", FlatStyle = FlatStyle.Popup };
+        flatButton.Click += (_, _) => this.SetStatus("The flat button was clicked.");
+        popupButton.Click += (_, _) => this.SetStatus("The popup button was clicked.");
+
         page.Controls.AddRange(
             Caption("Button + MVVM counter", 16, 12),
             counterLabel, counterBar, clickButton, disabledButton,
             Caption("Button → modal dialog", 16, 134),
-            dialogButton, dialogResultLabel, customDialogButton);
+            dialogButton, dialogResultLabel, customDialogButton,
+            flatButton, popupButton);
 
         this.Publish("basics.customDialog", customDialogButton);
+        this.Publish("basics.flat", flatButton);
+        this.Publish("basics.popup", popupButton);
 
         // --- Column 2: labels, link, check boxes, toggle switch ---------------------------------
 

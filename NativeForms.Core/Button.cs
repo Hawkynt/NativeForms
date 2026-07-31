@@ -21,6 +21,10 @@ public class Button : OwnerDrawnControl
     /// face shows sunken.</summary>
     private bool _pressed;
 
+    /// <summary>Whether the pointer is over the painted face, which is what raises a
+    /// <see cref="FlatStyle.Popup"/> button out of flat.</summary>
+    private bool _hovered;
+
     /// <summary>
     /// The image shown on the button face, or <see langword="null"/> for a text-only button. An image
     /// on its own is rendered by the widget, which centres it on all three platforms. An image
@@ -90,6 +94,26 @@ public class Button : OwnerDrawnControl
     } = TextImageRelation.ImageBeforeText;
 
     /// <summary>
+    /// How the face is drawn. <see cref="FlatStyle.Standard"/> and <see cref="FlatStyle.System"/> are
+    /// the platform's own button and keep the widget; <see cref="FlatStyle.Flat"/> and
+    /// <see cref="FlatStyle.Popup"/> are faces no platform button offers, so they join
+    /// <see cref="Image"/> as the promotion gate (§12) and are painted in the desktop's own colours.
+    /// </summary>
+    public FlatStyle FlatStyle
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.ReconsiderPromotion();
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>
     /// The verdict a click reports to the owning <see cref="Form"/>. Anything other than
     /// <see cref="DialogResult.None"/> makes a click set <see cref="Form.DialogResult"/>, which in
     /// turn closes the form when it is shown modally — exactly the WinForms dialog contract.
@@ -146,7 +170,9 @@ public class Button : OwnerDrawnControl
     /// Whether the configured properties stay inside what a platform button can express. Everything
     /// does except an image with a caption beside it — see <see cref="Image"/>.
     /// </summary>
-    private bool IsNativeEligible => this.Image is null || this.Text.Length == 0;
+    private bool IsNativeEligible
+        => (this.Image is null || this.Text.Length == 0)
+        && this.FlatStyle is FlatStyle.Standard or FlatStyle.System;
 
     /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
     private bool WouldBeNative => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible;
@@ -217,7 +243,22 @@ public class Button : OwnerDrawnControl
         var face = new Rectangle(0, 0, this.Width - 1, this.Height - 1);
 
         g.FillRectangle(this.Parent?.BackColor ?? theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
-        GlyphRenderer.DrawButtonFace(g, theme, face, this.Enabled, _pressed ? theme.SelectionBackground : null);
+
+        // Flat carries no frame at all; Popup wears one only while the pointer is on it, which is the
+        // whole difference between the two. A press draws the frame either way — without it a pressed
+        // flat button is a rectangle that changed colour, and nothing says it is a button being held.
+        var framed = this.FlatStyle switch
+        {
+            FlatStyle.Flat => _pressed,
+            FlatStyle.Popup => _pressed || _hovered,
+            _ => true,
+        };
+
+        var fill = _pressed ? theme.SelectionBackground : (Color?)null;
+        if (framed)
+            GlyphRenderer.DrawButtonFace(g, theme, face, this.Enabled, fill);
+        else
+            g.FillRectangle(fill ?? theme.ControlBackground, face);
 
         // The default button carries the accent border the platform would give it; that emphasis is
         // what tells the user which button Enter works, so the painted half cannot drop it.
@@ -290,12 +331,23 @@ public class Button : OwnerDrawnControl
     }
 
     /// <inheritdoc/>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_hovered)
+            return;
+
+        _hovered = true;
+        this.Invalidate();
+    }
+
+    /// <inheritdoc/>
     protected override void OnMouseLeave(EventArgs e)
     {
-        if (!_pressed)
+        if (!_pressed && !_hovered)
             return;
 
         _pressed = false;
+        _hovered = false;
         this.Invalidate();
     }
 
