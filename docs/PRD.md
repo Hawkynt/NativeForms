@@ -370,9 +370,15 @@ strategy (may differ per platform; note exceptions inline).
   - [x] `PasswordChar`/`UseSystemPasswordChar`, `ReadOnly`, `MaxLength` (GTK: entry only —
         GtkTextView has no native limit, documented), `CharacterCasing` (core-side, all backends)
   - [x] Selection API (`SelectionStart`/`SelectionLength`/`SelectedText`), buffered → live
-  - [~] Owner-drawn grey placeholder for multiline: GTK paints the hint after the `GtkTextView`'s own
-        draw while the buffer is empty (verified in pixels); the Win32 multiline `EDIT` half is not
-        wired yet
+  - [x] Owner-drawn grey placeholder for multiline, on both backends: GTK paints the hint after the
+        `GtkTextView`'s own draw while the buffer is empty, and Win32 paints it after the `EDIT`'s own
+        `WM_PAINT` — out of the subclass the keys already come through, into the `EM_GETRECT`
+        formatting box so the hint starts exactly where the first typed character will. It survives
+        focus on both, which a cue banner would not; the two backends would otherwise disagree about a
+        property neither exposes. Verified in pixels on both: the Windows tier counts what an empty
+        multiline box drew into its own client area against what one with no placeholder drew, since
+        an EDIT that is empty is not necessarily blank — it may be carrying a caret, and a yes/no would
+        read that as the hint
   - [~] `ITextBoxPeer.KeyDown` seam exists (Win32 EDIT subclass, GTK pre-connected
         `key-press-event`, headless fake) — wired for `SearchBox` and now for
         `NumericUpDown`/`DomainUpDown` (Enter commits the pending edit, Up/Down step from inside the
@@ -839,9 +845,38 @@ strategy (may differ per platform; note exceptions inline).
       cause was one wrong constant; the control group that found it was a *loose* combo box outside any
       strip, which was blank too. `Win32NativePromotionTests` now asserts the theme metrics are control
       measurements rather than display ones, since a wrong index does not fail — it returns another number.
-- [ ] Remaining Win32 rendering observations: a plain `→` falls back to a replacement box even though it
-      is not an emoji, so the font-fallback chain for the owner-drawn text path deserves a look; and the
-      `RichTextBox` cannot be exercised at all under wine, so its Win32 paint path remains unobserved.
+- [x] **Both remaining Win32 rendering observations are closed, and neither was what it was filed as.**
+      The `→` was never a font-fallback problem in the owner-drawn text path: every arrow in the gallery
+      sits on a native `Label`, and those were all drawing in the Windows 3.1 raster font until the caption
+      font was fixed above. All three read as a true arrow in the current `windows-screenshots` artifact,
+      checked at glyph level rather than at a glance — "Button → modal dialog" on Basics,
+      "PathExists = false → warning frame" on Pickers, "Ribbon (tabs → groups → items…)" on Ribbon — and
+      the ellipsis beside them is one glyph rather than the missing-glyph bar. There is no owner-drawn `→`
+      anywhere in the gallery, which is why the attribution was wrong: the shot that produced it could not
+      have exercised that path.
+      The `RichTextBox` is now observed, and it was never wine that hid it. The shooter photographed
+      `00-basics` twice and `01-input` never — the page carrying the text box, the combo, the up-downs and
+      the rich text box — so the one page nobody could look at was the one this entry was asking about.
+      With the shutter fixed, `01-input` arrives on the Windows runner and the Win32 `RICHEDIT50W` paint
+      path renders bold, italic and coloured runs correctly.
+      What that page did reveal is new and is tracked as its own line below rather than folded in here.
+- [x] **A promoted `ScrollBar` photographs as a hairline on Windows, and the widget is not the problem.**
+      The Input page shows both bars as a one-pixel trough with a short dash where the thumb belongs,
+      while the `TrackBar` two rows above them — promoted the same way — draws in full and the GTK shot of
+      the same page draws a proper trough and thumb. Two explanations fitted those pixels and they led
+      opposite ways: a window collapsed along its cross axis, or a window that is the right size and did
+      not reach the capture. Both halves are now measured rather than argued.
+      `Win32NativePromotionTests` reads `GetClientRect` off each bar's own window and asserts it is the
+      rectangle the control was given; it answers 200×16 and 16×180 under wine **and on the
+      `windows-latest` runner**, so the widget is intact. The shoot log now records the capture route, and
+      it is `PrintWindow(client)` — which reaches child windows through `WM_PRINTCLIENT`, a message the
+      older stock classes implement only partly. `msctls_trackbar32` is a common control and answers it;
+      USER32's `SCROLLBAR` predates the convention and draws almost nothing for it.
+      So: the Windows artifact cannot be used to judge how a stock scroll bar renders, and a reader who
+      takes it at face value will go looking in the paint path for a defect that is not there. That is
+      what the route line in the log is for. The other two routes are already tried on every shot and
+      lose on detail; making one of them win would trade this gap for a blank page, which is the worse
+      failure — a capture that claims success having drawn nothing.
 - [x] `TableLayoutPanel` now sizes and positions its tracks from `DisplayRectangle`, so cells honor
       `Padding` and never sit under a visible `AutoScroll` scrollbar — the same class of defect
       `Panel` was fixed for.
