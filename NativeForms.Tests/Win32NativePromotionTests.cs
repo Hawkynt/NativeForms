@@ -48,6 +48,12 @@ public sealed class Win32NativePromotionTests
         /// <summary>The theme's scroll-bar thickness, which a wrong metric index turns into a screen dimension.</summary>
         public int ScrollBarSize;
 
+        /// <summary>How many pixels an empty multiline box with a placeholder drew into its client area.</summary>
+        public int MultilineHintPixels;
+
+        /// <summary>And how many one without a placeholder drew, which is what the first is measured against.</summary>
+        public int BlankMultilinePixels;
+
         /// <summary>The client size of the promoted horizontal scroll bar's own window.</summary>
         public Size HScrollClient;
 
@@ -151,6 +157,17 @@ public sealed class Win32NativePromotionTests
         gatedList.Items.AddRange(["a", "b"]);
         var gatedGroup = new GroupBox { Bounds = new Rectangle(270, 300, 240, 60), Text = "gated", Image = icon };
 
+        // EM_SETCUEBANNER is a single-line message, so the multiline hint has to be painted. Two empty
+        // boxes, alike but for the placeholder: what separates "the hint drew" from "an EDIT draws
+        // something anyway" is the one that must stay blank.
+        var hinted = new TextBox
+        {
+            Bounds = new Rectangle(270, 370, 240, 60),
+            Multiline = true,
+            PlaceholderText = "Type something here",
+        };
+        var blank = new TextBox { Bounds = new Rectangle(270, 440, 240, 60), Multiline = true };
+
         var tipped = new Button { Bounds = new Rectangle(540, 140, 140, 26), Text = "tipped" };
         var toolTip = new ToolTip();
         var painter = new ColorGlyphPainter { Bounds = new Rectangle(540, 400, 200, 60) };
@@ -162,7 +179,7 @@ public sealed class Win32NativePromotionTests
         };
 
         form.Controls.AddRange(
-            check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped,
+            check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped, hinted, blank,
             gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost, painter, described);
 
         // Observed from a timer rather than from Load: some of this needs the window to have been shown
@@ -258,6 +275,9 @@ public sealed class Win32NativePromotionTests
                 observed.CanvasAccessibleRole = MsaaRoleOf(described);
                 observed.ShadowAccessibleRole = ShadowRoleProbe(described);
 
+                observed.MultilineHintPixels = ForegroundPixels(hinted);
+                observed.BlankMultilinePixels = ForegroundPixels(blank);
+
                 // The window the promotion produced has to be the size the control asked for. A stand-alone
                 // SCROLLBAR that ignored its rectangle draws as a hairline, which reads in a screenshot as
                 // "the scroll bar did not render" and is indistinguishable from a paint bug until measured.
@@ -318,6 +338,49 @@ public sealed class Win32NativePromotionTests
     }
 
     /// <summary>The window text of a control's peer, read back out of the OS.</summary>
+    /// <summary>
+    /// How many pixels of a control's client area are not its background — a count rather than a
+    /// yes/no, because an empty EDIT is not necessarily blank: it may be carrying a caret, and a
+    /// boolean would read that as drawing. The background is sampled from the far corner rather than
+    /// the near one: text starts at the top left, and the top-left client pixel is where a themed
+    /// control's own edge lands. The window is repainted first, so the answer is about this moment
+    /// rather than about whatever the queue had got round to.
+    /// </summary>
+    private static int ForegroundPixels(Control control)
+    {
+        if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+            return 0;
+
+        unsafe
+        {
+            NativeMethods.InvalidateRect(peer.Handle, null, true);
+        }
+
+        NativeMethods.UpdateWindow(peer.Handle);
+        if (!NativeMethods.GetClientRect(peer.Handle, out var rect))
+            return 0;
+
+        var hdc = NativeMethods.GetDC(peer.Handle);
+        if (hdc == 0)
+            return 0;
+
+        try
+        {
+            var background = NativeMethods.GetPixel(hdc, rect.right - 3, rect.bottom - 3);
+            var count = 0;
+            for (var y = 2; y < rect.bottom - 2; ++y)
+                for (var x = 2; x < rect.right - 2; ++x)
+                    if (NativeMethods.GetPixel(hdc, x, y) != background)
+                        ++count;
+
+            return count;
+        }
+        finally
+        {
+            NativeMethods.ReleaseDC(peer.Handle, hdc);
+        }
+    }
+
     /// <summary>The client size of the native window behind a control, or empty when it has none.</summary>
     private static Size ClientSizeOf(Control control)
         => control.Peer is Win32ControlPeer peer && peer.Handle != 0 && NativeMethods.GetClientRect(peer.Handle, out var rect)
@@ -509,6 +572,23 @@ public sealed class Win32NativePromotionTests
     /// PRD §8: MSAA names a window it knows nothing else about by its window text, and our canvas class
     /// has none — so an owner-drawn control is announced as a bare pane until the toolkit supplies one.
     /// </summary>
+    /// <summary>
+    /// PRD §7.1: a multiline box shows its placeholder. <c>EM_SETCUEBANNER</c> reaches single-line EDIT
+    /// controls only — a multiline one accepts the message and draws nothing — so the hint is painted
+    /// over the empty control, and only a live desktop can say whether those pixels landed. The box
+    /// without a placeholder is the control: an empty EDIT that drew anything would make the other
+    /// assertion pass for free.
+    /// </summary>
+    [Test]
+    public void An_empty_multiline_box_paints_its_placeholder()
+    {
+        var observed = Result();
+        Assert.That(
+            observed.MultilineHintPixels,
+            Is.GreaterThan(observed.BlankMultilinePixels + 50),
+            $"the hint drew {observed.MultilineHintPixels} px where a box without one drew {observed.BlankMultilinePixels}");
+    }
+
     /// <summary>
     /// A promoted scroll bar has to occupy the rectangle the control was given. A stand-alone
     /// <c>SCROLLBAR</c> is the one promotion whose window can silently collapse along its cross axis —

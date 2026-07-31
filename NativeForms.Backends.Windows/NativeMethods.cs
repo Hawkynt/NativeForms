@@ -112,6 +112,10 @@ internal static partial class NativeMethods
     /// <summary>Selects the character range wParam (start) … lParam (end).</summary>
     internal const uint EM_SETSEL = 0x00B1;
 
+    /// <summary>Copies the formatting rectangle — the box the control lays text out in — into the
+    /// <see cref="RECT"/> lParam points at.</summary>
+    internal const uint EM_GETRECT = 0x00B2;
+
     /// <summary>Caps the amount of text the user can type; wParam 0 raises the limit to the class maximum.</summary>
     internal const uint EM_SETLIMITTEXT = 0x00C5;
 

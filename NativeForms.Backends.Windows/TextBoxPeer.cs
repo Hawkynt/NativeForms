@@ -14,9 +14,10 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// routing, exactly like button clicks.
 /// </summary>
 /// <remarks>
-/// The cue banner (<c>EM_SETCUEBANNER</c>) only exists on single-line EDIT controls, so multiline
-/// boxes show no placeholder until an owner-drawn hint is added. Character casing is normalized by
-/// the core, so no <c>ES_UPPERCASE</c>/<c>ES_LOWERCASE</c> style bits are needed here.
+/// The cue banner (<c>EM_SETCUEBANNER</c>) only exists on single-line EDIT controls — a multiline box
+/// accepts the message and shows nothing — so the multiline hint is painted over the empty control
+/// instead, out of the same subclass the keys come through. Character casing is normalized by the
+/// core, so no <c>ES_UPPERCASE</c>/<c>ES_LOWERCASE</c> style bits are needed here.
 ///
 /// A line break is <c>\n</c> everywhere above this class and <c>\r\n</c> inside the widget, so it is
 /// translated on the way in and back on the way out. An EDIT breaks a line on the pair alone — a bare
@@ -139,7 +140,63 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
             && peer.RaiseKeyDown(wParam))
             return 0;
 
-        return NativeMethods.DefSubclassProc(hwnd, msg, wParam, lParam);
+        var result = NativeMethods.DefSubclassProc(hwnd, msg, wParam, lParam);
+
+        // After the control has drawn, never instead of it: the hint is an overlay on an empty box, so
+        // the EDIT still owns its background, its border and its caret. Same shape as the GTK half,
+        // which hangs its placeholder off the text view's "draw" signal with G_CONNECT_AFTER.
+        if (msg == NativeMethods.WM_PAINT && peer is not null)
+            peer.PaintPlaceholder(hwnd);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Draws the grey hint over an empty multiline box.
+    /// </summary>
+    /// <remarks>
+    /// <c>EM_SETCUEBANNER</c> is a single-line-EDIT message — a multiline box accepts it and shows
+    /// nothing — so the multiline hint has to be painted. The rectangle comes from
+    /// <c>EM_GETRECT</c> rather than from the client area, because that is the box the control itself
+    /// lays text out in, so the hint starts exactly where the first typed character will.
+    ///
+    /// It stays visible while the box has focus, which is what the GTK half does and what the caller
+    /// asked for; a cue banner's default of vanishing on focus would make the two backends disagree
+    /// about a property neither of them exposes.
+    ///
+    /// A fresh DC rather than the one <c>BeginPaint</c> handed the control: that one was released
+    /// before this returns. Nothing is cached — a box that is empty is a box nobody is typing in, so
+    /// this runs at rest and never on a keystroke.
+    /// </remarks>
+    private void PaintPlaceholder(nint hwnd)
+    {
+        if (!_multiline || _placeholder.Length == 0 || NativeMethods.GetWindowTextLengthW(hwnd) != 0)
+            return;
+
+        var hdc = NativeMethods.GetDC(hwnd);
+        if (hdc == 0)
+            return;
+
+        var font = NativeMethods.SendMessageW(hwnd, NativeMethods.WM_GETFONT, 0, 0);
+        var previousFont = font == 0 ? 0 : NativeMethods.SelectObject(hdc, font);
+        var previousMode = NativeMethods.SetBkMode(hdc, NativeMethods.TRANSPARENT);
+        var previousColor = NativeMethods.SetTextColor(hdc, NativeMethods.GetSysColor(NativeMethods.COLOR_GRAYTEXT));
+
+        var rect = default(NativeMethods.RECT);
+        NativeMethods.SendMessageW(hwnd, NativeMethods.EM_GETRECT, 0, (nint)(&rect));
+        NativeMethods.DrawTextW(
+            hdc,
+            _placeholder,
+            -1,
+            ref rect,
+            NativeMethods.DT_LEFT | NativeMethods.DT_TOP | NativeMethods.DT_NOPREFIX | NativeMethods.DT_WORDBREAK);
+
+        NativeMethods.SetTextColor(hdc, previousColor);
+        NativeMethods.SetBkMode(hdc, previousMode);
+        if (previousFont != 0)
+            NativeMethods.SelectObject(hdc, previousFont);
+
+        NativeMethods.ReleaseDC(hwnd, hdc);
     }
 
     /// <summary>Raises <see cref="KeyDown"/> and reports whether a handler consumed the key.</summary>
@@ -204,8 +261,19 @@ internal unsafe class TextBoxPeer : Win32ChildPeer, ITextBoxPeer
     public void SetPlaceholder(string placeholder)
     {
         _placeholder = placeholder ?? string.Empty;
-        if (Handle != 0 && !_multiline)
+        if (Handle == 0)
+            return;
+
+        if (!_multiline)
+        {
             NativeMethods.SendMessageStringW(Handle, NativeMethods.EM_SETCUEBANNER, 1, _placeholder);
+            return;
+        }
+
+        // The multiline hint is painted, so nothing about the control changed and it has no reason to
+        // repaint on its own — a hint replaced while the box sits empty would otherwise not appear
+        // until something else invalidated it.
+        NativeMethods.InvalidateRect(Handle, null, true);
     }
 
     /// <inheritdoc/>

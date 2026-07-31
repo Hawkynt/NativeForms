@@ -464,6 +464,12 @@ internal static unsafe partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool InvalidateRect(nint hWnd, RECT* lpRect, [MarshalAs(UnmanagedType.Bool)] bool bErase);
 
+    /// <summary>Sends <c>WM_PAINT</c> straight to a window when its update region is not empty, so the
+    /// drawing has happened by the time the call returns rather than whenever the queue drains.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool UpdateWindow(nint hWnd);
+
     /// <summary>Fills a rectangle with the given brush (the brush edges are not painted).</summary>
     [LibraryImport("user32.dll")]
     internal static partial int FillRect(nint hDC, in RECT lprc, nint hbr);
