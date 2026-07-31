@@ -88,21 +88,26 @@ jobs:
         with:
           fetch-depth: 0
       - name: Compute release marker
-        # The marker is the UTC date, which is not unique: a day that cuts a second stable release
-        # lands on a tag that already exists. Re-using it would upsert the first release — the newer
-        # packages attached to a tag still pointing at the older commit, a release whose tag does not
-        # contain what it ships. So the first free marker wins, dotted: v20260731, v20260731.2, …
-        # `v[0-9]*` still matches, so the next release measures its commit range from here correctly.
+        run: echo "REL=v$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+
+      # There is at most ONE release per day, and it is the latest one: a second run today replaces
+      # the first outright rather than adding beside it. Retiring the earlier release here, rather
+      # than letting the create step upsert it, is what makes the replacement complete — the tag is
+      # re-cut on the new commit instead of staying on the old one, and the assets are this run's
+      # alone with none of the earlier run's left behind.
+      #
+      # The local tag goes too, and before the notes are generated: update-changelog.mjs measures
+      # its commit range from the last stable tag it can see, so leaving today's behind would make
+      # the day's release describe only the part of the day after the run it replaces.
+      - name: Retire an earlier release from the same day
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          base="v$(date -u +%Y%m%d)"
-          rel="$base"
-          n=1
-          while git rev-parse -q --verify "refs/tags/$rel" >/dev/null; do
-            n=$((n + 1))
-            rel="$base.$n"
-          done
-          echo "Release marker: $rel"
-          echo "REL=$rel" >> "$GITHUB_ENV"
+          if gh release view "$REL" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Replacing today's earlier release $REL."
+            gh release delete "$REL" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY"
+          fi
+          git tag -d "$REL" 2>/dev/null || true
 
       # Pull whichever artifacts _build produced (binaries, packages, or both).
       - uses: actions/download-artifact@v4
