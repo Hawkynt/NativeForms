@@ -423,8 +423,14 @@ strategy (may differ per platform; note exceptions inline).
       identical rows), `PlaceholderText`, full keyboard model (Alt+Down/F4, closed-arrow
       selection, prefix cycling open and closed), light-dismiss popup sized by
       `MaxDropDownItems`, `DataSource` + `DisplaySelector`/`ValueSelector`/`SelectedValue`
-      (lambda-shaped DisplayMember/ValueMember) done; `Simple` style and autocomplete pending
-      (autocomplete needs key events on `ITextBoxPeer`)
+      (lambda-shaped DisplayMember/ValueMember), `AutoCompleteMode`
+      (`Suggest`/`Append`/`SuggestAppend`: the drop-down narrows to the matching items, the rest of the
+      first match is filled into the field and left selected, and the list re-fits itself in place
+      rather than re-showing, which would hand the pointer grab round). Candidates are the combo's own
+      items — Windows Forms' `AutoCompleteSource.ListItems` — since committing one sets `SelectedIndex`
+      and a candidate from anywhere else has no index to commit. A deletion never completes, told from
+      an insertion by comparing against what was *typed* rather than what the field shows, because
+      typing over a selected completion shortens the field. Done; `Simple` style pending
 - [~] `ListView` (owner, native metrics) — Details/List/LargeIcon/SmallIcon/Tile views, columns,
       per-item icons (`Large`/`SmallImageList` + `ImageIndex`), sub-items, groups (flattened
       header rows), checkboxes (`ItemCheck` veto + corner overlay in icon views), MultiExtended

@@ -79,6 +79,7 @@ internal sealed partial class MainForm
             Bounds = new(16, 400, 300, 26),
             DropDownStyle = ComboBoxStyle.DropDown,
             PlaceholderText = "Type or pick a tag…",
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
         };
         comboEdit.Items.AddRange(["alpha", "beta", "release-candidate", "stable"]);
 

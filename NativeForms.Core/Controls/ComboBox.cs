@@ -25,12 +25,33 @@ public class ComboBox : OwnerDrawnControl
     private bool _focused;
 
     private IPopupPeer? _popup;
-    private int _hoverIndex = -1;
+
+    /// <summary>The hovered <em>row</em> of the open drop-down, which is the item index only while the
+    /// list is unfiltered; <see cref="ItemIndexAt"/> is what turns one into the other.</summary>
+    private int _hoverRow = -1;
     private int _popupTopIndex;
     private int _popupVisibleRows;
     private Size _popupSize;
 
+    /// <summary>
+    /// The item indices a suggestion filter has left showing, or <see langword="null"/> while the list
+    /// is showing everything. Never empty: no match closes the drop-down rather than opening an empty
+    /// box under the field.
+    /// </summary>
+    private List<int>? _matches;
+
     private TextBox? _editor;
+
+    /// <summary>Guards the editor write that inline completion makes, so it is not read back as typing.</summary>
+    private bool _autoCompleting;
+
+    /// <summary>
+    /// What the user has actually typed, without anything completion filled in. A deletion is told from
+    /// an insertion by comparing against <em>this</em> rather than against what the field shows:
+    /// typing over a selected completion makes the field's text shorter, so a field-length comparison
+    /// would read every second keystroke as a backspace and stop completing.
+    /// </summary>
+    private string _typedText = string.Empty;
 
     /// <summary>Creates a combo box in the closed, non-editable <see cref="ComboBoxStyle.DropDownList"/> style.</summary>
     public ComboBox()
@@ -153,6 +174,31 @@ public class ComboBox : OwnerDrawnControl
             this.Invalidate();
         }
     } = string.Empty;
+
+    /// <summary>
+    /// How the editable style completes what is typed against the items: not at all (the default),
+    /// by filling the rest of the first match into the field (<see cref="AutoCompleteMode.Append"/>),
+    /// by narrowing the drop-down to the matches (<see cref="AutoCompleteMode.Suggest"/>), or both.
+    /// </summary>
+    /// <remarks>
+    /// The candidates are the combo's own items — Windows Forms' <c>AutoCompleteSource.ListItems</c> —
+    /// because committing a suggestion sets <see cref="SelectedIndex"/>, and a candidate from anywhere
+    /// else has no index to commit. A <see cref="ComboBoxStyle.DropDownList"/> combo ignores this: with
+    /// no editor there is nothing to complete, and typing already cycles through the matching items.
+    /// </remarks>
+    public AutoCompleteMode AutoCompleteMode
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            if (value is AutoCompleteMode.None or AutoCompleteMode.Append)
+                this.ClearSuggestions(); // whatever a previous Suggest left showing is no longer meant
+        }
+    }
 
     /// <summary>The maximum number of rows the drop-down shows before it scrolls. Defaults to 8.</summary>
     public int MaxDropDownItems
@@ -520,8 +566,8 @@ public class ComboBox : OwnerDrawnControl
                     break;
 
                 case Keys.Enter:
-                    if (_hoverIndex >= 0 && _hoverIndex < this.Items.Count)
-                        this.CommitAndClose(_hoverIndex);
+                    if (_hoverRow >= 0 && _hoverRow < this.RowCount)
+                        this.CommitAndClose(this.ItemIndexAt(_hoverRow));
                     else
                         this.CloseDropDown();
 
@@ -566,7 +612,7 @@ public class ComboBox : OwnerDrawnControl
         if (char.IsControl(e.KeyChar) || this.Items.Count == 0)
             return;
 
-        var match = this.FindPrefixMatch(e.KeyChar, _droppedDown ? _hoverIndex : _selectedIndex);
+        var match = this.FindPrefixMatch(e.KeyChar, _droppedDown ? this.ItemIndexAt(_hoverRow) : _selectedIndex);
         if (match < 0)
             return;
 
@@ -577,8 +623,8 @@ public class ComboBox : OwnerDrawnControl
             return;
         }
 
-        _hoverIndex = match;
-        this.EnsurePopupVisible(match);
+        _hoverRow = this.RowOf(match);
+        this.EnsurePopupVisible(_hoverRow);
         _popup?.InvalidateAll();
     }
 
@@ -624,11 +670,11 @@ public class ComboBox : OwnerDrawnControl
             return;
 
         var popup = _popup ??= this.CreatePopup(backend);
-        _popupVisibleRows = Math.Max(1, Math.Min(this.Items.Count, this.MaxDropDownItems));
+        _popupVisibleRows = Math.Max(1, Math.Min(this.RowCount, this.MaxDropDownItems));
         _popupSize = new Size(this.Width, _popupVisibleRows * this.Theme.RowHeight);
-        _hoverIndex = _selectedIndex;
+        _hoverRow = this.RowOf(_selectedIndex);
         _popupTopIndex = 0;
-        this.EnsurePopupVisible(_hoverIndex);
+        this.EnsurePopupVisible(_hoverRow);
         _droppedDown = true;
         this.OwnsOpenPopup = true;
         popup.ShowAt(this.PointToScreen(new Point(0, this.Height)), _popupSize);
@@ -678,15 +724,15 @@ public class ComboBox : OwnerDrawnControl
         g.FillRectangle(this.BackColor, new Rectangle(0, 0, size.Width, size.Height));
 
         var rowHeight = theme.RowHeight;
-        var last = Math.Min(this.Items.Count, _popupTopIndex + _popupVisibleRows);
-        for (var i = _popupTopIndex; i < last; ++i)
+        var last = Math.Min(this.RowCount, _popupTopIndex + _popupVisibleRows);
+        for (var row = _popupTopIndex; row < last; ++row)
         {
-            var rowRect = new Rectangle(0, (i - _popupTopIndex) * rowHeight, size.Width, rowHeight);
-            var hovered = i == _hoverIndex;
+            var rowRect = new Rectangle(0, (row - _popupTopIndex) * rowHeight, size.Width, rowHeight);
+            var hovered = row == _hoverRow;
             if (hovered)
                 GlyphRenderer.FillSelection(g, theme, rowRect);
 
-            var item = this.Items[i];
+            var item = this.Items[this.ItemIndexAt(row)];
             ListBox.DrawRowContent(g, theme, rowRect, this.DisplaySelector(item), this.IconOf(item), hovered);
         }
 
@@ -699,10 +745,10 @@ public class ComboBox : OwnerDrawnControl
             return;
 
         var row = _popupTopIndex + (e.Y / this.Theme.RowHeight);
-        if (row >= this.Items.Count || row == _hoverIndex)
+        if (row >= this.RowCount || row == _hoverRow)
             return;
 
-        _hoverIndex = row;
+        _hoverRow = row;
         _popup?.InvalidateAll();
     }
 
@@ -712,15 +758,15 @@ public class ComboBox : OwnerDrawnControl
             return;
 
         var row = _popupTopIndex + (e.Y / this.Theme.RowHeight);
-        if (row >= this.Items.Count)
+        if (row >= this.RowCount)
             return;
 
-        this.CommitAndClose(row);
+        this.CommitAndClose(this.ItemIndexAt(row));
     }
 
     private void OnPopupMouseWheel(MouseEventArgs e)
     {
-        var maxTop = Math.Max(0, this.Items.Count - _popupVisibleRows);
+        var maxTop = Math.Max(0, this.RowCount - _popupVisibleRows);
         var top = Math.Clamp(_popupTopIndex - Math.Sign(e.Delta) * 3, 0, maxTop);
         if (top == _popupTopIndex)
             return;
@@ -742,25 +788,26 @@ public class ComboBox : OwnerDrawnControl
         this.OnDropDownClosed(EventArgs.Empty);
     }
 
-    /// <summary>Commits the given row as the selection and closes the drop-down.</summary>
+    /// <summary>Commits the given item as the selection and closes the drop-down.</summary>
     private void CommitAndClose(int index)
     {
         this.CloseDropDown();
+        _matches = null; // the filter belongs to the edit that is now finished
         this.SelectedIndex = index;
     }
 
     /// <summary>Moves the hover row by <paramref name="delta"/>, clamped, scrolling it into view.</summary>
     private void MoveHover(int delta)
     {
-        var count = this.Items.Count;
+        var count = this.RowCount;
         if (count == 0)
             return;
 
-        var target = Math.Clamp(_hoverIndex + delta, 0, count - 1);
-        if (target == _hoverIndex)
+        var target = Math.Clamp(_hoverRow + delta, 0, count - 1);
+        if (target == _hoverRow)
             return;
 
-        _hoverIndex = target;
+        _hoverRow = target;
         this.EnsurePopupVisible(target);
         _popup?.InvalidateAll();
     }
@@ -776,7 +823,141 @@ public class ComboBox : OwnerDrawnControl
         else if (index >= _popupTopIndex + _popupVisibleRows)
             _popupTopIndex = index - _popupVisibleRows + 1;
 
-        _popupTopIndex = Math.Clamp(_popupTopIndex, 0, Math.Max(0, this.Items.Count - _popupVisibleRows));
+        _popupTopIndex = Math.Clamp(_popupTopIndex, 0, Math.Max(0, this.RowCount - _popupVisibleRows));
+    }
+
+    // --- The suggestion filter ---------------------------------------------------------------------
+
+    /// <summary>How many rows the drop-down has: every item, or only the ones a filter left.</summary>
+    private int RowCount => _matches?.Count ?? this.Items.Count;
+
+    /// <summary>The item a drop-down row stands for; the two are the same only unfiltered.</summary>
+    private int ItemIndexAt(int row)
+        => _matches is { } matches
+            ? row >= 0 && row < matches.Count ? matches[row] : -1
+            : row;
+
+    /// <summary>The row an item occupies, or -1 while a filter is hiding it.</summary>
+    private int RowOf(int itemIndex)
+        => _matches is { } matches ? matches.IndexOf(itemIndex) : itemIndex;
+
+    /// <summary>Drops any suggestion filter, so the next open shows the whole list again.</summary>
+    private void ClearSuggestions()
+    {
+        if (_matches is null)
+            return;
+
+        _matches = null;
+        _hoverRow = this.RowOf(_selectedIndex);
+        _popupTopIndex = 0;
+        if (_droppedDown)
+            this.ResizeDropDown();
+    }
+
+    /// <summary>
+    /// Re-fits an open drop-down to the rows it now has, in place. Resized rather than re-shown, which
+    /// on a backend with a pointer grab would hand the grab round and dismiss the popup mid-edit —
+    /// the same reason the filterable menu resizes.
+    /// </summary>
+    private void ResizeDropDown()
+    {
+        if (_popup is not { } popup)
+            return;
+
+        _popupVisibleRows = Math.Max(1, Math.Min(this.RowCount, this.MaxDropDownItems));
+        _popupSize = new Size(this.Width, _popupVisibleRows * this.Theme.RowHeight);
+        this.EnsurePopupVisible(_hoverRow);
+        popup.Resize(_popupSize);
+        popup.InvalidateAll();
+    }
+
+    /// <summary>
+    /// Completes what has just been typed into the hosted editor: fills in the rest of the first match
+    /// (<see cref="AutoCompleteMode.Append"/>) and narrows the drop-down to the matches
+    /// (<see cref="AutoCompleteMode.Suggest"/>).
+    /// </summary>
+    /// <param name="typed">What the editor now holds.</param>
+    /// <param name="deleting">Whether the edit shortened the text, which never completes.</param>
+    private void ApplyAutoComplete(string typed, bool deleting)
+    {
+        var mode = this.AutoCompleteMode;
+        if (mode is AutoCompleteMode.None || _editor is not { } editor)
+            return;
+
+        if (typed.Length == 0)
+        {
+            // An empty field matches everything, which is no filter at all rather than every row.
+            this.ClearSuggestions();
+            if (_droppedDown && mode.HasFlag(AutoCompleteMode.Suggest))
+                this.CloseDropDown();
+
+            return;
+        }
+
+        if (mode.HasFlag(AutoCompleteMode.Suggest))
+        {
+            var matches = this.CollectMatches(typed);
+            if (matches.Count == 0)
+            {
+                _matches = null;
+                if (_droppedDown)
+                    this.CloseDropDown();
+            }
+            else
+            {
+                _matches = matches;
+                _hoverRow = -1; // nothing is chosen yet: the first arrow key picks the first match
+                _popupTopIndex = 0;
+                if (_droppedDown)
+                    this.ResizeDropDown();
+                else
+                    this.OpenDropDown();
+            }
+        }
+
+        if (deleting || !mode.HasFlag(AutoCompleteMode.Append))
+            return;
+
+        var match = this.FindCompletion(typed);
+        if (match < 0)
+            return;
+
+        var completion = this.DisplaySelector(this.Items[match]);
+        if (completion.Length <= typed.Length)
+            return; // an exact match has nothing left to fill in
+
+        _autoCompleting = true;
+        try
+        {
+            editor.Text = completion;
+            editor.Select(typed.Length, completion.Length - typed.Length);
+        }
+        finally
+        {
+            _autoCompleting = false;
+        }
+
+    }
+
+    /// <summary>The indices of the items whose display text starts with <paramref name="prefix"/>.</summary>
+    private List<int> CollectMatches(string prefix)
+    {
+        var matches = new List<int>();
+        for (var i = 0; i < this.Items.Count; ++i)
+            if (this.DisplaySelector(this.Items[i]).StartsWith(prefix, StringComparison.CurrentCultureIgnoreCase))
+                matches.Add(i);
+
+        return matches;
+    }
+
+    /// <summary>The first item whose display text starts with <paramref name="prefix"/>; -1 for none.</summary>
+    private int FindCompletion(string prefix)
+    {
+        for (var i = 0; i < this.Items.Count; ++i)
+            if (this.DisplaySelector(this.Items[i]).StartsWith(prefix, StringComparison.CurrentCultureIgnoreCase))
+                return i;
+
+        return -1;
     }
 
     /// <summary>Finds the next item after <paramref name="after"/> (wrapping) whose display text
@@ -833,8 +1014,8 @@ public class ComboBox : OwnerDrawnControl
 
         if (_droppedDown)
         {
-            _hoverIndex = Math.Min(_hoverIndex, this.Items.Count - 1);
-            _popupTopIndex = Math.Clamp(_popupTopIndex, 0, Math.Max(0, this.Items.Count - _popupVisibleRows));
+            _hoverRow = Math.Min(_hoverRow, this.RowCount - 1);
+            _popupTopIndex = Math.Clamp(_popupTopIndex, 0, Math.Max(0, this.RowCount - _popupVisibleRows));
             _popup?.InvalidateAll();
         }
 
@@ -895,12 +1076,42 @@ public class ComboBox : OwnerDrawnControl
     private void SyncEditorBounds(TextBox editor)
         => editor.Bounds = new Rectangle(0, 0, Math.Max(0, this.Width - this.ButtonWidth), this.Height);
 
-    private void OnEditorTextChanged(object? sender, EventArgs e) => this.OnTextChanged(EventArgs.Empty);
+    /// <summary>
+    /// The hosted editor's text moved. Completion runs first so the public
+    /// <see cref="Control.TextChanged"/> reports the finished text once, rather than once for what was
+    /// typed and again for what was filled in.
+    /// </summary>
+    private void OnEditorTextChanged(object? sender, EventArgs e)
+    {
+        if (_autoCompleting)
+            return; // completion's own write; the call that started it reports the result
+
+        var typed = _editor?.Text ?? string.Empty;
+        var deleting = typed.Length <= _typedText.Length;
+        _typedText = typed;
+
+        this.ApplyAutoComplete(typed, deleting);
+        this.OnTextChanged(EventArgs.Empty);
+    }
 
     /// <summary>Pushes the selected item's display text into the hosted editor, if any.</summary>
     private void PushSelectionIntoEditor()
     {
-        if (_editor is { } editor && _selectedIndex >= 0)
+        if (_editor is not { } editor || _selectedIndex < 0)
+            return;
+
+        // Not an edit: a selection pushed into the field must not be completed against the items or
+        // re-open the drop-down that committing it just closed.
+        _autoCompleting = true;
+        try
+        {
             editor.Text = this.DisplaySelector(this.Items[_selectedIndex]);
+        }
+        finally
+        {
+            _autoCompleting = false;
+        }
+
+        _typedText = editor.Text;
     }
 }
