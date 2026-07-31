@@ -88,7 +88,21 @@ jobs:
         with:
           fetch-depth: 0
       - name: Compute release marker
-        run: echo "REL=v$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+        # The marker is the UTC date, which is not unique: a day that cuts a second stable release
+        # lands on a tag that already exists. Re-using it would upsert the first release — the newer
+        # packages attached to a tag still pointing at the older commit, a release whose tag does not
+        # contain what it ships. So the first free marker wins, dotted: v20260731, v20260731.2, …
+        # `v[0-9]*` still matches, so the next release measures its commit range from here correctly.
+        run: |
+          base="v$(date -u +%Y%m%d)"
+          rel="$base"
+          n=1
+          while git rev-parse -q --verify "refs/tags/$rel" >/dev/null; do
+            n=$((n + 1))
+            rel="$base.$n"
+          done
+          echo "Release marker: $rel"
+          echo "REL=$rel" >> "$GITHUB_ENV"
 
       # Pull whichever artifacts _build produced (binaries, packages, or both).
       - uses: actions/download-artifact@v4
