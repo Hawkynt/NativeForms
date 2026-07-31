@@ -66,8 +66,10 @@ internal sealed partial class MainForm
         // The two faces no platform button offers, so both are painted (PRD §12). They want to be on a
         // page somebody photographs, and next to the two widget buttons above them, because the point
         // of the painted half is that the difference is the one the style asks for and nothing else.
-        var flatButton = new Button { Bounds = new(16, 266, 145, 30), Text = "FlatStyle.Flat", FlatStyle = FlatStyle.Flat };
-        var popupButton = new Button { Bounds = new(171, 266, 145, 30), Text = "Popup (hover me)", FlatStyle = FlatStyle.Popup };
+        var flatButton = new Button { Bounds = new(16, 290, 145, 30), Text = "Flat", FlatStyle = FlatStyle.Flat };
+        var popupButton = new Button { Bounds = new(171, 290, 145, 30), Text = "Popup", FlatStyle = FlatStyle.Popup };
+        _toolTip.SetToolTip(flatButton, "FlatStyle.Flat — no frame until it is pressed.");
+        _toolTip.SetToolTip(popupButton, "FlatStyle.Popup — flat until the pointer arrives, then it wears the button frame.");
         flatButton.Click += (_, _) => this.SetStatus("The flat button was clicked.");
         popupButton.Click += (_, _) => this.SetStatus("The popup button was clicked.");
 
@@ -76,6 +78,7 @@ internal sealed partial class MainForm
             counterLabel, counterBar, clickButton, disabledButton,
             Caption("Button → modal dialog", 16, 134),
             dialogButton, dialogResultLabel, customDialogButton,
+            Caption("Button: FlatStyle (painted)", 16, 266),
             flatButton, popupButton);
 
         this.Publish("basics.customDialog", customDialogButton);
