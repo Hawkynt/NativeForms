@@ -112,6 +112,15 @@ if (shooting)
     var pages = (form as MainForm)?.Tabs;
     var page = 0;
 
+    // The Windows input checks drain the message queue so an injected click has been handled before
+    // anything asks whether it arrived — and a pending shutter tick is one of the messages that drain
+    // dispatches. Re-entering here would photograph the page a second time under the *same* index and
+    // then advance twice, which is how `01-input` went missing from every Windows artifact while the
+    // log still counted a shot per page. The guard makes the nested tick a no-op; the outer one owns
+    // the walk.
+    var firing = false;
+    var shot = new HashSet<string>();
+
     form.Load += (_, _) =>
     {
         // One tick of the real loop first, so the shot is of a window the platform has finished
@@ -120,11 +129,38 @@ if (shooting)
         var shutter = new Hawkynt.NativeForms.Timer { Interval = 400 };
         shutter.Tick += (_, _) =>
         {
+            if (firing)
+                return;
+
+            firing = true;
+            try
+            {
+                Shot();
+            }
+            finally
+            {
+                firing = false;
+            }
+        };
+        shutter.Start();
+
+        void Shot()
+        {
             var name = pages is null
                 ? "gallery"
                 : $"{page:00}-{new string([.. pages.TabPages[page].Text.Where(char.IsLetterOrDigit)]).ToLowerInvariant()}";
 
             var path = Path.Combine(directory, name + ".png");
+
+            // A shot that lands on a name already written is a page the walk never reached: the file it
+            // overwrites belonged to another page, and the count of shots still says one per page. The
+            // artifact hid that for as long as nobody diffed the file list against the tab strip, so the
+            // run says it instead.
+            if (!shot.Add(name))
+            {
+                Note($"  {name}: photographed twice, so a page was skipped");
+                ++shootFailures;
+            }
 
             // Once, off the first page: whether the pointer can reach a control at all is a property
             // of the window and its views, not of any one page, and it is invisible in a screenshot.
@@ -252,9 +288,7 @@ if (shooting)
                 : $"shoot: {shootFailures} check(s) failed across {page} page(s){injected}");
 
             form.Close();
-        };
-
-        shutter.Start();
+        }
     };
 
     Note("gallery constructed, waiting for the window");
