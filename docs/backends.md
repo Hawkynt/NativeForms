@@ -38,15 +38,26 @@ The mnemonic's underline is drawn on macOS and on neither of the other two. GTK 
 until Alt is held, which is their desktops' convention; this one has no such convention and no
 message that reports the modifier, so the line is simply drawn.
 
+The last row of that group is the exception, and it is the same on all three. A label carrying an
+image cannot stay on a platform static — none of the three renders a bitmap and a caption in one
+widget — so it is painted instead, which is why its underline shows everywhere the widget's does not.
+
 ### Input
 
 ![The Input page on all three backends](screenshots/backends/01-input.png)
 
-Only GTK shows the multiline placeholder: `EM_SETCUEBANNER` is a single-line message a multiline
-`EDIT` ignores, `NSTextView` carries no placeholder at all, and painting one over an editor whose
-caret and selection belong to the platform is a fight both backend sections below decline. The
-standalone scroll bars are the second tell — Windows 11 draws a themed scroll bar as a hairline until
-the pointer is over it, and nothing is hovering while a capture is taken.
+GTK and Windows both show the multiline placeholder now; macOS does not. No platform offers one —
+`EM_SETCUEBANNER` is a single-line message a multiline `EDIT` ignores and `NSTextView` carries none at
+all — so each backend paints it over the empty editor after the widget's own draw. Cocoa has not been
+wired for it yet.
+
+The standalone scroll bars are the page's other tell, and the cause is still open. Their windows are
+the full size the control asked for, measured off the widget on the runner itself, so what is missing
+happens between the bar and the PNG: either Windows 11 drawing a themed scroll bar as a hairline rail
+until the pointer is over it — and nothing hovers during a capture — or the `PrintWindow` route not
+reaching a stock `SCROLLBAR` through `WM_PRINTCLIENT`. The multiline `EDIT` above them draws its own
+scroll bar in full, unhovered, through the same capture, which argues against both. Do not read these
+two panels as a rendering defect until one of the two is proven.
 
 ### Lists
 
