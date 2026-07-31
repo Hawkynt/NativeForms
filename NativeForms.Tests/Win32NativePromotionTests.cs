@@ -48,6 +48,12 @@ public sealed class Win32NativePromotionTests
         /// <summary>The theme's scroll-bar thickness, which a wrong metric index turns into a screen dimension.</summary>
         public int ScrollBarSize;
 
+        /// <summary>The client size of the promoted horizontal scroll bar's own window.</summary>
+        public Size HScrollClient;
+
+        /// <summary>And of the vertical one's; both are read off the widget, not off the core.</summary>
+        public Size VScrollClient;
+
         /// <summary>The theme's row height, guarded the same way.</summary>
         public int RowHeight;
 
@@ -252,6 +258,12 @@ public sealed class Win32NativePromotionTests
                 observed.CanvasAccessibleRole = MsaaRoleOf(described);
                 observed.ShadowAccessibleRole = ShadowRoleProbe(described);
 
+                // The window the promotion produced has to be the size the control asked for. A stand-alone
+                // SCROLLBAR that ignored its rectangle draws as a hairline, which reads in a screenshot as
+                // "the scroll bar did not render" and is indistinguishable from a paint bug until measured.
+                observed.HScrollClient = ClientSizeOf(hscroll);
+                observed.VScrollClient = ClientSizeOf(vscroll);
+
                 var theme = BackendRegistry.Resolve().Theme;
                 observed.ScrollBarSize = theme.ScrollBarSize;
                 observed.RowHeight = theme.RowHeight;
@@ -306,6 +318,12 @@ public sealed class Win32NativePromotionTests
     }
 
     /// <summary>The window text of a control's peer, read back out of the OS.</summary>
+    /// <summary>The client size of the native window behind a control, or empty when it has none.</summary>
+    private static Size ClientSizeOf(Control control)
+        => control.Peer is Win32ControlPeer peer && peer.Handle != 0 && NativeMethods.GetClientRect(peer.Handle, out var rect)
+            ? new Size(rect.right - rect.left, rect.bottom - rect.top)
+            : Size.Empty;
+
     private static string? WindowTextOf(Control control)
     {
         if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
@@ -491,6 +509,26 @@ public sealed class Win32NativePromotionTests
     /// PRD §8: MSAA names a window it knows nothing else about by its window text, and our canvas class
     /// has none — so an owner-drawn control is announced as a bare pane until the toolkit supplies one.
     /// </summary>
+    /// <summary>
+    /// A promoted scroll bar has to occupy the rectangle the control was given. A stand-alone
+    /// <c>SCROLLBAR</c> is the one promotion whose window can silently collapse along its cross axis —
+    /// the alignment style bits decide whether the control honours the rectangle or substitutes the
+    /// system metric — and a collapsed one photographs as a hairline, which reads as "the scroll bar did
+    /// not paint" and sends the next reader into the paint path instead of the geometry.
+    /// </summary>
+    [TestCase("HScrollBar")]
+    [TestCase("VScrollBar")]
+    public void A_promoted_scroll_bar_fills_the_rectangle_it_was_given(string name)
+    {
+        var observed = Result();
+        var (measured, asked) = name == "HScrollBar"
+            ? (observed.HScrollClient, new Size(200, 16))
+            : (observed.VScrollClient, new Size(16, 180));
+
+        Assert.That(measured, Is.Not.EqualTo(Size.Empty), "the promotion produced no window to measure");
+        Assert.That(measured, Is.EqualTo(asked));
+    }
+
     /// <summary>
     /// A theme metric read through the wrong <c>GetSystemMetrics</c> index does not fail — it returns
     /// another metric, and the only sign is that everything sized by it is wrong. <c>SM_CXVSCROLL</c> was
