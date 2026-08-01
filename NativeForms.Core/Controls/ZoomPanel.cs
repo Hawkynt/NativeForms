@@ -221,13 +221,20 @@ public class ZoomPanel : OwnerDrawnControl
 
         // The content, scaled and panned. Origin is the view-space position of content (0,0).
         var origin = new PointF(view.X + (float)_offX, view.Y + (float)_offY);
-        if (this.Image is { } image && _contentSize.Width > 0 && _contentSize.Height > 0)
+        // CurrentFrameOf resolves an animated image to the frame due now and returns a still one
+        // unchanged, which is what every other control that draws an image does. Handing the animated
+        // wrapper itself to DrawImage draws nothing at all: the panel sized itself to the picture,
+        // reported a sensible zoom, and stayed blank.
+        if (this.Image is { } image
+            && this.CurrentFrameOf(image) is { } frame
+            && _contentSize.Width > 0
+            && _contentSize.Height > 0)
         {
             var dst = new Rectangle(
                 (int)Math.Round(origin.X), (int)Math.Round(origin.Y),
                 Math.Max(1, (int)Math.Round(_contentSize.Width * _zoom)),
                 Math.Max(1, (int)Math.Round(_contentSize.Height * _zoom)));
-            g.DrawImage(image, dst);
+            g.DrawImage(frame, dst);
         }
 
         if (this.GridSize > 0)

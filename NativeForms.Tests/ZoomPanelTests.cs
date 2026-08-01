@@ -1,3 +1,4 @@
+using Hawkynt.NativeForms.Drawing;
 using System.Drawing;
 using Hawkynt.NativeForms.Tests.Fakes;
 
@@ -199,6 +200,36 @@ internal sealed class ZoomPanelTests
                     Is.GreaterThanOrEqualTo(stacked[i - 1].Bottom),
                     "no digit box overlaps the one above it, so a stacked number reads as itself");
         });
+    }
+
+    /// <summary>
+    /// An animated image has to be resolved to the frame due now, the way every other control that
+    /// draws one does. Handed the animated wrapper itself, the drawing layer draws nothing — so the
+    /// panel sized itself to the picture, reported a sensible zoom, and showed an empty box.
+    /// </summary>
+    [Test]
+    public void An_animated_image_is_drawn_as_its_current_frame()
+    {
+        var panel = Create(out _, out var canvas);
+        panel.Image = new AnimatedImage(
+            new DecodedImage(100, 100, [new ImageFrame(new int[100 * 100], 100), new ImageFrame(new int[100 * 100], 100)], 0));
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.DrawnImages, Has.None.InstanceOf<AnimatedImage>(),
+            "the frame reaches the drawing layer, not the wrapper around it, which draws nothing");
+        Assert.That(g.DrawnImages, Is.Not.Empty);
+    }
+
+    [Test]
+    public void A_single_frame_image_is_still_drawn_unchanged()
+    {
+        var panel = Create(out var backend, out var canvas);
+        panel.Image = backend.CreateImage(100, 100, new int[100 * 100]);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Exists(o => o.StartsWith("image")), Is.True);
     }
 
     private static Rectangle FirstImageRect(HeadlessCanvasPeer canvas)

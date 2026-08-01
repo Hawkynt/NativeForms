@@ -1196,6 +1196,13 @@ internal sealed class RecordingGraphics : IGraphics
     /// <summary>Every draw call the control issued, clipped or not — the record of intent.</summary>
     public List<string> Operations { get; } = [];
 
+    /// <summary>Every image handed to <see cref="DrawImage"/>, so a test can see which one it was.</summary>
+    /// <remarks>
+    /// The operation log records only a size, and an animated image is the same size as its frames —
+    /// so nothing in it can tell a drawable frame from the wrapper around one.
+    /// </remarks>
+    public List<IImage> DrawnImages { get; } = [];
+
     /// <summary>Only the draws that survive the current clip region, in order.</summary>
     public List<string> ClippedOperations { get; } = [];
 
@@ -1275,7 +1282,10 @@ internal sealed class RecordingGraphics : IGraphics
     internal static Size Measure(string text) => new((text?.Length ?? 0) * _CharWidth, _LineHeight);
 
     public void DrawImage(IImage image, Rectangle bounds)
-        => this.Record($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
+    {
+        this.DrawnImages.Add(image);
+        this.Record($"image {image.Width}x{image.Height} @{bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}", bounds);
+    }
 
     public void PushClip(Rectangle bounds)
     {
