@@ -15,6 +15,12 @@ public enum MouseButtons
 
     /// <summary>The middle button.</summary>
     Middle = 4,
+
+    /// <summary>The first side button, which desktops conventionally map to "back".</summary>
+    XButton1 = 8,
+
+    /// <summary>The second side button, conventionally "forward".</summary>
+    XButton2 = 16,
 }
 
 /// <summary>Keyboard modifier flags.</summary>

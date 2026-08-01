@@ -41,6 +41,15 @@ internal static unsafe partial class NativeMethods
     /// <summary>Middle mouse button released.</summary>
     internal const uint WM_MBUTTONUP = 0x0208;
 
+    /// <summary>A side button pressed. Which one is in the high word of wParam, not the message.</summary>
+    internal const uint WM_XBUTTONDOWN = 0x020B;
+
+    /// <summary>A side button released.</summary>
+    internal const uint WM_XBUTTONUP = 0x020C;
+
+    /// <summary>wParam high word for the first side button.</summary>
+    internal const uint XBUTTON1 = 0x0001;
+
     /// <summary>The pointer moved over the client area.</summary>
     internal const uint WM_MOUSEMOVE = 0x0200;
 

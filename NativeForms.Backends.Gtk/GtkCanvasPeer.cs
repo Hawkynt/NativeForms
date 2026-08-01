@@ -295,12 +295,19 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 
     // --- Mapping helpers ------------------------------------------------------------------------
 
-    /// <summary>Maps a GDK button number (1/2/3) to a <see cref="MouseButtons"/> value.</summary>
-    private static MouseButtons ToButton(uint button) => button switch
+    /// <summary>Maps a GDK button number to a <see cref="MouseButtons"/> value.</summary>
+    /// <remarks>
+    /// GDK numbers the side buttons 8 and 9, straight after the scroll axes that used to be buttons
+    /// 4 through 7. A mouse that has them sends nothing else, so leaving them unmapped is what made
+    /// the thumb buttons do nothing at all.
+    /// </remarks>
+    internal static MouseButtons ToButton(uint button) => button switch
     {
         1 => MouseButtons.Left,
         2 => MouseButtons.Middle,
         3 => MouseButtons.Right,
+        8 => MouseButtons.XButton1,
+        9 => MouseButtons.XButton2,
         _ => MouseButtons.None,
     };
 

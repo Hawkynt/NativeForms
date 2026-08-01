@@ -184,6 +184,13 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer, ICocoaFocusTarget
         Add(created, "mouseEntered:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
         Add(created, "mouseExited:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseExited);
         Add(created, "rightMouseDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnRightMouseDown);
+
+        // Everything that is neither the left nor the right button — the wheel pressed, and the two
+        // side buttons a mouse puts under the thumb — arrives through this one pair and says which it
+        // was in buttonNumber. Without them AppKit had no way to report any of the three.
+        Add(created, "otherMouseDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnOtherMouseDown);
+        Add(created, "otherMouseUp:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnOtherMouseUp);
+        Add(created, "otherMouseDragged:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMouseMoved);
         Add(created, "scrollWheel:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnScrollWheel);
         Add(created, "keyDown:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyDownEvent);
         Add(created, "keyUp:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&KeyUpEvent);
@@ -275,6 +282,37 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer, ICocoaFocusTarget
         var at = LocationOf(self, theEvent);
         canvas.MouseUp?.Invoke(canvas, new(MouseButtons.Left, at.X, at.Y, 0, ModifiersOf(theEvent)));
     }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnOtherMouseDown(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        canvas.MouseDown?.Invoke(canvas, new(OtherButtonOf(theEvent), at.X, at.Y, 0, ModifiersOf(theEvent)));
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static void OnOtherMouseUp(nint self, nint selector, nint theEvent)
+    {
+        if (CanvasOf(self) is not { } canvas)
+            return;
+
+        var at = LocationOf(self, theEvent);
+        canvas.MouseUp?.Invoke(canvas, new(OtherButtonOf(theEvent), at.X, at.Y, 0, ModifiersOf(theEvent)));
+    }
+
+    /// <summary>Which button an otherMouse* event is about: AppKit numbers them from zero.</summary>
+    /// <remarks>0 and 1 are the left and right buttons, which have selectors of their own.</remarks>
+    private static MouseButtons OtherButtonOf(nint theEvent)
+        => CocoaRuntime.SendInteger(theEvent, CocoaRuntime.sel_registerName("buttonNumber")) switch
+        {
+            2 => MouseButtons.Middle,
+            3 => MouseButtons.XButton1,
+            4 => MouseButtons.XButton2,
+            _ => MouseButtons.None,
+        };
 
     [System.Runtime.InteropServices.UnmanagedCallersOnly]
     private static void OnMouseMoved(nint self, nint selector, nint theEvent)

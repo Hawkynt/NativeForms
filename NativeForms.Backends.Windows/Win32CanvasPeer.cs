@@ -388,6 +388,10 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
     private void RaiseMouse(EventHandler<MouseEventArgs>? handler, MouseButtons button, nint lParam)
         => handler?.Invoke(this, new MouseEventArgs(button, LoWord(lParam), HiWord(lParam), 0, CurrentModifiers()));
 
+    /// <summary>Which side button a WM_XBUTTON* message is about, from wParam's high word.</summary>
+    internal static MouseButtons XButton(nint wParam)
+        => ((wParam >> 16) & 0xFFFF) == NativeMethods.XBUTTON1 ? MouseButtons.XButton1 : MouseButtons.XButton2;
+
     /// <summary>Raises <see cref="MouseMove"/> and (re)arms leave tracking for the surface.</summary>
     private void OnMouseMoveMessage(nint lParam)
     {
@@ -567,6 +571,18 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer
                     NativeMethods.ReleaseCapture();
                     peer.RaiseMouse(peer.MouseUp, MouseButtons.Middle, lParam);
                     return 0;
+
+                // Both side buttons share one message pair and say which they are in wParam's high
+                // word. Windows also wants a non-zero reply to say the message was handled.
+                case NativeMethods.WM_XBUTTONDOWN:
+                    NativeMethods.SetCapture(hwnd);
+                    peer.RaiseMouse(peer.MouseDown, XButton(wParam), lParam);
+                    return 1;
+
+                case NativeMethods.WM_XBUTTONUP:
+                    NativeMethods.ReleaseCapture();
+                    peer.RaiseMouse(peer.MouseUp, XButton(wParam), lParam);
+                    return 1;
 
                 case NativeMethods.WM_MOUSEMOVE:
                     peer.OnMouseMoveMessage(lParam);
