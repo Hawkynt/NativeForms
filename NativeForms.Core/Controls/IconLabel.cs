@@ -194,4 +194,39 @@ public class IconLabel : OwnerDrawnControl
         base.OnRealized(peer);
         this.ApplyAutoSize();
     }
+
+    /// <summary>Where the button went down, so a release can tell a click from the end of a drag.</summary>
+    private Point _pressedAt = new(-1, -1);
+
+    /// <inheritdoc/>
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left)
+            _pressedAt = e.Location;
+    }
+
+    /// <summary>
+    /// Raises <see cref="Control.Click"/> for a press and release inside the label.
+    /// </summary>
+    /// <remarks>
+    /// An owner-drawn control raises Click only if it says so, and this one never did — so a label
+    /// with a handler attached was inert, and an application using one as a row, a link or a
+    /// disclosure triangle got a picture of a control rather than a control. Every other toolkit's
+    /// label clicks; the ones here now do too.
+    /// </remarks>
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        var pressed = _pressedAt;
+        _pressedAt = new Point(-1, -1);
+        base.OnMouseUp(e);
+
+        if (e.Button != MouseButtons.Left || pressed.X < 0)
+            return;
+
+        // Released where it went down, and still over the label: that is a click and not a drag that
+        // happened to end here.
+        if (new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
+            this.OnClick(EventArgs.Empty);
+    }
 }
