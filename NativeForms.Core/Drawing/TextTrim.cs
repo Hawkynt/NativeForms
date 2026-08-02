@@ -74,6 +74,7 @@ internal static class TextTrim
         internal string? Text;
         internal int Width;
         internal Font Font;
+        internal bool Middle;
         internal string Result;
     }
 
@@ -83,6 +84,23 @@ internal static class TextTrim
     /// even the ellipsis fits.
     /// </summary>
     internal static string ToWidth(IGraphics g, string text, Font font, int maxWidth)
+        => Trim(g, text, font, maxWidth, middle: false);
+
+    /// <summary>
+    /// As <see cref="ToWidth"/>, but drops the middle and keeps both ends.
+    /// </summary>
+    /// <remarks>
+    /// For a name whose distinguishing part is at the end, a trailing ellipsis is no better than the
+    /// clipping it replaces: a column of volumes called "ArchinstallVolumeGroup-root",
+    /// "…-home" and "…-swap" cuts to the same "Archinstall…" three times over, and the reader is left
+    /// picking between three identical rows. Keeping both ends spends the same width on the half of
+    /// the string that actually differs. Use it for names and paths; a sentence still reads better
+    /// trimmed from the end.
+    /// </remarks>
+    internal static string ToWidthMiddle(IGraphics g, string text, Font font, int maxWidth)
+        => Trim(g, text, font, maxWidth, middle: true);
+
+    private static string Trim(IGraphics g, string text, Font font, int maxWidth, bool middle)
     {
         if (string.IsNullOrEmpty(text) || maxWidth <= 0)
             return string.Empty;
@@ -94,27 +112,28 @@ internal static class TextTrim
 
         var cache = _cache;
         var mask = cache.Length - 1;
-        for (var slot = Slot(text, maxWidth) & mask; ; slot = (slot + 1) & mask)
+        for (var slot = Slot(text, maxWidth, middle) & mask; ; slot = (slot + 1) & mask)
         {
             ref var memo = ref cache[slot];
             if (memo.Text is null)
                 break; // the probe run ended without the key, so it is not in the table
 
-            if (memo.Width == maxWidth && memo.Font == font && memo.Text == text)
+            if (memo.Width == maxWidth && memo.Font == font && memo.Middle == middle && memo.Text == text)
                 return memo.Result;
         }
 
-        var trimmed = Shorten(g, text, font, maxWidth);
-        Remember(text, font, maxWidth, trimmed);
+        var trimmed = Shorten(g, text, font, maxWidth, middle);
+        Remember(text, font, maxWidth, middle, trimmed);
         return trimmed;
     }
 
     /// <summary>The slot a key starts probing from; masked by the caller, which knows the size.</summary>
-    private static int Slot(string text, int maxWidth) => text.GetHashCode() ^ (maxWidth * 397);
+    private static int Slot(string text, int maxWidth, bool middle)
+        => text.GetHashCode() ^ (maxWidth * 397) ^ (middle ? 0x5F5F : 0);
 
     /// <summary>Files a freshly shortened result, growing or emptying the table first if it is full
     /// enough that probe runs would get long.</summary>
-    private static void Remember(string text, Font font, int maxWidth, string trimmed)
+    private static void Remember(string text, Font font, int maxWidth, bool middle, string trimmed)
     {
         if ((_live + 1) * 2 > _cache.Length)
         {
@@ -123,7 +142,7 @@ internal static class TextTrim
                 var grown = new Memo[_cache.Length * 2];
                 foreach (var entry in _cache)
                     if (entry.Text is not null)
-                        Place(grown, entry.Text, entry.Font, entry.Width, entry.Result);
+                        Place(grown, entry.Text, entry.Font, entry.Width, entry.Middle, entry.Result);
 
                 _cache = grown;
             }
@@ -135,27 +154,28 @@ internal static class TextTrim
             }
         }
 
-        Place(_cache, text, font, maxWidth, trimmed);
+        Place(_cache, text, font, maxWidth, middle, trimmed);
         ++_live;
     }
 
     /// <summary>Writes an entry into the first free slot of its probe run.</summary>
-    private static void Place(Memo[] cache, string text, Font font, int maxWidth, string trimmed)
+    private static void Place(Memo[] cache, string text, Font font, int maxWidth, bool middle, string trimmed)
     {
         var mask = cache.Length - 1;
-        var slot = Slot(text, maxWidth) & mask;
+        var slot = Slot(text, maxWidth, middle) & mask;
         while (cache[slot].Text is not null)
             slot = (slot + 1) & mask;
 
         ref var memo = ref cache[slot];
         memo.Width = maxWidth;
         memo.Font = font;
+        memo.Middle = middle;
         memo.Result = trimmed;
         memo.Text = text; // last: the key is what admits the entry, so publish it once it is whole
     }
 
     /// <summary>Does the actual search. Only ever reached on a memo miss.</summary>
-    private static string Shorten(IGraphics g, string text, Font font, int maxWidth)
+    private static string Shorten(IGraphics g, string text, Font font, int maxWidth, bool middle)
     {
         if (g.MeasureText(Ellipsis, font).Width > maxWidth)
             return string.Empty;
@@ -173,22 +193,36 @@ internal static class TextTrim
         }
 
         // Binary search for the most clusters that still fit with the ellipsis. `low` is the largest
-        // count known to fit (0 = ellipsis alone), `high` the smallest known not to.
+        // count known to fit (0 = ellipsis alone), `high` the smallest known not to. Keeping more
+        // clusters never makes the string narrower, either end of it, so the predicate is monotone
+        // and the search is sound for both shapes.
         var low = 0;
         var high = count; // the whole string does not fit, established above
         while (high - low > 1)
         {
             var mid = low + ((high - low) / 2);
-            if (Fits(g, text, font, boundaries[mid - 1], maxWidth))
+            if (g.MeasureText(Keep(text, boundaries, count, mid, middle), font).Width <= maxWidth)
                 low = mid;
             else
                 high = mid;
         }
 
-        return low == 0 ? Ellipsis : string.Concat(text.AsSpan(0, boundaries[low - 1]), Ellipsis);
+        return low == 0 ? Ellipsis : Keep(text, boundaries, count, low, middle);
     }
 
-    /// <summary>Whether the first <paramref name="length"/> chars plus an ellipsis fit.</summary>
-    private static bool Fits(IGraphics g, string text, Font font, int length, int maxWidth)
-        => g.MeasureText(string.Concat(text.AsSpan(0, length), Ellipsis), font).Width <= maxWidth;
+    /// <summary>
+    /// The candidate made of <paramref name="keep"/> whole clusters and the ellipsis — taken from the
+    /// front, or split between the two ends when <paramref name="middle"/> is set.
+    /// </summary>
+    private static string Keep(string text, ReadOnlySpan<int> boundaries, int count, int keep, bool middle)
+    {
+        if (!middle)
+            return string.Concat(text.AsSpan(0, boundaries[keep - 1]), Ellipsis);
+
+        // The odd cluster goes to the front, where a name's stem is.
+        var head = (keep + 1) / 2;
+        var tail = keep - head;
+        var tailStart = tail == 0 ? text.Length : boundaries[count - tail - 1];
+        return string.Concat(text.AsSpan(0, boundaries[head - 1]), Ellipsis, text.AsSpan(tailStart));
+    }
 }

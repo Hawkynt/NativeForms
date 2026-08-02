@@ -231,4 +231,89 @@ internal sealed class TextTrimTests
             Assert.That(char.IsHighSurrogate(trimmed[^2]), Is.False, "cut between the surrogates");
         });
     }
+
+    private static string TrimMiddle(string text, int maxWidth)
+        => TextTrim.ToWidthMiddle(new ShapingGraphics(), text, TestFont, maxWidth);
+
+    /// <summary>
+    /// The reason middle elision exists: names that share a long stem stay tellable apart, where
+    /// trimming from the end collapses them all onto the stem.
+    /// </summary>
+    [Test]
+    public void Names_sharing_a_stem_stay_distinct_when_the_middle_goes()
+    {
+        string[] volumes = ["ArchinstallVolumeGroup-root", "ArchinstallVolumeGroup-home", "ArchinstallVolumeGroup-swap"];
+        var width = 14 * Narrow;
+
+        var middle = volumes.Select(v => TrimMiddle(v, width)).ToArray();
+        var trailing = volumes.Select(v => Trim(v, width)).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(middle, Is.Unique);
+            Assert.That(trailing, Is.Not.Unique, "the trailing form is what this replaces");
+            foreach (var name in middle)
+                Assert.That(ShapingGraphics.Width(name), Is.LessThanOrEqualTo(width));
+        });
+    }
+
+    [Test]
+    public void The_middle_form_keeps_both_ends_and_marks_the_gap()
+    {
+        var trimmed = TrimMiddle("abcdefghijklmnop", 8 * Narrow);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(trimmed, Does.StartWith("a"));
+            Assert.That(trimmed, Does.EndWith("p"));
+            Assert.That(trimmed, Does.Contain(TextTrim.Ellipsis));
+            Assert.That(ShapingGraphics.Width(trimmed), Is.LessThanOrEqualTo(8 * Narrow));
+        });
+    }
+
+    /// <summary>A name that fits is returned whole — the same instance, so a repaint allocates nothing.</summary>
+    [Test]
+    public void The_middle_form_leaves_a_fitting_label_alone()
+    {
+        const string Name = "sda1";
+        Assert.That(TrimMiddle(Name, 40 * Narrow), Is.SameAs(Name));
+    }
+
+    /// <summary>Cutting from the middle must not split a glyph either.</summary>
+    [Test]
+    public void The_middle_form_cuts_between_glyphs()
+    {
+        var name = string.Concat(Enumerable.Repeat("🎉a", 30));
+
+        var trimmed = TrimMiddle(name, (6 * Wide) + (6 * Narrow));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ShapingGraphics.Width(trimmed), Is.LessThanOrEqualTo((6 * Wide) + (6 * Narrow)));
+            Assert.That(trimmed.EnumerateRunes().Any(r => r.Value == 0xFFFD), Is.False, "no orphaned surrogate");
+            Assert.That(Clusters(trimmed), Has.All.Not.EqualTo("\uD83C"), "no half emoji");
+        });
+    }
+
+    /// <summary>
+    /// The two forms of the same name at the same width are different answers, so the memo must not
+    /// serve one for the other.
+    /// </summary>
+    [Test]
+    public void The_memo_keeps_the_two_forms_apart()
+    {
+        const string Name = "ArchinstallVolumeGroup-home";
+        var width = 12 * Narrow;
+
+        // Whichever order they are asked in, and asked twice so both come from the memo the second time.
+        var trailingFirst = Trim(Name, width);
+        var middleAfter = TrimMiddle(Name, width);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(middleAfter, Is.Not.EqualTo(trailingFirst));
+            Assert.That(Trim(Name, width), Is.EqualTo(trailingFirst));
+            Assert.That(TrimMiddle(Name, width), Is.EqualTo(middleAfter));
+        });
+    }
 }

@@ -252,7 +252,7 @@ public class ProgressTile : OwnerDrawnControl
         var y = content.Y;
         if (y < content.Bottom)
             g.DrawText(
-                this.Text,
+                TextTrim.ToWidthMiddle(g, this.Text, font, content.Width),
                 font,
                 textColor,
                 new Rectangle(content.X, y, content.Width, Math.Min(lineHeight, content.Bottom - y)),
@@ -266,8 +266,9 @@ public class ProgressTile : OwnerDrawnControl
             y = bar.Bottom + _BarGap;
 
             if (this.SecondaryText.Length > 0 && y + lineHeight <= content.Bottom)
+                // A phrase rather than a name — "45.2 GB free of 128 GB" — so it trims from the end.
                 g.DrawText(
-                    this.SecondaryText,
+                    TextTrim.ToWidth(g, this.SecondaryText, font, content.Width),
                     font,
                     this.Enabled ? (this.Selected ? theme.SelectionText : theme.DisabledText) : theme.DisabledText,
                     new Rectangle(content.X, y, content.Width, lineHeight),
@@ -302,7 +303,12 @@ public class ProgressTile : OwnerDrawnControl
         var blockHeight = lineHeight + _BarGap + _BarHeight;
         var blockTop = content.Y + Math.Max(0, (content.Height - blockHeight) / 2);
 
-        g.DrawText(this.Text, font, textColor, new Rectangle(rightX, blockTop, rightW, lineHeight), ContentAlignment.TopLeft);
+        // Elided from the middle, not the end. A tile's caption is a name — a volume, a device, a
+        // path — and a column of them is read by telling one from another. Clipping alone gave five
+        // sidebar entries reading "ArchinstallV", and a trailing ellipsis would only have made the
+        // same cut visible; what separates those names is their far end.
+        var caption = TextTrim.ToWidthMiddle(g, this.Text, font, rightW);
+        g.DrawText(caption, font, textColor, new Rectangle(rightX, blockTop, rightW, lineHeight), ContentAlignment.TopLeft);
         GlyphRenderer.DrawProgressBar(g, theme, new Rectangle(rightX, blockTop + lineHeight + _BarGap, rightW, _BarHeight), _value, 0, _maximum, this.IsWarning ? this.WarningColor : theme.Accent);
 
         g.PopClip();

@@ -270,7 +270,7 @@ public class Breadcrumb : OwnerDrawnControl
         if (this.Items.Count == 0)
             return;
 
-        var font = theme.DefaultFont;
+        var font = this.Font;
         var first = this.FirstVisible(g, font, out var overflow);
         var x = 0;
 
@@ -313,7 +313,7 @@ public class Breadcrumb : OwnerDrawnControl
         }
 
         var color = hot ? theme.Accent : theme.ControlText;
-        g.DrawText(item.Text, theme.DefaultFont, color, new Rectangle(textLeft, rect.Y, Math.Max(0, rect.Right - _Padding - textLeft), rect.Height), ContentAlignment.MiddleLeft);
+        g.DrawText(item.Text, this.Font, color, new Rectangle(textLeft, rect.Y, Math.Max(0, rect.Right - _Padding - textLeft), rect.Height), ContentAlignment.MiddleLeft);
         _zones.Add((rect.X, rect.Right, index));
     }
 
@@ -725,7 +725,7 @@ public class Breadcrumb : OwnerDrawnControl
                 GlyphRenderer.FillSelection(g, theme, rowRect);
 
             var text = new Rectangle(rowRect.X + _Padding, rowRect.Y, rowRect.Width - (2 * _Padding), rowRect.Height);
-            g.DrawText(_suggestions[i], theme.DefaultFont, hovered ? theme.SelectionText : theme.ControlText, text, ContentAlignment.MiddleLeft);
+            g.DrawText(_suggestions[i], this.Font, hovered ? theme.SelectionText : theme.ControlText, text, ContentAlignment.MiddleLeft);
         }
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, _suggestSize.Width - 1, _suggestSize.Height - 1));

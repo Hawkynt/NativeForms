@@ -406,4 +406,41 @@ internal sealed class BreadcrumbTests
 
         Assert.That(crumb.EditorText, Is.EqualTo("Home/Docs/Sub"));
     }
+
+    /// <summary>
+    /// The path bar draws with the font it inherits, like the toolbar it sits in and the list below it.
+    /// </summary>
+    /// <remarks>
+    /// It took the theme's default instead, so the one strip of text a file browser puts across the
+    /// top of its window was the one strip that came out a different size from everything around it.
+    /// </remarks>
+    [Test]
+    public void The_path_draws_with_the_font_it_inherits()
+    {
+        var crumb = ThreeSegments();
+        var wanted = new Hawkynt.NativeForms.Drawing.Font("Sans", 21f);
+        crumb.Font = wanted;
+
+        var g = Realize(crumb, out _).RaisePaint();
+
+        Assert.That(g.TextDraws, Is.Not.Empty, "the path drew something");
+        Assert.That(
+            g.TextDraws.Select(d => d.Font.SizeInPoints),
+            Has.All.EqualTo(wanted.SizeInPoints),
+            "every segment uses the inherited font");
+    }
+
+    [Test]
+    public void A_path_with_no_font_of_its_own_follows_the_form()
+    {
+        var crumb = ThreeSegments();
+        var backend = new HeadlessBackend();
+        var form = new Form { Font = new Hawkynt.NativeForms.Drawing.Font("Sans", 17f) };
+        form.Controls.Add(crumb);
+        Application.Run(form, backend);
+
+        var g = ((HeadlessCanvasPeer)crumb.Peer!).RaisePaint();
+
+        Assert.That(g.TextDraws.Select(d => d.Font.SizeInPoints), Has.All.EqualTo(17f));
+    }
 }

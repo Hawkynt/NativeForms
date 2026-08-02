@@ -337,4 +337,50 @@ internal sealed class ProgressTileTests
             Assert.That(g.StayedInBounds, Is.True, "an icon-height clip no longer swallows the bar");
         });
     }
+
+    // --- Captions too long for the tile ------------------------------------------------------------
+
+    /// <summary>The caption drawn by a tile, whatever it ended up being.</summary>
+    private static string CaptionOf(RecordingGraphics g)
+    {
+        var op = g.Operations.First(o => o.StartsWith("text"));
+        var open = op.IndexOf('"') + 1;
+        return op[open..op.LastIndexOf('"')];
+    }
+
+    /// <summary>
+    /// A sidebar of LVM volumes is the case this exists for: every name opens with the same twenty
+    /// characters, so a caption cut at the tile's edge gives a column of identical rows.
+    /// </summary>
+    [TestCase(true)]
+    [TestCase(false)]
+    public void A_caption_too_long_for_the_tile_loses_its_middle(bool compact)
+    {
+        var tile = new ProgressTile
+        {
+            Text = "ArchinstallVolumeGroup-home",
+            Bounds = new(0, 0, 120, 48),
+            Maximum = 100,
+            Value = 50,
+            Compact = compact,
+        };
+
+        var caption = CaptionOf(Realize(tile, out _).RaisePaint());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(caption, Does.Contain(Hawkynt.NativeForms.Drawing.TextTrim.Ellipsis));
+            Assert.That(caption, Does.StartWith("A"), "the stem survives");
+            Assert.That(caption, Does.EndWith("home"), "and so does the part that tells it from the others");
+            Assert.That(caption.Length * 7, Is.LessThanOrEqualTo(120), "it fits the tile it was drawn in");
+        });
+    }
+
+    [Test]
+    public void A_caption_that_fits_is_left_alone()
+    {
+        var tile = new ProgressTile { Text = "sda1", Bounds = new(0, 0, 240, 48), Maximum = 100, Value = 50 };
+
+        Assert.That(CaptionOf(Realize(tile, out _).RaisePaint()), Is.EqualTo("sda1"));
+    }
 }
