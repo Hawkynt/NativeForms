@@ -2237,7 +2237,7 @@ public class DataGridView : OwnerDrawnControl
                 g.FillRectangle(this.AlternatingRowColor, new Rectangle(0, y, width, rowHeight));
 
             if (this.MergedTextOf(item) is { } mergedText)
-                g.DrawText(mergedText, theme.DefaultFont, theme.ControlText,
+                g.DrawText(mergedText, this.Font, theme.ControlText,
                     new Rectangle(contentLeft + _CellPadding, y, Math.Max(0, width - contentLeft - _CellPadding), rowHeight), ContentAlignment.MiddleLeft);
             else if (frozenWidth == 0)
                 this.PaintRowCells(g, theme, item, modelIndex, y, rowHeight, selected, frozen: false);
@@ -2311,7 +2311,8 @@ public class DataGridView : OwnerDrawnControl
                     column.Alignment,
                     _CellPadding,
                     separator: false,
-                    trailingReserve: filterReserve + sortReserve);
+                    trailingReserve: filterReserve + sortReserve,
+                    font: this.Font);
 
                 if (sorted)
                     GlyphRenderer.DrawSortArrow(
@@ -2481,10 +2482,10 @@ public class DataGridView : OwnerDrawnControl
                 // Shortened before it is measured, because the rule below it is placed from that
                 // measurement: an address too long for its column drew a clipped link with an underline
                 // running on past it and under the column beside it.
-                text = TextTrim.ToWidth(g, text, theme.DefaultFont, textRect.Width);
-                g.DrawText(text, theme.DefaultFont, linkColor, textRect, alignment);
+                text = TextTrim.ToWidth(g, text, this.Font, textRect.Width);
+                g.DrawText(text, this.Font, linkColor, textRect, alignment);
 
-                var size = g.MeasureText(text, theme.DefaultFont);
+                var size = g.MeasureText(text, this.Font);
                 var left = textRect.X;
                 if (alignment is ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter)
                     left = textRect.X + ((textRect.Width - size.Width) / 2);
@@ -2545,8 +2546,8 @@ public class DataGridView : OwnerDrawnControl
                 // The rectangle already has the arrow zone taken out of it, so a value wider than what
                 // is left ran under the arrow and out of the cell rather than stopping at either.
                 g.DrawText(
-                    TextTrim.ToWidth(g, this.GetDisplayText(column, item, modelIndex), theme.DefaultFont, textRect.Width),
-                    theme.DefaultFont,
+                    TextTrim.ToWidth(g, this.GetDisplayText(column, item, modelIndex), this.Font, textRect.Width),
+                    this.Font,
                     foreColor,
                     textRect,
                     alignment);
@@ -2570,7 +2571,7 @@ public class DataGridView : OwnerDrawnControl
                 if (icon is null)
                 {
                     var plain = new Rectangle(cellRect.X + _CellPadding, cellRect.Y, Math.Max(0, cellRect.Width - (2 * _CellPadding)), cellRect.Height);
-                    g.DrawText(TextTrim.ToWidth(g, text, theme.DefaultFont, plain.Width), theme.DefaultFont, foreColor, plain, alignment);
+                    g.DrawText(TextTrim.ToWidth(g, text, this.Font, plain.Width), this.Font, foreColor, plain, alignment);
                     break;
                 }
 
@@ -2581,7 +2582,7 @@ public class DataGridView : OwnerDrawnControl
                 ContentLayout.Arrange(
                     content,
                     box,
-                    text.Length == 0 ? Size.Empty : g.MeasureText(text, theme.DefaultFont),
+                    text.Length == 0 ? Size.Empty : g.MeasureText(text, this.Font),
                     column.TextImageRelation,
                     alignment,
                     out var imageRect,
@@ -2609,7 +2610,7 @@ public class DataGridView : OwnerDrawnControl
                         _ => (textRect, ContentAlignment.MiddleLeft),
                     };
 
-                    g.DrawText(TextTrim.ToWidth(g, text, theme.DefaultFont, band.Width), theme.DefaultFont, foreColor, band, bandAlignment);
+                    g.DrawText(TextTrim.ToWidth(g, text, this.Font, band.Width), this.Font, foreColor, band, bandAlignment);
                 }
 
                 break;
@@ -2712,7 +2713,7 @@ public class DataGridView : OwnerDrawnControl
             if (column.AutoSizeMode != DataGridViewAutoSizeColumnMode.AllCells)
                 continue;
 
-            var font = this.Theme.DefaultFont;
+            var font = this.Font;
             var widest = 0;
             var count = this.RowSourceCount;
             var height = this.Height;

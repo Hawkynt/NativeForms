@@ -164,12 +164,15 @@ internal static class GlyphRenderer
         ContentAlignment alignment,
         int textPadding,
         bool separator,
-        int trailingReserve = 0)
+        int trailingReserve = 0,
+        Font? font = null)
     {
         g.FillRectangle(theme.HeaderBackground, bounds);
         g.PushClip(bounds);
         var textRect = new Rectangle(bounds.X + textPadding, bounds.Y, Math.Max(0, bounds.Width - (2 * textPadding) - trailingReserve), bounds.Height);
-        g.DrawText(text, theme.DefaultFont, theme.HeaderText, textRect, alignment);
+        // A caller that has a font of its own passes it, so a header follows the application's font
+        // the way the cells under it do; the rest keep the theme's.
+        g.DrawText(text, font ?? theme.DefaultFont, theme.HeaderText, textRect, alignment);
         g.PopClip();
 
         if (separator)

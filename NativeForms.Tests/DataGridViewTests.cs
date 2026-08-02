@@ -1,3 +1,4 @@
+using Hawkynt.NativeForms.Drawing;
 using Hawkynt.NativeForms;
 using Hawkynt.NativeForms.Tests.Fakes;
 
@@ -152,5 +153,46 @@ internal sealed class DataGridViewTests
         // 2 header cells + at most (VisibleRowCount + 1) rows * 2 columns — a small bounded number,
         // nowhere near 100000. Proves rows are virtualized rather than all rendered.
         Assert.That(textOps, Is.LessThan(32), $"rendered {textOps} text ops for 100000 rows");
+    }
+
+    /// <summary>
+    /// The grid draws with the font it inherits, like every other text on the form.
+    /// </summary>
+    /// <remarks>
+    /// It used to reach past the ambient font for the theme's default at every one of its ten draw
+    /// and measure sites, so a grid was the one control an application's font setting could not
+    /// reach: a file browser that scaled its menus, its sidebar and its detail panel left the list
+    /// of files sitting at whatever size the theme happened to pick.
+    /// </remarks>
+    [Test]
+    public void The_grid_draws_with_the_font_it_inherits()
+    {
+        var grid = MakeGrid();
+        var wanted = new Font("Sans", 21f);
+        grid.Font = wanted;
+        var canvas = Realize(grid);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.TextDraws, Is.Not.Empty, "the grid drew something");
+        Assert.That(
+            g.TextDraws.Select(d => d.Font.SizeInPoints),
+            Has.All.EqualTo(wanted.SizeInPoints),
+            "every cell and header uses the inherited font");
+    }
+
+    [Test]
+    public void A_grid_with_no_font_of_its_own_follows_the_form()
+    {
+        var grid = MakeGrid();
+        var backend = new HeadlessBackend();
+        var form = new Form { Font = new Font("Sans", 17f) };
+        form.Controls.Add(grid);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.TextDraws.Select(d => d.Font.SizeInPoints), Has.All.EqualTo(17f));
     }
 }
