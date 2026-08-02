@@ -298,4 +298,62 @@ internal sealed class NumericUpDownTests
             Assert.That(editor.Text, Is.EqualTo(9876.5m.ToString("N1")), "the commit re-renders the grouping");
         });
     }
+    // --- Stepping ---------------------------------------------------------------------------------
+
+    /// <summary>
+    /// One press of the spinner is one step, so a double click is two.
+    /// </summary>
+    /// <remarks>
+    /// GTK reports a double click as a third press — press, release, press, 2BUTTON_PRESS, release —
+    /// and that summary used to be indistinguishable from a press of its own, so a double click on an
+    /// arrow moved the value by three and clicking quickly landed nowhere predictable. It now arrives
+    /// labelled and is skipped; an ordinary press is still an ordinary step.
+    /// </remarks>
+    [Test]
+    public void Each_press_of_the_up_arrow_is_exactly_one_step()
+    {
+        var upDown = new NumericUpDown { Bounds = new(0, 0, 120, 24), Minimum = 0, Maximum = 100, Value = 10 };
+        var canvas = CanvasOf(Realize(upDown));
+        var arrow = new Point(upDown.Width - 6, 5); // inside the up half of the spinner
+
+        for (var press = 1; press <= 3; ++press)
+        {
+            canvas.RaiseMouseDown(arrow.X, arrow.Y);
+            canvas.RaiseMouseUp(arrow.X, arrow.Y);
+            Assert.That(upDown.Value, Is.EqualTo(10 + press), $"after {press} press(es)");
+        }
+    }
+
+    [Test]
+    public void Each_press_of_the_down_arrow_is_exactly_one_step()
+    {
+        var upDown = new NumericUpDown { Bounds = new(0, 0, 120, 24), Minimum = 0, Maximum = 100, Value = 10 };
+        var canvas = CanvasOf(Realize(upDown));
+        var arrow = new Point(upDown.Width - 6, upDown.Height - 5);
+
+        canvas.RaiseMouseDown(arrow.X, arrow.Y);
+        canvas.RaiseMouseUp(arrow.X, arrow.Y);
+        canvas.RaiseMouseDown(arrow.X, arrow.Y);
+        canvas.RaiseMouseUp(arrow.X, arrow.Y);
+
+        Assert.That(upDown.Value, Is.EqualTo(8));
+    }
+
+    /// <summary>The platform's echo of a press already counted is not a second step.</summary>
+    [Test]
+    public void The_double_click_echo_does_not_step_again()
+    {
+        var upDown = new NumericUpDown { Bounds = new(0, 0, 120, 24), Minimum = 0, Maximum = 100, Value = 10 };
+        var canvas = CanvasOf(Realize(upDown));
+        var arrow = new Point(upDown.Width - 6, 5);
+
+        // What GTK delivers for one double click: two real presses and the summary of both.
+        canvas.RaiseMouseDown(arrow.X, arrow.Y);
+        canvas.RaiseMouseUp(arrow.X, arrow.Y);
+        canvas.RaiseMouseDown(arrow.X, arrow.Y);
+        canvas.RaiseMouseDownEcho(arrow.X, arrow.Y, clicks: 2);
+        canvas.RaiseMouseUp(arrow.X, arrow.Y);
+
+        Assert.That(upDown.Value, Is.EqualTo(12), "two clicks, two steps");
+    }
 }

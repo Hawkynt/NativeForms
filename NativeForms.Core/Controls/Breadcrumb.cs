@@ -475,7 +475,9 @@ public class Breadcrumb : OwnerDrawnControl
     /// <summary>Leaves the edit field. When <paramref name="commit"/>, the typed path replaces the
     /// segments (through <see cref="PathParser"/>) and <see cref="PathEntered"/> fires; otherwise the
     /// crumbs are restored unchanged.</summary>
-    public void EndEdit(bool commit)
+    public void EndEdit(bool commit) => this.EndEdit(commit, takeFocus: true);
+
+    private void EndEdit(bool commit, bool takeFocus)
     {
         if (!_editing)
             return;
@@ -487,8 +489,28 @@ public class Breadcrumb : OwnerDrawnControl
         if (commit)
             this.CommitPath(text);
 
-        this.Focus();
+        // Not when the edit ended *because* focus went elsewhere: taking it back would pull it off
+        // whatever the user just clicked.
+        if (takeFocus)
+            this.Focus();
+
         this.Invalidate();
+    }
+
+    /// <summary>
+    /// Clicking away from the path field closes it, leaving the crumbs as they were.
+    /// </summary>
+    /// <remarks>
+    /// Only Enter and Escape used to close it, so clicking into the file list left the field open
+    /// behind the click with its text still highlighted — two selections on screen at once, in two
+    /// controls, and no way to tell which one a keystroke would reach. Abandoned rather than
+    /// committed: half a typed path is not a request to go anywhere.
+    /// </remarks>
+    private void OnEditorLostFocus(object? sender, EventArgs e)
+    {
+        // Focus moving into the completion list is focus still inside the field.
+        if (_editing && !_suggestShown)
+            this.EndEdit(commit: false, takeFocus: false);
     }
 
     private TextBox EnsureEditor()
@@ -499,6 +521,7 @@ public class Breadcrumb : OwnerDrawnControl
         _editor = new TextBox { TabStop = false, Visible = false };
         _editor.KeyDown += this.OnEditorKeyDown;
         _editor.TextChanged += this.OnEditorTextChanged;
+        _editor.LostFocus += this.OnEditorLostFocus;
         this.Controls.Add(_editor);
         return _editor;
     }

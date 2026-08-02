@@ -1783,7 +1783,7 @@ public class ListView : OwnerDrawnControl
         }
 
         if (_marquee is { Active: true } marquee)
-            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band);
+            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band, theme.FieldBackground);
 
         if (gutter > 0)
             g.PopClip();

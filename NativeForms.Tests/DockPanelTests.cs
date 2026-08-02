@@ -455,4 +455,55 @@ internal sealed class DockPanelTests
         Assert.That(tabIdx, Is.GreaterThan(0), "the tab caption is painted");
         Assert.That(g.Operations[tabIdx - 1], Does.StartWith("clip"), "each tab caption draws inside its own clip");
     }
+    // --- The document area's own caption ----------------------------------------------------------
+
+    /// <summary>
+    /// The document area can drop its caption bar, which names something its tabs already name.
+    /// </summary>
+    /// <remarks>
+    /// A tool window's caption is what names it, drags it and closes it; the document area has none
+    /// of those jobs. In a file browser whose documents fill the window it was a strip of chrome
+    /// reading "Files" above a list of files.
+    /// </remarks>
+    [Test]
+    public void The_document_caption_can_be_turned_off_and_gives_its_height_back()
+    {
+        var dock = new DockPanel();
+        var doc = Pane("doc");
+        dock.AddDocument(doc);
+        Realize(dock);
+
+        var withCaption = doc.Bounds.Height;
+
+        dock.ShowDocumentCaption = false;
+        dock.PerformLayout();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.Bounds.Height, Is.GreaterThan(withCaption), "the content grew into the freed strip");
+            Assert.That(doc.Bounds.Y, Is.LessThan(withCaption == 0 ? int.MaxValue : doc.Bounds.Y + 1));
+        });
+    }
+
+    /// <summary>A tool window keeps its caption: that is where its close and float buttons live.</summary>
+    [Test]
+    public void Turning_the_document_caption_off_leaves_docked_panels_alone()
+    {
+        var dock = new DockPanel();
+        dock.AddDocument(Pane("doc"));
+        var tool = Pane("tool");
+        dock.Add(tool, DockState.Docked, DockEdge.Right);
+        Realize(dock);
+
+        var before = tool.Bounds.Height;
+
+        dock.ShowDocumentCaption = false;
+        dock.PerformLayout();
+
+        Assert.That(tool.Bounds.Height, Is.EqualTo(before));
+    }
+
+    [Test]
+    public void The_document_caption_is_on_by_default()
+        => Assert.That(new DockPanel().ShowDocumentCaption, Is.True);
 }

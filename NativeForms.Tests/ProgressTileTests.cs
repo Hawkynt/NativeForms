@@ -57,8 +57,8 @@ internal sealed class ProgressTileTests
 
         var g = canvas.RaisePaint();
 
-        // Content spans 8..212 (204 wide); the bar's track is 202 px, so half is 101 px.
-        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF0078D4 9,") && o.EndsWith(",101,6")), Is.True);
+        // Content spans 4..216 (212 wide); the bar's track is 210 px, so half is 105 px.
+        Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF0078D4 5,") && o.EndsWith(",105,6")), Is.True);
     }
 
     [Test]
@@ -300,7 +300,7 @@ internal sealed class ProgressTileTests
             Assert.That(g.Operations.Exists(o => o.StartsWith("image 32x32")), Is.True, "the icon still paints");
             Assert.That(g.DrewText("45.2 GB free of 128 GB"), Is.False, "the secondary line is dropped in compact mode");
             Assert.That(caption.X, Is.GreaterThan(32), "the caption sits to the right of the icon");
-            Assert.That(caption.Y, Is.EqualTo(10), "the caption + bar block is centred down the content (8..40, block 28 → top 10)");
+            Assert.That(caption.Y, Is.EqualTo(11), "the caption + bar block is centred down the content (8..40, block 28 → top 10)");
             Assert.That(AccentFillY(g), Is.GreaterThan(caption.Y), "the usage bar sits below the caption");
             Assert.That(AccentFillY(g), Is.LessThan(40), "and within the icon's vertical band");
         });

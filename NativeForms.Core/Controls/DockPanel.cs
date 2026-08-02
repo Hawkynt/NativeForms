@@ -88,6 +88,29 @@ public partial class DockPanel : OwnerDrawnControl
     protected override bool Focusable => true;
 
     private int CaptionHeight => this.Theme.RowHeight;
+
+    /// <summary>
+    /// Whether the document area carries a caption bar of its own. Default <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// A tool window's caption is what names it, drags it and closes it. The document area has none
+    /// of those jobs: it cannot be closed or floated as a group, and its tabs already name what is in
+    /// it — so the bar is a strip of chrome saying a word the tabs beneath it repeat. An application
+    /// whose documents fill the window can turn it off and get the height back.
+    /// </remarks>
+    public bool ShowDocumentCaption
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.PerformLayout();
+            this.Invalidate();
+        }
+    } = true;
     private int TabStripHeight => this.Theme.RowHeight;
     private int AutoHideThickness => this.Theme.RowHeight;
 
@@ -641,7 +664,7 @@ public partial class DockPanel : OwnerDrawnControl
 
     private void LayoutGroup(DockTabGroupNode group, Rectangle bounds)
     {
-        var caption = this.CaptionHeight;
+        var caption = group.IsDocument && !this.ShowDocumentCaption ? 0 : this.CaptionHeight;
         group.CaptionBounds = new Rectangle(bounds.X, bounds.Y, bounds.Width, Math.Min(caption, bounds.Height));
 
         // The region under the caption is split between the tab strip — on the chosen edge — and content.

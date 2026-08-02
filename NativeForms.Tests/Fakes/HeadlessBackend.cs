@@ -1063,6 +1063,10 @@ internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer
     public void RaiseMouseDown(int x, int y, MouseButtons button = MouseButtons.Left, KeyModifiers modifiers = KeyModifiers.None)
         => this.MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 
+    /// <summary>The platform's summary of a completed multi-click, as GTK's GDK_2BUTTON_PRESS.</summary>
+    public void RaiseMouseDownEcho(int x, int y, int clicks, MouseButtons button = MouseButtons.Left, KeyModifiers modifiers = KeyModifiers.None)
+        => this.MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers, clicks));
+
     public void RaiseMouseUp(int x, int y, MouseButtons button = MouseButtons.Left, KeyModifiers modifiers = KeyModifiers.None)
         => this.MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
 

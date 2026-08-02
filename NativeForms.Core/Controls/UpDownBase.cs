@@ -118,6 +118,12 @@ public abstract class UpDownBase : OwnerDrawnControl
         if (e.Button != MouseButtons.Left)
             return;
 
+        // The platform's summary of a double click, not a press of its own: a spinner steps once per
+        // press, so counting it made a double click on an arrow move the value by three and left fast
+        // clicking landing somewhere nobody could predict.
+        if (e.Clicks > 1)
+            return;
+
         if (this.UpButtonRect.Contains(e.Location))
             this.PressButton(+1);
         else if (this.DownButtonRect.Contains(e.Location))

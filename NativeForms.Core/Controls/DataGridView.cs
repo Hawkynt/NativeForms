@@ -1219,6 +1219,34 @@ public class DataGridView : OwnerDrawnControl
     /// <summary>Makes <paramref name="currentRow"/> the current row after a multi-selection gesture
     /// and reports the changed set — the gesture-shaped sibling of the
     /// <see cref="SelectedRowIndex"/> setter.</summary>
+    /// <summary>
+    /// Drops the selection for a press that landed past the last row.
+    /// </summary>
+    /// <remarks>
+    /// Clicking the empty space under a list is how a selection is let go, and the press did nothing
+    /// at all — the rows stayed lit with no way to clear them but selecting something else. Ctrl and
+    /// Shift are left alone: those presses are the start of a band that adds to what is already
+    /// there, and clearing first would throw away the very selection they mean to extend.
+    /// </remarks>
+    private void ClearSelectionOnEmptyPress(KeyModifiers modifiers)
+    {
+        if ((modifiers & (KeyModifiers.Control | KeyModifiers.Shift)) != 0)
+            return;
+
+        var hadMulti = _multiSelection is { Count: > 0 };
+        if (!hadMulti && _selectedRowIndex < 0)
+            return;
+
+        if (!this.ValidateRowChange())
+            return;
+
+        _multiSelection?.Clear();
+        _anchorRowIndex = -1;
+        _selectedRowIndex = -1;
+        this.Invalidate();
+        this.OnSelectionChanged(EventArgs.Empty);
+    }
+
     private void ApplyMultiSelection(int currentRow)
     {
         _selectedRowIndex = currentRow;
@@ -1725,7 +1753,10 @@ public class DataGridView : OwnerDrawnControl
         // under the pointer, the band covers that same row, and the two must not cancel out.
         this.BeginMarquee(e);
         if (rowIndex < 0)
+        {
+            this.ClearSelectionOnEmptyPress(e.Modifiers);
             return;
+        }
 
         var item = this.GetRowItem(rowIndex);
         if (this.MergedTextOf(item) is not null)
@@ -2268,7 +2299,7 @@ public class DataGridView : OwnerDrawnControl
         }
 
         if (_marquee is { Active: true } marquee)
-            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band);
+            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band, theme.FieldBackground);
 
         g.PopClip();
 

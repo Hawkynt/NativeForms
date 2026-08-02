@@ -201,14 +201,29 @@ internal static class GlyphRenderer
     /// under a full-accent outline. The wash is arithmetic rather than alpha, like the focus ring, so
     /// it renders identically on GDI; under high contrast it is dropped altogether, where a wash over
     /// text costs more legibility than the outline alone gives back.</summary>
-    public static void DrawSelectionBand(IGraphics g, ITheme theme, Rectangle band)
+    /// <summary>
+    /// The rubber band: a wash of the accent colour inside an accent outline.
+    /// </summary>
+    /// <param name="over">
+    /// The surface the band is being drawn on top of. The wash is a pre-mixed opaque colour rather
+    /// than a translucent one — the Win32 <c>FillRect</c> path takes a solid brush and drops alpha
+    /// entirely — so the mix has to be made against the right backdrop. It was always made against
+    /// <see cref="ITheme.ControlBackground"/>, while a grid draws its band over rows sitting on
+    /// <see cref="ITheme.FieldBackground"/>: over the rows the wash was the wrong tint and read as a
+    /// solid block rather than a see-through one, and it only looked right where the band happened to
+    /// cross the empty area below the last row.
+    /// </param>
+    public static void DrawSelectionBand(IGraphics g, ITheme theme, Rectangle band, Color? over = null)
     {
         if (band.Width <= 0 || band.Height <= 0)
             return;
 
         var accent = theme.Accent;
         if (!theme.IsHighContrast)
-            g.FillRectangle(Blend(Blend(accent, theme.ControlBackground), theme.ControlBackground), band);
+        {
+            var beneath = over ?? theme.ControlBackground;
+            g.FillRectangle(Blend(Blend(accent, beneath), beneath), band);
+        }
 
         g.DrawRectangle(accent, band);
     }

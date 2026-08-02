@@ -443,4 +443,60 @@ internal sealed class BreadcrumbTests
 
         Assert.That(g.TextDraws.Select(d => d.Font.SizeInPoints), Has.All.EqualTo(17f));
     }
+    // --- Leaving the path field ------------------------------------------------------------------
+
+    /// <summary>
+    /// Clicking away from the path field closes it, leaving the crumbs alone.
+    /// </summary>
+    /// <remarks>
+    /// Only Enter and Escape closed it, so clicking into the file list left the field open behind the
+    /// click with its text still highlighted — two selections on screen at once, in two controls,
+    /// with no way to tell which one the next keystroke would reach.
+    /// </remarks>
+    [Test]
+    public void Focus_leaving_the_field_closes_it()
+    {
+        var crumb = ThreeSegments();
+        crumb.Editable = true;
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        var elsewhere = new TextBox();
+        form.Controls.Add(crumb);
+        form.Controls.Add(elsewhere);
+        Application.Run(form, backend);
+
+        crumb.BeginEdit();
+        Assert.That(crumb.IsEditing, Is.True);
+
+        elsewhere.Focus();
+
+        Assert.That(crumb.IsEditing, Is.False);
+    }
+
+    /// <summary>Half a typed path is not a request to go anywhere, so leaving abandons it.</summary>
+    [Test]
+    public void Focus_leaving_the_field_abandons_what_was_typed()
+    {
+        var crumb = ThreeSegments(); // Home / Docs / Sub
+        crumb.Editable = true;
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        var elsewhere = new TextBox();
+        form.Controls.Add(crumb);
+        form.Controls.Add(elsewhere);
+        Application.Run(form, backend);
+
+        string? entered = null;
+        crumb.PathEntered += (_, e) => entered = e.Path;
+
+        crumb.BeginEdit();
+        crumb.TypeIntoEditorForTest("Users/Alex/Half");
+        elsewhere.Focus();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entered, Is.Null, "nothing was entered");
+            Assert.That(crumb.Items.Select(i => i.Text), Is.EqualTo(new[] { "Home", "Docs", "Sub" }));
+        });
+    }
 }

@@ -25,17 +25,24 @@ namespace Hawkynt.NativeForms;
 /// </remarks>
 public class ProgressTile : OwnerDrawnControl
 {
-    /// <summary>The padding between the tile's frame and its content.</summary>
-    private const int _Padding = 8;
+    /// <summary>
+    /// The padding between the tile's frame and its content.
+    /// </summary>
+    /// <remarks>
+    /// Tight on purpose. A tile is used in columns of a dozen or more — a sidebar of volumes is the
+    /// usual case — where padding is multiplied by every row and spent twice over, once above and
+    /// once below. At eight a side the frame took more height than the caption standing in it.
+    /// </remarks>
+    private const int _Padding = 4;
 
     /// <summary>The gap between the icon column and the text column.</summary>
-    private const int _IconGap = 10;
+    private const int _IconGap = 6;
 
     /// <summary>The height of the usage bar.</summary>
     private const int _BarHeight = 8;
 
     /// <summary>The gap above and below the usage bar.</summary>
-    private const int _BarGap = 4;
+    private const int _BarGap = 2;
 
     private int _maximum = 100;
     private int _value;

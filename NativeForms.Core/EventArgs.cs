@@ -25,7 +25,7 @@ public sealed class PaintEventArgs(IGraphics graphics, Rectangle clipRectangle) 
 /// <summary>Describes a mouse event, matching <c>System.Windows.Forms.MouseEventArgs</c> plus the
 /// modifier keys held at the time — multi-selection gestures (Ctrl/Shift+click) and
 /// Shift+wheel scrolling need them.</summary>
-public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers = KeyModifiers.None) : EventArgs
+public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers = KeyModifiers.None, int clicks = 1) : EventArgs
 {
     /// <summary>The button that changed state (or <see cref="MouseButtons.None"/> for moves).</summary>
     public MouseButtons Button { get; } = button;
@@ -41,6 +41,20 @@ public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta,
 
     /// <summary>The signed wheel delta (0 for non-wheel events).</summary>
     public int Delta { get; } = delta;
+
+    /// <summary>
+    /// How many clicks this press completes: 1 for an ordinary press, 2 for the second of a double
+    /// click, 3 for a triple.
+    /// </summary>
+    /// <remarks>
+    /// GTK reports a double click as a third event — <c>press, release, press, GDK_2BUTTON_PRESS,
+    /// release</c> — where the last is a summary of the two that already arrived rather than a press
+    /// of its own. It is forwarded, because controls like <see cref="Ribbon"/> rely on receiving it,
+    /// but it says so here: a control that acts once per press (a spinner arrow, say) can skip the
+    /// echo instead of counting a double click as three. Backends that report each press exactly once
+    /// leave this at 1 throughout, so a control reading it behaves the same everywhere.
+    /// </remarks>
+    public int Clicks { get; } = clicks;
 
     /// <summary>Whether Shift was held.</summary>
     public bool Shift => (this.Modifiers & KeyModifiers.Shift) != 0;

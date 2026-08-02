@@ -611,4 +611,66 @@ internal sealed class DataGridViewInteractionTests
             Assert.That(validated, Is.EqualTo(1));
         });
     }
+
+    // --- Letting a selection go ------------------------------------------------------------------
+
+    /// <summary>
+    /// Clicking the empty space under the rows is how a selection is let go.
+    /// </summary>
+    /// <remarks>
+    /// The press armed a rubber band and then returned without touching the selection, so the rows
+    /// stayed lit and the only way to clear them was to select something else instead.
+    /// </remarks>
+    [Test]
+    public void A_press_below_the_last_row_clears_the_selection()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+        canvas.RaiseMouseDown(20, 30);   // the first row
+        canvas.RaiseMouseUp(20, 30);
+        Assert.That(grid.SelectedRowIndex, Is.Zero, "something is selected to begin with");
+
+        var changed = 0;
+        grid.SelectionChanged += (_, _) => ++changed;
+
+        canvas.RaiseMouseDown(20, 105);  // past the last of four 22px rows under a 22px header
+        canvas.RaiseMouseUp(20, 105);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedRowIndex, Is.EqualTo(-1));
+            Assert.That(grid.SelectedItems, Is.Empty);
+            Assert.That(changed, Is.EqualTo(1), "and it said so once");
+        });
+    }
+
+    /// <summary>Ctrl and Shift start a band that adds to the selection, so they must not clear it.</summary>
+    [TestCase(KeyModifiers.Control)]
+    [TestCase(KeyModifiers.Shift)]
+    public void A_modified_press_below_the_last_row_keeps_the_selection(KeyModifiers modifiers)
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+        canvas.RaiseMouseDown(20, 30);
+        canvas.RaiseMouseUp(20, 30);
+
+        canvas.RaiseMouseDown(20, 105, MouseButtons.Left, modifiers);
+
+        Assert.That(grid.SelectedItems, Is.Not.Empty);
+    }
+
+    [Test]
+    public void An_empty_press_with_nothing_selected_says_nothing()
+    {
+        var grid = MakeGrid();
+        var canvas = Realize(grid);
+        var changed = 0;
+        grid.SelectionChanged += (_, _) => ++changed;
+
+        canvas.RaiseMouseDown(20, 105);
+
+        Assert.That(changed, Is.Zero);
+    }
 }

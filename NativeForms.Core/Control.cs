@@ -949,7 +949,15 @@ public abstract class Control
     /// or push this rather than the raw image so an animated image assigned to a plain image property
     /// animates.
     /// </summary>
-    private protected IImage? CurrentFrameOf(IImage? image)
+    /// <remarks>
+    /// Every control that paints an image has to go through here, including the ones an application
+    /// writes for itself — an <see cref="AnimatedImage"/> handed straight to
+    /// <see cref="IGraphics.DrawImage"/> has no frame to draw and silently paints nothing. It was
+    /// <c>private protected</c>, which is to say unreachable from a control in any other assembly, so
+    /// an application deriving from <see cref="OwnerDrawnControl"/> had no way to draw an image that
+    /// might be animated and no hint as to why its picture was missing.
+    /// </remarks>
+    protected internal IImage? CurrentFrameOf(IImage? image)
     {
         if (image is not AnimatedImage animated || this.Backend is not { } backend)
             return this.Enabled || image is null ? image : image.DisabledImage ?? image;

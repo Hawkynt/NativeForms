@@ -219,8 +219,8 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
         base.Dispose();
     }
 
-    private void RaiseMouseDown(MouseButtons button, int x, int y, KeyModifiers modifiers)
-        => MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
+    private void RaiseMouseDown(MouseButtons button, int x, int y, KeyModifiers modifiers, int clicks = 1)
+        => MouseDown?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers, clicks));
 
     private void RaiseMouseUp(MouseButtons button, int x, int y, KeyModifiers modifiers)
         => MouseUp?.Invoke(this, new MouseEventArgs(button, x, y, 0, modifiers));
@@ -415,12 +415,29 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
             unsafe
             {
                 ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
-                peer.RaiseMouseDown(ToButton(e.Button), (int)e.X, (int)e.Y, ToModifiers(e.State));
+
+                // GDK follows the second press of a double click with a summary event describing the
+                // whole gesture. It is passed on rather than dropped — controls that toggle on the
+                // second press expect it — but it is labelled, so a control acting once per press can
+                // tell the echo from a press of its own.
+                var clicks = e.Type switch
+                {
+                    _Gdk2ButtonPress => 2,
+                    _Gdk3ButtonPress => 3,
+                    _ => 1,
+                };
+                peer.RaiseMouseDown(ToButton(e.Button), (int)e.X, (int)e.Y, ToModifiers(e.State), clicks);
             }
         }
 
         return 1;
     }
+
+    /// <summary>GdkEventType.GDK_2BUTTON_PRESS — the "and that was a double click" summary.</summary>
+    private const int _Gdk2ButtonPress = 5;
+
+    /// <summary>GdkEventType.GDK_3BUTTON_PRESS — likewise for a triple.</summary>
+    private const int _Gdk3ButtonPress = 6;
 
     /// <summary>Native "button-release-event" handler.</summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
