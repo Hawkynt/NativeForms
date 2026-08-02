@@ -1195,13 +1195,22 @@ public class DataGridView : OwnerDrawnControl
     private void SelectDisplayRange(int fromModelIndex, int toModelIndex)
     {
         this.EnsureSortMap();
-        var multi = _multiSelection ??= [];
-        multi.Clear();
 
         var from = this.ToDisplayIndex(fromModelIndex);
         var to = this.ToDisplayIndex(toModelIndex);
-        if (from < 0 || to < 0)
-            return;
+        if (to < 0)
+            return; // the row that was clicked is not on show; leave the selection as it was
+
+        // An anchor that no longer maps — the rows were replaced under it, which is what navigating
+        // to another folder does — is not a reason to select nothing. The run is then the clicked row
+        // on its own, which is what a plain click on it would have given. Clearing first and
+        // returning on an unusable anchor emptied the selection instead, so shift-clicking in a
+        // freshly listed folder put the lights out rather than lighting a run.
+        if (from < 0)
+            from = to;
+
+        var multi = _multiSelection ??= [];
+        multi.Clear();
 
         if (from > to)
             (from, to) = (to, from);

@@ -673,4 +673,51 @@ internal sealed class DataGridViewInteractionTests
 
         Assert.That(changed, Is.Zero);
     }
+
+    [Test]
+    public void Shift_clicking_takes_the_run_between()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(20, 30);   // row 0
+        canvas.RaiseMouseUp(20, 30);
+        canvas.RaiseMouseDown(20, 74, MouseButtons.Left, KeyModifiers.Shift);  // row 2
+        canvas.RaiseMouseUp(20, 74, MouseButtons.Left, KeyModifiers.Shift);
+
+        Assert.That(grid.SelectedItems.OfType<object>().Count(), Is.EqualTo(3));
+    }
+
+    /// <summary>
+    /// Shift-clicking with no usable anchor selects the clicked row, never nothing.
+    /// </summary>
+    /// <remarks>
+    /// The anchor is a model index, and replacing the rows — which is what walking into another
+    /// folder does — can leave it pointing at nothing. The range then cleared the selection and
+    /// returned early, so a shift-click in a freshly listed folder put the lights out instead of
+    /// lighting a run, and the selection the application was holding went stale behind it.
+    /// </remarks>
+    [Test]
+    public void Shift_clicking_after_the_rows_were_replaced_selects_the_row_it_landed_on()
+    {
+        var grid = MakeGrid();
+        grid.MultiSelect = true;
+        var canvas = Realize(grid);
+
+        canvas.RaiseMouseDown(20, 30);   // anchor on row 0
+        canvas.RaiseMouseUp(20, 30);
+
+        // A new listing, as a navigation gives: the anchor now refers to rows that are gone.
+        grid.Items.Clear();
+        grid.Items.AddRange([new Person("Dave", 51), new Person("Erin", 33), new Person("Fay", 27)]);
+
+        canvas.RaiseMouseDown(20, 74, MouseButtons.Left, KeyModifiers.Shift);
+        canvas.RaiseMouseUp(20, 74, MouseButtons.Left, KeyModifiers.Shift);
+
+        Assert.That(
+            grid.SelectedItems.OfType<Person>().Select(p => p.Name),
+            Is.EqualTo(new[] { "Fay" }),
+            "the row the shift-click landed on, rather than an empty selection");
+    }
 }
