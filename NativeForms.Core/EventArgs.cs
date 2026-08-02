@@ -25,8 +25,21 @@ public sealed class PaintEventArgs(IGraphics graphics, Rectangle clipRectangle) 
 /// <summary>Describes a mouse event, matching <c>System.Windows.Forms.MouseEventArgs</c> plus the
 /// modifier keys held at the time — multi-selection gestures (Ctrl/Shift+click) and
 /// Shift+wheel scrolling need them.</summary>
-public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers = KeyModifiers.None, int clicks = 1) : EventArgs
+public sealed class MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers, int clicks) : EventArgs
 {
+    /// <summary>An ordinary single press, click or move.</summary>
+    /// <remarks>
+    /// Spelled out rather than left to a default on <c>clicks</c>, because a default is a compile-time
+    /// convenience and this is a runtime contract: a backend assembly built before <see cref="Clicks"/>
+    /// existed calls a five-argument constructor, and giving the sixth parameter a default would have
+    /// left only a six-argument one in the metadata. Every such backend — every one not rebuilt in the
+    /// same release — would then throw <see cref="MissingMethodException"/> on its first mouse event.
+    /// </remarks>
+    public MouseEventArgs(MouseButtons button, int x, int y, int delta, KeyModifiers modifiers = KeyModifiers.None)
+        : this(button, x, y, delta, modifiers, 1)
+    {
+    }
+
     /// <summary>The button that changed state (or <see cref="MouseButtons.None"/> for moves).</summary>
     public MouseButtons Button { get; } = button;
 
