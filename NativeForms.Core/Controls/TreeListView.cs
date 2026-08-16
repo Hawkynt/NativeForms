@@ -15,7 +15,12 @@ namespace Hawkynt.NativeForms;
 /// cheap for very large trees.
 /// </summary>
 /// <remarks>
-/// TODO: column sorting, interactive column resize and label editing.
+/// Three seams let a caller take part in how a row looks and behaves without subclassing:
+/// <see cref="RowBackColorSelector"/> and <see cref="RowForeColorSelector"/> colour a row by what it
+/// represents, <see cref="CellPaint"/> hands over a cell whose content is not text, and
+/// <see cref="ColumnClick"/> reports a click on the header. Together they are what a process list, a
+/// log viewer or a file browser needs and could not previously express.
+/// <para>TODO: interactive column resize and label editing.</para>
 /// </remarks>
 public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 {
@@ -33,6 +38,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     private int? _itemHeight;
     private TreeNode? _lastClickNode;
     private long _lastClickTicks;
+    private readonly TreeListViewCellPaintEventArgs _cellPaintArgs = new();
 
     /// <summary>Creates a tree-list view.</summary>
     public TreeListView()
@@ -52,6 +58,19 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// caption, width or alignment — repaints the control.
     /// </summary>
     public ObservableList<TreeListViewColumn> Columns { get; }
+
+    /// <summary>
+    /// Gives each row a background colour of its own, or <see langword="null"/> to use the theme's.
+    /// </summary>
+    /// <remarks>
+    /// Called once per painted row, so it must be cheap — read a value the caller already computed
+    /// rather than computing one here. The selected row keeps the theme's selection colour whatever
+    /// this returns, because a selection that some rows swallow is worse than an uncoloured row.
+    /// </remarks>
+    public Func<TreeNode, Color?>? RowBackColorSelector { get; set; }
+
+    /// <summary>Gives each row a text colour of its own, or <see langword="null"/> for the theme's.</summary>
+    public Func<TreeNode, Color?>? RowForeColorSelector { get; set; }
 
     /// <summary>The selected node, or <see langword="null"/>. Setting it scrolls the node into view.</summary>
     /// <exception cref="ArgumentException">The node belongs to a different control.</exception>
@@ -144,6 +163,22 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>The number of rows the expanded part of the tree currently occupies.</summary>
     public int VisibleNodeCount => _rows.Count;
 
+    /// <summary>
+    /// Raised for every cell before it is painted, so a caller can draw one itself.
+    /// </summary>
+    /// <remarks>
+    /// The event args are reused between cells — never keep a reference to them past the handler.
+    /// The graphics surface is already clipped to the cell.
+    /// </remarks>
+    public event EventHandler<TreeListViewCellPaintEventArgs>? CellPaint;
+
+    /// <summary>Raised when a column header is clicked, with the column's index.</summary>
+    /// <remarks>
+    /// Sorting is the caller's to implement — the control has no opinion about what its rows mean.
+    /// This reports the gesture that every list makes people expect.
+    /// </remarks>
+    public event EventHandler<ColumnClickEventArgs>? ColumnClick;
+
     /// <summary>Raised before <see cref="SelectedNode"/> changes to a node — on every selection path,
     /// mouse, keyboard and assignment alike; set <see cref="TreeViewCancelEventArgs.Cancel"/> to keep
     /// the current selection.</summary>
@@ -217,6 +252,12 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 
     /// <summary>Raises <see cref="BeforeCheck"/>.</summary>
     protected virtual void OnBeforeCheck(TreeViewCancelEventArgs e) => this.BeforeCheck?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="CellPaint"/>.</summary>
+    protected virtual void OnCellPaint(TreeListViewCellPaintEventArgs e) => this.CellPaint?.Invoke(this, e);
+
+    /// <summary>Raises <see cref="ColumnClick"/>.</summary>
+    protected virtual void OnColumnClick(ColumnClickEventArgs e) => this.ColumnClick?.Invoke(this, e);
 
     /// <summary>Raises <see cref="AfterCheck"/>.</summary>
     protected virtual void OnAfterCheck(TreeViewEventArgs e) => this.AfterCheck?.Invoke(this, e);
@@ -324,6 +365,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         if (contentY < 0)
         {
             _lastClickNode = null;
+            this.RaiseColumnClick(e.X);
             return;
         }
 
@@ -373,6 +415,26 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         _lastClickTicks = now;
     }
 
+    /// <summary>Maps an x inside the header onto a column and reports the click.</summary>
+    private void RaiseColumnClick(int x)
+    {
+        if (this.ColumnClick is null || this.HeaderHeight <= 0)
+            return;
+
+        var left = 0;
+        for (var i = 0; i < this.Columns.Count; ++i)
+        {
+            var width = this.Columns[i].Width;
+            if (x >= left && x < left + width)
+            {
+                this.OnColumnClick(new(i));
+                return;
+            }
+
+            left += width;
+        }
+    }
+
     /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)
     {
@@ -409,8 +471,12 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         var selected = ReferenceEquals(node, _selectedNode);
         if (selected)
             GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, this.Width, rowHeight));
+        else if (this.RowBackColorSelector?.Invoke(node) is { } back)
+            g.FillRectangle(back, new Rectangle(0, y, this.Width, rowHeight));
 
-        var textColor = selected ? theme.SelectionText : theme.ControlText;
+        var textColor = selected
+            ? theme.SelectionText
+            : this.RowForeColorSelector?.Invoke(node) ?? theme.ControlText;
         if (this.Columns.Count == 0)
         {
             this.PaintTreeCell(g, theme, node, selected, textColor, this.Width, y, rowHeight);
@@ -421,14 +487,27 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         for (var c = 0; c < this.Columns.Count; ++c)
         {
             var col = this.Columns[c];
-            g.PushClip(new Rectangle(x, y, col.Width, rowHeight));
-            if (c == 0)
-                this.PaintTreeCell(g, theme, node, selected, textColor, col.Width, y, rowHeight);
-            else
+            var cell = new Rectangle(x, y, col.Width, rowHeight);
+            g.PushClip(cell);
+
+            var handled = false;
+            if (this.CellPaint is not null)
             {
-                var text = col.TextSelector?.Invoke(node) ?? string.Empty;
-                var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
-                g.DrawText(text, theme.DefaultFont, textColor, textRect, col.TextAlign);
+                _cellPaintArgs.Rebind(g, theme, node, c, cell, selected);
+                this.OnCellPaint(_cellPaintArgs);
+                handled = _cellPaintArgs.Handled;
+            }
+
+            if (!handled)
+            {
+                if (c == 0)
+                    this.PaintTreeCell(g, theme, node, selected, textColor, col.Width, y, rowHeight);
+                else
+                {
+                    var text = col.TextSelector?.Invoke(node) ?? string.Empty;
+                    var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
+                    g.DrawText(text, theme.DefaultFont, textColor, textRect, col.TextAlign);
+                }
             }
 
             g.PopClip();
