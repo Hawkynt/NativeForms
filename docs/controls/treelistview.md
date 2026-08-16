@@ -88,12 +88,41 @@ in the column's `TextAlign`. The selection highlight spans the full row width ac
 
 **Hit-testing.** The glyph and check cells react only inside the tree column — where painting clips
 them. A click on a deep node's glyph position that falls in a neighboring column selects the row
-instead of toggling. Clicks in the header band select nothing.
+instead of toggling. Clicks in the header band select nothing, and raise `ColumnClick` instead.
+
+**Taking part in a row.** Three seams let a caller shape a row without subclassing the control:
+
+| Member | What it does |
+|---|---|
+| `RowBackColorSelector` | `Func<TreeNode, Color?>` — gives a row its own background. Called once per painted row, so read a value the caller already has rather than computing one. The selected row keeps the theme's selection colour whatever this returns: a selection some rows swallow loses the user. |
+| `RowForeColorSelector` | The same for the row's text colour. |
+| `CellPaint` | Raised for every cell before it is painted, with the graphics surface already clipped to the cell. Set `Handled` to draw the cell yourself and suppress its text; leave it false to paint *behind* the text — an in-cell bar with the number on top. The event args are reused between cells, so never keep a reference past the handler. |
+| `ColumnClick` | Raised with the clicked header's index. Sorting stays the caller's to implement; the control has no opinion about what its rows mean. |
+
+Together they are what a process list needs and could not previously express: rows coloured by what
+kind of process they are, a column whose content is a sparkline rather than text, and a header that
+sorts when clicked.
+
+```csharp
+tree.RowBackColorSelector = node => ((Row)node.Tag!).IsService ? Color.FromArgb(0xFF, 0xE6, 0xF2, 0xFF) : null;
+
+tree.CellPaint += (_, e) =>
+{
+    if (e.ColumnIndex != CpuHistoryColumn)
+        return;
+
+    DrawSparkline(e.Graphics, e.Bounds, ((Row)e.Node.Tag!).History);
+    e.Handled = true;
+};
+
+tree.ColumnClick += (_, e) => SortBy(e.Column);
+```
 
 **SetDataSource.** A convenience for object graphs: reflection-free like all binding in the
 toolkit, it snapshots the hierarchy eagerly (children start collapsed) and replaces any existing
 nodes. The depth guard bounds cycles — a self-referencing item with `maxDepth: 5` yields exactly
 five levels.
 
-**Not yet implemented** (per `docs/PRD.md` §7.4): column sorting, interactive column resize and
-label editing.
+**Not yet implemented** (per `docs/PRD.md` §7.4): interactive column resize and label editing. Column
+*sorting* is now expressible — `ColumnClick` reports the gesture and the caller reorders its own
+nodes — but the control still does not sort for you.
