@@ -33,6 +33,9 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     private const int _CellPad = 2;
 
     private readonly TreeRowList _rows;
+
+    /// <summary>Painted only while there are more rows than fit.</summary>
+    private readonly RowScrollBar _scrollBar = new();
     private readonly List<TreeListViewColumn> _watchedColumns = [];
     private TreeNode? _selectedNode;
     private int? _itemHeight;
@@ -269,6 +272,16 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>The number of fully visible rows in the item area.</summary>
     protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.ItemHeight);
 
+    /// <summary>Whether the tree is showing a scrollbar of its own.</summary>
+    private bool HasScrollBar => RowScrollBar.IsNeeded(_rows.Count, this.VisibleRowCount);
+
+    /// <summary>The width the rows and the header have, which is the control's less any bar.</summary>
+    protected int ContentWidth => this.Width - (this.HasScrollBar ? this.Theme.ScrollBarSize : 0);
+
+    /// <summary>The bar runs below the header, so it never covers a column caption.</summary>
+    private Rectangle ScrollBarStrip
+        => RowScrollBar.StripOf(this.Theme, this.Width, this.HeaderHeight, this.Height);
+
     /// <summary>Raises <see cref="BeforeSelect"/>.</summary>
     protected virtual void OnBeforeSelect(TreeViewCancelEventArgs e) => this.BeforeSelect?.Invoke(this, e);
 
@@ -398,6 +411,20 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         if (e.Button != MouseButtons.Left)
             return;
 
+        if (this.HasScrollBar)
+        {
+            var scrolled = _scrollBar.MouseDown(
+                this.Theme, this.ScrollBarStrip, _rows.Count, this.VisibleRowCount, _rows.TopIndex, e.Location);
+
+            if (scrolled >= 0)
+            {
+                _lastClickNode = null;
+                _rows.ScrollTo(scrolled);
+                this.Invalidate();
+                return;
+            }
+        }
+
         var contentY = e.Y - this.HeaderHeight;
         if (contentY < 0)
         {
@@ -480,6 +507,19 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     }
 
     /// <inheritdoc/>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (!_scrollBar.IsDragging)
+            return;
+
+        _rows.ScrollTo(_scrollBar.Drag(this.ScrollBarStrip, _rows.Count, this.VisibleRowCount, e.Y));
+        this.Invalidate();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseEventArgs e) => _scrollBar.Release();
+
+    /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
         => e.Handled = TreeNavigation.HandleKey(this, _rows, this.VisibleRowCount, this.CheckBoxes, e);
 
@@ -493,30 +533,34 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         var rowHeight = this.ItemHeight;
         var headerHeight = this.HeaderHeight;
         if (headerHeight > 0)
-            HeaderRowPainter.Draw(g, theme, this.Columns, this.Width, headerHeight);
+            HeaderRowPainter.Draw(g, theme, this.Columns, this.ContentWidth, headerHeight);
 
         var top = _rows.TopIndex;
         var last = Math.Min(_rows.Count, top + this.VisibleRowCount + 1);
         for (var i = top; i < last; ++i)
             this.PaintRow(g, theme, _rows[i], headerHeight + ((i - top) * rowHeight), rowHeight);
 
+        if (this.HasScrollBar)
+            _scrollBar.Paint(g, theme, this.ScrollBarStrip, _rows.Count, this.VisibleRowCount, _rows.TopIndex);
+
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
     }
 
     private void PaintRow(IGraphics g, ITheme theme, TreeNode node, int y, int rowHeight)
     {
+        var width = this.ContentWidth;
         var selected = ReferenceEquals(node, _selectedNode);
         if (selected)
-            GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, this.Width, rowHeight));
+            GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, width, rowHeight));
         else if (this.RowBackColorSelector?.Invoke(node) is { } back)
-            g.FillRectangle(back, new Rectangle(0, y, this.Width, rowHeight));
+            g.FillRectangle(back, new Rectangle(0, y, width, rowHeight));
 
         var textColor = selected
             ? theme.SelectionText
             : this.RowForeColorSelector?.Invoke(node) ?? theme.ControlText;
         if (this.Columns.Count == 0)
         {
-            this.PaintTreeCell(g, theme, node, selected, textColor, this.Width, y, rowHeight);
+            this.PaintTreeCell(g, theme, node, selected, textColor, width, y, rowHeight);
             return;
         }
 

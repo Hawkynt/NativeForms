@@ -19,6 +19,9 @@ public class ListBox : OwnerDrawnControl
 
     private const int _IconGap = 4;
 
+    /// <summary>Painted only while there are more rows than fit; null-object until then.</summary>
+    private readonly RowScrollBar _scrollBar = new();
+
     /// <summary>The selected row indices, always kept sorted ascending.</summary>
     private readonly List<int> _selectedIndices = [];
 
@@ -290,6 +293,15 @@ public class ListBox : OwnerDrawnControl
     /// <summary>The number of fully visible rows.</summary>
     protected int VisibleRowCount => Math.Max(1, this.Height / this.ItemHeight);
 
+    /// <summary>Whether the list is showing a scrollbar of its own, which only an unpromoted one does.</summary>
+    private bool HasScrollBar => _native is null && RowScrollBar.IsNeeded(this.Items.Count, this.VisibleRowCount);
+
+    /// <summary>The width the rows have, which is the control's less whatever the bar takes.</summary>
+    protected int ContentWidth
+        => this.Width - (this.HasScrollBar ? this.Theme.ScrollBarSize : 0);
+
+    private Rectangle ScrollBarStrip => RowScrollBar.StripOf(this.Theme, this.Width, 0, this.Height);
+
     /// <summary>Whether the row at the given index is selected.</summary>
     public bool GetSelected(int index) => _selectedIndices.BinarySearch(index) >= 0;
 
@@ -328,6 +340,10 @@ public class ListBox : OwnerDrawnControl
         // The widget lays its own rows out, so it is the only honest source of this once promoted.
         if (_native is { } peer)
             return peer.IndexFromPoint(x, y);
+
+        // A press on the bar is not a press on the row behind it.
+        if (this.HasScrollBar && x >= this.ContentWidth)
+            return -1;
 
         var row = _topIndex + (y / this.ItemHeight);
         return row >= 0 && row < this.Items.Count ? row : -1;
@@ -508,6 +524,20 @@ public class ListBox : OwnerDrawnControl
         if (e.Button != MouseButtons.Left)
             return;
 
+        if (this.HasScrollBar)
+        {
+            var scrolled = _scrollBar.MouseDown(
+                this.Theme, this.ScrollBarStrip, this.Items.Count, this.VisibleRowCount, _topIndex, e.Location);
+
+            if (scrolled >= 0)
+            {
+                _topIndex = scrolled;
+                this.ClampScroll();
+                this.Invalidate();
+                return;
+            }
+        }
+
         var row = this.IndexFromPoint(e.X, e.Y);
         if (row < 0)
             return;
@@ -555,6 +585,20 @@ public class ListBox : OwnerDrawnControl
         this.ClampScroll();
         this.Invalidate();
     }
+
+    /// <inheritdoc/>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (!_scrollBar.IsDragging)
+            return;
+
+        _topIndex = _scrollBar.Drag(this.ScrollBarStrip, this.Items.Count, this.VisibleRowCount, e.Y);
+        this.ClampScroll();
+        this.Invalidate();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseEventArgs e) => _scrollBar.Release();
 
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
@@ -627,17 +671,21 @@ public class ListBox : OwnerDrawnControl
         g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
         var rowHeight = this.ItemHeight;
+        var rowWidth = this.ContentWidth;
         var last = Math.Min(this.Items.Count, _topIndex + this.VisibleRowCount + 1);
         for (var i = _topIndex; i < last; ++i)
         {
             var y = (i - _topIndex) * rowHeight;
-            var rowRect = new Rectangle(0, y, this.Width, rowHeight);
+            var rowRect = new Rectangle(0, y, rowWidth, rowHeight);
             var selected = this.GetSelected(i);
             if (selected)
                 GlyphRenderer.FillSelection(g, theme, rowRect);
 
             this.OnDrawRow(g, i, rowRect, selected);
         }
+
+        if (this.HasScrollBar)
+            _scrollBar.Paint(g, theme, this.ScrollBarStrip, this.Items.Count, this.VisibleRowCount, _topIndex);
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
     }
