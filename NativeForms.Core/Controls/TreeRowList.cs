@@ -56,6 +56,14 @@ internal sealed class TreeRowList
         return _rows.IndexOf(node);
     }
 
+    /// <summary>Sets the first visible row, clamped to the valid range.</summary>
+    public void ScrollTo(int rowIndex)
+    {
+        this.EnsureFlat();
+        _topIndex = rowIndex;
+        this.ClampScroll();
+    }
+
     /// <summary>Moves the scroll position by the given number of rows, clamped to the valid range.</summary>
     public void ScrollBy(int rowDelta)
     {

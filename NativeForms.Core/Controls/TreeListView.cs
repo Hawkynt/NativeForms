@@ -158,7 +158,35 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     } = true;
 
     /// <summary>The index of the first visible row in the flattened tree (scroll position).</summary>
-    public int TopIndex => _rows.TopIndex;
+    /// <summary>
+    /// The first visible row, and the seam a caller needs to keep a live list still.
+    /// </summary>
+    /// <remarks>
+    /// A list whose contents are replaced every second cannot hold its place through this index
+    /// alone: the index survives, but the rows underneath it do not, so the view appears to jump
+    /// whenever anything above it is added or removed. A caller that wants stability notes the node
+    /// at the top before it rebuilds, finds that node's new row afterwards, and assigns it here.
+    /// Clamped to the rows that exist, so a stale index is a no-op rather than an exception.
+    /// </remarks>
+    public int TopIndex
+    {
+        get => _rows.TopIndex;
+        set
+        {
+            if (_rows.TopIndex == value)
+                return;
+
+            _rows.ScrollTo(value);
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>The row a node occupies in the flattened tree, or -1 when it is not visible.</summary>
+    /// <remarks>
+    /// The other half of holding a scroll position: without it a caller can name the node it wants
+    /// at the top but cannot say which row that has become.
+    /// </remarks>
+    public int RowOf(TreeNode node) => _rows.IndexOf(node);
 
     /// <summary>The number of rows the expanded part of the tree currently occupies.</summary>
     public int VisibleNodeCount => _rows.Count;
