@@ -615,4 +615,81 @@ internal sealed class TreeListViewTests
             Assert.That(tree.Nodes[0].Nodes[0].IsExpanded, Is.False);
         });
     }
+
+    /// <summary>
+    /// A list whose contents are rebuilt while somebody is reading it has to be able to hold its
+    /// place. The index alone cannot do that — the rows underneath it change — so the caller needs
+    /// to name a node and ask which row it has become.
+    /// </summary>
+    [Test]
+    public void TopIndex_can_be_set_and_RowOf_finds_a_nodes_row()
+    {
+        var tree = MakeTree();
+        // Short enough that the five expanded rows do not all fit: a list with nothing to scroll
+        // clamps every position to zero, which is correct and proves nothing.
+        tree.Bounds = new(0, 0, 400, 66);
+        tree.ExpandAll();
+        Realize(tree);
+
+        var leaf = tree.Nodes[0].Nodes[0].Nodes[0];
+        var row = tree.RowOf(leaf);
+        Assert.That(row, Is.EqualTo(2), "root0, child00, leaf000");
+
+        tree.TopIndex = row;
+        Assert.That(tree.TopIndex, Is.EqualTo(row));
+    }
+
+    [Test]
+    public void A_list_with_nothing_to_scroll_stays_at_the_top()
+    {
+        var tree = MakeTree();
+        tree.ExpandAll();
+        Realize(tree);
+
+        // Five rows in a ten-row viewport: there is nowhere to scroll to.
+        tree.TopIndex = 3;
+        Assert.That(tree.TopIndex, Is.Zero);
+    }
+
+    [Test]
+    public void RowOf_returns_minus_one_for_a_node_no_row_shows()
+    {
+        var tree = MakeTree();
+        Realize(tree);
+
+        // Collapsed: the child occupies no row at all.
+        Assert.That(tree.RowOf(tree.Nodes[0].Nodes[0]), Is.EqualTo(-1));
+    }
+
+    /// <summary>
+    /// A caller restoring a remembered position may name a row that has since gone. Clamping keeps
+    /// that a no-op rather than an exception in the middle of a refresh.
+    /// </summary>
+    [Test]
+    public void TopIndex_is_clamped_rather_than_throwing()
+    {
+        var tree = MakeTree();
+        tree.ExpandAll();
+        Realize(tree);
+
+        tree.TopIndex = 9999;
+        Assert.That(tree.TopIndex, Is.LessThan(tree.VisibleNodeCount));
+
+        tree.TopIndex = -5;
+        Assert.That(tree.TopIndex, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void Setting_TopIndex_to_what_it_already_is_changes_nothing()
+    {
+        var tree = MakeTree();
+        tree.ExpandAll();
+        Realize(tree);
+
+        tree.TopIndex = 2;
+        var before = tree.TopIndex;
+        tree.TopIndex = 2;
+        Assert.That(tree.TopIndex, Is.EqualTo(before));
+    }
+
 }
