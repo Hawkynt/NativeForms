@@ -191,6 +191,15 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>The number of rows the expanded part of the tree currently occupies.</summary>
     public int VisibleNodeCount => _rows.Count;
 
+    /// <summary>The node showing at a row, or null when the tree has no such row.</summary>
+    /// <remarks>
+    /// The inverse of <see cref="RowOf"/>, and the cheap way to note where a view is before a
+    /// rebuild: without it a caller has to ask <see cref="RowOf"/> about every node it holds to find
+    /// the one row it cares about.
+    /// </remarks>
+    // Count flattens the tree if it is stale, so the bounds check is also what makes the read safe.
+    public TreeNode? NodeAt(int row) => (uint)row < (uint)_rows.Count ? _rows[row] : null;
+
     /// <summary>
     /// Raised for every cell before it is painted, so a caller can draw one itself.
     /// </summary>

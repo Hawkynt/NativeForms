@@ -692,4 +692,41 @@ internal sealed class TreeListViewTests
         Assert.That(tree.TopIndex, Is.EqualTo(before));
     }
 
+    [Test]
+    public void NodeAt_and_RowOf_are_inverses()
+    {
+        var tree = new TreeListView();
+        var parent = tree.Nodes.Add("parent");
+        var child = parent.Nodes.Add("child");
+        parent.Expand();
+        var second = tree.Nodes.Add("second");
+
+        Assert.That(tree.NodeAt(0), Is.SameAs(parent));
+        Assert.That(tree.NodeAt(1), Is.SameAs(child));
+        Assert.That(tree.NodeAt(2), Is.SameAs(second));
+        Assert.That(tree.NodeAt(tree.RowOf(child)), Is.SameAs(child));
+    }
+
+    [Test]
+    public void NodeAt_returns_null_off_either_end()
+    {
+        var tree = new TreeListView();
+        tree.Nodes.Add("only");
+
+        Assert.That(tree.NodeAt(-1), Is.Null);
+        Assert.That(tree.NodeAt(1), Is.Null);
+    }
+
+    /// <summary>A collapsed subtree occupies no rows, so its children are behind no index at all.</summary>
+    [Test]
+    public void NodeAt_skips_rows_a_collapsed_parent_does_not_have()
+    {
+        var tree = new TreeListView();
+        var parent = tree.Nodes.Add("parent");
+        parent.Nodes.Add("hidden");
+        var second = tree.Nodes.Add("second");
+
+        Assert.That(tree.NodeAt(1), Is.SameAs(second));
+    }
+
 }
