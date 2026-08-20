@@ -13,6 +13,7 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
 {
     private readonly nint _fixed;
+    private readonly nint _layout;
 
     /// <summary>Whether a <see cref="RunModal"/> loop currently owns this window.</summary>
     private bool _modal;
@@ -43,8 +44,22 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     internal GtkWindowPeer()
     {
         _widget = NativeMethods.gtk_window_new(NativeMethods.GTK_WINDOW_TOPLEVEL);
+        // The children live in a GtkFixed, as they always have, but that fixed hangs inside a
+        // GtkLayout rather than directly in the window.
+        //
+        // A GtkFixed reports the union of its children's size requests as its own minimum, and a
+        // window's minimum becomes the WM_NORMAL_HINTS floor a window manager enforces. Every child
+        // sized to fill the form therefore made the window's current size its smallest size — so it
+        // could be grown and never shrunk, and each growth ratcheted the floor up again. It read as
+        // a window that does not resize at all.
+        //
+        // GtkLayout is the same fixed-position container with one difference that matters here: it
+        // reports a minimum of zero, because it is scrollable and expects to be smaller than its
+        // content. That breaks the feedback loop without changing where a single child sits.
+        _layout = NativeMethods.gtk_layout_new(0, 0);
         _fixed = NativeMethods.gtk_fixed_new();
-        NativeMethods.gtk_container_add(_widget, _fixed);
+        NativeMethods.gtk_layout_put(_layout, _fixed, 0, 0);
+        NativeMethods.gtk_container_add(_widget, _layout);
 
         this.PinSelf();
         unsafe
@@ -117,6 +132,7 @@ internal sealed class GtkWindowPeer : GtkControlPeer, IWindowPeer
     public void Show()
     {
         NativeMethods.gtk_widget_show(_fixed);
+        NativeMethods.gtk_widget_show(_layout);
         NativeMethods.gtk_widget_show(_widget);
     }
 

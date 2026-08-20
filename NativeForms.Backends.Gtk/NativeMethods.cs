@@ -50,6 +50,16 @@ internal static partial class NativeMethods
     [LibraryImport(Gtk)]
     internal static partial nint gtk_fixed_new();
 
+    /// <summary>
+    /// A <c>GtkLayout</c>: a fixed-position container that, unlike <c>GtkFixed</c>, reports a
+    /// minimum size of zero rather than the union of its children's.
+    /// </summary>
+    [LibraryImport("libgtk-3.so.0")]
+    internal static partial nint gtk_layout_new(nint horizontal, nint vertical);
+
+    [LibraryImport("libgtk-3.so.0")]
+    internal static partial void gtk_layout_put(nint layout, nint widget, int x, int y);
+
     /// <summary>Adds <paramref name="widget"/> to the single-child container <paramref name="container"/>.</summary>
     [LibraryImport(Gtk)]
     internal static partial void gtk_container_add(nint container, nint widget);
