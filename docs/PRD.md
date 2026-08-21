@@ -468,7 +468,8 @@ strategy (may differ per platform; note exceptions inline).
       virtualized at 100k nodes, `SetDataSource` with reflection-free children selector +
       cycle-bounding depth guard, horizontal scrolling when the columns are wider than the control
       (`HorizontalOffset`/`MaxHorizontalOffset`, a bar along the bottom, shifted wheel, and the
-      header and hit-testing travelling with the columns); column sorting, interactive column
+      header and hit-testing travelling with the columns), frozen columns pinned at the left
+      (`TreeListViewColumn.Frozen`, the leading run only); column sorting, interactive column
       resize, label editing pending
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
   - [x] Column types (single `DataGridViewColumn` + `Kind` enum + per-kind selectors, one

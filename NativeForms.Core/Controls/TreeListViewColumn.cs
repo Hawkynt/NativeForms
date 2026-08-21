@@ -44,4 +44,26 @@ public sealed class TreeListViewColumn : ColumnHeader
             this.OnChanged();
         }
     }
+
+    /// <summary>
+    /// Whether the column is pinned to the left edge, staying put while
+    /// <see cref="TreeListView.HorizontalOffset"/> scrolls the rest underneath it.
+    /// </summary>
+    /// <remarks>
+    /// The frozen columns are the leading run of the list: freezing the third column without the two
+    /// before it would leave a pinned column with a hole beside it, so everything up to the last
+    /// frozen one is pinned. A table whose every column is frozen simply does not scroll.
+    /// </remarks>
+    public bool Frozen
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.OnChanged();
+        }
+    }
 }

@@ -19,18 +19,34 @@ internal static class HeaderRowPainter
     /// cells move, so a header scrolled halfway still looks like a header rather than like a row of
     /// captions floating over the background.
     /// </param>
-    public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight, int offset = 0)
+    /// <param name="frozen">
+    /// How many columns at the left are pinned. They are drawn where they belong and the rest are
+    /// drawn shifted, so a pinned caption stays over its own column while the others move.
+    /// </param>
+    public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight, int offset = 0, int frozen = 0)
     {
         // The band fill also covers the residual area beyond the last column; each cell face then
         // comes from the shared header-cell primitive so the band matches every other header.
         g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, width, headerHeight));
 
+        // The scrolling columns first, so a pinned one drawn afterwards covers whatever slid under it
+        // rather than being covered by it.
         var x = -offset;
         for (var c = 0; c < columns.Count; ++c)
         {
             var col = columns[c];
-            GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
+            if (c >= frozen)
+                GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
+
             x += col.Width;
+        }
+
+        var pinned = 0;
+        for (var c = 0; c < frozen && c < columns.Count; ++c)
+        {
+            var col = columns[c];
+            GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(pinned, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
+            pinned += col.Width;
         }
 
         g.DrawLine(theme.Border, 0, headerHeight - 1, width, headerHeight - 1);
