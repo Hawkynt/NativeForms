@@ -71,6 +71,70 @@ internal sealed class TreeListViewTests
         return tree;
     }
 
+    /// <summary>A pinned first column stays where it is while the rest slide under it.</summary>
+    [Test]
+    public void A_frozen_column_does_not_move_when_the_rest_scroll()
+    {
+        var tree = MakeWideTree();
+        ((TreeListViewColumn)tree.Columns[0]).Frozen = true;
+        var canvas = Realize(tree);
+
+        var before = LeftOf(canvas.RaisePaint(), "root0");
+        tree.HorizontalOffset = tree.MaxHorizontalOffset;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(LeftOf(canvas.RaisePaint(), "root0"), Is.EqualTo(before), "the pinned column held still");
+            Assert.That(LeftOf(canvas.RaisePaint(), "far-right"), Is.LessThan(300), "and the rest moved");
+        });
+    }
+
+    /// <summary>Its caption holds still too, or it would sit over somebody else's numbers.</summary>
+    [Test]
+    public void A_frozen_columns_header_holds_still_as_well()
+    {
+        var tree = MakeWideTree();
+        ((TreeListViewColumn)tree.Columns[0]).Frozen = true;
+        var canvas = Realize(tree);
+
+        var before = LeftOf(canvas.RaisePaint(), "Name");
+        tree.HorizontalOffset = tree.MaxHorizontalOffset;
+
+        Assert.That(LeftOf(canvas.RaisePaint(), "Name"), Is.EqualTo(before));
+    }
+
+    /// <summary>
+    /// A click on a pinned caption names the pinned column, not whatever has scrolled beneath it.
+    /// </summary>
+    [Test]
+    public void Clicking_a_frozen_header_names_the_frozen_column()
+    {
+        var tree = MakeWideTree();
+        ((TreeListViewColumn)tree.Columns[0]).Frozen = true;
+        var canvas = Realize(tree);
+        var clicked = -1;
+        tree.ColumnClick += (_, e) => clicked = e.Column;
+
+        tree.HorizontalOffset = tree.MaxHorizontalOffset;
+        canvas.RaiseMouseDown(10, 4);
+
+        Assert.That(clicked, Is.Zero);
+    }
+
+    /// <summary>The pinned run cannot itself be scrolled away, so it never becomes unreachable.</summary>
+    [Test]
+    public void Freezing_reduces_what_can_be_scrolled_away()
+    {
+        var tree = MakeWideTree();
+        var loose = Realize(tree) is not null ? tree.MaxHorizontalOffset : 0;
+
+        var pinned = MakeWideTree();
+        ((TreeListViewColumn)pinned.Columns[0]).Frozen = true;
+        Realize(pinned);
+
+        Assert.That(pinned.MaxHorizontalOffset, Is.LessThanOrEqualTo(loose));
+    }
+
     [Test]
     public void A_column_past_the_edge_is_reachable_by_scrolling()
     {

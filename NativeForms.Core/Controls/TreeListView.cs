@@ -284,6 +284,45 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <summary>The width the rows and the header have, which is the control's less any bar.</summary>
     protected int ContentWidth => this.Width - (this.HasScrollBar ? this.Theme.ScrollBarSize : 0);
 
+    /// <summary>
+    /// The width of the pinned run at the left, which never scrolls.
+    /// </summary>
+    /// <remarks>
+    /// The leading run rather than "every column marked frozen": a pinned third column with two
+    /// scrolling ones before it would leave a hole beside it that nothing could fill. So the run
+    /// stops at the first column that is not frozen, and anything marked after that is treated as
+    /// ordinary — the alternative is a layout that cannot be drawn.
+    /// </remarks>
+    protected int FrozenWidth
+    {
+        get
+        {
+            var total = 0;
+            for (var c = 0; c < this.Columns.Count; ++c)
+            {
+                if (this.Columns[c] is not TreeListViewColumn { Frozen: true })
+                    break;
+
+                total += this.Columns[c].Width;
+            }
+
+            return total;
+        }
+    }
+
+    /// <summary>How many columns at the left are pinned.</summary>
+    private int FrozenCount
+    {
+        get
+        {
+            var count = 0;
+            while (count < this.Columns.Count && this.Columns[count] is TreeListViewColumn { Frozen: true })
+                ++count;
+
+            return count;
+        }
+    }
+
     /// <summary>Everything the columns ask for, whether or not it fits.</summary>
     protected int TotalColumnWidth
     {
@@ -334,7 +373,8 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// The furthest the table can be scrolled sideways: everything the columns want, less what the
     /// control can show at once. Nought when they already fit.
     /// </summary>
-    public int MaxHorizontalOffset => Math.Max(0, this.TotalColumnWidth - this.ContentWidth);
+    public int MaxHorizontalOffset
+        => Math.Max(0, this.TotalColumnWidth - Math.Max(this.FrozenWidth, this.ContentWidth));
 
     /// <summary>The strip along the bottom, inside the border and clear of any vertical bar.</summary>
     private Rectangle HorizontalScrollBarStrip
@@ -504,7 +544,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
             _lastClickNode = null;
             // In the columns' own coordinates, not the control's, or a scrolled table sorts by
             // whichever column happens to be under the pointer's unscrolled position.
-            this.RaiseColumnClick(e.X + this.HorizontalOffset);
+            this.RaiseColumnClick(this.ColumnCoordinate(e.X));
             return;
         }
 
@@ -520,7 +560,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         var indent = this.ItemHeight;
         // Column coordinates: the glyph and the check box moved with their column when the table
         // scrolled, so the pointer has to be put back into the same frame they were drawn in.
-        var pointerX = e.X + this.HorizontalOffset;
+        var pointerX = this.ColumnCoordinate(e.X);
         var glyphCellLeft = node.Level * indent;
         var contentLeft = glyphCellLeft + indent;
 
@@ -558,6 +598,20 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     }
 
     /// <summary>Maps an x inside the header onto a column and reports the click.</summary>
+    /// <summary>
+    /// Turns a position on the control into a position in the columns.
+    /// </summary>
+    /// <remarks>
+    /// A pinned column is where it looks; everything else moved left by the scroll offset. Asking
+    /// this rather than adding the offset unconditionally is what stops a click on a pinned caption
+    /// from selecting whichever column has scrolled underneath it.
+    /// </remarks>
+    private int ColumnCoordinate(int x)
+    {
+        var frozenWidth = this.FrozenWidth;
+        return x < frozenWidth ? x : x + this.HorizontalOffset;
+    }
+
     private void RaiseColumnClick(int x)
     {
         if (this.ColumnClick is null || this.HeaderHeight <= 0)
@@ -633,7 +687,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         var rowHeight = this.ItemHeight;
         var headerHeight = this.HeaderHeight;
         if (headerHeight > 0)
-            HeaderRowPainter.Draw(g, theme, this.Columns, this.ContentWidth, headerHeight, this.HorizontalOffset);
+            HeaderRowPainter.Draw(g, theme, this.Columns, this.ContentWidth, headerHeight, this.HorizontalOffset, this.FrozenCount);
 
         var top = _rows.TopIndex;
         var last = Math.Min(_rows.Count, top + this.VisibleRowCount + 1);
@@ -681,10 +735,22 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
             return;
         }
 
-        var x = -this.HorizontalOffset;
+        // Twice: the scrolling columns, then the pinned run over whatever slid underneath it. Drawing
+        // them in one pass would leave a scrolled cell on top of the column that is supposed to be
+        // holding still.
+        var frozen = this.FrozenCount;
+        for (var pass = 0; pass < 2; ++pass)
+        {
+        var x = pass == 0 ? -this.HorizontalOffset : 0;
         for (var c = 0; c < this.Columns.Count; ++c)
         {
             var col = this.Columns[c];
+            if ((pass == 0 && c < frozen) || (pass == 1 && c >= frozen))
+            {
+                x += col.Width;
+                continue;
+            }
+
             var cell = new Rectangle(x, y, col.Width, rowHeight);
             g.PushClip(cell);
 
@@ -710,6 +776,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 
             g.PopClip();
             x += col.Width;
+        }
         }
     }
 
