@@ -14,13 +14,18 @@ internal static class HeaderRowPainter
     private const int _CellPad = 2;
 
     /// <summary>Draws the band across the top of a control that is <paramref name="width"/> pixels wide.</summary>
-    public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight)
+    /// <param name="offset">
+    /// How far the columns are scrolled sideways. The band and its underline stay put; only the
+    /// cells move, so a header scrolled halfway still looks like a header rather than like a row of
+    /// captions floating over the background.
+    /// </param>
+    public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight, int offset = 0)
     {
         // The band fill also covers the residual area beyond the last column; each cell face then
         // comes from the shared header-cell primitive so the band matches every other header.
         g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, width, headerHeight));
 
-        var x = 0;
+        var x = -offset;
         for (var c = 0; c < columns.Count; ++c)
         {
             var col = columns[c];

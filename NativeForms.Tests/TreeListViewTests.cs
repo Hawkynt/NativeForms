@@ -46,6 +46,127 @@ internal sealed class TreeListViewTests
         return tree;
     }
 
+    /// <summary>Where a piece of drawn text ended up, which is the only way to tell clipped from absent.</summary>
+    private static int LeftOf(RecordingGraphics g, string text)
+    {
+        foreach (var (drawn, bounds) in g.TextRects)
+            if (drawn.Contains(text, StringComparison.Ordinal))
+                return bounds.X;
+
+        Assert.Fail($"nothing drew {text}");
+        return -1;
+    }
+
+    /// <summary>A tree whose columns are wider than the control, so there is something to reach.</summary>
+    private static TreeListView MakeWideTree()
+    {
+        var tree = new TreeListView { Bounds = new(0, 0, 300, 242) };
+        tree.Columns.AddRange(
+        [
+            new TreeListViewColumn("Name", 200),
+            new TreeListViewColumn("Size", 200, static n => n.Tag as string ?? string.Empty),
+            new TreeListViewColumn("Owner", 200, static _ => "far-right"),
+        ]);
+        tree.Nodes.Add("root0").Tag = "10 KB";
+        return tree;
+    }
+
+    [Test]
+    public void A_column_past_the_edge_is_reachable_by_scrolling()
+    {
+        var tree = MakeWideTree();
+        var canvas = Realize(tree);
+
+        // 600px of columns in a 300px control: the third column begins past its right-hand edge. The
+        // cell is still painted — it is clipped, not skipped — so the question is where it landed.
+        Assert.That(LeftOf(canvas.RaisePaint(), "far-right"), Is.GreaterThanOrEqualTo(300), "outside the control");
+
+        tree.HorizontalOffset = tree.MaxHorizontalOffset;
+
+        Assert.That(LeftOf(canvas.RaisePaint(), "far-right"), Is.LessThan(300), "scrolled into view");
+    }
+
+    [Test]
+    public void The_offset_never_scrolls_past_the_last_column()
+    {
+        var tree = MakeWideTree();
+        Realize(tree);
+
+        tree.HorizontalOffset = 10_000;
+
+        // 600 of columns less the 300 the control has: half of it can ever be off to the left.
+        Assert.That(tree.HorizontalOffset, Is.EqualTo(300));
+    }
+
+    [Test]
+    public void A_table_that_fits_does_not_scroll_at_all()
+    {
+        var tree = MakeTree();
+        Realize(tree);
+
+        tree.HorizontalOffset = 500;
+
+        Assert.That(tree.HorizontalOffset, Is.Zero, "280px of columns in a 400px control has nowhere to go");
+    }
+
+    [Test]
+    public void The_offset_is_never_negative()
+    {
+        var tree = MakeWideTree();
+        Realize(tree);
+
+        tree.HorizontalOffset = -50;
+
+        Assert.That(tree.HorizontalOffset, Is.Zero);
+    }
+
+    /// <summary>
+    /// The header travels with its columns. A caption left behind over a different column is worse
+    /// than no caption at all, because it is confidently wrong about what the numbers under it are.
+    /// </summary>
+    [Test]
+    public void The_header_scrolls_with_the_columns()
+    {
+        var tree = MakeWideTree();
+        var canvas = Realize(tree);
+
+        tree.HorizontalOffset = 400;
+
+        Assert.That(canvas.RaisePaint().DrewText("Owner"), Is.True);
+    }
+
+    /// <summary>
+    /// Clicking a header sorts by the column under the pointer, and once the table has scrolled that
+    /// is not the column that would have been there before.
+    /// </summary>
+    [Test]
+    public void A_header_click_names_the_column_under_the_pointer_after_scrolling()
+    {
+        var tree = MakeWideTree();
+        var canvas = Realize(tree);
+        var clicked = -1;
+        tree.ColumnClick += (_, e) => clicked = e.Column;
+
+        tree.HorizontalOffset = tree.MaxHorizontalOffset;
+        // Scrolled as far as it goes, 300px of columns are off to the left, so 150px into the
+        // control is 450px into the columns — the third one.
+        canvas.RaiseMouseDown(150, 4);
+
+        Assert.That(clicked, Is.EqualTo(2));
+    }
+
+    /// <summary>A shifted wheel is what a hand reaches for, and it must not move the rows.</summary>
+    [Test]
+    public void A_shifted_wheel_scrolls_sideways_rather_than_down()
+    {
+        var tree = MakeWideTree();
+        var canvas = Realize(tree);
+
+        canvas.RaiseMouseWheel(-120, 10, 40, KeyModifiers.Shift);
+
+        Assert.That(tree.HorizontalOffset, Is.GreaterThan(0));
+    }
+
     [Test]
     public void Paint_draws_headers_tree_cells_and_selector_subitems()
     {
