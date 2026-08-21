@@ -36,6 +36,11 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 
     /// <summary>Painted only while there are more rows than fit.</summary>
     private readonly RowScrollBar _scrollBar = new();
+
+    /// <summary>Whether the sideways bar is being dragged, and where the drag started.</summary>
+    private bool _horizontalDragging;
+    private int _horizontalGrabX;
+    private int _horizontalGrabOffset;
     private readonly List<TreeListViewColumn> _watchedColumns = [];
     private TreeNode? _selectedNode;
     private int? _itemHeight;
@@ -270,13 +275,70 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     protected int HeaderHeight => this.ShowColumnHeaders ? this.ItemHeight : 0;
 
     /// <summary>The number of fully visible rows in the item area.</summary>
-    protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.ItemHeight);
+    protected int VisibleRowCount
+        => Math.Max(1, (this.Height - this.HeaderHeight - this.HorizontalBarHeight) / this.ItemHeight);
 
     /// <summary>Whether the tree is showing a scrollbar of its own.</summary>
     private bool HasScrollBar => RowScrollBar.IsNeeded(_rows.Count, this.VisibleRowCount);
 
     /// <summary>The width the rows and the header have, which is the control's less any bar.</summary>
     protected int ContentWidth => this.Width - (this.HasScrollBar ? this.Theme.ScrollBarSize : 0);
+
+    /// <summary>Everything the columns ask for, whether or not it fits.</summary>
+    protected int TotalColumnWidth
+    {
+        get
+        {
+            var total = 0;
+            for (var c = 0; c < this.Columns.Count; ++c)
+                total += this.Columns[c].Width;
+
+            return total;
+        }
+    }
+
+    /// <summary>
+    /// Whether the columns are wider than the control, so there is something to scroll to.
+    /// </summary>
+    /// <remarks>
+    /// Measured against the width less a vertical bar's worth, rather than against
+    /// <see cref="ContentWidth"/>: that would ask whether a vertical bar is showing, which asks how
+    /// many rows are visible, which asks whether a horizontal bar is taking a row's worth of height.
+    /// Assuming the vertical bar shows the horizontal one slightly sooner than strictly necessary,
+    /// which is the harmless side of the trade.
+    /// </remarks>
+    private bool HasHorizontalScrollBar
+        => this.Columns.Count > 0 && this.TotalColumnWidth > this.Width - this.Theme.ScrollBarSize;
+
+    private int HorizontalBarHeight => this.HasHorizontalScrollBar ? this.Theme.ScrollBarSize : 0;
+
+    /// <summary>
+    /// How far the columns are scrolled sideways, in pixels.
+    /// </summary>
+    /// <remarks>
+    /// Clamped on the way out rather than on the way in, because the columns can change width after
+    /// a value is set and an offset that was legal a moment ago must not leave the table showing
+    /// blank space to the right of its last column.
+    /// </remarks>
+    public int HorizontalOffset
+    {
+        get => Math.Min(field, this.MaxHorizontalOffset);
+        set
+        {
+            field = Math.Max(0, value);
+            this.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// The furthest the table can be scrolled sideways: everything the columns want, less what the
+    /// control can show at once. Nought when they already fit.
+    /// </summary>
+    public int MaxHorizontalOffset => Math.Max(0, this.TotalColumnWidth - this.ContentWidth);
+
+    /// <summary>The strip along the bottom, inside the border and clear of any vertical bar.</summary>
+    private Rectangle HorizontalScrollBarStrip
+        => new(1, this.Height - this.Theme.ScrollBarSize - 1, Math.Max(0, this.ContentWidth - 2), this.Theme.ScrollBarSize);
 
     /// <summary>The bar runs below the header, so it never covers a column caption.</summary>
     private Rectangle ScrollBarStrip
@@ -425,11 +487,24 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
             }
         }
 
+        if (this.HasHorizontalScrollBar && this.HorizontalScrollBarStrip.Contains(e.Location))
+        {
+            // Anywhere on the strip grabs it: the thumb is small on a wide table, and a click that
+            // does nothing because it missed by two pixels reads as a table that cannot scroll.
+            _lastClickNode = null;
+            _horizontalDragging = true;
+            _horizontalGrabX = e.X;
+            _horizontalGrabOffset = this.HorizontalOffset;
+            return;
+        }
+
         var contentY = e.Y - this.HeaderHeight;
         if (contentY < 0)
         {
             _lastClickNode = null;
-            this.RaiseColumnClick(e.X);
+            // In the columns' own coordinates, not the control's, or a scrolled table sorts by
+            // whichever column happens to be under the pointer's unscrolled position.
+            this.RaiseColumnClick(e.X + this.HorizontalOffset);
             return;
         }
 
@@ -443,22 +518,25 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 
         var node = _rows[row];
         var indent = this.ItemHeight;
+        // Column coordinates: the glyph and the check box moved with their column when the table
+        // scrolled, so the pointer has to be put back into the same frame they were drawn in.
+        var pointerX = e.X + this.HorizontalOffset;
         var glyphCellLeft = node.Level * indent;
         var contentLeft = glyphCellLeft + indent;
 
         // The glyph/check cells only react inside the tree column — painting clips them there, so a
         // click on a neighboring column always selects even when a deep node's cells would overlap.
         var treeCellRight = this.Columns.Count == 0 ? this.Width : this.Columns[0].Width;
-        var inTreeCell = e.X < treeCellRight;
+        var inTreeCell = pointerX < treeCellRight;
 
-        if (inTreeCell && node.HasChildren && e.X >= glyphCellLeft && e.X < contentLeft)
+        if (inTreeCell && node.HasChildren && pointerX >= glyphCellLeft && pointerX < contentLeft)
         {
             _lastClickNode = null;
             node.Toggle();
             return;
         }
 
-        if (inTreeCell && this.CheckBoxes && e.X >= contentLeft && e.X < contentLeft + _CheckCellWidth)
+        if (inTreeCell && this.CheckBoxes && pointerX >= contentLeft && pointerX < contentLeft + _CheckCellWidth)
         {
             _lastClickNode = null;
             node.Checked = !node.Checked;
@@ -502,6 +580,14 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <inheritdoc/>
     protected override void OnMouseWheel(MouseEventArgs e)
     {
+        // A table wider than its control scrolls sideways on a shifted wheel, which is what every
+        // other table does and what a hand reaches for without being told.
+        if ((e.Modifiers & KeyModifiers.Shift) != 0 && this.HasHorizontalScrollBar)
+        {
+            this.HorizontalOffset -= Math.Sign(e.Delta) * this.ItemHeight * 3;
+            return;
+        }
+
         _rows.ScrollBy(-Math.Sign(e.Delta) * 3);
         this.Invalidate();
     }
@@ -509,6 +595,16 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     /// <inheritdoc/>
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        if (_horizontalDragging)
+        {
+            // The thumb covers the viewport's share of the whole width, so the table travels further
+            // than the pointer does, in that proportion.
+            var strip = Math.Max(1, this.HorizontalScrollBarStrip.Width);
+            this.HorizontalOffset = _horizontalGrabOffset
+                + ((e.X - _horizontalGrabX) * this.TotalColumnWidth / strip);
+            return;
+        }
+
         if (!_scrollBar.IsDragging)
             return;
 
@@ -517,7 +613,11 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     }
 
     /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e) => _scrollBar.Release();
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _scrollBar.Release();
+        _horizontalDragging = false;
+    }
 
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
@@ -533,7 +633,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         var rowHeight = this.ItemHeight;
         var headerHeight = this.HeaderHeight;
         if (headerHeight > 0)
-            HeaderRowPainter.Draw(g, theme, this.Columns, this.ContentWidth, headerHeight);
+            HeaderRowPainter.Draw(g, theme, this.Columns, this.ContentWidth, headerHeight, this.HorizontalOffset);
 
         var top = _rows.TopIndex;
         var last = Math.Min(_rows.Count, top + this.VisibleRowCount + 1);
@@ -542,6 +642,23 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
 
         if (this.HasScrollBar)
             _scrollBar.Paint(g, theme, this.ScrollBarStrip, _rows.Count, this.VisibleRowCount, _rows.TopIndex);
+
+        if (this.HasHorizontalScrollBar)
+        {
+            // The same renderer the standalone bar uses, driven straight from the offset so the
+            // thumb cannot drift from what is actually drawn.
+            var scrollable = this.TotalColumnWidth;
+            ScrollBarRenderer.Paint(
+                g,
+                theme,
+                this.HorizontalScrollBarStrip,
+                vertical: false,
+                0,
+                Math.Max(0, scrollable - 1),
+                this.HorizontalOffset,
+                Math.Max(1, scrollable - this.MaxHorizontalOffset),
+                _horizontalDragging ? ScrollBarPart.Thumb : ScrollBarPart.None);
+        }
 
         g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
     }
@@ -564,7 +681,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
             return;
         }
 
-        var x = 0;
+        var x = -this.HorizontalOffset;
         for (var c = 0; c < this.Columns.Count; ++c)
         {
             var col = this.Columns[c];
@@ -582,7 +699,7 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
             if (!handled)
             {
                 if (c == 0)
-                    this.PaintTreeCell(g, theme, node, selected, textColor, col.Width, y, rowHeight);
+                    this.PaintTreeCell(g, theme, node, selected, textColor, col.Width, y, rowHeight, x);
                 else
                 {
                     var text = col.TextSelector?.Invoke(node) ?? string.Empty;
@@ -596,10 +713,15 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         }
     }
 
-    private void PaintTreeCell(IGraphics g, ITheme theme, TreeNode node, bool selected, Color textColor, int width, int y, int rowHeight)
+    /// <param name="left">
+    /// Where the tree column begins on screen, which is not nought once the table is scrolled
+    /// sideways. The glyph and the check box hang off it, so passing it in is what keeps them with
+    /// their own column rather than pinned to the edge of the control.
+    /// </param>
+    private void PaintTreeCell(IGraphics g, ITheme theme, TreeNode node, bool selected, Color textColor, int width, int y, int rowHeight, int left = 0)
     {
         var indent = rowHeight;
-        var glyphCellLeft = node.Level * indent;
+        var glyphCellLeft = left + (node.Level * indent);
         var contentLeft = glyphCellLeft + indent;
 
         if (node.HasChildren)

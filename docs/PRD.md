@@ -466,7 +466,10 @@ strategy (may differ per platform; note exceptions inline).
       factored (`ITreeNodeHost`, `TreeRowList`, `TreeNavigation`, `HeaderRowPainter`,
       `ExpandGlyph` — glyphs pixel-identical to TreeView), per-node icons, full keyboard parity,
       virtualized at 100k nodes, `SetDataSource` with reflection-free children selector +
-      cycle-bounding depth guard; column sorting, interactive column resize, label editing pending
+      cycle-bounding depth guard, horizontal scrolling when the columns are wider than the control
+      (`HorizontalOffset`/`MaxHorizontalOffset`, a bar along the bottom, shifted wheel, and the
+      header and hit-testing travelling with the columns); column sorting, interactive column
+      resize, label editing pending
 - [~] `DataGridView` (owner) — **flagship owner-drawn control**:
   - [x] Column types (single `DataGridViewColumn` + `Kind` enum + per-kind selectors, one
         allocation-free paint switch): [x] text, [x] image, [x] image+text, [x] check (toggle via
