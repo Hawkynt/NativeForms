@@ -209,6 +209,33 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     public TreeNode? NodeAt(int row) => (uint)row < (uint)_rows.Count ? _rows[row] : null;
 
     /// <summary>
+    /// Which row is under a point in the control's own coordinates, or -1 for none.
+    /// </summary>
+    /// <remarks>
+    /// The arithmetic the mouse handlers already do, made available to a caller — a table that wants
+    /// to say something about the row under the pointer, rather than about the row that is selected,
+    /// has no other way to find out which one that is. The header is not a row and neither is the
+    /// empty space below the last one, and both answer -1 rather than the nearest row: a tooltip
+    /// that describes whatever is nearest to a pointer resting on nothing is worse than none.
+    /// </remarks>
+    public int RowAt(Point point)
+    {
+        var contentY = point.Y - this.HeaderHeight;
+        if (contentY < 0)
+            return -1;
+
+        var row = _rows.TopIndex + (contentY / this.ItemHeight);
+        return (uint)row < (uint)_rows.Count ? row : -1;
+    }
+
+    /// <summary>The node under a point, or null for the header, the empty space, or a stale tree.</summary>
+    public TreeNode? NodeAt(Point point)
+    {
+        var row = this.RowAt(point);
+        return row < 0 ? null : _rows[row];
+    }
+
+    /// <summary>
     /// Raised for every cell before it is painted, so a caller can draw one itself.
     /// </summary>
     /// <remarks>
@@ -272,7 +299,16 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
     protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
 
     /// <summary>The pixel height reserved for the header row (0 while headers are hidden).</summary>
-    protected int HeaderHeight => this.ShowColumnHeaders ? this.ItemHeight : 0;
+    /// <summary>
+    /// How much of the top of the control the column headers take, or nought when they are hidden.
+    /// </summary>
+    /// <remarks>
+    /// Public alongside <see cref="ItemHeight"/> because the two together are what a caller needs to
+    /// reason about where a row is: placing something over a row, or working out which row a point
+    /// belongs to, is not possible from outside without both. It was protected while nothing outside
+    /// the control had a reason to ask.
+    /// </remarks>
+    public int HeaderHeight => this.ShowColumnHeaders ? this.ItemHeight : 0;
 
     /// <summary>The number of fully visible rows in the item area.</summary>
     protected int VisibleRowCount

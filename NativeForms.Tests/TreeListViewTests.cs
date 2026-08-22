@@ -878,6 +878,47 @@ internal sealed class TreeListViewTests
     }
 
     [Test]
+    public void RowAt_finds_the_row_under_a_point()
+    {
+        var tree = new TreeListView();
+        var first = tree.Nodes.Add("first");
+        var second = tree.Nodes.Add("second");
+
+        var y = tree.HeaderHeight;
+        Assert.That(tree.RowAt(new(4, y)), Is.EqualTo(0));
+        Assert.That(tree.NodeAt(new Point(4, y)), Is.SameAs(first));
+        Assert.That(tree.NodeAt(new Point(4, y + tree.ItemHeight)), Is.SameAs(second));
+    }
+
+    /// <summary>
+    /// The header is not a row and neither is the empty space under the last one. Both answer -1
+    /// rather than the nearest row: something describing whatever is closest to a pointer resting on
+    /// nothing is worse than nothing at all.
+    /// </summary>
+    [Test]
+    public void RowAt_says_nothing_for_the_header_and_the_empty_space()
+    {
+        var tree = new TreeListView();
+        tree.Nodes.Add("only");
+
+        Assert.That(tree.RowAt(new(4, 0)), Is.EqualTo(-1), "the header");
+        Assert.That(tree.RowAt(new(4, tree.HeaderHeight + tree.ItemHeight * 5)), Is.EqualTo(-1), "past the end");
+        Assert.That(tree.NodeAt(new Point(4, 0)), Is.Null);
+    }
+
+    /// <summary>And it follows the scroll, or a scrolled table names the wrong row.</summary>
+    [Test]
+    public void RowAt_follows_the_scroll()
+    {
+        var tree = new TreeListView();
+        for (var i = 0; i < 20; ++i)
+            tree.Nodes.Add("row " + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        tree.TopIndex = 5;
+        Assert.That(tree.RowAt(new(4, tree.HeaderHeight)), Is.EqualTo(5));
+    }
+
+    [Test]
     public void NodeAt_and_RowOf_are_inverses()
     {
         var tree = new TreeListView();
