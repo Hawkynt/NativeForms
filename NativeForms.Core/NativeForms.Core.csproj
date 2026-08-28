@@ -48,4 +48,9 @@
           Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- PackageReadmeFile names the README inside the package; it does not put it there. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>

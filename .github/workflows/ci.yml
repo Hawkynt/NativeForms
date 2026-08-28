@@ -31,6 +31,12 @@ jobs:
         run: dotnet restore NativeForms.sln
       - name: Build
         run: dotnet build NativeForms.sln --configuration Release --no-restore
+      # The package READMEs must follow the house template, and their API reference must still match
+      # the assemblies just built. The template lives in RepositoryTemplate; nothing is copied here.
+      # One OS only: the reference must not depend on which runner produced it.
+      - name: Check package READMEs
+        if: matrix.os == 'ubuntu-latest'
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
       - name: Test
         run: dotnet test NativeForms.sln --configuration Release --no-build --logger "trx;LogFileName=tests.trx"
       - name: Upload test results

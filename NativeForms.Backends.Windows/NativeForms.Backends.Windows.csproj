@@ -30,4 +30,9 @@
     <ProjectReference Include="..\NativeForms.Core\NativeForms.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- PackageReadmeFile names the README inside the package; it does not put it there. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>
