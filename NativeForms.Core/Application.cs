@@ -18,7 +18,7 @@ public static class Application
     /// Set it to <see langword="false"/> before <see cref="Run(Form)"/> for pixel-identical rendering on
     /// every platform, which is what a screenshot-comparing test suite wants. A backend that does not
     /// implement a given widget declines regardless, so this is a preference and never a guarantee; an
-    /// individual control can override it (for example <see cref="CheckBox.UseNativeWidget"/>).
+    /// individual control can override it (see <see cref="Control.UseNativeWidget"/>).
     /// </remarks>
     public static bool PreferNativeWidgets { get; set; } = true;
 

@@ -14,6 +14,11 @@ internal static class HeaderRowPainter
     private const int _CellPad = 2;
 
     /// <summary>Draws the band across the top of a control that is <paramref name="width"/> pixels wide.</summary>
+    /// <param name="g">Where the band is painted.</param>
+    /// <param name="theme">Supplies the band's fill, its underline and the header cell face.</param>
+    /// <param name="columns">The headers to draw, in display order, each carrying its own width.</param>
+    /// <param name="width">How wide the control is, which is how far the band and its underline run.</param>
+    /// <param name="headerHeight">How tall the band is.</param>
     /// <param name="offset">
     /// How far the columns are scrolled sideways. The band and its underline stay put; only the
     /// cells move, so a header scrolled halfway still looks like a header rather than like a row of

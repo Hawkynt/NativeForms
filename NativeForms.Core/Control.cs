@@ -931,7 +931,7 @@ public abstract class Control
     /// <summary>
     /// (Re)subscribes an image to the shared <see cref="AnimationClock"/> when it is an animated image
     /// and the control is realized, invoking <paramref name="onFrame"/> as each frame advances, and
-    /// unsubscribes otherwise. Owner-drawn controls pass <see cref="Invalidate"/>; native-widget
+    /// unsubscribes otherwise. Owner-drawn controls pass <see cref="Invalidate()"/>; native-widget
     /// controls pass their peer re-push. The subscription is dropped centrally when the control
     /// unrealizes, so callers only re-track when the image or realized state changes.
     /// </summary>

@@ -150,12 +150,20 @@ internal static class GlyphRenderer
 
     /// <summary>Draws one column-header cell: header-colored face, the caption clipped and padded
     /// inside it, and optionally the separator after its trailing edge.</summary>
+    /// <param name="g">Where the cell is painted.</param>
+    /// <param name="theme">Supplies the face, the caption colour and the separator colour.</param>
+    /// <param name="bounds">The cell, face and all.</param>
+    /// <param name="text">The caption.</param>
+    /// <param name="alignment">Where the caption sits inside what is left of the cell after padding.</param>
+    /// <param name="textPadding">How far the caption is inset from both the leading and trailing edges.</param>
+    /// <param name="separator">Whether to draw the divider after the cell's trailing edge.</param>
     /// <param name="trailingReserve">
     /// Width kept clear at the trailing edge for glyphs the caller paints there — a sort arrow, a
     /// filter funnel. The face still fills the whole cell; only the caption gives way. Without it a
     /// right-aligned caption runs straight under those glyphs, which is invisible in a headless test
     /// and obvious on screen.
     /// </param>
+    /// <param name="font">The caption's font; <see langword="null"/> takes the theme's.</param>
     public static void DrawHeaderCell(
         IGraphics g,
         ITheme theme,
@@ -204,6 +212,9 @@ internal static class GlyphRenderer
     /// <summary>
     /// The rubber band: a wash of the accent colour inside an accent outline.
     /// </summary>
+    /// <param name="g">Where the band is painted.</param>
+    /// <param name="theme">Supplies the accent the wash and the outline are made from.</param>
+    /// <param name="band">The rectangle the drag has swept out.</param>
     /// <param name="over">
     /// The surface the band is being drawn on top of. The wash is a pre-mixed opaque colour rather
     /// than a translucent one — the Win32 <c>FillRect</c> path takes a solid brush and drops alpha

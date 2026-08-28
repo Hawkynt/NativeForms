@@ -4794,7 +4794,7 @@ Implements `IControlPeer`, `IDisposable`.
 | --- | --- | --- |
 | `GetValue` | `int GetValue()` | The widget's current position, read when it reports a change. |
 | `SetRange` | `void SetRange(int minimum, int maximum, int largeChange, int smallChange)` | Sets the scrollable range and the size of the visible window within it, which is what gives the thumb its proportional length. The reachable maximum is `maximum - largeChange + 1`, the Windows Forms convention. |
-| `SetValue` | `void SetValue(int value)` | Pushes the position into the widget without raising `ValueChanged`. |
+| `SetValue` | `void SetValue(int value)` | Pushes the position into the widget without raising `Scrolled`. |
 | `Scrolled` | `event EventHandler<ScrollEventType> Scrolled` | Raised when the user scrolls, carrying the gesture that did it — both platforms report one, and `Scroll` passes it on. Programmatic `SetValue` must not raise it. |
 
 #### `ITextBoxPeer`

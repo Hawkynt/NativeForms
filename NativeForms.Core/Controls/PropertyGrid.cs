@@ -26,7 +26,7 @@ public enum PropertyGridEditor
     /// <c>bool?</c>.</summary>
     TriState,
 
-    /// <summary>A 3×3 alignment picker whose value is a <see cref="System.Drawing.ContentAlignment"/> name
+    /// <summary>A 3×3 alignment picker whose value is a <see cref="Hawkynt.NativeForms.Drawing.ContentAlignment"/> name
     /// (e.g. <c>"MiddleCenter"</c>), or the row's <see cref="PropertyGridRow.GridValues"/> when supplied
     /// (a spatial enum picker such as dock).</summary>
     Align,
@@ -75,7 +75,7 @@ public sealed class PropertyGridRow(string name, Func<string> get, Action<string
 
     /// <summary>For an <see cref="PropertyGridEditor.Align"/> row, the nine values the 3×3 flyout cells map
     /// to (row-major; an empty entry disables that cell). <see langword="null"/> uses the default
-    /// <see cref="System.Drawing.ContentAlignment"/> names — set it to repurpose the grid for a spatial enum
+    /// <see cref="Hawkynt.NativeForms.Drawing.ContentAlignment"/> names — set it to repurpose the grid for a spatial enum
     /// (dock, anchor).</summary>
     public IReadOnlyList<string>? GridValues { get; set; }
 

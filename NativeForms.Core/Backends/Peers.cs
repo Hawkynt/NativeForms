@@ -534,7 +534,7 @@ public interface IScrollBarPeer : IControlPeer
     /// </summary>
     void SetRange(int minimum, int maximum, int largeChange, int smallChange);
 
-    /// <summary>Pushes the position into the widget without raising <see cref="ValueChanged"/>.</summary>
+    /// <summary>Pushes the position into the widget without raising <see cref="Scrolled"/>.</summary>
     void SetValue(int value);
 
     /// <summary>The widget's current position, read when it reports a change.</summary>

@@ -816,6 +816,15 @@ public class TreeListView : OwnerDrawnControl, ITreeNodeHost
         }
     }
 
+    /// <summary>Paints one row's tree column: the expander glyph, the optional check box and the label.</summary>
+    /// <param name="g">Where the cell is painted.</param>
+    /// <param name="theme">Supplies the glyph, check box and text colours.</param>
+    /// <param name="node">The node on this row, whose level sets the indent.</param>
+    /// <param name="selected">Whether the row is selected, which decides the background it is drawn over.</param>
+    /// <param name="textColor">The colour the label is drawn in.</param>
+    /// <param name="width">How wide the tree column is, which is where the label is clipped.</param>
+    /// <param name="y">The row's top edge.</param>
+    /// <param name="rowHeight">How tall the row is; it also sets the indent per level.</param>
     /// <param name="left">
     /// Where the tree column begins on screen, which is not nought once the table is scrolled
     /// sideways. The glyph and the check box hang off it, so passing it in is what keeps them with

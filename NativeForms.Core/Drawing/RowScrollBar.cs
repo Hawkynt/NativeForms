@@ -10,12 +10,12 @@ namespace Hawkynt.NativeForms.Drawing;
 /// that a list scrolls in rows, that the bar appears only when there are more rows than fit, and that
 /// a press on the trough has to be turned back into a row index. That is the same twenty lines in
 /// every list-shaped control, so it lives here once rather than being copied into each — the mistake
-/// that left <see cref="Controls.ListBox"/> and <see cref="Controls.TreeListView"/> silently
+/// that left <see cref="Hawkynt.NativeForms.ListBox"/> and <see cref="Hawkynt.NativeForms.TreeListView"/> silently
 /// scrollable with nothing on screen to say so.
 /// <para>
 /// The quartet the renderer wants is the row count minus one as the maximum and the viewport as the
 /// page, which is the conversion its container-shaped overloads document. The stepper-button shape is
-/// deliberate: it matches the bar <see cref="Controls.DataGridView"/> paints, and these lists sit
+/// deliberate: it matches the bar <see cref="Hawkynt.NativeForms.DataGridView"/> paints, and these lists sit
 /// beside grids.
 /// </para>
 /// </remarks>

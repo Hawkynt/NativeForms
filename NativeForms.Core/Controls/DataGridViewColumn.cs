@@ -183,7 +183,7 @@ public sealed class DataGridViewColumn
     }
 
     /// <summary>Optional per-cell tooltip text, surfaced through
-    /// <see cref="DataGridView.GetCellTooltip"/>; <see langword="null"/> for none.</summary>
+    /// <see cref="DataGridView.GetCellTooltip(int, int)"/>; <see langword="null"/> for none.</summary>
     public Func<object?, string?>? TooltipSelector { get; set; }
 
     /// <summary>Whether clicking this column's header sorts the grid. Defaults to
