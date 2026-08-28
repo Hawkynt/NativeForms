@@ -2181,7 +2181,7 @@ Inherits `EventArgs`.
 
 #### `Keys`
 
-Virtual key codes for the keys the toolkit reacts to. Values follow the Win32 virtual-key numbers so backends can forward them directly; letters and digits use their ASCII code. Like its Windows Forms namesake the enum doubles as key data: the `Shift`/`Control`/ `Alt` modifier bits combine with a key code to describe a chord such as `Keys.Control \| Keys.S` for menu shortcuts.
+Virtual key codes for the keys the toolkit reacts to. Values follow the Win32 virtual-key numbers so backends can forward them directly; letters and digits use their ASCII code. Like its Windows Forms namesake the enum doubles as key data: the `Shift`/`Control`/ `Alt` modifier bits combine with a key code to describe a chord such as `Keys.Control | Keys.S` for menu shortcuts.
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
@@ -4068,7 +4068,7 @@ Inherits `ToolStripDropDownItem`.
 
 #### `ToolStripStatusLabel`
 
-A status-bar panel: caption plus optional icon. With `Spring` set the panel absorbs whatever width the fixed panels leave over — several springs share the leftover equally — which is how the classic "message area \| details \| clock" status-bar layout is built.
+A status-bar panel: caption plus optional icon. With `Spring` set the panel absorbs whatever width the fixed panels leave over — several springs share the leftover equally — which is how the classic "message area | details | clock" status-bar layout is built.
 
 Inherits `ToolStripItem`.
 
@@ -4489,7 +4489,7 @@ Inherits `EventArgs`.
 
 #### `FileDialogFilter`
 
-One entry of a file dialog's type drop-down: a display name plus its glob patterns — the parsed form of one `"Text files\|*.txt"` pair from the WinForms filter syntax.
+One entry of a file dialog's type drop-down: a display name plus its glob patterns — the parsed form of one `"Text files|*.txt"` pair from the WinForms filter syntax.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
