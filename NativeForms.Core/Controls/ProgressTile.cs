@@ -17,7 +17,7 @@ namespace Hawkynt.NativeForms;
 /// volume — and no per-frame formatting sneaks onto the paint path.
 /// </para>
 /// <para>
-/// The bar reuses <see cref="GlyphRenderer.DrawProgressBar"/>, so a tile and a
+/// The bar reuses <see cref="GlyphRenderer.DrawProgressBar(IGraphics, ITheme, Rectangle, int, int, int)"/>, so a tile and a
 /// <see cref="ProgressBar"/> render the same fill from the same code. With <see cref="Clickable"/>
 /// the tile takes focus, highlights on hover and raises <see cref="Control.Click"/> on click or
 /// Space; left alone it is as inert as a label.

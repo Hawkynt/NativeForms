@@ -209,7 +209,7 @@ public sealed class PropertyGridGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Emits the <see cref="Hawkynt.NativeForms.ListView"/> pair: <c>PopulateColumns(ListView)</c> for the
+    /// Emits the <c>ListView</c> pair: <c>PopulateColumns(ListView)</c> for the
     /// Details-view headers, and <c>ToListViewItem()</c> which turns one model into a row whose sub-item
     /// order matches those headers. Together they make
     /// <c>list.SetDataSource(models, m =&gt; m.ToListViewItem())</c> a one-liner.

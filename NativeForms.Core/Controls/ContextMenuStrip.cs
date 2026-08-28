@@ -71,6 +71,8 @@ public class ContextMenuStrip : Component
 
     /// <summary>Opens the menu at an absolute screen position on the given backend, unless a
     /// <see cref="Opening"/> handler vetoes it.</summary>
+    /// <param name="backend">The backend that owns the display connection the menu is put up on.</param>
+    /// <param name="screenLocation">Where the menu's top-left corner goes, in screen coordinates.</param>
     /// <param name="owner">The window the cascade belongs to. Not optional: a menu with no owner is
     /// an unrelated top-level window to the display server, which cannot then anchor it and greys out
     /// the window it was opened from.</param>

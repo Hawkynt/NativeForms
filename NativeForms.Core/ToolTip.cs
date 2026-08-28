@@ -210,6 +210,9 @@ public sealed class ToolTip : Component
     }
 
     /// <summary>Shows (creating on first use) the popup with the given text at a screen position.</summary>
+    /// <param name="backend">The backend that owns the display connection the popup is put up on.</param>
+    /// <param name="screenLocation">Where the popup's top-left corner goes, in screen coordinates.</param>
+    /// <param name="text">The tip's text.</param>
     /// <param name="owner">The control being tipped; its form owns the surface, so the tip is
     /// anchored to that window and does not make it look inactive while it floats.</param>
     private void ShowPopup(IPlatformBackend backend, Control owner, Point screenLocation, string text)

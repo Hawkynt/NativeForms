@@ -1225,9 +1225,6 @@ public class DataGridView : OwnerDrawnControl
         multi.Sort();
     }
 
-    /// <summary>Makes <paramref name="currentRow"/> the current row after a multi-selection gesture
-    /// and reports the changed set — the gesture-shaped sibling of the
-    /// <see cref="SelectedRowIndex"/> setter.</summary>
     /// <summary>
     /// Drops the selection for a press that landed past the last row.
     /// </summary>
@@ -1256,6 +1253,9 @@ public class DataGridView : OwnerDrawnControl
         this.OnSelectionChanged(EventArgs.Empty);
     }
 
+    /// <summary>Makes <paramref name="currentRow"/> the current row after a multi-selection gesture
+    /// and reports the changed set — the gesture-shaped sibling of the
+    /// <see cref="SelectedRowIndex"/> setter.</summary>
     private void ApplyMultiSelection(int currentRow)
     {
         _selectedRowIndex = currentRow;

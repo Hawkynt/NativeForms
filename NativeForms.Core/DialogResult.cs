@@ -1,7 +1,7 @@
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// The verdict a dialog returns from <see cref="Form.ShowDialog"/> or <see cref="MessageBox.Show(string)"/>.
+/// The verdict a dialog returns from <see cref="Form.ShowDialog(Form?)"/> or <see cref="MessageBox.Show(string)"/>.
 /// The numeric values match both <c>System.Windows.Forms.DialogResult</c> and the Win32
 /// <c>MessageBox</c> return ids (<c>IDOK</c> … <c>IDNO</c>), so the Win32 backend maps by cast.
 /// </summary>

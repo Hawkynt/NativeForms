@@ -4,7 +4,7 @@ using Hawkynt.NativeForms.ComponentModel;
 namespace Hawkynt.NativeForms.Tests;
 
 /// <summary>
-/// The lambda binding sugar (<see cref="BindingExtensions.Bind"/>): the fluent control-first
+/// The lambda binding sugar (<see cref="BindingExtensions"/>'s <c>Bind</c> overloads): the fluent control-first
 /// overloads over <see cref="PropertyBinding{T}"/>, plus the per-binding fallbacks and the
 /// validation-error callback that ride along with them.
 /// </summary>

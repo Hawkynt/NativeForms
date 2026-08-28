@@ -65,7 +65,8 @@ internal sealed class MenuDropDown
     public bool IsOpen => _levels.Count > 0;
 
     /// <summary>
-    /// The window every level of the cascade belongs to. Set it before <see cref="Open"/>: the engine
+    /// The window every level of the cascade belongs to. Set it before
+    /// <see cref="Open(IReadOnlyList{ToolStripItem}, Point)"/>: the engine
     /// outlives any single opening and the owning control may not have been realized when the engine
     /// was built, so the owner is read afresh each time rather than captured in the constructor.
     /// </summary>

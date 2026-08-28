@@ -7,7 +7,7 @@ namespace Hawkynt.NativeForms;
 /// A top-level window. Maps to a native window on every platform; its <see cref="Control.Text"/> is
 /// the title-bar caption and its <see cref="Control.Controls"/> are laid out in the client area.
 /// Shown modelessly through <see cref="Application.Run(Form)"/> or modally through
-/// <see cref="ShowDialog"/>.
+/// <see cref="ShowDialog(Form?)"/>.
 /// </summary>
 /// <remarks>
 /// Window-management state — border style, window state, size limits, icon, top-most, opacity — is
@@ -53,7 +53,7 @@ public class Form : Control
     /// <summary>
     /// Raised after the form is realized and before it is first shown — the moment initialization
     /// code that needs live peers (measuring, focusing) traditionally runs. Fires on every show:
-    /// once per <see cref="Application.Run(Form)"/>, <see cref="Show"/> or <see cref="ShowDialog"/>,
+    /// once per <see cref="Application.Run(Form)"/>, <see cref="Show"/> or <see cref="ShowDialog(Form?)"/>,
     /// since the form unrealizes between them.
     /// </summary>
     public event EventHandler? Load;
@@ -61,7 +61,7 @@ public class Form : Control
     /// <summary>
     /// Raised before the form closes — by the native close button, <see cref="Close"/>, or a modal
     /// verdict — carrying the <see cref="CloseReason"/>. Set
-    /// <see cref="FormClosingEventArgs.Cancel"/> to veto and keep the window open.
+    /// <see cref="System.ComponentModel.CancelEventArgs.Cancel"/> to veto and keep the window open.
     /// </summary>
     public event EventHandler<FormClosingEventArgs>? FormClosing;
 
@@ -75,7 +75,7 @@ public class Form : Control
     public event EventHandler? SizeChanged;
 
     /// <summary>
-    /// The verdict this form reports from <see cref="ShowDialog"/>. Setting a value other than
+    /// The verdict this form reports from <see cref="ShowDialog(Form?)"/>. Setting a value other than
     /// <see cref="DialogResult.None"/> while the form is shown modally closes it — the WinForms
     /// contract a <see cref="Button.DialogResult"/> click relies on.
     /// </summary>
@@ -704,7 +704,7 @@ public class Form : Control
     /// <summary>
     /// Closes the form as the native close button would, running the <see cref="FormClosing"/> veto
     /// with <see cref="CloseReason.ProgrammaticClosing"/> first. A no-op before realization; on a
-    /// modal form this ends the <see cref="ShowDialog"/> loop.
+    /// modal form this ends the <see cref="ShowDialog(Form?)"/> loop.
     /// </summary>
     public void Close()
     {

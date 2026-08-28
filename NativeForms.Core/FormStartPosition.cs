@@ -2,7 +2,7 @@ namespace Hawkynt.NativeForms;
 
 /// <summary>
 /// Where a <see cref="Form"/> is placed when it is first shown. Applied once, at
-/// <see cref="Application.Run(Form)"/>/<see cref="Form.ShowDialog"/> time, by computing the final
+/// <see cref="Application.Run(Form)"/>/<see cref="Form.ShowDialog(Form?)"/> time, by computing the final
 /// <see cref="Control.Bounds"/> in the core before the window is realized — the peers never see the
 /// policy, only the resulting rectangle.
 /// </summary>
