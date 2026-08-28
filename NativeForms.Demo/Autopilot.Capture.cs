@@ -145,6 +145,7 @@ internal static unsafe partial class Capture
     /// </summary>
     /// <param name="mainWindow">The gallery's own <c>GdkWindow</c>, which anchors the composition —
     /// a popup that never overlaps it still widens the frame rather than replacing it.</param>
+    /// <param name="path">Where the composited PNG is written.</param>
     internal static Size? Toplevels(nint mainWindow, string path)
     {
         var layers = MappedLayers(mainWindow);

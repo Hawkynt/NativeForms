@@ -179,7 +179,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
     /// sets a <em>minimum</em>, so a GtkFixed hands this canvas the bounding box of its children
     /// whenever they overflow, and clipping to that would be clipping to the spill itself.
     /// This bounds our own drawing only — the native children are confined by
-    /// <see cref="ClampAllocation"/>, because GTK 3's draw marshaller wraps every handler in
+    /// <see cref="GtkControlPeer.ClampAllocation"/>, because GTK 3's draw marshaller wraps every handler in
     /// <c>cairo_save</c>/<c>cairo_restore</c> and so discards this clip before the children draw.
     /// </summary>
     private void ClipToClientRectangle(nint cr)
@@ -382,7 +382,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer
 
     /// <summary>Native "draw" handler: <c>gboolean (GtkWidget*, cairo_t*, gpointer)</c>. Clips the
     /// context to the client rectangle for the duration of our own painting; the children are
-    /// bounded by <see cref="ClampAllocation"/>, not by this clip.</summary>
+    /// bounded by <see cref="GtkControlPeer.ClampAllocation"/>, not by this clip.</summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int OnDraw(nint widget, nint cr, nint userData)
     {
