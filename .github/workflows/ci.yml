@@ -19,38 +19,18 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  test:
-    name: test ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0                          # version.pl needs full history
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-      - name: Restore
-        run: dotnet restore NativeForms.sln
-      - name: Build
-        run: dotnet build NativeForms.sln --configuration Release --no-restore
-      # The package READMEs must follow the house template, and their API reference must still match
-      # the assemblies just built. The template lives in RepositoryTemplate; nothing is copied here.
-      # One OS only: the reference must not depend on which runner produced it.
-      - name: Check package READMEs
-        if: matrix.os == 'ubuntu-latest'
-        uses: Hawkynt/RepositoryTemplate/package-readme@v1
-      - name: Test
-        run: dotnet test NativeForms.sln --configuration Release --no-build --logger "trx;LogFileName=tests.trx"
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.os }}
-          path: '**/TestResults/*.trx'
+  # The standard part: build the solution on three runners, check the package READMEs against the
+  # assemblies, run the suite. Everything below is what this repository has that no other does.
+  ci:
+    uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-ci.yml@v1
+    with:
+      solution: NativeForms.sln
+      dotnet-version: '10.0.x'
+      os-matrix: '["ubuntu-latest","windows-latest","macos-latest"]'
+      # One runner only: the committed reference must not depend on which machine produced it.
+      package-readme-os: ubuntu-latest
+      # No coverage leg here — the real signal is the autopilot and the screenshots below.
+      coverage: false
 
   autopilot:
     name: autopilot (linux/gtk)
