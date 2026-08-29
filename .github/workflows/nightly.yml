@@ -4,12 +4,8 @@ name: Nightly
 # a nightly, so the "latest nightly" always points at tested code. Builds the
 # exact SHA CI validated (not branch tip). Does NOT push to NuGet.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    # `main` is the canonical default branch; `master` is accepted only while
-    # a repo's rename is pending (STANDARD.md §2, rollout step 0).
-    branches: [main, master]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -26,18 +22,16 @@ env:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_build.yml
     with:
-      ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      ref: ${{ github.sha }}
 
   benchmark:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -63,12 +57,11 @@ jobs:
           path: benchmark-results.txt
 
   trim:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -110,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.sha }}
           fetch-depth: 0                         # update-changelog.mjs reads git log
       - name: Compute nightly tag
         run: echo "TAG=nightly-$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
@@ -139,7 +132,7 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
-          target_commitish: ${{ github.event.workflow_run.head_sha || github.sha }}
+          target_commitish: ${{ github.sha }}
           prerelease: true
           files: dist/*
           body_path: RELEASE_NOTES.md            # commit-message changelog, not GitHub's PR notes
