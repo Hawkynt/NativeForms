@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](https://www.gnu.org/licenses/lgpl-3.0.html)
 [![CI](https://img.shields.io/github/actions/workflow/status/Hawkynt/NativeForms/ci.yml?branch=main&label=CI)](https://github.com/Hawkynt/NativeForms/actions/workflows/ci.yml)
 
-> The macOS backend for NativeForms. Published so the backend set is complete and referenceable -- it is not implemented yet, and every entry point throws.
+> The macOS backend for NativeForms, implemented on Cocoa/AppKit through direct Objective-C runtime interop.
 
 ## 📦 Installation
 
@@ -17,9 +17,11 @@ This is a backend for [NativeForms](https://www.nuget.org/packages/Hawkynt.Nativ
 
 ## ✨ Features
 
-- Renders [NativeForms](https://www.nuget.org/packages/Hawkynt.NativeForms/) controls on macOS through Cocoa.
-- None yet. The type surface exists so consuming code can compile and register against it.
-- Reflection-free and source-generated, so it survives trimming and NativeAOT.
+- Native `NSWindow` forms and AppKit-backed control peers for text entry, buttons, labels, lists, trees, ranges, progress, date/time input and related primitives.
+- Native open/save/folder, color and font dialogs plus Cocoa menus and context menus.
+- Native-themed owner-drawn controls for the shared cross-platform control surface.
+- In-process macOS screenshot/probe coverage in CI, in addition to the ordinary macOS build/test leg.
+- Reflection-free interop designed to survive trimming and NativeAOT.
 - Referenced but never registered, the whole backend is dropped again by the trimmer.
 
 ## 🚀 Quick start
@@ -52,12 +54,13 @@ Every public and protected member of all 1 type, generated from the built assemb
 | --- | --- |
 | [`Hawkynt.NativeForms`](https://www.nuget.org/packages/Hawkynt.NativeForms/) | The controls, layout and backend abstraction this package implements. |
 
-**Runtime requirement:** macOS, once implemented.
+**Runtime requirement:** macOS with Cocoa/AppKit.
 
 ## ⚠️ Limitations
 
-- **Not implemented.** Every entry point throws. Do not ship an application that depends on this backend to render.
-- It is published for completeness and to keep the backend set referenceable; progress is tracked in docs/PRD.md.
+- Cocoa support is substantial but not claimed to be byte-for-byte Win32/GTK parity. Platform-specific behavioral differences and remaining gaps are tracked in [`docs/backends.md`](https://github.com/Hawkynt/NativeForms/blob/main/docs/backends.md) and [`docs/PRD.md`](https://github.com/Hawkynt/NativeForms/blob/main/docs/PRD.md).
+- Some shared controls remain owner-drawn by design when AppKit has no faithful native equivalent.
+- OS-originated drag/drop is still separate from NativeForms' in-process `DoDragDrop` contract and remains tracked work.
 
 ## ❤️ Support
 
