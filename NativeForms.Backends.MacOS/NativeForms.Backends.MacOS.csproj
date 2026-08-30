@@ -5,7 +5,7 @@
     <RootNamespace>Hawkynt.NativeForms.Backends.MacOS</RootNamespace>
     <PackageId>Hawkynt.NativeForms.Backends.MacOS</PackageId>
     <Version>1.0.0</Version>
-    <Description>The macOS (Cocoa) backend for NativeForms. Placeholder: the peer surface is wired but every entry point throws PlatformNotSupportedException, so nothing renders yet — it exists to keep the backend contract honest and the roadmap slot reserved (see docs/PRD.md).</Description>
+    <Description>The macOS Cocoa backend for NativeForms. Implements native AppKit windows, controls, menus and common dialogs with CI smoke and screenshot coverage; see docs/backends.md for the remaining platform-specific limitations.</Description>
     <PackageTags>ui;winforms;gui;cross-platform;native;pinvoke;macos;cocoa;aot;trimming</PackageTags>
 
     <!-- Ships a .snupkg to nuget.org's symbol server, which needs a real portable PDB; this
