@@ -8,14 +8,16 @@ working in this repository. These rules are not optional. The full house spec li
 
 A cross-platform **C# (.NET 10) UI toolkit** with a Windows Forms-shaped API. The window and the
 text-bearing primitives (`Form`, `Button`, `Label`, `TextBox`, `RichTextBox`) are real platform
-widgets driven via `[LibraryImport]` P/Invoke; every other control is owner-drawn in that platform's
-own theme. **Shipping platforms are Windows (Win32) and Linux (GTK 3); macOS is a stub, not a
-feature.** It must stay **fast**, **tiny** (bytes, not megabytes) and **trim/NativeAOT compatible**.
+widgets driven via `[LibraryImport]` P/Invoke; controls without a faithful platform counterpart are
+owner-drawn in that platform's own theme. **Windows (Win32) and Linux (GTK 3) are the mature shipping
+backends; macOS (Cocoa/AppKit) is implemented and exercised by native CI probes/screenshots, but still
+has platform-specific gaps documented in `docs/backends.md`.** It must stay **fast**, **tiny** (bytes,
+not megabytes) and **trim/NativeAOT compatible**.
 
 Solution layout — project folders at the repo root:
 - `NativeForms.Core` — platform-agnostic controls, layout, events, data-binding (`Hawkynt.NativeForms`).
-- `NativeForms.Backends.Windows` / `.Gtk` — the two implemented native backends.
-- `NativeForms.Backends.MacOS` — a stub; every member throws `PlatformNotSupportedException`.
+- `NativeForms.Backends.Windows` / `.Gtk` — the mature Win32 and GTK 3 native backends.
+- `NativeForms.Backends.MacOS` — the Cocoa/AppKit backend with native peers, dialogs, menus and CI smoke/screenshot coverage; see `docs/backends.md` for known differences.
 - `NativeForms.Generators` — Roslyn source generator (`[GridEditable]` → `PopulateGrid`), packed as an
   analyzer asset inside the Core NuGet package.
 - `NativeForms.Demo` — a runnable sample (`WinExe`) and the AOT publish target.

@@ -27,6 +27,8 @@
     <!-- Pure [LibraryImport] declarations, so it builds and loads anywhere; the fixture that uses it
          self-skips off Windows, which is what keeps the suite green on every runner. -->
     <ProjectReference Include="..\NativeForms.Backends.Windows\NativeForms.Backends.Windows.csproj" />
+    <!-- Cocoa range arithmetic is pure managed code and can be regression-tested on every runner. -->
+    <ProjectReference Include="..\NativeForms.Backends.MacOS\NativeForms.Backends.MacOS.csproj" />
     <!-- The property-grid populator source generator (compile-time only; no runtime assembly). -->
     <ProjectReference Include="..\NativeForms.Generators\NativeForms.Generators.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />

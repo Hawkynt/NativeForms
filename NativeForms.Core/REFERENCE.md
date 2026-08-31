@@ -1439,7 +1439,7 @@ Inherits `EventArgs`.
 | --- | --- | --- |
 | `DragEventArgs` | `DragEventArgs(object data, DragDropEffects allowedEffect, int x, int y)` | Describes a drag over a potential drop target. A handler inspects `Data` and answers by setting `Effect` — leaving it `None` refuses the drop. |
 | `AllowedEffect` | `DragDropEffects AllowedEffect { get; }` | The effects the drag source permits. |
-| `Data` | `object Data { get; }` | The payload the drag source handed to `DoDragDrop`. |
+| `Data` | `object Data { get; }` | The payload the drag source handed to `DoDragDrop`, or a payload translated by a native backend. |
 | `Effect` | `DragDropEffects Effect { get; set; }` | The target's answer: which effect the drop would have here. Effects outside `AllowedEffect` are ignored. |
 | `X` | `int X { get; }` | The pointer's x-coordinate in screen space. |
 | `Y` | `int Y { get; }` | The pointer's y-coordinate in screen space. |
@@ -4400,7 +4400,7 @@ Inherits `EventArgs`.
 
 ### Namespace `Hawkynt.NativeForms.Backends`
 
-[`BackendRegistry`](#backendregistry) · [`ContextMenuRequestedEventArgs`](#contextmenurequestedeventargs) · [`FileDialogFilter`](#filedialogfilter) · [`FileDialogKind`](#filedialogkind) · [`FileDialogOptions`](#filedialogoptions) · [`IButtonPeer`](#ibuttonpeer) · [`ICanvasPeer`](#icanvaspeer) · [`ICheckBoxPeer`](#icheckboxpeer) · [`IComboBoxPeer`](#icomboboxpeer) · [`IContainerPeer`](#icontainerpeer) · [`IControlPeer`](#icontrolpeer) · [`IGroupBoxPeer`](#igroupboxpeer) · [`ILabelPeer`](#ilabelpeer) · [`ILinkLabelPeer`](#ilinklabelpeer) · [`IListBoxPeer`](#ilistboxpeer) · [`INotifyIconPeer`](#inotifyiconpeer) · [`IPlatformBackend`](#iplatformbackend) · [`IPopupPeer`](#ipopuppeer) · [`IProgressBarPeer`](#iprogressbarpeer) · [`IRadioButtonPeer`](#iradiobuttonpeer) · [`IRichTextBoxPeer`](#irichtextboxpeer) · [`IScrollBarPeer`](#iscrollbarpeer) · [`ITextBoxPeer`](#itextboxpeer) · [`ITimerPeer`](#itimerpeer) · [`ITrackBarPeer`](#itrackbarpeer) · [`IWindowPeer`](#iwindowpeer)
+[`BackendRegistry`](#backendregistry) · [`ContextMenuRequestedEventArgs`](#contextmenurequestedeventargs) · [`ExternalDropBridge`](#externaldropbridge) · [`FileDialogFilter`](#filedialogfilter) · [`FileDialogKind`](#filedialogkind) · [`FileDialogOptions`](#filedialogoptions) · [`IButtonPeer`](#ibuttonpeer) · [`ICanvasPeer`](#icanvaspeer) · [`ICheckBoxPeer`](#icheckboxpeer) · [`IComboBoxPeer`](#icomboboxpeer) · [`IContainerPeer`](#icontainerpeer) · [`IControlPeer`](#icontrolpeer) · [`IGroupBoxPeer`](#igroupboxpeer) · [`ILabelPeer`](#ilabelpeer) · [`ILinkLabelPeer`](#ilinklabelpeer) · [`IListBoxPeer`](#ilistboxpeer) · [`INotifyIconPeer`](#inotifyiconpeer) · [`IPlatformBackend`](#iplatformbackend) · [`IPopupPeer`](#ipopuppeer) · [`IProgressBarPeer`](#iprogressbarpeer) · [`IRadioButtonPeer`](#iradiobuttonpeer) · [`IRichTextBoxPeer`](#irichtextboxpeer) · [`IScrollBarPeer`](#iscrollbarpeer) · [`ITextBoxPeer`](#itextboxpeer) · [`ITimerPeer`](#itimerpeer) · [`ITrackBarPeer`](#itrackbarpeer) · [`IWindowPeer`](#iwindowpeer)
 
 #### `BackendRegistry`
 
@@ -4424,6 +4424,14 @@ Inherits `EventArgs`.
 | `ContextMenuRequestedEventArgs` | `ContextMenuRequestedEventArgs(Point location)` | The native side of a single `Control`. A peer owns one platform widget (an HWND, a GtkWidget*, an NSView …) and exposes only the operations the core needs to keep that widget in sync with the managed control. All coordinates are in the parent's client space, top-left origin, pixels — exactly like Windows Forms. |
 | `Handled` | `bool Handled { get; set; }` | Set by the core when it opened a menu, so the peer suppresses the native default one. |
 | `Location` | `Point Location { get; }` | Where the menu should open, in the requesting widget's client space. |
+
+#### `ExternalDropBridge`
+
+Backend hook for operating-system-originated drops. Platform peers report a native payload and screen position here; the core keeps ownership of hit-testing and the managed drag-event contract.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Route` | `static DragDropEffects Route(IWindowPeer window, object data, DragDropEffects allowedEffects, Point screenLocation)` | Routes one native final-drop notification into the managed control tree. |
 
 #### `FileDialogFilter`
 

@@ -94,9 +94,12 @@ internal sealed class CocoaWindowPeer : IWindowPeer
         // A window's content view is a plain NSView, so its origin is the bottom left and every direct
         // child lands mirrored — the menu bar at the foot of the window, the tab strip off the top.
         // Replacing it with the canvas class, which answers isFlipped, makes the window agree with the
-        // coordinates its children were laid out in.
+        // coordinates its children were laid out in. The same view is the external file-drop destination.
         if (_window != 0 && CocoaCanvasPeer.CreateFlippedView() is var content && content != 0)
+        {
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("setContentView:"), content);
+            CocoaExternalDrop.Attach(content, this);
+        }
     }
 
     /// <summary>The window handle, for the parts of the backend that message it directly.</summary>
@@ -162,7 +165,10 @@ internal sealed class CocoaWindowPeer : IWindowPeer
 
         _closed = true;
         if (_window != 0)
+        {
+            CocoaExternalDrop.Forget(CocoaRuntime.SendPointer(_window, CocoaRuntime.sel_registerName("contentView")));
             CocoaRuntime.SendVoid(_window, CocoaRuntime.sel_registerName("close"));
+        }
 
         Closed?.Invoke(this, EventArgs.Empty);
 

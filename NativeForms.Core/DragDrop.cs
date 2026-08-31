@@ -28,7 +28,7 @@ public enum DragDropEffects
 /// </summary>
 public sealed class DragEventArgs(object data, DragDropEffects allowedEffect, int x, int y) : EventArgs
 {
-    /// <summary>The payload the drag source handed to <see cref="Control.DoDragDrop"/>.</summary>
+    /// <summary>The payload the drag source handed to <see cref="Control.DoDragDrop"/>, or a payload translated by a native backend.</summary>
     public object Data { get; } = data;
 
     /// <summary>The effects the drag source permits.</summary>
@@ -48,14 +48,10 @@ public sealed class DragEventArgs(object data, DragDropEffects allowedEffect, in
 }
 
 /// <summary>
-/// The toolkit's in-process drag-and-drop engine (PRD §8). One drag can be active at a time: the
-/// source's mouse stream — which stays with the source while a button is held, on every backend — is
-/// rerouted here, translated to screen space and hit-tested against the source's own window tree, so
-/// <see cref="Control.DragEnter"/>/<see cref="Control.DragOver"/>/<see cref="Control.DragLeave"/>/
-/// <see cref="Control.DragDrop"/> fire exactly like their WinForms counterparts. Deliberately
-/// in-process only: OS-level drags (OLE <c>RegisterDragDrop</c>, <c>gtk_drag_*</c>) need COM or
-/// per-platform integrations that are tracked in <c>docs/PRD.md</c> §8 — this engine is the shared
-/// behavior they will forward into.
+/// The toolkit's drag-and-drop routing engine (PRD §8). In-process drags are driven by the source's
+/// mouse stream; operating-system-originated drops are translated by a platform backend and forwarded
+/// through <see cref="Backends.ExternalDropBridge"/>. Both routes share the same hit-testing and
+/// <see cref="Control.AllowDrop"/> semantics.
 /// </summary>
 internal static class DragDropSession
 {
@@ -137,6 +133,41 @@ internal static class DragDropSession
             target.RaiseDragDrop(new DragEventArgs(data, allowed, screen.X, screen.Y) { Effect = effect });
 
         return true;
+    }
+
+    /// <summary>
+    /// Routes one final drop delivered by an operating-system backend. Native file-drop protocols do
+    /// not all expose the same hover lifecycle (the Win32 shell path, for example, only delivers the
+    /// final <c>WM_DROPFILES</c>), so this intentionally synthesizes only the common contract:
+    /// <see cref="Control.DragEnter"/> decides whether the target accepts the payload, a rejection is
+    /// paired with <see cref="Control.DragLeave"/>, and an accepted payload raises
+    /// <see cref="Control.DragDrop"/>. Continuous <see cref="Control.DragOver"/> remains available to
+    /// in-process drags and to a future richer native protocol bridge.
+    /// </summary>
+    internal static DragDropEffects RouteExternalDrop(
+        Control root,
+        object data,
+        DragDropEffects allowedEffects,
+        Point screenLocation)
+    {
+        var target = FindDropTarget(root, screenLocation);
+        if (target is null)
+            return DragDropEffects.None;
+
+        var enter = new DragEventArgs(data, allowedEffects, screenLocation.X, screenLocation.Y);
+        target.RaiseDragEnter(enter);
+        var effect = enter.Effect & allowedEffects;
+        if (effect == DragDropEffects.None)
+        {
+            target.RaiseDragLeave();
+            return DragDropEffects.None;
+        }
+
+        target.RaiseDragDrop(new DragEventArgs(data, allowedEffects, screenLocation.X, screenLocation.Y)
+        {
+            Effect = effect,
+        });
+        return effect;
     }
 
     /// <summary>Returns the session to idle without raising anything.</summary>

@@ -81,7 +81,15 @@ internal sealed class CocoaScrollBarPeer : CocoaControlPeer, IScrollBarPeer
     }
 
     /// <summary>How far the value can actually travel, which is never the whole range.</summary>
-    private int Reach => Math.Max(1, _maximum - _largeChange + 1 - _minimum);
+    private int Reach => CalculateReach(_minimum, _maximum, _largeChange);
+
+    /// <summary>
+    /// Calculates the distance between the minimum and the effective maximum. A range smaller than
+    /// one page has no travel at all; forcing a positive denominator there would manufacture a value
+    /// above <paramref name="maximum"/>.
+    /// </summary>
+    internal static int CalculateReach(int minimum, int maximum, int largeChange)
+        => Math.Max(0, maximum - Math.Max(1, largeChange) + 1 - minimum);
 
     /// <inheritdoc/>
     /// <remarks>A caption on a scroll bar is meaningless, and an <c>NSScroller</c> answers no
@@ -95,6 +103,7 @@ internal sealed class CocoaScrollBarPeer : CocoaControlPeer, IScrollBarPeer
         _maximum = maximum;
         _largeChange = Math.Max(1, largeChange);
         _smallChange = Math.Max(1, smallChange);
+        _value = Math.Clamp(_value, _minimum, _minimum + this.Reach);
         this.Push();
     }
 
@@ -116,7 +125,8 @@ internal sealed class CocoaScrollBarPeer : CocoaControlPeer, IScrollBarPeer
 
         var span = Math.Max(1, _maximum - _minimum + 1);
         CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setKnobProportion:"), Math.Clamp(_largeChange / (double)span, 0.0, 1.0));
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setDoubleValue:"), Math.Clamp((_value - _minimum) / (double)this.Reach, 0.0, 1.0));
+        var position = this.Reach == 0 ? 0.0 : (_value - _minimum) / (double)this.Reach;
+        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setDoubleValue:"), Math.Clamp(position, 0.0, 1.0));
     }
 
     /// <summary>
