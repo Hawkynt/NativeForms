@@ -88,15 +88,15 @@ internal sealed class ExternalDropTests
     private sealed class FakeWindowPeer : IWindowPeer
     {
         private Rectangle _bounds;
-        public event EventHandler? GotFocus;
-        public event EventHandler? LostFocus;
-        public event EventHandler<MouseEventArgs>? PointerMove;
-        public event EventHandler? PointerLeave;
-        public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
-        public event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested;
+        public event EventHandler? GotFocus { add { } remove { } }
+        public event EventHandler? LostFocus { add { } remove { } }
+        public event EventHandler<MouseEventArgs>? PointerMove { add { } remove { } }
+        public event EventHandler? PointerLeave { add { } remove { } }
+        public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested { add { } remove { } }
+        public event EventHandler<System.ComponentModel.CancelEventArgs>? CloseRequested { add { } remove { } }
         public event EventHandler? Closed;
-        public event EventHandler<Rectangle>? BoundsChangedByUser;
-        public event EventHandler<FormWindowState>? WindowStateChanged;
+        public event EventHandler<Rectangle>? BoundsChangedByUser { add { } remove { } }
+        public event EventHandler<FormWindowState>? WindowStateChanged { add { } remove { } }
         public void SetBounds(Rectangle bounds) => _bounds = bounds;
         public void SetText(string text) { }
         public void SetVisible(bool visible) { }
