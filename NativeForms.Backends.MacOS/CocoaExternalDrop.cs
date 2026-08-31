@@ -5,30 +5,41 @@ using System.Runtime.InteropServices;
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
 /// <summary>
-/// AppKit's external file-drop destination for a top-level window. The content view registers only
-/// <c>NSPasteboardTypeFileURL</c>; successful drops are translated to the same managed file-list
-/// payload and <see cref="ExternalDropBridge"/> path the Win32 and GTK backends use.
+/// AppKit's external file-drop destination for a top-level window. The existing flipped content view
+/// registers only <c>NSPasteboardTypeFileURL</c>; successful drops are translated to the same managed
+/// file-list payload and <see cref="ExternalDropBridge"/> path the Win32 and GTK backends use.
 /// </summary>
 internal static unsafe class CocoaExternalDrop
 {
     private const nuint _Copy = 1; // NSDragOperationCopy
 
     private static readonly ConcurrentDictionary<nint, CocoaWindowPeer> _windows = new();
-    private static nint _viewClass;
+    private static nint _installedClass;
 
-    /// <summary>Creates the flipped window content view and registers it for external file URLs.</summary>
-    internal static nint CreateContentView(CocoaWindowPeer owner)
+    /// <summary>Adds the two destination callbacks to the backend's flipped view class and registers one view.</summary>
+    internal static void Attach(nint view, CocoaWindowPeer owner)
     {
-        EnsureViewClass();
-        if (_viewClass == 0)
-            return 0;
-
-        var allocated = CocoaRuntime.SendPointer(_viewClass, CocoaRuntime.sel_registerName("alloc"));
-        var view = allocated == 0
-            ? 0
-            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
         if (view == 0)
-            return 0;
+            return;
+
+        var cls = CocoaRuntime.object_getClass(view);
+        if (cls == 0)
+            return;
+
+        if (_installedClass != cls)
+        {
+            CocoaRuntime.class_addMethod(
+                cls,
+                CocoaRuntime.sel_registerName("draggingEntered:"),
+                (nint)(delegate* unmanaged<nint, nint, nint, nuint>)&DraggingEntered,
+                "Q@:@");
+            CocoaRuntime.class_addMethod(
+                cls,
+                CocoaRuntime.sel_registerName("performDragOperation:"),
+                (nint)(delegate* unmanaged<nint, nint, nint, byte>)&PerformDragOperation,
+                "c@:@");
+            _installedClass = cls;
+        }
 
         var fileType = CocoaRuntime.Constant("NSPasteboardTypeFileURL");
         var arrays = CocoaRuntime.objc_getClass("NSArray");
@@ -36,11 +47,10 @@ internal static unsafe class CocoaExternalDrop
             ? 0
             : CocoaRuntime.SendPointer(arrays, CocoaRuntime.sel_registerName("arrayWithObject:"), fileType);
         if (types == 0)
-            return view;
+            return;
 
         _windows[view] = owner;
         CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("registerForDraggedTypes:"), types);
-        return view;
     }
 
     /// <summary>Stops retaining a window peer after its native window is closed.</summary>
@@ -49,42 +59,6 @@ internal static unsafe class CocoaExternalDrop
         if (view != 0)
             _windows.TryRemove(view, out _);
     }
-
-    private static void EnsureViewClass()
-    {
-        if (_viewClass != 0 || !CocoaRuntime.Available)
-            return;
-
-        var superclass = CocoaRuntime.objc_getClass("NSView");
-        if (superclass == 0)
-            return;
-
-        var created = CocoaRuntime.objc_allocateClassPair(superclass, "NativeFormsDropContentView", 0);
-        if (created == 0)
-            return;
-
-        CocoaRuntime.class_addMethod(
-            created,
-            CocoaRuntime.sel_registerName("isFlipped"),
-            (nint)(delegate* unmanaged<nint, nint, byte>)&IsFlipped,
-            "c@:");
-        CocoaRuntime.class_addMethod(
-            created,
-            CocoaRuntime.sel_registerName("draggingEntered:"),
-            (nint)(delegate* unmanaged<nint, nint, nint, nuint>)&DraggingEntered,
-            "Q@:@");
-        CocoaRuntime.class_addMethod(
-            created,
-            CocoaRuntime.sel_registerName("performDragOperation:"),
-            (nint)(delegate* unmanaged<nint, nint, nint, byte>)&PerformDragOperation,
-            "c@:@");
-
-        CocoaRuntime.objc_registerClassPair(created);
-        _viewClass = created;
-    }
-
-    [UnmanagedCallersOnly]
-    private static byte IsFlipped(nint self, nint selector) => 1;
 
     [UnmanagedCallersOnly]
     private static nuint DraggingEntered(nint self, nint selector, nint draggingInfo)
