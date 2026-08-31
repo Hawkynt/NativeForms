@@ -277,7 +277,16 @@ internal sealed class NativePeerPromotionTests
     public void A_track_bar_promotes_and_seeds_the_widget_with_its_range_and_steps()
     {
         var backend = new HeadlessBackend { OfferNativeTrackBar = true };
-        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Minimum = 5, Maximum = 25, Value = 12, SmallChange = 2, LargeChange = 7 }, backend);
+        var bar = RealizeTrack(new TrackBar
+        {
+            Bounds = new(0, 0, 200, 30),
+            Minimum = 5,
+            Maximum = 25,
+            Value = 12,
+            SmallChange = 2,
+            LargeChange = 7,
+            TickStyle = TickStyle.None,
+        }, backend);
 
         Assert.Multiple(() =>
         {
@@ -291,10 +300,39 @@ internal sealed class NativePeerPromotionTests
     }
 
     [Test]
+    public void Visible_ticks_fall_back_when_a_native_peer_cannot_render_them()
+    {
+        var backend = new HeadlessBackend { OfferNativeTrackBar = true };
+        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), TickFrequency = 2 }, backend);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.False, "visible marks must not disappear merely because the backend offered a slider");
+            Assert.That(backend.LastTrackBar!.Disposed, Is.True, "the unsuitable candidate is released before owner drawing takes over");
+        });
+    }
+
+    [Test]
+    public void Disabling_ticks_can_promote_a_fallback_track_bar()
+    {
+        var backend = new HeadlessBackend { OfferNativeTrackBar = true };
+        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Value = 6 }, backend);
+        Assume.That(bar.IsNativeWidget, Is.False);
+
+        bar.TickStyle = TickStyle.None;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bar.IsNativeWidget, Is.True);
+            Assert.That(backend.LastTrackBar!.GetValue(), Is.EqualTo(6), "the value survives the owner-drawn/native swap");
+        });
+    }
+
+    [Test]
     public void A_drag_on_the_widget_surfaces_as_ValueChanged_and_Scroll_once()
     {
         var backend = new HeadlessBackend { OfferNativeTrackBar = true };
-        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Maximum = 100 }, backend);
+        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Maximum = 100, TickStyle = TickStyle.None }, backend);
         int changed = 0, scrolled = 0;
         bar.ValueChanged += (_, _) => ++changed;
         bar.Scroll += (_, _) => ++scrolled;
@@ -313,7 +351,13 @@ internal sealed class NativePeerPromotionTests
     public void Turning_a_promoted_slider_rebuilds_it_in_the_new_orientation()
     {
         var backend = new HeadlessBackend { OfferNativeTrackBar = true };
-        var bar = RealizeTrack(new TrackBar { Bounds = new(0, 0, 200, 30), Maximum = 100, Value = 30 }, backend);
+        var bar = RealizeTrack(new TrackBar
+        {
+            Bounds = new(0, 0, 200, 30),
+            Maximum = 100,
+            Value = 30,
+            TickStyle = TickStyle.None,
+        }, backend);
         Assume.That(backend.LastTrackBar!.Vertical, Is.False);
 
         bar.Orientation = Orientation.Vertical;
