@@ -344,11 +344,11 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
                     return;
 
                 var capacity = checked((int)length + 1);
-                Span<char> buffer = capacity <= 512 ? stackalloc char[capacity] : new char[capacity];
+                var buffer = new char[capacity];
                 fixed (char* destination = buffer)
                 {
                     var written = NativeMethods.DragQueryFileW(hDrop, i, destination, (uint)capacity);
-                    files[i] = new string(buffer[..(int)written]);
+                    files[i] = new string(buffer.AsSpan(0, (int)written));
                 }
             }
 
