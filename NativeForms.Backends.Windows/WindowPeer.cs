@@ -84,7 +84,10 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
             0);
 
         if (Handle != 0)
+        {
             _windows[Handle] = this;
+            NativeMethods.DragAcceptFiles(Handle, true);
+        }
     }
 
     /// <inheritdoc/>
@@ -321,6 +324,43 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
         handler.Invoke(this, new Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top));
     }
 
+    /// <summary>Translates a shell <c>HDROP</c> into the toolkit's file-drop payload.</summary>
+    private void OnDropFiles(nint hDrop)
+    {
+        try
+        {
+            if (!NativeMethods.DragQueryPoint(hDrop, out var clientPoint))
+                return;
+
+            var count = NativeMethods.DragQueryFileW(hDrop, uint.MaxValue, null, 0);
+            if (count == 0 || count > int.MaxValue)
+                return;
+
+            var files = new string[(int)count];
+            for (uint i = 0; i < count; ++i)
+            {
+                var length = NativeMethods.DragQueryFileW(hDrop, i, null, 0);
+                if (length >= int.MaxValue)
+                    return;
+
+                var capacity = checked((int)length + 1);
+                Span<char> buffer = capacity <= 512 ? stackalloc char[capacity] : new char[capacity];
+                fixed (char* destination = buffer)
+                {
+                    var written = NativeMethods.DragQueryFileW(hDrop, i, destination, (uint)capacity);
+                    files[i] = new string(buffer[..(int)written]);
+                }
+            }
+
+            var screenPoint = this.PointToScreen(new Point(clientPoint.x, clientPoint.y));
+            ExternalDropBridge.Route(this, files, DragDropEffects.Copy, screenPoint);
+        }
+        finally
+        {
+            NativeMethods.DragFinish(hDrop);
+        }
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// The Win32 modal recipe: disable the owner, show this window, and pump a nested
@@ -497,6 +537,12 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
 
                 return 0;
 
+            case NativeMethods.WM_DROPFILES:
+                if (wParam != 0 && _windows.TryGetValue(hwnd, out var dropWindow))
+                    dropWindow.OnDropFiles(wParam);
+
+                return 0;
+
             case NativeMethods.WM_DPICHANGED:
                 // lParam points at the rectangle Windows wants the window moved and resized to so it
                 // keeps its physical size on the new display; honouring it is what per-monitor v2 asks of
@@ -666,7 +712,10 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer
     public override void Dispose()
     {
         if (Handle != 0)
+        {
+            NativeMethods.DragAcceptFiles(Handle, false);
             _windows.TryRemove(Handle, out _);
+        }
 
         base.Dispose();
 
