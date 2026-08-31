@@ -654,6 +654,7 @@ public class Form : Control
             return;
 
         _window = window;
+        ExternalDropBridge.Attach(window, this);
         _lastSize = this.Bounds.Size;
         window.SetQuitsOnClose(this.QuitsOnLoopClose);
         window.CloseRequested += this.OnPeerCloseRequested;
@@ -677,6 +678,7 @@ public class Form : Control
         if (_window is not { } window)
             return;
 
+        ExternalDropBridge.Detach(window);
         window.CloseRequested -= this.OnPeerCloseRequested;
         window.Closed -= this.OnPeerClosed;
         window.BoundsChangedByUser -= this.OnPeerBoundsChanged;
