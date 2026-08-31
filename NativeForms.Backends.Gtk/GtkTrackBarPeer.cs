@@ -11,18 +11,25 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// <remarks>
 /// GTK fixes a scale's orientation at construction, so the orientation is passed in and a control that
 /// turns re-realizes rather than mutating the widget. "value-changed" fires for programmatic writes as
-/// well, so <see cref="SetValue"/> suppresses the callback.
+/// well, so <see cref="SetValue"/> suppresses the callback. GtkScale marks can be placed independently
+/// on either side, so this peer can preserve every <see cref="TickStyle"/> configuration exactly.
 /// </remarks>
-internal sealed class GtkTrackBarPeer(bool vertical) : GtkControlPeer, ITrackBarPeer
+internal sealed class GtkTrackBarPeer(bool vertical) : GtkControlPeer, ITrackBarPeer, ITrackBarTickPeer
 {
     private const int _Horizontal = 0;
     private const int _Vertical = 1;
+    private const int _Left = 0;
+    private const int _Right = 1;
+    private const int _Top = 2;
+    private const int _Bottom = 3;
 
     private double _value;
     private double _minimum;
     private double _maximum = 10;
     private double _step = 1;
     private double _page = 5;
+    private int _tickFrequency = 1;
+    private TickStyle _tickStyle = TickStyle.None;
     private bool _suppress;
 
     /// <inheritdoc />
@@ -41,8 +48,11 @@ internal sealed class GtkTrackBarPeer(bool vertical) : GtkControlPeer, ITrackBar
     {
         _minimum = minimum;
         _maximum = maximum;
-        if (_widget != 0)
-            NativeMethods.gtk_range_set_range(_widget, minimum, maximum);
+        if (_widget == 0)
+            return;
+
+        NativeMethods.gtk_range_set_range(_widget, minimum, maximum);
+        this.ApplyTicks();
     }
 
     /// <inheritdoc />
@@ -76,6 +86,51 @@ internal sealed class GtkTrackBarPeer(bool vertical) : GtkControlPeer, ITrackBar
             NativeMethods.gtk_range_set_increments(_widget, _step, _page);
     }
 
+    /// <inheritdoc/>
+    public bool SupportsTicks(int minimum, int maximum, int frequency, TickStyle style)
+        => frequency > 0 && style is TickStyle.None or TickStyle.TopLeft or TickStyle.BottomRight or TickStyle.Both;
+
+    /// <inheritdoc/>
+    public void SetTicks(int minimum, int maximum, int frequency, TickStyle style)
+    {
+        _minimum = minimum;
+        _maximum = maximum;
+        _tickFrequency = Math.Max(1, frequency);
+        _tickStyle = style;
+        if (_widget != 0)
+            this.ApplyTicks();
+    }
+
+    /// <summary>Rebuilds the GtkScale marks from the managed range and style.</summary>
+    private void ApplyTicks()
+    {
+        NativeMethods.gtk_scale_clear_marks(_widget);
+        if (_tickStyle == TickStyle.None)
+            return;
+
+        var firstPosition = vertical ? _Left : _Top;
+        var secondPosition = vertical ? _Right : _Bottom;
+        var first = _tickStyle is TickStyle.TopLeft or TickStyle.Both;
+        var second = _tickStyle is TickStyle.BottomRight or TickStyle.Both;
+        var frequency = (long)_tickFrequency;
+
+        for (long value = (long)_minimum; value <= (long)_maximum; value += frequency)
+            this.AddMark(value, firstPosition, secondPosition, first, second);
+
+        var span = (long)_maximum - (long)_minimum;
+        if (span > 0 && span % frequency != 0)
+            this.AddMark((long)_maximum, firstPosition, secondPosition, first, second);
+    }
+
+    /// <summary>Adds one logical tick on each requested side of the scale.</summary>
+    private void AddMark(long value, int firstPosition, int secondPosition, bool first, bool second)
+    {
+        if (first)
+            NativeMethods.gtk_scale_add_mark(_widget, value, firstPosition, 0);
+        if (second)
+            NativeMethods.gtk_scale_add_mark(_widget, value, secondPosition, 0);
+    }
+
     /// <inheritdoc />
     protected override void OnWidgetRealized()
     {
@@ -84,6 +139,7 @@ internal sealed class GtkTrackBarPeer(bool vertical) : GtkControlPeer, ITrackBar
         NativeMethods.gtk_range_set_range(_widget, _minimum, _maximum);
         NativeMethods.gtk_range_set_increments(_widget, _step, _page);
         NativeMethods.gtk_range_set_value(_widget, _value);
+        this.ApplyTicks();
 
         var data = this.PinSelf();
         unsafe

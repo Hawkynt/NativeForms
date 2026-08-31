@@ -5,9 +5,9 @@ using Hawkynt.NativeForms.Drawing;
 namespace Hawkynt.NativeForms;
 
 /// <summary>
-/// An owner-drawn slider: a themed groove with an accent-filled portion and thumb, plus tick marks
-/// every <see cref="TickFrequency"/> values. Clicking the track pages toward the click, dragging the
-/// thumb scrubs with live <see cref="ValueChanged"/> notifications, and the keyboard follows the
+/// An owner-drawn slider: a themed groove with an accent-filled portion and thumb, plus optional tick
+/// marks every <see cref="TickFrequency"/> values. Clicking the track pages toward the click, dragging
+/// the thumb scrubs with live <see cref="ValueChanged"/> notifications, and the keyboard follows the
 /// native trackbar: arrows step by <see cref="SmallChange"/> (Left/Up toward the minimum),
 /// PageUp/PageDown by <see cref="LargeChange"/>, Home/End jump to the ends.
 /// </summary>
@@ -19,14 +19,12 @@ public class TrackBar : OwnerDrawnControl
     private ITrackBarPeer? _native;
     private bool? _nativeOffered;
 
-
     /// <summary>Whether the control is currently backed by a real platform slider.</summary>
     public override bool IsNativeWidget => _native is not null;
 
     /// <summary>
-    /// Always eligible: a platform slider carries the range, the position and the step sizes, and the
-    /// orientation is chosen when the widget is built. Tick marks are the one thing GTK and Win32 place
-    /// differently from us, and they are decoration rather than behaviour, so they do not gate.
+    /// The range, value, steps and orientation all have native counterparts. Tick marks are checked
+    /// separately because not every platform slider can reproduce every requested layout exactly.
     /// </summary>
     private static bool IsNativeEligible => true;
 
@@ -45,6 +43,9 @@ public class TrackBar : OwnerDrawnControl
 
     /// <summary>The length of a painted tick mark.</summary>
     private const int _TickLength = 3;
+
+    /// <summary>The inset of a tick painted on the top/left side.</summary>
+    private const int _NearTickStart = 2;
 
     private int _minimum;
     private int _maximum = 10;
@@ -65,6 +66,7 @@ public class TrackBar : OwnerDrawnControl
             if (_maximum < _minimum)
                 _maximum = _minimum;
 
+            this.PushNativeRangeAndTicks();
             this.Value = _value;
             this.Invalidate();
         }
@@ -83,6 +85,7 @@ public class TrackBar : OwnerDrawnControl
             if (_minimum > _maximum)
                 _minimum = _maximum;
 
+            this.PushNativeRangeAndTicks();
             this.Value = _value;
             this.Invalidate();
         }
@@ -119,7 +122,7 @@ public class TrackBar : OwnerDrawnControl
         set => field = Math.Max(1, value);
     } = 5;
 
-    /// <summary>The value spacing between painted tick marks. At least 1.</summary>
+    /// <summary>The value spacing between tick marks. At least 1.</summary>
     public int TickFrequency
     {
         get => field;
@@ -130,9 +133,23 @@ public class TrackBar : OwnerDrawnControl
                 return;
 
             field = value;
-            this.Invalidate();
+            this.OnTickPresentationChanged();
         }
     } = 1;
+
+    /// <summary>Where tick marks are displayed relative to the track.</summary>
+    public TickStyle TickStyle
+    {
+        get => field;
+        set
+        {
+            if (field == value)
+                return;
+
+            field = value;
+            this.OnTickPresentationChanged();
+        }
+    } = TickStyle.BottomRight;
 
     /// <summary>The axis the track runs along.</summary>
     public Orientation Orientation
@@ -236,7 +253,8 @@ public class TrackBar : OwnerDrawnControl
     /// <inheritdoc/>
     /// <remarks>
     /// The promotion point (PRD §12): on a willing backend the slider becomes a real platform slider, so
-    /// the desktop's groove, thumb and input conventions apply. Otherwise it falls back to the canvas.
+    /// the desktop's groove, thumb and input conventions apply. A visible tick configuration additionally
+    /// requires <see cref="ITrackBarTickPeer"/> support; otherwise the exact owner-drawn twin is used.
     /// </remarks>
     private protected override IControlPeer CreatePeer(IPlatformBackend backend)
     {
@@ -246,12 +264,22 @@ public class TrackBar : OwnerDrawnControl
             _nativeOffered = offered is not null;
             if (offered is { } peer)
             {
-                _native = peer;
-                peer.SetRange(_minimum, _maximum);
-                peer.SetSteps(this.SmallChange, this.LargeChange);
-                peer.SetValue(_value);
-                peer.ValueChanged += this.OnNativeValueChanged;
-                return peer;
+                var tickPeer = peer as ITrackBarTickPeer;
+                var ticksSupported = this.TickStyle == TickStyle.None
+                    || tickPeer?.SupportsTicks(_minimum, _maximum, this.TickFrequency, this.TickStyle) == true;
+
+                if (ticksSupported)
+                {
+                    tickPeer?.SetTicks(_minimum, _maximum, this.TickFrequency, this.TickStyle);
+                    _native = peer;
+                    peer.SetRange(_minimum, _maximum);
+                    peer.SetSteps(this.SmallChange, this.LargeChange);
+                    peer.SetValue(_value);
+                    peer.ValueChanged += this.OnNativeValueChanged;
+                    return peer;
+                }
+
+                peer.Dispose();
             }
         }
 
@@ -278,6 +306,29 @@ public class TrackBar : OwnerDrawnControl
 
         this.Value = peer.GetValue();
         this.OnScroll(EventArgs.Empty);
+    }
+
+    /// <summary>Updates a live native range and regenerates its marks when supported.</summary>
+    private void PushNativeRangeAndTicks()
+    {
+        if (_native is not { } peer)
+            return;
+
+        peer.SetRange(_minimum, _maximum);
+        if (peer is ITrackBarTickPeer tickPeer)
+            tickPeer.SetTicks(_minimum, _maximum, this.TickFrequency, this.TickStyle);
+    }
+
+    /// <summary>
+    /// Tick style can decide whether a peer is eligible at all, while placement is a creation-time Win32
+    /// style. Re-realizing is therefore the one operation that is correct for every backend.
+    /// </summary>
+    private void OnTickPresentationChanged()
+    {
+        if (this.IsRealized)
+            this.RerealizePeer();
+        else
+            this.Invalidate();
     }
 
     /// <inheritdoc/>
@@ -318,16 +369,29 @@ public class TrackBar : OwnerDrawnControl
     /// <summary>Paints one tick per <see cref="TickFrequency"/> step, plus one at the maximum.</summary>
     private void PaintTicks(IGraphics g)
     {
-        var color = this.Theme.ControlText;
-        var tickStart = this.CrossExtent - 6;
-        for (var value = _minimum; value <= _maximum; value += this.TickFrequency)
-            this.PaintTick(g, color, value, tickStart);
+        if (this.TickStyle == TickStyle.None)
+            return;
 
-        if (_maximum > _minimum && (_maximum - _minimum) % this.TickFrequency != 0)
-            this.PaintTick(g, color, _maximum, tickStart);
+        var color = this.Theme.ControlText;
+        var frequency = (long)this.TickFrequency;
+        for (long value = _minimum; value <= (long)_maximum; value += frequency)
+            this.PaintTickOnRequestedSides(g, color, (int)value);
+
+        var span = (long)_maximum - (long)_minimum;
+        if (span > 0 && span % frequency != 0)
+            this.PaintTickOnRequestedSides(g, color, _maximum);
     }
 
-    /// <summary>Paints a single tick mark near the far cross-axis edge.</summary>
+    /// <summary>Paints one logical tick on each side selected by <see cref="TickStyle"/>.</summary>
+    private void PaintTickOnRequestedSides(IGraphics g, Color color, int value)
+    {
+        if (this.TickStyle is TickStyle.TopLeft or TickStyle.Both)
+            this.PaintTick(g, color, value, _NearTickStart);
+        if (this.TickStyle is TickStyle.BottomRight or TickStyle.Both)
+            this.PaintTick(g, color, value, this.CrossExtent - 6);
+    }
+
+    /// <summary>Paints a single tick mark at the supplied cross-axis position.</summary>
     private void PaintTick(IGraphics g, Color color, int value, int tickStart)
     {
         var axis = _EndMargin + this.PositionOf(value);

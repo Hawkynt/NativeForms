@@ -74,4 +74,24 @@ internal sealed class SegmentedControlTests
 
         Assert.That(g.Operations.Exists(o => o.StartsWith("fill #FF0078D4 100,0")), Is.True, "the second cell fills with the accent");
     }
+
+    [Test]
+    public void Ram_presets_are_one_mutually_exclusive_segment_selection()
+    {
+        var seg = new SegmentedControl { Bounds = new(0, 0, 500, 28) };
+        seg.SetSegments("¼ RAM", "½ RAM", "1× RAM", "2 GiB", "8 GiB");
+        var backend = new HeadlessBackend();
+        var form = new Form();
+        form.Controls.Add(seg);
+        Application.Run(form, backend);
+        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+
+        canvas.RaiseMouseDown(450, 14);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(seg.SelectedIndex, Is.EqualTo(4));
+            Assert.That(seg.SelectedSegment, Is.EqualTo("8 GiB"));
+        });
+    }
 }

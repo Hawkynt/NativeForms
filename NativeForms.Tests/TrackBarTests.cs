@@ -31,6 +31,7 @@ internal sealed class TrackBarTests
             Assert.That(bar.SmallChange, Is.EqualTo(1));
             Assert.That(bar.LargeChange, Is.EqualTo(5));
             Assert.That(bar.TickFrequency, Is.EqualTo(1));
+            Assert.That(bar.TickStyle, Is.EqualTo(TickStyle.BottomRight));
             Assert.That(bar.Orientation, Is.EqualTo(Orientation.Horizontal));
         });
     }
@@ -159,6 +160,65 @@ internal sealed class TrackBarTests
     }
 
     [Test]
+    public void TickFrequency_always_includes_a_non_divisible_maximum()
+    {
+        var bar = CreateHundredPixelTrack();
+        bar.TickFrequency = 4;
+        var canvas = Realize(bar);
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Count(o => o.StartsWith("line #FF1A1A1A")), Is.EqualTo(4), "0, 4, 8 and 10");
+            Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 108,24-108,27"), "the exact maximum is marked");
+        });
+    }
+
+    [Test]
+    public void TickStyle_None_suppresses_marks()
+    {
+        var bar = CreateHundredPixelTrack();
+        bar.TickStyle = TickStyle.None;
+        var canvas = Realize(bar);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations.Count(o => o.StartsWith("line #FF1A1A1A")), Is.Zero);
+    }
+
+    [Test]
+    public void TickStyle_TopLeft_moves_horizontal_marks_above_the_track()
+    {
+        var bar = CreateHundredPixelTrack();
+        bar.TickFrequency = 5;
+        bar.TickStyle = TickStyle.TopLeft;
+        var canvas = Realize(bar);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 8,2-8,5"));
+    }
+
+    [Test]
+    public void TickStyle_Both_paints_each_logical_mark_on_both_sides()
+    {
+        var bar = CreateHundredPixelTrack();
+        bar.TickFrequency = 5;
+        bar.TickStyle = TickStyle.Both;
+        var canvas = Realize(bar);
+
+        var g = canvas.RaisePaint();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(g.Operations.Count(o => o.StartsWith("line #FF1A1A1A")), Is.EqualTo(6));
+            Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 8,2-8,5"));
+            Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 8,24-8,27"));
+        });
+    }
+
+    [Test]
     public void Vertical_bar_paints_and_drags_along_the_y_axis()
     {
         var bar = new TrackBar { Bounds = new(0, 0, 30, 116), Orientation = Orientation.Vertical, Value = 5 };
@@ -175,6 +235,23 @@ internal sealed class TrackBarTests
         canvas.RaiseMouseDown(15, 58); // grab the thumb
         canvas.RaiseMouseMove(15, 78);
         Assert.That(bar.Value, Is.EqualTo(7));
+    }
+
+    [Test]
+    public void Vertical_TopLeft_marks_are_drawn_on_the_left()
+    {
+        var bar = new TrackBar
+        {
+            Bounds = new(0, 0, 30, 116),
+            Orientation = Orientation.Vertical,
+            TickFrequency = 5,
+            TickStyle = TickStyle.TopLeft,
+        };
+        var canvas = Realize(bar);
+
+        var g = canvas.RaisePaint();
+
+        Assert.That(g.Operations, Does.Contain("line #FF1A1A1A 2,8-5,8"));
     }
 
     [Test]
