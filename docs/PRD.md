@@ -124,10 +124,12 @@ Targets (measured by the `NativeForms.Benchmarks` project; treat as CI-guarded g
 - [x] Append to a bound `ObservableList<T>` with no listener allocates **0 bytes** (null-conditional
       short-circuits the event args) — asserted.
 - [x] Empty `Form` realized: **< 8 KB** managed allocation (measured ~920 B, asserted).
-- [x] Zero per-frame managed allocation in steady state — asserted for EVERY owner-drawn
-      control (31-control sweep incl. open menus); per-frame sort-map closure and per-cell
-      display-text recomputation in the grid were found and removed (display text now cached
-      per row, invalidated on data/selector changes).
+- [~] Zero per-frame managed allocation in steady state — `PaintAllocationTests` sweeps 44
+      owner-drawn controls incl. open menus (not *every* one: `SegmentedControl`, `RangeSlider`,
+      `InfoBar`/`Toast`, `NavigationView`, `TokenBox`, `ZoomPanel`, `PropertyGrid`, `CodeTextBox`,
+      `Breadcrumb` and `ColorPicker` — the §7.9/§7.10 additions — are not in it). Per-frame sort-map
+      closure and per-cell display-text recomputation in the grid were found and removed (display
+      text now cached per row, invalidated on data/selector changes).
 - [x] No boxing on the event hot path; `EventHandler` slots are null until subscribed.
 - [~] Startup (cold) to first window shown, measured on the Linux/GTK AOT self-contained build via
       the demo's `--measure-startup`: **~90 ms** floor, of which the toolkit itself is negligible —
@@ -763,10 +765,17 @@ strategy (may differ per platform; note exceptions inline).
         because that is what it is from the toolkit's side: every pixel metric — default font, row height,
         scroll-bar thickness, the owner-drawn metrics of §5 — is read from `ITheme` and derived from the
         DPI, so the listeners that already re-measure are exactly the ones that must.
-  - [ ] `Control.LogicalToDevice` exists but is called in one place (a tooltip offset), so authored
-        layout, font sizes and control metrics are still in device pixels. Making scaling apply to
-        *layout* is the remaining work and is a larger change than awareness was.
-  - [ ] macOS backing-scale, which waits on the backend.
+  - [ ] `Control.LogicalToDevice` exists but is called in two places, both of them the same tooltip
+        cursor offset (`ToolTip.ShowPopup` and `ToolStrip`'s own tip), so authored layout, font sizes
+        and control metrics are still in device pixels. Making scaling apply to
+        *layout* is the remaining work and is a larger change than awareness was. `GetDpiScale` has
+        exactly one production consumer, which is `LogicalToDevice` itself; the `Size` overload has
+        none outside `DpiScaleTests`.
+  - [ ] macOS backing-scale (`CocoaBackend.GetDpiScale` reads `backingScaleFactor` through the real
+        `objc_msgSend_fpret`/`objc_msgSend` ABI split; it asks `NSScreen.mainScreen` rather than the
+        window's screen, and nothing observes
+        `NSWindowDidChangeBackingPropertiesNotification`, so neither half of what is ticked above for
+        Win32 and GTK — window-following scale, live re-scale — holds yet).
 - [x] Dark mode / high contrast with live theme-change notifications — see §5
 - [~] Accessibility. `Control.AccessibleName`/`AccessibleDescription`/`AccessibleRole` (Windows-Forms
       shaped, and packed into the existing rarely-set slot object so a control nobody has described costs
@@ -793,7 +802,12 @@ strategy (may differ per platform; note exceptions inline).
         genuine check box. That control group is what distinguishes "our reply did not take" from "this
         machine cannot tell a check box from a pane"; without it the test would have looked like a defect
         in the toolkit.
-  - [ ] macOS/NSAccessibility, which waits on the backend itself.
+  - [ ] macOS/NSAccessibility (`CocoaAccessibility.Describe` ships: it sets `setAccessibilityLabel:`,
+        `setAccessibilityHelp:` and a real AppKit role constant — resolved out of the framework's
+        exported symbols rather than hardcoded — behind a `respondsToSelector:` guard, and both
+        `CocoaCanvasPeer` and `CocoaControlPeer` call it, so the owner-drawn and promoted paths are
+        both covered. What is missing is the assertion the other two rows are ticked on: nothing reads
+        a role back out of NSAccessibility the way `GtkAccessibilityTests` reads it out of ATK).
   - [ ] A screen reader announces a promoted and an owner-drawn control on both platforms — verified by
         hand, once, since no automation substitutes for hearing it. Note that wine cannot stand in for the
         Windows half: its `oleacc` reports every window as a generic client, so only the plumbing is
@@ -841,13 +855,15 @@ strategy (may differ per platform; note exceptions inline).
 ## 9. Quality gates
 - [x] Unit tests (NUnit 4) for platform-agnostic behavior — model, realization, registry, binding,
       focus/keyboard, layout, appearance, threading, decoding, and every control's paint/input
-      (1302 tests); grows with each control.
+      (~2384 `[Test]`/`[TestCase]` declarations; the 1989-test run recorded below is the authority on
+      what actually executes); grows with each control.
 - [x] Headless backend for tests (`HeadlessBackend` + recording `ICanvasPeer`/`RecordingGraphics`) so
       control paint and input are testable without a display.
 - [x] Trim + AOT publish of the demo in CI on each OS with trim warnings as errors (headline goal).
-- [x] Footprint regression thresholds via `AllocationBudgetTests` + `PaintAllocationTests`
-      (per-instance budgets, empty-Form budget, zero-allocation steady-state repaint for every
-      owner-drawn control) — every CI run, all OSes; benchmark + trim jobs nightly.
+- [~] Footprint regression thresholds via `AllocationBudgetTests` + `PaintAllocationTests`
+      (per-instance budgets and the empty-Form budget hold; the zero-allocation steady-state repaint
+      sweep covers 44 owner-drawn controls, not every one — see §4) — every CI run, all OSes;
+      benchmark + trim jobs nightly.
 - [x] **WinForms conformance audit**: every control family reviewed against `System.Windows.Forms`
       semantics (names, defaults, event order, behavioral contracts). Deviations were either fixed
       (dock order, form lifecycle, input gates, member parity, event pipelines) or documented as
@@ -855,7 +871,8 @@ strategy (may differ per platform; note exceptions inline).
 - [x] **Demo autopilot**: `dotnet run --project NativeForms.Demo -- --autopilot` drives the whole
       gallery with injected input, asserts real control state, runs a layout audit (out-of-frame,
       truncated captions, overlaps) per page and writes in-process PNG captures
-      (`gtk_widget_draw` → cairo → `cairo_surface_write_to_png`, no external tool). 90 checks;
+      (`gtk_widget_draw` → cairo → `cairo_surface_write_to_png`, no external tool). 325 check call
+      sites in `Autopilot*.cs`, 160 checks in a full run;
       the pass/fail gate for "the demo works and looks right".
 - [~] **Real-GTK test tier**: fixtures that drive the actual backend (in-process `GdkEvent`
       injection via `gtk_main_do_event`/`gdk_display_put_event`, `gtk_test_widget_wait_for_draw`
@@ -981,6 +998,11 @@ strategy (may differ per platform; note exceptions inline).
       container (`presses landed on: GtkFixed`). Any future capture work must resolve colours and settle
       *before* the walkthrough starts, never during it. The residual `gtk_widget_draw: alloc_needed`
       warning on a freshly mapped dialog is accepted as cosmetic until then.
+      Where this stands today: the offending fill was reverted rather than re-architected, so
+      `Autopilot.Capture` reads no theme at all — the background is a literal `cairo_set_source_rgb`.
+      But nothing *enforces* the rule (no guard, no assert), and the capture still calls
+      `gtk_test_widget_wait_for_draw` per layer, which is precisely the "settles pending relayouts"
+      half of the mechanism above. Unchecked until the rule is enforced rather than remembered.
 - [x] **The TimePicker double-click check is deterministic.** It failed ~2 runs in 8 on X11 with
       `the clock never opened`. Established along the way: `GtkCanvasPeer` *is* a `gtk_fixed_new()`, so the
       `presses landed on: GtkFixed` line means the gesture **did** reach the control — it was a
@@ -1004,9 +1026,15 @@ strategy (may differ per platform; note exceptions inline).
       advisory again — the 3840-pixel scroll bar above would have failed the layout audit on its first
       frame, and was found by eye instead.
 - [ ] **Interactive GUI verification in CI**: the headless fakes cannot see event routing,
-      clipping or coordinate mapping — those bugs shipped green. A GTK harness driving real
-      input (`gdk_test_simulate_*` / `gtk_main_do_event`) exists for local runs; wiring it into
-      CI needs a real X server (XTEST does not land under Xwayland).
+      clipping or coordinate mapping — those bugs shipped green. What is left here is narrower than
+      it was: the *autopilot's* interactive input does run in CI and gates (the row above), because
+      injection is `gtk_main_do_event` rather than XTEST — nothing in the tree P/Invokes
+      `gdk_test_simulate_*`, and the four comments still calling it that are stale. The gap is the
+      **NUnit** harness: `GtkHostedEditorInputTests`, `GtkNativeSizingTests`,
+      `GtkToolTipClickThroughTests`, `GtkPopupLifetimeTests`, `GtkPopupPlacementTests` and
+      `GtkAccessibilityTests` all `Assert.Ignore` when `DISPLAY` is unset, and `xvfb` is installed
+      only for the autopilot job — nothing gives the test leg a display, so those six suites are
+      proven on a developer's machine and skipped in CI.
 - [x] `GtkPopupPeer.IsOutside` maps the press through `XRoot`/`YRoot` and the popup's own origin,
       so a grab-redirected click no longer reads as "inside" (was latent until drop-downs began
       staying open, which made it reachable).
@@ -1297,8 +1325,11 @@ would not survive the feature set we already ship (15 column kinds, merged rows,
       held.
 - [ ] A screen reader announces a promoted `CheckBox` on Windows and on Linux (the point of the
       exercise — verified manually, once, per control family).
-- [x] `docs/README.md`'s strategy column and each control page's header say which path a control
-      takes and what the gate is.
+- [~] `docs/README.md`'s strategy column says which path a control takes, and each promotable page
+      carries a "Native widget promotion" section giving the gate. The *header* line of all nine
+      promotable pages (`checkbox`, `radiobutton`, `progressbar`, `trackbar`, `scrollbar`, `groupbox`,
+      `linklabel`, `combobox`, `listbox`) still reads `strategy: **owner-drawn** · peer: ICanvasPeer`,
+      mentioning neither the native path nor the gate — only `button.md` and `label.md` name both.
 
 ---
 
@@ -1626,6 +1657,11 @@ populator.
       handler-signature checking lands with the click attributes.
 - [x] Every one of the 15 column kinds is reachable from attributes.
 - [x] The same model still generates a working `PropertyGrid`.
-- [x] `dotnet publish -p:PublishAot=true` on a consumer stays clean.
+- [~] `dotnet publish -p:PublishAot=true` on a consumer stays clean. The mechanism is deliberate —
+      `NativeForms.Core.csproj` packs the generator as an analyzer asset rather than a
+      `ProjectReference`, so it never enters a consumer's AOT graph — but nothing exercises the
+      criterion: the only AOT-published projects are `NativeForms.Demo` and `NativeForms.TrimProbe`,
+      and neither declares a `[GridEditable]` type. The one analyzer consumer, `NativeForms.Tests`,
+      is never published.
 - [x] [`datagridview.md`](controls/datagridview.md) and [`propertygrid.md`](controls/propertygrid.md)
       document the shared vocabulary, with a porting table from the reference library's names.
