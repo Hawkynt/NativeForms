@@ -546,9 +546,16 @@ internal sealed partial class Autopilot
             this.Click(calendar, cell.X, cell.Y);
             var second = this.Read(() => calendar.SelectionStart).Date;
             var delta = (int)(first - second).TotalDays;
+            // A FIXED GRID POSITION does not move by a month's length. The grid starts on the
+            // week boundary on or before the 1st, so paging back moves that origin by a whole
+            // number of weeks - 28 when the previous month fits in the same number of rows, 35
+            // when it needs one more. It is never 29, 30 or 31. The old 28..31 bound therefore
+            // passed only in the 28 months and failed in the 35 ones (in 2026: April, June,
+            // September and December), which is why this check turned red on the 1st of a month
+            // with nothing in the control having changed.
             this.ExpectTrue(
-                $"paging back one month should move the same cell 28..31 days earlier, observed {delta} ({first:yyyy-MM-dd} then {second:yyyy-MM-dd})",
-                delta is >= 28 and <= 31);
+                $"paging back one month should move the same cell 28 or 35 days earlier, observed {delta} ({first:yyyy-MM-dd} then {second:yyyy-MM-dd})",
+                delta is 28 or 35);
         });
 
         this.Check("MonthCalendar: the title drills out to years and a cell drills back in", () =>
