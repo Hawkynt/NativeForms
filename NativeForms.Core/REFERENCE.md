@@ -616,7 +616,7 @@ Inherits `CommonDialog`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `ColorDialog` | `ColorDialog()` |  |
+| `ColorDialog` | `ColorDialog()` | Creates a dialog bound to whatever backend the application runs on. |
 | `Color` | `Color Color { get; set; }` | The chosen color after OK; pre-selects the picker before. |
 
 #### `ColorPicker`
@@ -1593,7 +1593,7 @@ Inherits `CommonDialog`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `FolderBrowserDialog` | `FolderBrowserDialog()` |  |
+| `FolderBrowserDialog` | `FolderBrowserDialog()` | Creates a dialog bound to whatever backend the application runs on. |
 | `SelectedPath` | `string SelectedPath { get; set; }` | The chosen directory after OK; pre-selects the dialog's start location before. |
 | `Title` | `string Title { get; set; }` | The title-bar caption; empty picks the platform default. |
 
@@ -1616,7 +1616,7 @@ Inherits `CommonDialog`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `FontDialog` | `FontDialog()` |  |
+| `FontDialog` | `FontDialog()` | Creates a dialog bound to whatever backend the application runs on. |
 | `Font` | `Font Font { get; set; }` | The chosen font after OK; pre-selects the picker before. |
 
 #### `Form`
@@ -2708,7 +2708,7 @@ Inherits `FileDialog`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `OpenFileDialog` | `OpenFileDialog()` |  |
+| `OpenFileDialog` | `OpenFileDialog()` | Creates a dialog bound to whatever backend the application runs on. |
 | `FileNames` | `string[] FileNames { get; }` | All selected absolute paths after OK — one element unless `Multiselect`. |
 | `Multiselect` | `bool Multiselect { get; set; }` | Whether the user may pick several files at once; they arrive in `FileNames`. |
 
@@ -2831,7 +2831,7 @@ Inherits `OwnerDrawnControl`.
 | `Image` | `IImage Image { get; set; }` | The image to display, or `null`. It may be an `AnimatedImage` (which is an `IImage`): when animated the box subscribes to the shared animation clock and repaints as the frame advances, and a disabled box freezes on and greys the current frame. |
 | `SizeMode` | `PictureBoxSizeMode SizeMode { get; set; }` | How the image is fitted into the client area. |
 | `TransparencyGridColor1` | `Color TransparencyGridColor1 { get; set; }` | The two colours of the transparency backdrop checkerboard (see `TransparencyGridSize`). |
-| `TransparencyGridColor2` | `Color TransparencyGridColor2 { get; set; }` |  |
+| `TransparencyGridColor2` | `Color TransparencyGridColor2 { get; set; }` | The two colours of the transparency backdrop checkerboard (see `TransparencyGridSize`). |
 | `TransparencyGridSize` | `int TransparencyGridSize { get; set; }` | The checker tile size, in pixels, of a transparency backdrop drawn behind the image so translucent regions read against a grid instead of a flat fill. `0` (the default) keeps the plain `ControlBackground` fill; any positive value turns the checkerboard on. |
 | `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
 
@@ -3321,7 +3321,7 @@ Inherits `FileDialog`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `SaveFileDialog` | `SaveFileDialog()` |  |
+| `SaveFileDialog` | `SaveFileDialog()` | Creates a dialog bound to whatever backend the application runs on. |
 
 #### `ScrollBar`
 
