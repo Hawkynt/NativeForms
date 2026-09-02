@@ -37,6 +37,7 @@ jobs:
     # deliberately never pushes them — this job is the only path to nuget.org.
     needs: [ci, build]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       # Lets the job ask GitHub for the short-lived OIDC token that nuget.org's Trusted Publishing
@@ -83,6 +84,7 @@ jobs:
     # release in name only.
     needs: [build, nuget]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
