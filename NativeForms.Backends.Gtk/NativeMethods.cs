@@ -8,998 +8,993 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// reflection at runtime — keeping the assembly trim- and NativeAOT-safe. All widget and
 /// <c>gpointer</c> handles are represented as <see cref="nint"/>; GTK strings are UTF-8.
 /// </summary>
-internal static partial class NativeMethods
-{
-    private const string Gtk = "libgtk-3.so.0";
-    private const string GObject = "libgobject-2.0.so.0";
-    private const string GLib = "libglib-2.0.so.0";
+internal static partial class NativeMethods {
+  private const string Gtk = "libgtk-3.so.0";
+  private const string GObject = "libgobject-2.0.so.0";
+  private const string GLib = "libglib-2.0.so.0";
 
-    /// <summary>ATK, the accessibility layer a Linux screen reader talks to.</summary>
-    private const string Atk = "libatk-1.0.so.0";
+  /// <summary>ATK, the accessibility layer a Linux screen reader talks to.</summary>
+  private const string Atk = "libatk-1.0.so.0";
 
-    /// <summary>Value of <c>GTK_WINDOW_TOPLEVEL</c> — a normal, WM-decorated top-level window.</summary>
-    internal const int GTK_WINDOW_TOPLEVEL = 0;
+  /// <summary>Value of <c>GTK_WINDOW_TOPLEVEL</c> — a normal, WM-decorated top-level window.</summary>
+  internal const int GTK_WINDOW_TOPLEVEL = 0;
 
-    /// <summary>Value of <c>GTK_WINDOW_POPUP</c> — an undecorated surface the WM ignores (menus, tooltips).</summary>
-    internal const int GTK_WINDOW_POPUP = 1;
+  /// <summary>Value of <c>GTK_WINDOW_POPUP</c> — an undecorated surface the WM ignores (menus, tooltips).</summary>
+  internal const int GTK_WINDOW_POPUP = 1;
 
-    /// <summary>Value of <c>GTK_STATE_FLAG_NORMAL</c> — the default, unmodified widget state.</summary>
-    internal const uint GTK_STATE_FLAG_NORMAL = 0;
+  /// <summary>Value of <c>GTK_STATE_FLAG_NORMAL</c> — the default, unmodified widget state.</summary>
+  internal const uint GTK_STATE_FLAG_NORMAL = 0;
 
-    // --- Library init and main loop -------------------------------------------------------------
+  // --- Library init and main loop -------------------------------------------------------------
 
-    /// <summary>Initializes GTK. Passing <c>0, 0</c> (NULL argc/argv) is the supported no-args form.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_init(nint argc, nint argv);
+  /// <summary>Initializes GTK. Passing <c>0, 0</c> (NULL argc/argv) is the supported no-args form.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_init(nint argc, nint argv);
 
-    /// <summary>Runs the GTK main loop until <see cref="gtk_main_quit"/> is called.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_main();
+  /// <summary>Runs the GTK main loop until <see cref="gtk_main_quit"/> is called.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_main();
 
-    /// <summary>Makes the innermost invocation of <see cref="gtk_main"/> return.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_main_quit();
+  /// <summary>Makes the innermost invocation of <see cref="gtk_main"/> return.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_main_quit();
 
-    // --- Windows and containers -----------------------------------------------------------------
+  // --- Windows and containers -----------------------------------------------------------------
 
-    /// <summary>Creates a new <c>GtkWindow</c> of the given <c>GtkWindowType</c>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_window_new(int type);
+  /// <summary>Creates a new <c>GtkWindow</c> of the given <c>GtkWindowType</c>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_window_new(int type);
 
-    /// <summary>Creates a new <c>GtkFixed</c> container that positions children by absolute coordinates.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_fixed_new();
+  /// <summary>Creates a new <c>GtkFixed</c> container that positions children by absolute coordinates.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_fixed_new();
 
-    /// <summary>
-    /// A <c>GtkLayout</c>: a fixed-position container that, unlike <c>GtkFixed</c>, reports a
-    /// minimum size of zero rather than the union of its children's.
-    /// </summary>
-    [LibraryImport("libgtk-3.so.0")]
-    internal static partial nint gtk_layout_new(nint horizontal, nint vertical);
+  /// <summary>
+  /// A <c>GtkLayout</c>: a fixed-position container that, unlike <c>GtkFixed</c>, reports a
+  /// minimum size of zero rather than the union of its children's.
+  /// </summary>
+  [LibraryImport("libgtk-3.so.0")]
+  internal static partial nint gtk_layout_new(nint horizontal, nint vertical);
 
-    [LibraryImport("libgtk-3.so.0")]
-    internal static partial void gtk_layout_put(nint layout, nint widget, int x, int y);
+  [LibraryImport("libgtk-3.so.0")]
+  internal static partial void gtk_layout_put(nint layout, nint widget, int x, int y);
 
-    /// <summary>Adds <paramref name="widget"/> to the single-child container <paramref name="container"/>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_container_add(nint container, nint widget);
+  /// <summary>Adds <paramref name="widget"/> to the single-child container <paramref name="container"/>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_container_add(nint container, nint widget);
 
-    /// <summary>Sets the title-bar caption of a window (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_window_set_title(nint window, string title);
+  /// <summary>Sets the title-bar caption of a window (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_window_set_title(nint window, string title);
 
-    /// <summary>Sets the size a window requests when it is first shown.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_default_size(nint window, int width, int height);
+  /// <summary>Sets the size a window requests when it is first shown.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_default_size(nint window, int width, int height);
 
-    /// <summary>Resizes an already-created window to the given client size.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_resize(nint window, int width, int height);
+  /// <summary>Resizes an already-created window to the given client size.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_resize(nint window, int width, int height);
 
-    /// <summary>Places <paramref name="widget"/> in a <c>GtkFixed</c> at the given coordinates.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_fixed_put(nint fixed_, nint widget, int x, int y);
+  /// <summary>Places <paramref name="widget"/> in a <c>GtkFixed</c> at the given coordinates.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_fixed_put(nint fixed_, nint widget, int x, int y);
 
-    /// <summary>Moves a child already inside a <c>GtkFixed</c> to new coordinates.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_fixed_move(nint fixed_, nint widget, int x, int y);
+  /// <summary>Moves a child already inside a <c>GtkFixed</c> to new coordinates.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_fixed_move(nint fixed_, nint widget, int x, int y);
 
-    /// <summary>Moves a top-level window to the given root-window (screen) coordinates.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_move(nint window, int x, int y);
+  /// <summary>Moves a top-level window to the given root-window (screen) coordinates.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_move(nint window, int x, int y);
 
-    // --- Window management ----------------------------------------------------------------------
+  // --- Window management ----------------------------------------------------------------------
 
-    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_NORMAL</c> — an ordinary application window.</summary>
-    internal const int GDK_WINDOW_TYPE_HINT_NORMAL = 0;
+  /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_NORMAL</c> — an ordinary application window.</summary>
+  internal const int GDK_WINDOW_TYPE_HINT_NORMAL = 0;
 
-    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_DIALOG</c> — window managers typically drop the
-    /// minimize/maximize buttons for it.</summary>
-    internal const int GDK_WINDOW_TYPE_HINT_DIALOG = 1;
+  /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_DIALOG</c> — window managers typically drop the
+  /// minimize/maximize buttons for it.</summary>
+  internal const int GDK_WINDOW_TYPE_HINT_DIALOG = 1;
 
-    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_UTILITY</c> — a small persistent tool window.</summary>
-    internal const int GDK_WINDOW_TYPE_HINT_UTILITY = 5;
+  /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_UTILITY</c> — a small persistent tool window.</summary>
+  internal const int GDK_WINDOW_TYPE_HINT_UTILITY = 5;
 
-    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU</c> — a menu pulled from a menu bar.
-    /// A window manager keeps the window it belongs to looking focused while one of these is up,
-    /// which is why an application's own menu must not read as an ordinary window.</summary>
-    internal const int GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU = 8;
+  /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU</c> — a menu pulled from a menu bar.
+  /// A window manager keeps the window it belongs to looking focused while one of these is up,
+  /// which is why an application's own menu must not read as an ordinary window.</summary>
+  internal const int GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU = 8;
 
-    /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_TOOLTIP</c> — a passive surface the user never aims at.</summary>
-    internal const int GDK_WINDOW_TYPE_HINT_TOOLTIP = 10;
+  /// <summary>Value of <c>GDK_WINDOW_TYPE_HINT_TOOLTIP</c> — a passive surface the user never aims at.</summary>
+  internal const int GDK_WINDOW_TYPE_HINT_TOOLTIP = 10;
 
-    /// <summary>Value of <c>GDK_HINT_MIN_SIZE</c> — the geometry's minimum size is valid.</summary>
-    internal const int GDK_HINT_MIN_SIZE = 1 << 1;
+  /// <summary>Value of <c>GDK_HINT_MIN_SIZE</c> — the geometry's minimum size is valid.</summary>
+  internal const int GDK_HINT_MIN_SIZE = 1 << 1;
 
-    /// <summary>Value of <c>GDK_HINT_MAX_SIZE</c> — the geometry's maximum size is valid.</summary>
-    internal const int GDK_HINT_MAX_SIZE = 1 << 2;
+  /// <summary>Value of <c>GDK_HINT_MAX_SIZE</c> — the geometry's maximum size is valid.</summary>
+  internal const int GDK_HINT_MAX_SIZE = 1 << 2;
 
-    /// <summary>Whether the user can resize the window (<c>gboolean</c> is passed as 1/0).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_resizable(nint window, int resizable);
+  /// <summary>Whether the user can resize the window (<c>gboolean</c> is passed as 1/0).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_resizable(nint window, int resizable);
 
-    /// <summary>Whether the window manager decorates the window with a frame and title bar.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_decorated(nint window, int setting);
+  /// <summary>Whether the window manager decorates the window with a frame and title bar.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_decorated(nint window, int setting);
 
-    /// <summary>Advises the window manager what kind of window this is (a <c>GdkWindowTypeHint</c> value).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_type_hint(nint window, int hint);
+  /// <summary>Advises the window manager what kind of window this is (a <c>GdkWindowTypeHint</c> value).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_type_hint(nint window, int hint);
 
-    /// <summary>Asks the window manager to minimize (iconify) the window.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_iconify(nint window);
+  /// <summary>Asks the window manager to minimize (iconify) the window.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_iconify(nint window);
 
-    /// <summary>Asks the window manager to restore the window from its minimized state.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_deiconify(nint window);
+  /// <summary>Asks the window manager to restore the window from its minimized state.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_deiconify(nint window);
 
-    /// <summary>Asks the window manager to maximize the window.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_maximize(nint window);
+  /// <summary>Asks the window manager to maximize the window.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_maximize(nint window);
 
-    /// <summary>Asks the window manager to restore the window from its maximized state.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_unmaximize(nint window);
+  /// <summary>Asks the window manager to restore the window from its maximized state.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_unmaximize(nint window);
 
-    /// <summary>Asks the window manager to keep the window above all normal windows.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_keep_above(nint window, int setting);
+  /// <summary>Asks the window manager to keep the window above all normal windows.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_keep_above(nint window, int setting);
 
-    /// <summary>Sets the widget's overall opacity (0..1); on a top-level this needs a compositor.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_opacity(nint widget, double opacity);
-
-    /// <summary>Sets the window's icon from a <c>GdkPixbuf</c> (the window takes its own reference).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_icon(nint window, nint icon);
-
-    /// <summary>Constrains interactive resizing with the valid fields of <paramref name="geometry"/>
-    /// (per <paramref name="geomMask"/>, a <c>GdkWindowHints</c> bitmask).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_geometry_hints(nint window, nint geometryWidget, in GdkGeometry geometry, int geomMask);
-
-    /// <summary>
-    /// The window-geometry constraints <see cref="gtk_window_set_geometry_hints"/> consumes. Only the
-    /// fields whose <c>GdkWindowHints</c> bit is set in the mask are read; layout mirrors the C
-    /// struct (eight <c>gint</c>s, two <c>gdouble</c>s, one <c>GdkGravity</c>).
-    /// </summary>
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct GdkGeometry
-    {
-        /// <summary>The smallest width the user can resize to.</summary>
-        public int MinWidth;
-
-        /// <summary>The smallest height the user can resize to.</summary>
-        public int MinHeight;
+  /// <summary>Sets the widget's overall opacity (0..1); on a top-level this needs a compositor.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_opacity(nint widget, double opacity);
 
-        /// <summary>The largest width the user can resize to.</summary>
-        public int MaxWidth;
-
-        /// <summary>The largest height the user can resize to.</summary>
-        public int MaxHeight;
-
-        /// <summary>Ignored here (base size hint).</summary>
-        public int BaseWidth;
-
-        /// <summary>Ignored here (base size hint).</summary>
-        public int BaseHeight;
-
-        /// <summary>Ignored here (resize increment hint).</summary>
-        public int WidthInc;
-
-        /// <summary>Ignored here (resize increment hint).</summary>
-        public int HeightInc;
-
-        /// <summary>Ignored here (aspect-ratio hint).</summary>
-        public double MinAspect;
-
-        /// <summary>Ignored here (aspect-ratio hint).</summary>
-        public double MaxAspect;
-
-        /// <summary>Ignored here (<c>GdkGravity</c> placement hint).</summary>
-        public int WinGravity;
-    }
-
-    // --- Generic widget operations --------------------------------------------------------------
-
-    /// <summary>Recursively shows <paramref name="widget"/> and all of its descendants.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_show_all(nint widget);
-
-    /// <summary>Shows <paramref name="widget"/> itself, leaving its descendants' own flags alone.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_show(nint widget);
-
-    /// <summary>Shows or hides a widget (<c>gboolean</c> is passed as 1/0).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_visible(nint widget, int visible);
-
-    /// <summary>Whether the widget's own visible flag is set (returns <c>gboolean</c> as 1/0).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_widget_get_visible(nint widget);
-
-    /// <summary>Enables or greys out a widget for interaction (<c>gboolean</c> is passed as 1/0).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_sensitive(nint widget, int sensitive);
-
-    /// <summary>Requests a minimum/fixed size for a widget; -1 means "natural size".</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_size_request(nint widget, int width, int height);
-
-    /// <summary>Hides a widget without destroying it.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_hide(nint widget);
-
-    /// <summary>Destroys a widget and drops the toolkit's reference to it.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_destroy(nint widget);
-
-    /// <summary>Returns the widget's <c>GdkWindow</c>, or 0 before the widget is realized.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_widget_get_window(nint widget);
-
-    /// <summary>Returns the <c>GdkDisplay</c> the widget renders on.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_widget_get_display(nint widget);
-
-    /// <summary>
-    /// Overrides the widget's font with a <c>PangoFontDescription</c> (0 clears the override).
-    /// Deprecated since GTK 3.16 in favor of per-widget CSS providers but fully functional through
-    /// GTK 3.24 — chosen here because it needs no CSS provider object per widget; see the remarks on
-    /// <see cref="Gtk.GtkControlPeer.SetFont"/>.
-    /// </summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_override_font(nint widget, nint fontDescription);
-
-    /// <summary>Overrides the widget's foreground color for a state (same deprecated-but-functional family).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_override_color(nint widget, uint state, in GdkRGBA color);
-
-    /// <summary>Clears a foreground override (the NULL-color form).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_override_color(nint widget, uint state, nint color);
-
-    /// <summary>Overrides the widget's background color for a state (same deprecated-but-functional family).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_override_background_color(nint widget, uint state, in GdkRGBA color);
-
-    /// <summary>Clears a background override (the NULL-color form).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_override_background_color(nint widget, uint state, nint color);
-
-    /// <summary>Whether the widget has its own <c>GdkWindow</c> rather than sharing its parent's (<c>gboolean</c>).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_widget_get_has_window(nint widget);
-
-    /// <summary>Reads the widget's current allocation — its position and size within its parent's window.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_get_allocation(nint widget, out GdkRectangle allocation);
-
-    /// <summary>Assigns a widget's size and position. <c>gtk_widget_set_size_request</c> only sets a
-    /// <em>minimum</em>, so a container is free to hand a widget more room than the toolkit asked
-    /// for; this is the seam that puts it back.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_size_allocate(nint widget, ref GdkRectangle allocation);
-
-    /// <summary>Assigns the area a widget may draw into. GTK 3.20 and later derive a container's clip
-    /// from the union of its children's, so a container whose content is larger than itself claims the
-    /// content's whole bounding box; this is the seam that pins the clip back to the allocation.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_clip(nint widget, ref GdkRectangle clip);
-
-    /// <summary>Makes <paramref name="widget"/> the target of all the application's events (a GTK grab).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_grab_add(nint widget);
-
-    /// <summary>Removes the application-wide event grab added by <see cref="gtk_grab_add"/>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_grab_remove(nint widget);
-
-    // --- Buttons and labels ---------------------------------------------------------------------
-
-    /// <summary>Creates a <c>GtkScale</c> over a new adjustment for the given orientation.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_scale_new_with_range(int orientation, double min, double max, double step);
-
-    /// <summary>Sets a range widget's current value.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_range_set_value(nint range, double value);
-
-    /// <summary>Reads a range widget's current value.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial double gtk_range_get_value(nint range);
-
-    /// <summary>Sets a range widget's bounds.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_range_set_range(nint range, double min, double max);
-
-    /// <summary>Sets the arrow-key and page step increments.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_range_set_increments(nint range, double step, double page);
-
-    /// <summary>Whether the scale paints its current value beside the slider.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_scale_set_draw_value(nint scale, int drawValue);
-
-    /// <summary>Creates a <c>GtkProgressBar</c>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_progress_bar_new();
-
-    /// <summary>Sets the filled fraction (0..1) of a progress bar.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_progress_bar_set_fraction(nint progressBar, double fraction);
-
-    /// <summary>Advances an indeterminate progress bar by one step.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_progress_bar_pulse(nint progressBar);
-
-    /// <summary>Sets how far a pulse moves the block, as a fraction of the trough.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
-
-    // --- GtkTreeView (the promoted ListBox) --------------------------------------------------------
-
-    /// <summary>A row cursor into a <c>GtkTreeModel</c>; opaque, but fixed-size and blittable.</summary>
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct GtkTreeIter
-    {
-        /// <summary>The model's stamp, used to detect a stale iterator.</summary>
-        internal int stamp;
-
-        /// <summary>Model-private.</summary>
-        internal nint user_data;
-
-        /// <summary>Model-private.</summary>
-        internal nint user_data2;
-
-        /// <summary>Model-private.</summary>
-        internal nint user_data3;
-    }
-
-    /// <summary>Creates a list store over the given column types.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_list_store_newv(int columns, nint[] types);
-
-    /// <summary>Empties a list store.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_list_store_clear(nint store);
-
-    /// <summary>Appends an empty row and hands back a cursor onto it.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_list_store_append(nint store, out GtkTreeIter iter);
-
-    /// <summary>
-    /// Writes one string column of a row through the variadic setter, mapped at its one fixed shape:
-    /// a column index, a value, then the -1 terminator.
-    /// </summary>
-    [LibraryImport(Gtk, EntryPoint = "gtk_list_store_set", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_list_store_set_string(nint store, ref GtkTreeIter iter, int column, string value, int terminator);
-
-    /// <summary>Creates a tree view showing the given model.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_tree_view_new_with_model(nint model);
-
-    /// <summary>Shows or hides a tree view's column headers.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_tree_view_set_headers_visible(nint treeView, int visible);
-
-    /// <summary>Creates a cell renderer that draws text.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_cell_renderer_text_new();
-
-    /// <summary>Creates an empty tree view column.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_tree_view_column_new();
-
-    /// <summary>Puts a renderer at the start of a column.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_tree_view_column_pack_start(nint column, nint renderer, int expand);
-
-    /// <summary>Binds one of a renderer's properties to a model column.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_tree_view_column_add_attribute(nint column, nint renderer, string attribute, int modelColumn);
-
-    /// <summary>Appends a column to a tree view.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_tree_view_append_column(nint treeView, nint column);
-
-    /// <summary>A tree view's selection object.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_tree_view_get_selection(nint treeView);
-
-    /// <summary>Reads the selected row; returns 0 when nothing is selected.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_tree_selection_get_selected(nint selection, out nint model, out GtkTreeIter iter);
-
-    /// <summary>Selects the row at a path.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_tree_selection_select_path(nint selection, nint path);
-
-    /// <summary>Clears the selection.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_tree_selection_unselect_all(nint selection);
-
-    /// <summary>Builds a path from a run of indices.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_tree_path_new_from_indicesv(int[] indices, nuint length);
-
-    /// <summary>The path of a row in a model.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_tree_model_get_path(nint model, ref GtkTreeIter iter);
-
-    /// <summary>How many indices a path carries.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_tree_path_get_depth(nint path);
-
-    /// <summary>A pointer to a path's indices, owned by the path.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_tree_path_get_indices(nint path);
-
-    /// <summary>Releases a path.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_tree_path_free(nint path);
-
-    /// <summary>The path of the row under a point in bin-window coordinates; returns 0 for none.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_tree_view_get_path_at_pos(
-        nint treeView,
-        int x,
-        int y,
-        out nint path,
-        out nint column,
-        out int cellX,
-        out int cellY);
-
-    /// <summary>Scrolls a row into view.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_tree_view_scroll_to_cell(nint treeView, nint path, nint column, int useAlign, float rowAlign, float colAlign);
-
-    // --- ATK (what a screen reader reads) ----------------------------------------------------------
-
-    /// <summary>The accessible object GTK keeps for a widget; created on first ask, owned by the widget.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_widget_get_accessible(nint widget);
-
-    /// <summary>Sets the name a screen reader announces for an accessible object.</summary>
-    [LibraryImport(Atk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void atk_object_set_name(nint accessible, string name);
-
-    /// <summary>Sets the longer description announced after the name.</summary>
-    [LibraryImport(Atk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void atk_object_set_description(nint accessible, string description);
-
-    /// <summary>Sets what the object is, as an <c>AtkRole</c>.</summary>
-    [LibraryImport(Atk)]
-    internal static partial void atk_object_set_role(nint accessible, int role);
-
-    /// <summary>Reads the name back — used by the real-GTK test tier to prove the round trip.</summary>
-    [LibraryImport(Atk)]
-    internal static partial nint atk_object_get_name(nint accessible);
-
-    /// <summary>Reads the role back.</summary>
-    [LibraryImport(Atk)]
-    internal static partial int atk_object_get_role(nint accessible);
-
-    /// <summary>Creates a <c>GtkFrame</c> with the given caption (0 for none).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint gtk_frame_new(string? label);
-
-    /// <summary>Replaces a frame's caption.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_frame_set_label(nint frame, string? label);
-
-    /// <summary>Creates a <c>GtkComboBoxText</c> — a drop-down list of plain strings.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_combo_box_text_new();
-
-    /// <summary>Appends a string to a <c>GtkComboBoxText</c>.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_combo_box_text_append_text(nint comboBox, string text);
-
-    /// <summary>Empties a <c>GtkComboBoxText</c>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_combo_box_text_remove_all(nint comboBox);
-
-    /// <summary>Selects the row at the given index, or clears the selection with -1.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_combo_box_set_active(nint comboBox, int index);
-
-    /// <summary>The selected row's index, or -1 for none.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_combo_box_get_active(nint comboBox);
-
-    /// <summary>Opens the combo's own list.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_combo_box_popup(nint comboBox);
-
-    /// <summary>Closes the combo's own list.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_combo_box_popdown(nint comboBox);
-
-    /// <summary>Creates a <c>GtkScrollbar</c> along the given orientation over an adjustment (0 makes one).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_scrollbar_new(int orientation, nint adjustment);
-
-    /// <summary>The <c>GtkAdjustment</c> backing a <c>GtkRange</c>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_range_get_adjustment(nint range);
-
-    /// <summary>Writes every member of an adjustment at once, emitting a single "changed".</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_adjustment_configure(
-        nint adjustment,
-        double value,
-        double lower,
-        double upper,
-        double stepIncrement,
-        double pageIncrement,
-        double pageSize);
-
-    /// <summary>Creates a <c>GtkLinkButton</c> showing <paramref name="label"/> and pointing at <paramref name="uri"/>.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint gtk_link_button_new_with_label(string uri, string label);
-
-    /// <summary>Sets whether a <c>GtkLinkButton</c> paints in its visited colour.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_link_button_set_visited(nint linkButton, int visited);
-
-    /// <summary>Creates a <c>GtkRadioButton</c> in the group given as a <c>GSList</c> (0 starts a new group).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_radio_button_new(nint group);
-
-    /// <summary>Creates a labelled <c>GtkRadioButton</c> joining the group of an existing radio button.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint gtk_radio_button_new_with_label_from_widget(nint groupMember, string label);
-
-    /// <summary>Creates a <c>GtkCheckButton</c> carrying the given caption.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint gtk_check_button_new_with_label(string label);
-
-    /// <summary>Sets a toggle button's (and therefore a check button's) state.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_toggle_button_set_active(nint toggleButton, int isActive);
-
-    /// <summary>Reads a toggle button's state.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_toggle_button_get_active(nint toggleButton);
-
-    /// <summary>
-    /// Draws the toggle button in its "inconsistent" state — GTK's name for indeterminate, a dash in
-    /// place of the check. It is orthogonal to <c>active</c>: the flag decides what is painted, the
-    /// active state is what the widget still reports.
-    /// </summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_toggle_button_set_inconsistent(nint toggleButton, int isInconsistent);
-
-    /// <summary>Creates a push button carrying the given label text (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint gtk_button_new_with_label(string label);
-
-    /// <summary>Sets the label text of a button (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_button_set_label(nint button, string label);
-
-    /// <summary>Creates a static-text label carrying the given text (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint gtk_label_new(string str);
-
-    /// <summary>Sets the text of a label (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_label_set_text(nint label, string str);
-
-    /// <summary>Sets the text of a label (UTF-8), underlining the character after each <c>_</c> as a mnemonic.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_label_set_text_with_mnemonic(nint label, string str);
-
-    /// <summary>Sets the horizontal alignment of a label's text (0 = left, 0.5 = center, 1 = right).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_label_set_xalign(nint label, float xalign);
-
-    /// <summary>Sets the vertical alignment of a label's text (0 = top, 0.5 = middle, 1 = bottom).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_label_set_yalign(nint label, float yalign);
-
-    /// <summary>Value of <c>PANGO_ELLIPSIZE_END</c> — elide the tail of a line that does not fit.</summary>
-    internal const int PANGO_ELLIPSIZE_END = 3;
-
-    /// <summary>
-    /// Sets how a label elides text that does not fit its allocation (a <c>PangoEllipsizeMode</c>).
-    /// Also drops the label's minimum width to about one ellipsis, which is what lets a caption
-    /// survive being allocated less room than its natural width.
-    /// </summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_label_set_ellipsize(nint label, int mode);
-
-    /// <summary>Returns the single child of a <c>GtkBin</c> (a button's label or box), or 0.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_bin_get_child(nint bin);
-
-    /// <summary>Looks up a registered <c>GType</c> by name, or 0 when the type is not registered yet.</summary>
-    [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nuint g_type_from_name(string name);
-
-    /// <summary>Whether a <c>GTypeInstance</c> is of the given type or one derived from it.</summary>
-    [LibraryImport(GObject)]
-    internal static partial int g_type_check_instance_is_a(nint instance, nuint type);
-
-    /// <summary>Whether <paramref name="widget"/> is a <c>GtkLabel</c> (or a subclass of one).</summary>
-    internal static bool IsLabel(nint widget)
-        => widget != 0 && g_type_check_instance_is_a(widget, g_type_from_name("GtkLabel")) != 0;
-
-    // --- Widget images ---------------------------------------------------------------------------
-
-    /// <summary>The image sits left of the button's label (a <c>GtkPositionType</c> value).</summary>
-    internal const int GTK_POS_LEFT = 0;
-
-    /// <summary>The image sits right of the button's label.</summary>
-    internal const int GTK_POS_RIGHT = 1;
-
-    /// <summary>The image sits above the button's label.</summary>
-    internal const int GTK_POS_TOP = 2;
-
-    /// <summary>The image sits below the button's label.</summary>
-    internal const int GTK_POS_BOTTOM = 3;
-
-    /// <summary>Creates a <c>GtkImage</c> widget displaying the given Cairo surface.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_image_new_from_surface(nint surface);
-
-    /// <summary>Sets (or with 0 clears) the image widget shown beside a button's label.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_button_set_image(nint button, nint image);
-
-    /// <summary>Positions the button's image relative to its label (a <c>GtkPositionType</c> value).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_button_set_image_position(nint button, int position);
-
-    /// <summary>Shows the button's image even when the theme's <c>gtk-button-images</c> setting is off.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_button_set_always_show_image(nint button, int alwaysShow);
-
-    // --- Text entry (single-line) ---------------------------------------------------------------
-
-    /// <summary>Creates an empty single-line text entry.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_entry_new();
-
-    /// <summary>Replaces the entry's content (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_entry_set_text(nint entry, string text);
-
-    /// <summary>Returns the entry's current text as a UTF-8 pointer owned by the widget — do not free.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_entry_get_text(nint entry);
-
-    /// <summary>Sets the widget's platform tooltip text (UTF-8), enabling its tooltip handling.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_widget_set_tooltip_text(nint widget, string? text);
-
-    /// <summary>Turns the widget's tooltip handling on (1) or off (0).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_has_tooltip(nint widget, int hasTooltip);
-
-    /// <summary>Asks GTK to re-evaluate the widget's tooltip now, showing it if one applies.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_trigger_tooltip_query(nint widget);
-
-    /// <summary>Sets the greyed hint shown while the entry is empty and unfocused (UTF-8).</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_entry_set_placeholder_text(nint entry, string text);
-
-    /// <summary>Shows the real text (1) or the invisible char (0) — the password-mode switch.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_entry_set_visibility(nint entry, int visible);
-
-    /// <summary>Sets the Unicode code point drawn instead of each character while visibility is off.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_entry_set_invisible_char(nint entry, uint ch);
-
-    /// <summary>Caps the number of characters the entry accepts; 0 means unlimited.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_entry_set_max_length(nint entry, int max);
-
-    /// <summary>Shows or hides the entry's own border frame.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_entry_set_has_frame(nint entry, int hasFrame);
-
-    /// <summary>Sets a scrolled window's shadow type (0 = none), the frame around a multiline editor.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_scrolled_window_set_shadow_type(nint scrolledWindow, int shadowType);
-
-    /// <summary>Toggles whether the user can edit the widget's text (<c>GtkEditable</c>).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_editable_set_editable(nint editable, int isEditable);
-
-    /// <summary>Selects the characters between the two offsets; -1 means the end of the text.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_editable_select_region(nint editable, int startPos, int endPos);
-
-    /// <summary>Reads the selection bounds in characters (both equal the caret when nothing is selected);
-    /// returns <c>TRUE</c> (1) when a non-empty selection exists.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_editable_get_selection_bounds(nint editable, out int startPos, out int endPos);
-
-    // --- Text view (multiline) ------------------------------------------------------------------
-
-    /// <summary>Creates a scrolled window; 0/0 lets it create its own adjustments.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_scrolled_window_new(nint hadjustment, nint vadjustment);
-
-    /// <summary>Creates an empty multiline text view (with its own buffer).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_text_view_new();
-
-    /// <summary>Returns the <c>GtkTextBuffer</c> the view displays (owned by the view).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_text_view_get_buffer(nint textView);
-
-    /// <summary>The number of characters in the buffer — zero marks an empty multiline editor.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_text_buffer_get_char_count(nint buffer);
-
-    /// <summary>The left inset (in pixels) where the view starts drawing text.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_text_view_get_left_margin(nint textView);
-
-    /// <summary>Toggles whether the user can edit the view's buffer.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_text_view_set_editable(nint textView, int setting);
-
-    /// <summary>Replaces the buffer's content (UTF-8); a length of -1 means NUL-terminated.</summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_text_buffer_set_text(nint buffer, string text, int len);
-
-    /// <summary>Writes iterators for the very start and very end of the buffer.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_text_buffer_get_bounds(nint buffer, out GtkTextIter start, out GtkTextIter end);
-
-    /// <summary>Returns the text between two iterators as a newly allocated UTF-8 string — free with <see cref="g_free"/>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_text_buffer_get_text(nint buffer, in GtkTextIter start, in GtkTextIter end, int includeHiddenChars);
-
-    /// <summary>Writes an iterator at the given character offset into the buffer.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_text_buffer_get_iter_at_offset(nint buffer, out GtkTextIter iter, int charOffset);
-
-    /// <summary>Moves the caret (<paramref name="ins"/>) and the selection bound in one operation.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_text_buffer_select_range(nint buffer, in GtkTextIter ins, in GtkTextIter bound);
-
-    /// <summary>Reads the selection bounds (both at the caret when nothing is selected); returns <c>TRUE</c> (1)
-    /// when a non-empty selection exists.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_text_buffer_get_selection_bounds(nint buffer, out GtkTextIter start, out GtkTextIter end);
-
-    /// <summary>Returns the character offset of an iterator within its buffer.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_text_iter_get_offset(in GtkTextIter iter);
-
-    /// <summary>
-    /// An opaque, stack-allocatable position inside a <c>GtkTextBuffer</c>. The fields are private
-    /// implementation details of GTK; only the overall size — as declared in <c>gtktextiter.h</c>
-    /// (14 dummy fields: pointers and ints) — matters, so the struct can live on the managed stack
-    /// and be passed by reference.
-    /// </summary>
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct GtkTextIter
-    {
-        private nint _dummy1, _dummy2;
-        private int _dummy3, _dummy4, _dummy5, _dummy6, _dummy7, _dummy8;
-        private nint _dummy9, _dummy10;
-        private int _dummy11, _dummy12, _dummy13;
-        private nint _dummy14;
-    }
-
-    // --- Owner-draw canvas ----------------------------------------------------------------------
-
-    /// <summary>
-    /// Sets whether the widget creates its own <c>GdkWindow</c> when realized. Must be called before
-    /// realization; the canvas needs it so a (normally window-less) <c>GtkFixed</c> can receive input
-    /// events and clip its drawing.
-    /// </summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_has_window(nint widget, int hasWindow);
-
-    /// <summary>Marks the widget as painting every pixel itself so the theme leaves its background alone.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_app_paintable(nint widget, int appPaintable);
-
-    /// <summary>Sets whether a widget accepts keyboard focus (<c>gboolean</c> is passed as 1/0).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_can_focus(nint widget, int canFocus);
-
-    /// <summary>Adds the given <c>GdkEventMask</c> bits to those the widget's window receives.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_add_events(nint widget, int events);
-
-    /// <summary>Schedules a full repaint of the widget.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_queue_draw(nint widget);
-
-    /// <summary>Schedules a repaint of the given rectangle in widget-relative coordinates.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_queue_draw_area(nint widget, int x, int y, int width, int height);
-
-    /// <summary>Moves keyboard focus to the widget (it must be focusable and realized).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_grab_focus(nint widget);
-
-    /// <summary>Whether the widget may become its window's default (a precondition of grabbing it).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_set_can_default(nint widget, int canDefault);
-
-    /// <summary>Makes the widget its window's default, so the theme paints the default emphasis.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_widget_grab_default(nint widget);
-
-    /// <summary>The widget's toplevel ancestor (a <c>GtkWindow</c> when parented into one).</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_widget_get_toplevel(nint widget);
-
-    /// <summary>Whether the widget is a toplevel (has no parent) — the guard before treating it as a window.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_widget_is_toplevel(nint widget);
-
-    /// <summary>Whether <paramref name="widget"/> is a descendant of <paramref name="ancestor"/>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_widget_is_ancestor(nint widget, nint ancestor);
-
-    /// <summary>The widget that currently holds focus within the window, or <c>NULL</c>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_window_get_focus(nint window);
-
-    /// <summary>Sets the window's focus widget; <c>NULL</c> clears it so a later grab starts clean.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_window_set_focus(nint window, nint widget);
-
-    /// <summary>Returns the widget's current allocated width in pixels.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_widget_get_allocated_width(nint widget);
-
-    /// <summary>Returns the widget's current allocated height in pixels.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial int gtk_widget_get_allocated_height(nint widget);
-
-    // --- Theming (GtkStyleContext / GtkSettings) ------------------------------------------------
-
-    /// <summary>Returns the (owned-by-widget) <c>GtkStyleContext</c> used to resolve theme colors.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_widget_get_style_context(nint widget);
-
-    /// <summary>Reads the foreground (text) color for the given <c>GtkStateFlags</c> into <paramref name="color"/>.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial void gtk_style_context_get_color(nint context, uint state, out GdkRGBA color);
-
-    /// <summary>
-    /// Reads one CSS property of a style context into a <c>GValue</c> (declared with the other
-    /// <c>g_value_*</c> plumbing). The non-variadic sibling of <c>gtk_style_context_get</c>, which
-    /// takes a NULL-terminated argument list no source generator can express.
-    /// </summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void gtk_style_context_get_property(nint context, string property, uint state, out GValue value);
-
-    /// <summary>Reads an integer out of a <c>GValue</c>.</summary>
-    [LibraryImport(GObject)]
-    internal static partial int g_value_get_int(ref GValue value);
-
-    /// <summary>Creates a <c>GtkButton</c> with no caption — a style probe, never shown.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_button_new();
-
-    /// <summary>
-    /// Looks up a named theme color (for example <c>"theme_bg_color"</c>) in the style context,
-    /// writing it to <paramref name="color"/> and returning <c>TRUE</c> (1) when the name resolves.
-    /// </summary>
-    [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial int gtk_style_context_lookup_color(nint context, string colorName, out GdkRGBA color);
-
-    /// <summary>Returns the default <c>GtkSettings</c> object for the current screen.</summary>
-    [LibraryImport(Gtk)]
-    internal static partial nint gtk_settings_get_default();
-
-    // --- GObject / GLib helpers -----------------------------------------------------------------
-
-    /// <summary>
-    /// Reads a single object property. Declared with a fixed (non-variadic) signature — the trailing
-    /// <c>NULL</c> terminator is passed explicitly — which matches the C ABI for the one string
-    /// property we read (<c>gtk-font-name</c>) and stays <c>LibraryImport</c>-compatible.
-    /// </summary>
-    [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void g_object_get(nint @object, string firstPropertyName, out nint value, nint terminator);
-
-    /// <summary>
-    /// Reads a single <c>gint</c> object property (the <c>gtk-double-click-time</c> setting) through
-    /// the same fixed-signature variadic mapping as the string overload; GObject writes exactly
-    /// <c>sizeof(gint)</c> bytes into the out slot.
-    /// </summary>
-    [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void g_object_get_int(nint @object, string firstPropertyName, out int value, nint terminator);
-
-    /// <summary>
-    /// Reads a single <c>gboolean</c> object property through the same fixed-signature variadic mapping
-    /// as the other readers; GObject writes exactly <c>sizeof(gboolean)</c> bytes into the out slot.
-    /// </summary>
-    [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial void g_object_get_gboolean(nint @object, string firstPropertyName, out int value, nint terminator);
-
-    /// <summary>Reads a boolean object property.</summary>
-    internal static bool g_object_get_bool(nint @object, string propertyName)
-    {
-        g_object_get_gboolean(@object, propertyName, out var value, 0);
-        return value != 0;
-    }
-
-    /// <summary>
-    /// Writes a single <c>gint</c> object property (used to pin <c>gtk-xft-dpi</c>) through the same
-    /// fixed-signature variadic mapping as the readers; GObject reads exactly <c>sizeof(gint)</c> bytes
-    /// from the value slot before the trailing <c>NULL</c> terminator.
-    /// </summary>
-    [LibraryImport(GObject, EntryPoint = "g_object_set", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial void g_object_set_int(nint @object, string firstPropertyName, int value, nint terminator);
-
-    /// <summary>Drops one reference to a <c>GObject</c>.</summary>
-    [LibraryImport(GObject)]
-    internal static partial void g_object_unref(nint @object);
-
-    /// <summary>
-    /// Converts a freshly constructed object's floating reference into a real one this process owns, so a
-    /// widget that is never added to a container is still kept alive and can be released deliberately.
-    /// </summary>
-    [LibraryImport(GObject)]
-    internal static partial nint g_object_ref_sink(nint @object);
-
-    /// <summary>Frees memory allocated by GLib (for example the string returned by <see cref="g_object_get"/>).</summary>
-    [LibraryImport(GLib)]
-    internal static partial void g_free(nint mem);
-
-    // --- Timers ---------------------------------------------------------------------------------
-
-    /// <summary>Value of <c>G_PRIORITY_DEFAULT</c> — the priority ordinary main-loop sources run at.</summary>
-    internal const int G_PRIORITY_DEFAULT = 0;
-
-    /// <summary>
-    /// Registers <paramref name="function"/> (a <c>GSourceFunc</c> function pointer) to be invoked by
-    /// the main loop every <paramref name="interval"/> milliseconds, threading <paramref name="data"/>
-    /// through as the callback's <c>user_data</c>. The source keeps firing while the callback returns
-    /// 1 (<c>G_SOURCE_CONTINUE</c>). <paramref name="notify"/> is a <c>GDestroyNotify</c> function
-    /// pointer (0 = none). Returns the source id for <see cref="g_source_remove"/>.
-    /// </summary>
-    [LibraryImport(GLib)]
-    internal static partial uint g_timeout_add_full(int priority, uint interval, nint function, nint data, nint notify);
-
-    /// <summary>Removes the main-loop source with the given id, stopping its callbacks. Returns <c>TRUE</c> (1) when found.</summary>
-    [LibraryImport(GLib)]
-    internal static partial int g_source_remove(uint tag);
-
-    /// <summary>
-    /// Registers <paramref name="function"/> (a <c>GSourceFunc</c> function pointer) to be invoked
-    /// once by the main loop when it is idle, threading <paramref name="data"/> through as the
-    /// callback's <c>user_data</c>. The callback returns 0 (<c>G_SOURCE_REMOVE</c>) to run exactly
-    /// once. <paramref name="notify"/> is a <c>GDestroyNotify</c> function pointer (0 = none).
-    /// Returns the source id.
-    /// </summary>
-    [LibraryImport(GLib)]
-    internal static partial uint g_idle_add_full(int priority, nint function, nint data, nint notify);
-
-    // --- Signals --------------------------------------------------------------------------------
-
-    /// <summary>The <c>GConnectFlags</c> bit that runs a handler after the signal's class closure.</summary>
-    internal const int G_CONNECT_AFTER = 1;
-
-    /// <summary>
-    /// Connects <paramref name="cHandler"/> (a C function pointer) to the named signal on
-    /// <paramref name="instance"/>, threading <paramref name="data"/> through as the callback's
-    /// <c>user_data</c>. <paramref name="destroyData"/> is a <c>GClosureNotify</c> function pointer
-    /// (0 = none) and <paramref name="connectFlags"/> is <c>GConnectFlags</c> (0 = default). The
-    /// returned handler id (<c>gulong</c>) is ignored here.
-    /// </summary>
-    [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nuint g_signal_connect_data(
-        nint instance,
-        string detailedSignal,
-        nint cHandler,
-        nint data,
-        nint destroyData,
-        int connectFlags);
+  /// <summary>Sets the window's icon from a <c>GdkPixbuf</c> (the window takes its own reference).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_icon(nint window, nint icon);
+
+  /// <summary>Constrains interactive resizing with the valid fields of <paramref name="geometry"/>
+  /// (per <paramref name="geomMask"/>, a <c>GdkWindowHints</c> bitmask).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_geometry_hints(nint window, nint geometryWidget, in GdkGeometry geometry, int geomMask);
+
+  /// <summary>
+  /// The window-geometry constraints <see cref="gtk_window_set_geometry_hints"/> consumes. Only the
+  /// fields whose <c>GdkWindowHints</c> bit is set in the mask are read; layout mirrors the C
+  /// struct (eight <c>gint</c>s, two <c>gdouble</c>s, one <c>GdkGravity</c>).
+  /// </summary>
+  [StructLayout(LayoutKind.Sequential)]
+  internal struct GdkGeometry {
+    /// <summary>The smallest width the user can resize to.</summary>
+    public int MinWidth;
+
+    /// <summary>The smallest height the user can resize to.</summary>
+    public int MinHeight;
+
+    /// <summary>The largest width the user can resize to.</summary>
+    public int MaxWidth;
+
+    /// <summary>The largest height the user can resize to.</summary>
+    public int MaxHeight;
+
+    /// <summary>Ignored here (base size hint).</summary>
+    public int BaseWidth;
+
+    /// <summary>Ignored here (base size hint).</summary>
+    public int BaseHeight;
+
+    /// <summary>Ignored here (resize increment hint).</summary>
+    public int WidthInc;
+
+    /// <summary>Ignored here (resize increment hint).</summary>
+    public int HeightInc;
+
+    /// <summary>Ignored here (aspect-ratio hint).</summary>
+    public double MinAspect;
+
+    /// <summary>Ignored here (aspect-ratio hint).</summary>
+    public double MaxAspect;
+
+    /// <summary>Ignored here (<c>GdkGravity</c> placement hint).</summary>
+    public int WinGravity;
+  }
+
+  // --- Generic widget operations --------------------------------------------------------------
+
+  /// <summary>Recursively shows <paramref name="widget"/> and all of its descendants.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_show_all(nint widget);
+
+  /// <summary>Shows <paramref name="widget"/> itself, leaving its descendants' own flags alone.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_show(nint widget);
+
+  /// <summary>Shows or hides a widget (<c>gboolean</c> is passed as 1/0).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_visible(nint widget, int visible);
+
+  /// <summary>Whether the widget's own visible flag is set (returns <c>gboolean</c> as 1/0).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_widget_get_visible(nint widget);
+
+  /// <summary>Enables or greys out a widget for interaction (<c>gboolean</c> is passed as 1/0).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_sensitive(nint widget, int sensitive);
+
+  /// <summary>Requests a minimum/fixed size for a widget; -1 means "natural size".</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_size_request(nint widget, int width, int height);
+
+  /// <summary>Hides a widget without destroying it.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_hide(nint widget);
+
+  /// <summary>Destroys a widget and drops the toolkit's reference to it.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_destroy(nint widget);
+
+  /// <summary>Returns the widget's <c>GdkWindow</c>, or 0 before the widget is realized.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_widget_get_window(nint widget);
+
+  /// <summary>Returns the <c>GdkDisplay</c> the widget renders on.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_widget_get_display(nint widget);
+
+  /// <summary>
+  /// Overrides the widget's font with a <c>PangoFontDescription</c> (0 clears the override).
+  /// Deprecated since GTK 3.16 in favor of per-widget CSS providers but fully functional through
+  /// GTK 3.24 — chosen here because it needs no CSS provider object per widget; see the remarks on
+  /// <see cref="Gtk.GtkControlPeer.SetFont"/>.
+  /// </summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_override_font(nint widget, nint fontDescription);
+
+  /// <summary>Overrides the widget's foreground color for a state (same deprecated-but-functional family).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_override_color(nint widget, uint state, in GdkRGBA color);
+
+  /// <summary>Clears a foreground override (the NULL-color form).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_override_color(nint widget, uint state, nint color);
+
+  /// <summary>Overrides the widget's background color for a state (same deprecated-but-functional family).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_override_background_color(nint widget, uint state, in GdkRGBA color);
+
+  /// <summary>Clears a background override (the NULL-color form).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_override_background_color(nint widget, uint state, nint color);
+
+  /// <summary>Whether the widget has its own <c>GdkWindow</c> rather than sharing its parent's (<c>gboolean</c>).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_widget_get_has_window(nint widget);
+
+  /// <summary>Reads the widget's current allocation — its position and size within its parent's window.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_get_allocation(nint widget, out GdkRectangle allocation);
+
+  /// <summary>Assigns a widget's size and position. <c>gtk_widget_set_size_request</c> only sets a
+  /// <em>minimum</em>, so a container is free to hand a widget more room than the toolkit asked
+  /// for; this is the seam that puts it back.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_size_allocate(nint widget, ref GdkRectangle allocation);
+
+  /// <summary>Assigns the area a widget may draw into. GTK 3.20 and later derive a container's clip
+  /// from the union of its children's, so a container whose content is larger than itself claims the
+  /// content's whole bounding box; this is the seam that pins the clip back to the allocation.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_clip(nint widget, ref GdkRectangle clip);
+
+  /// <summary>Makes <paramref name="widget"/> the target of all the application's events (a GTK grab).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_grab_add(nint widget);
+
+  /// <summary>Removes the application-wide event grab added by <see cref="gtk_grab_add"/>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_grab_remove(nint widget);
+
+  // --- Buttons and labels ---------------------------------------------------------------------
+
+  /// <summary>Creates a <c>GtkScale</c> over a new adjustment for the given orientation.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_scale_new_with_range(int orientation, double min, double max, double step);
+
+  /// <summary>Sets a range widget's current value.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_range_set_value(nint range, double value);
+
+  /// <summary>Reads a range widget's current value.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial double gtk_range_get_value(nint range);
+
+  /// <summary>Sets a range widget's bounds.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_range_set_range(nint range, double min, double max);
+
+  /// <summary>Sets the arrow-key and page step increments.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_range_set_increments(nint range, double step, double page);
+
+  /// <summary>Whether the scale paints its current value beside the slider.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_scale_set_draw_value(nint scale, int drawValue);
+
+  /// <summary>Creates a <c>GtkProgressBar</c>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_progress_bar_new();
+
+  /// <summary>Sets the filled fraction (0..1) of a progress bar.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_progress_bar_set_fraction(nint progressBar, double fraction);
+
+  /// <summary>Advances an indeterminate progress bar by one step.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_progress_bar_pulse(nint progressBar);
+
+  /// <summary>Sets how far a pulse moves the block, as a fraction of the trough.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_progress_bar_set_pulse_step(nint progressBar, double fraction);
+
+  // --- GtkTreeView (the promoted ListBox) --------------------------------------------------------
+
+  /// <summary>A row cursor into a <c>GtkTreeModel</c>; opaque, but fixed-size and blittable.</summary>
+  [StructLayout(LayoutKind.Sequential)]
+  internal struct GtkTreeIter {
+    /// <summary>The model's stamp, used to detect a stale iterator.</summary>
+    internal int stamp;
+
+    /// <summary>Model-private.</summary>
+    internal nint user_data;
+
+    /// <summary>Model-private.</summary>
+    internal nint user_data2;
+
+    /// <summary>Model-private.</summary>
+    internal nint user_data3;
+  }
+
+  /// <summary>Creates a list store over the given column types.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_list_store_newv(int columns, nint[] types);
+
+  /// <summary>Empties a list store.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_list_store_clear(nint store);
+
+  /// <summary>Appends an empty row and hands back a cursor onto it.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_list_store_append(nint store, out GtkTreeIter iter);
+
+  /// <summary>
+  /// Writes one string column of a row through the variadic setter, mapped at its one fixed shape:
+  /// a column index, a value, then the -1 terminator.
+  /// </summary>
+  [LibraryImport(Gtk, EntryPoint = "gtk_list_store_set", StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_list_store_set_string(nint store, ref GtkTreeIter iter, int column, string value, int terminator);
+
+  /// <summary>Creates a tree view showing the given model.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_tree_view_new_with_model(nint model);
+
+  /// <summary>Shows or hides a tree view's column headers.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_tree_view_set_headers_visible(nint treeView, int visible);
+
+  /// <summary>Creates a cell renderer that draws text.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_cell_renderer_text_new();
+
+  /// <summary>Creates an empty tree view column.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_tree_view_column_new();
+
+  /// <summary>Puts a renderer at the start of a column.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_tree_view_column_pack_start(nint column, nint renderer, int expand);
+
+  /// <summary>Binds one of a renderer's properties to a model column.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_tree_view_column_add_attribute(nint column, nint renderer, string attribute, int modelColumn);
+
+  /// <summary>Appends a column to a tree view.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_tree_view_append_column(nint treeView, nint column);
+
+  /// <summary>A tree view's selection object.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_tree_view_get_selection(nint treeView);
+
+  /// <summary>Reads the selected row; returns 0 when nothing is selected.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_tree_selection_get_selected(nint selection, out nint model, out GtkTreeIter iter);
+
+  /// <summary>Selects the row at a path.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_tree_selection_select_path(nint selection, nint path);
+
+  /// <summary>Clears the selection.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_tree_selection_unselect_all(nint selection);
+
+  /// <summary>Builds a path from a run of indices.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_tree_path_new_from_indicesv(int[] indices, nuint length);
+
+  /// <summary>The path of a row in a model.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_tree_model_get_path(nint model, ref GtkTreeIter iter);
+
+  /// <summary>How many indices a path carries.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_tree_path_get_depth(nint path);
+
+  /// <summary>A pointer to a path's indices, owned by the path.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_tree_path_get_indices(nint path);
+
+  /// <summary>Releases a path.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_tree_path_free(nint path);
+
+  /// <summary>The path of the row under a point in bin-window coordinates; returns 0 for none.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_tree_view_get_path_at_pos(
+      nint treeView,
+      int x,
+      int y,
+      out nint path,
+      out nint column,
+      out int cellX,
+      out int cellY);
+
+  /// <summary>Scrolls a row into view.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_tree_view_scroll_to_cell(nint treeView, nint path, nint column, int useAlign, float rowAlign, float colAlign);
+
+  // --- ATK (what a screen reader reads) ----------------------------------------------------------
+
+  /// <summary>The accessible object GTK keeps for a widget; created on first ask, owned by the widget.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_widget_get_accessible(nint widget);
+
+  /// <summary>Sets the name a screen reader announces for an accessible object.</summary>
+  [LibraryImport(Atk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void atk_object_set_name(nint accessible, string name);
+
+  /// <summary>Sets the longer description announced after the name.</summary>
+  [LibraryImport(Atk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void atk_object_set_description(nint accessible, string description);
+
+  /// <summary>Sets what the object is, as an <c>AtkRole</c>.</summary>
+  [LibraryImport(Atk)]
+  internal static partial void atk_object_set_role(nint accessible, int role);
+
+  /// <summary>Reads the name back — used by the real-GTK test tier to prove the round trip.</summary>
+  [LibraryImport(Atk)]
+  internal static partial nint atk_object_get_name(nint accessible);
+
+  /// <summary>Reads the role back.</summary>
+  [LibraryImport(Atk)]
+  internal static partial int atk_object_get_role(nint accessible);
+
+  /// <summary>Creates a <c>GtkFrame</c> with the given caption (0 for none).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint gtk_frame_new(string? label);
+
+  /// <summary>Replaces a frame's caption.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_frame_set_label(nint frame, string? label);
+
+  /// <summary>Creates a <c>GtkComboBoxText</c> — a drop-down list of plain strings.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_combo_box_text_new();
+
+  /// <summary>Appends a string to a <c>GtkComboBoxText</c>.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_combo_box_text_append_text(nint comboBox, string text);
+
+  /// <summary>Empties a <c>GtkComboBoxText</c>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_combo_box_text_remove_all(nint comboBox);
+
+  /// <summary>Selects the row at the given index, or clears the selection with -1.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_combo_box_set_active(nint comboBox, int index);
+
+  /// <summary>The selected row's index, or -1 for none.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_combo_box_get_active(nint comboBox);
+
+  /// <summary>Opens the combo's own list.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_combo_box_popup(nint comboBox);
+
+  /// <summary>Closes the combo's own list.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_combo_box_popdown(nint comboBox);
+
+  /// <summary>Creates a <c>GtkScrollbar</c> along the given orientation over an adjustment (0 makes one).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_scrollbar_new(int orientation, nint adjustment);
+
+  /// <summary>The <c>GtkAdjustment</c> backing a <c>GtkRange</c>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_range_get_adjustment(nint range);
+
+  /// <summary>Writes every member of an adjustment at once, emitting a single "changed".</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_adjustment_configure(
+      nint adjustment,
+      double value,
+      double lower,
+      double upper,
+      double stepIncrement,
+      double pageIncrement,
+      double pageSize);
+
+  /// <summary>Creates a <c>GtkLinkButton</c> showing <paramref name="label"/> and pointing at <paramref name="uri"/>.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint gtk_link_button_new_with_label(string uri, string label);
+
+  /// <summary>Sets whether a <c>GtkLinkButton</c> paints in its visited colour.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_link_button_set_visited(nint linkButton, int visited);
+
+  /// <summary>Creates a <c>GtkRadioButton</c> in the group given as a <c>GSList</c> (0 starts a new group).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_radio_button_new(nint group);
+
+  /// <summary>Creates a labelled <c>GtkRadioButton</c> joining the group of an existing radio button.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint gtk_radio_button_new_with_label_from_widget(nint groupMember, string label);
+
+  /// <summary>Creates a <c>GtkCheckButton</c> carrying the given caption.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint gtk_check_button_new_with_label(string label);
+
+  /// <summary>Sets a toggle button's (and therefore a check button's) state.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_toggle_button_set_active(nint toggleButton, int isActive);
+
+  /// <summary>Reads a toggle button's state.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_toggle_button_get_active(nint toggleButton);
+
+  /// <summary>
+  /// Draws the toggle button in its "inconsistent" state — GTK's name for indeterminate, a dash in
+  /// place of the check. It is orthogonal to <c>active</c>: the flag decides what is painted, the
+  /// active state is what the widget still reports.
+  /// </summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_toggle_button_set_inconsistent(nint toggleButton, int isInconsistent);
+
+  /// <summary>Creates a push button carrying the given label text (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint gtk_button_new_with_label(string label);
+
+  /// <summary>Sets the label text of a button (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_button_set_label(nint button, string label);
+
+  /// <summary>Creates a static-text label carrying the given text (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint gtk_label_new(string str);
+
+  /// <summary>Sets the text of a label (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_label_set_text(nint label, string str);
+
+  /// <summary>Sets the text of a label (UTF-8), underlining the character after each <c>_</c> as a mnemonic.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_label_set_text_with_mnemonic(nint label, string str);
+
+  /// <summary>Sets the horizontal alignment of a label's text (0 = left, 0.5 = center, 1 = right).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_label_set_xalign(nint label, float xalign);
+
+  /// <summary>Sets the vertical alignment of a label's text (0 = top, 0.5 = middle, 1 = bottom).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_label_set_yalign(nint label, float yalign);
+
+  /// <summary>Value of <c>PANGO_ELLIPSIZE_END</c> — elide the tail of a line that does not fit.</summary>
+  internal const int PANGO_ELLIPSIZE_END = 3;
+
+  /// <summary>
+  /// Sets how a label elides text that does not fit its allocation (a <c>PangoEllipsizeMode</c>).
+  /// Also drops the label's minimum width to about one ellipsis, which is what lets a caption
+  /// survive being allocated less room than its natural width.
+  /// </summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_label_set_ellipsize(nint label, int mode);
+
+  /// <summary>Returns the single child of a <c>GtkBin</c> (a button's label or box), or 0.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_bin_get_child(nint bin);
+
+  /// <summary>Looks up a registered <c>GType</c> by name, or 0 when the type is not registered yet.</summary>
+  [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nuint g_type_from_name(string name);
+
+  /// <summary>Whether a <c>GTypeInstance</c> is of the given type or one derived from it.</summary>
+  [LibraryImport(GObject)]
+  internal static partial int g_type_check_instance_is_a(nint instance, nuint type);
+
+  /// <summary>Whether <paramref name="widget"/> is a <c>GtkLabel</c> (or a subclass of one).</summary>
+  internal static bool IsLabel(nint widget)
+      => widget != 0 && g_type_check_instance_is_a(widget, g_type_from_name("GtkLabel")) != 0;
+
+  // --- Widget images ---------------------------------------------------------------------------
+
+  /// <summary>The image sits left of the button's label (a <c>GtkPositionType</c> value).</summary>
+  internal const int GTK_POS_LEFT = 0;
+
+  /// <summary>The image sits right of the button's label.</summary>
+  internal const int GTK_POS_RIGHT = 1;
+
+  /// <summary>The image sits above the button's label.</summary>
+  internal const int GTK_POS_TOP = 2;
+
+  /// <summary>The image sits below the button's label.</summary>
+  internal const int GTK_POS_BOTTOM = 3;
+
+  /// <summary>Creates a <c>GtkImage</c> widget displaying the given Cairo surface.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_image_new_from_surface(nint surface);
+
+  /// <summary>Sets (or with 0 clears) the image widget shown beside a button's label.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_button_set_image(nint button, nint image);
+
+  /// <summary>Positions the button's image relative to its label (a <c>GtkPositionType</c> value).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_button_set_image_position(nint button, int position);
+
+  /// <summary>Shows the button's image even when the theme's <c>gtk-button-images</c> setting is off.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_button_set_always_show_image(nint button, int alwaysShow);
+
+  // --- Text entry (single-line) ---------------------------------------------------------------
+
+  /// <summary>Creates an empty single-line text entry.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_entry_new();
+
+  /// <summary>Replaces the entry's content (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_entry_set_text(nint entry, string text);
+
+  /// <summary>Returns the entry's current text as a UTF-8 pointer owned by the widget — do not free.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_entry_get_text(nint entry);
+
+  /// <summary>Sets the widget's platform tooltip text (UTF-8), enabling its tooltip handling.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_widget_set_tooltip_text(nint widget, string? text);
+
+  /// <summary>Turns the widget's tooltip handling on (1) or off (0).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_has_tooltip(nint widget, int hasTooltip);
+
+  /// <summary>Asks GTK to re-evaluate the widget's tooltip now, showing it if one applies.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_trigger_tooltip_query(nint widget);
+
+  /// <summary>Sets the greyed hint shown while the entry is empty and unfocused (UTF-8).</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_entry_set_placeholder_text(nint entry, string text);
+
+  /// <summary>Shows the real text (1) or the invisible char (0) — the password-mode switch.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_entry_set_visibility(nint entry, int visible);
+
+  /// <summary>Sets the Unicode code point drawn instead of each character while visibility is off.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_entry_set_invisible_char(nint entry, uint ch);
+
+  /// <summary>Caps the number of characters the entry accepts; 0 means unlimited.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_entry_set_max_length(nint entry, int max);
+
+  /// <summary>Shows or hides the entry's own border frame.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_entry_set_has_frame(nint entry, int hasFrame);
+
+  /// <summary>Sets a scrolled window's shadow type (0 = none), the frame around a multiline editor.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_scrolled_window_set_shadow_type(nint scrolledWindow, int shadowType);
+
+  /// <summary>Toggles whether the user can edit the widget's text (<c>GtkEditable</c>).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_editable_set_editable(nint editable, int isEditable);
+
+  /// <summary>Selects the characters between the two offsets; -1 means the end of the text.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_editable_select_region(nint editable, int startPos, int endPos);
+
+  /// <summary>Reads the selection bounds in characters (both equal the caret when nothing is selected);
+  /// returns <c>TRUE</c> (1) when a non-empty selection exists.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_editable_get_selection_bounds(nint editable, out int startPos, out int endPos);
+
+  // --- Text view (multiline) ------------------------------------------------------------------
+
+  /// <summary>Creates a scrolled window; 0/0 lets it create its own adjustments.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_scrolled_window_new(nint hadjustment, nint vadjustment);
+
+  /// <summary>Creates an empty multiline text view (with its own buffer).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_text_view_new();
+
+  /// <summary>Returns the <c>GtkTextBuffer</c> the view displays (owned by the view).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_text_view_get_buffer(nint textView);
+
+  /// <summary>The number of characters in the buffer — zero marks an empty multiline editor.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_text_buffer_get_char_count(nint buffer);
+
+  /// <summary>The left inset (in pixels) where the view starts drawing text.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_text_view_get_left_margin(nint textView);
+
+  /// <summary>Toggles whether the user can edit the view's buffer.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_text_view_set_editable(nint textView, int setting);
+
+  /// <summary>Replaces the buffer's content (UTF-8); a length of -1 means NUL-terminated.</summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_text_buffer_set_text(nint buffer, string text, int len);
+
+  /// <summary>Writes iterators for the very start and very end of the buffer.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_text_buffer_get_bounds(nint buffer, out GtkTextIter start, out GtkTextIter end);
+
+  /// <summary>Returns the text between two iterators as a newly allocated UTF-8 string — free with <see cref="g_free"/>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_text_buffer_get_text(nint buffer, in GtkTextIter start, in GtkTextIter end, int includeHiddenChars);
+
+  /// <summary>Writes an iterator at the given character offset into the buffer.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_text_buffer_get_iter_at_offset(nint buffer, out GtkTextIter iter, int charOffset);
+
+  /// <summary>Moves the caret (<paramref name="ins"/>) and the selection bound in one operation.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_text_buffer_select_range(nint buffer, in GtkTextIter ins, in GtkTextIter bound);
+
+  /// <summary>Reads the selection bounds (both at the caret when nothing is selected); returns <c>TRUE</c> (1)
+  /// when a non-empty selection exists.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_text_buffer_get_selection_bounds(nint buffer, out GtkTextIter start, out GtkTextIter end);
+
+  /// <summary>Returns the character offset of an iterator within its buffer.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_text_iter_get_offset(in GtkTextIter iter);
+
+  /// <summary>
+  /// An opaque, stack-allocatable position inside a <c>GtkTextBuffer</c>. The fields are private
+  /// implementation details of GTK; only the overall size — as declared in <c>gtktextiter.h</c>
+  /// (14 dummy fields: pointers and ints) — matters, so the struct can live on the managed stack
+  /// and be passed by reference.
+  /// </summary>
+  [StructLayout(LayoutKind.Sequential)]
+  internal struct GtkTextIter {
+    private nint _dummy1, _dummy2;
+    private int _dummy3, _dummy4, _dummy5, _dummy6, _dummy7, _dummy8;
+    private nint _dummy9, _dummy10;
+    private int _dummy11, _dummy12, _dummy13;
+    private nint _dummy14;
+  }
+
+  // --- Owner-draw canvas ----------------------------------------------------------------------
+
+  /// <summary>
+  /// Sets whether the widget creates its own <c>GdkWindow</c> when realized. Must be called before
+  /// realization; the canvas needs it so a (normally window-less) <c>GtkFixed</c> can receive input
+  /// events and clip its drawing.
+  /// </summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_has_window(nint widget, int hasWindow);
+
+  /// <summary>Marks the widget as painting every pixel itself so the theme leaves its background alone.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_app_paintable(nint widget, int appPaintable);
+
+  /// <summary>Sets whether a widget accepts keyboard focus (<c>gboolean</c> is passed as 1/0).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_can_focus(nint widget, int canFocus);
+
+  /// <summary>Adds the given <c>GdkEventMask</c> bits to those the widget's window receives.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_add_events(nint widget, int events);
+
+  /// <summary>Schedules a full repaint of the widget.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_queue_draw(nint widget);
+
+  /// <summary>Schedules a repaint of the given rectangle in widget-relative coordinates.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_queue_draw_area(nint widget, int x, int y, int width, int height);
+
+  /// <summary>Moves keyboard focus to the widget (it must be focusable and realized).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_grab_focus(nint widget);
+
+  /// <summary>Whether the widget may become its window's default (a precondition of grabbing it).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_set_can_default(nint widget, int canDefault);
+
+  /// <summary>Makes the widget its window's default, so the theme paints the default emphasis.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_widget_grab_default(nint widget);
+
+  /// <summary>The widget's toplevel ancestor (a <c>GtkWindow</c> when parented into one).</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_widget_get_toplevel(nint widget);
+
+  /// <summary>Whether the widget is a toplevel (has no parent) — the guard before treating it as a window.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_widget_is_toplevel(nint widget);
+
+  /// <summary>Whether <paramref name="widget"/> is a descendant of <paramref name="ancestor"/>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_widget_is_ancestor(nint widget, nint ancestor);
+
+  /// <summary>The widget that currently holds focus within the window, or <c>NULL</c>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_window_get_focus(nint window);
+
+  /// <summary>Sets the window's focus widget; <c>NULL</c> clears it so a later grab starts clean.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_window_set_focus(nint window, nint widget);
+
+  /// <summary>Returns the widget's current allocated width in pixels.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_widget_get_allocated_width(nint widget);
+
+  /// <summary>Returns the widget's current allocated height in pixels.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial int gtk_widget_get_allocated_height(nint widget);
+
+  // --- Theming (GtkStyleContext / GtkSettings) ------------------------------------------------
+
+  /// <summary>Returns the (owned-by-widget) <c>GtkStyleContext</c> used to resolve theme colors.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_widget_get_style_context(nint widget);
+
+  /// <summary>Reads the foreground (text) color for the given <c>GtkStateFlags</c> into <paramref name="color"/>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_style_context_get_color(nint context, uint state, out GdkRGBA color);
+
+  /// <summary>
+  /// Reads one CSS property of a style context into a <c>GValue</c> (declared with the other
+  /// <c>g_value_*</c> plumbing). The non-variadic sibling of <c>gtk_style_context_get</c>, which
+  /// takes a NULL-terminated argument list no source generator can express.
+  /// </summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void gtk_style_context_get_property(nint context, string property, uint state, out GValue value);
+
+  /// <summary>Reads an integer out of a <c>GValue</c>.</summary>
+  [LibraryImport(GObject)]
+  internal static partial int g_value_get_int(ref GValue value);
+
+  /// <summary>Creates a <c>GtkButton</c> with no caption — a style probe, never shown.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_button_new();
+
+  /// <summary>
+  /// Looks up a named theme color (for example <c>"theme_bg_color"</c>) in the style context,
+  /// writing it to <paramref name="color"/> and returning <c>TRUE</c> (1) when the name resolves.
+  /// </summary>
+  [LibraryImport(Gtk, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial int gtk_style_context_lookup_color(nint context, string colorName, out GdkRGBA color);
+
+  /// <summary>Returns the default <c>GtkSettings</c> object for the current screen.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_settings_get_default();
+
+  // --- GObject / GLib helpers -----------------------------------------------------------------
+
+  /// <summary>
+  /// Reads a single object property. Declared with a fixed (non-variadic) signature — the trailing
+  /// <c>NULL</c> terminator is passed explicitly — which matches the C ABI for the one string
+  /// property we read (<c>gtk-font-name</c>) and stays <c>LibraryImport</c>-compatible.
+  /// </summary>
+  [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void g_object_get(nint @object, string firstPropertyName, out nint value, nint terminator);
+
+  /// <summary>
+  /// Reads a single <c>gint</c> object property (the <c>gtk-double-click-time</c> setting) through
+  /// the same fixed-signature variadic mapping as the string overload; GObject writes exactly
+  /// <c>sizeof(gint)</c> bytes into the out slot.
+  /// </summary>
+  [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void g_object_get_int(nint @object, string firstPropertyName, out int value, nint terminator);
+
+  /// <summary>
+  /// Reads a single <c>gboolean</c> object property through the same fixed-signature variadic mapping
+  /// as the other readers; GObject writes exactly <c>sizeof(gboolean)</c> bytes into the out slot.
+  /// </summary>
+  [LibraryImport(GObject, EntryPoint = "g_object_get", StringMarshalling = StringMarshalling.Utf8)]
+  private static partial void g_object_get_gboolean(nint @object, string firstPropertyName, out int value, nint terminator);
+
+  /// <summary>Reads a boolean object property.</summary>
+  internal static bool g_object_get_bool(nint @object, string propertyName) {
+    g_object_get_gboolean(@object, propertyName, out var value, 0);
+    return value != 0;
+  }
+
+  /// <summary>
+  /// Writes a single <c>gint</c> object property (used to pin <c>gtk-xft-dpi</c>) through the same
+  /// fixed-signature variadic mapping as the readers; GObject reads exactly <c>sizeof(gint)</c> bytes
+  /// from the value slot before the trailing <c>NULL</c> terminator.
+  /// </summary>
+  [LibraryImport(GObject, EntryPoint = "g_object_set", StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial void g_object_set_int(nint @object, string firstPropertyName, int value, nint terminator);
+
+  /// <summary>Drops one reference to a <c>GObject</c>.</summary>
+  [LibraryImport(GObject)]
+  internal static partial void g_object_unref(nint @object);
+
+  /// <summary>
+  /// Converts a freshly constructed object's floating reference into a real one this process owns, so a
+  /// widget that is never added to a container is still kept alive and can be released deliberately.
+  /// </summary>
+  [LibraryImport(GObject)]
+  internal static partial nint g_object_ref_sink(nint @object);
+
+  /// <summary>Frees memory allocated by GLib (for example the string returned by <see cref="g_object_get"/>).</summary>
+  [LibraryImport(GLib)]
+  internal static partial void g_free(nint mem);
+
+  // --- Timers ---------------------------------------------------------------------------------
+
+  /// <summary>Value of <c>G_PRIORITY_DEFAULT</c> — the priority ordinary main-loop sources run at.</summary>
+  internal const int G_PRIORITY_DEFAULT = 0;
+
+  /// <summary>
+  /// Registers <paramref name="function"/> (a <c>GSourceFunc</c> function pointer) to be invoked by
+  /// the main loop every <paramref name="interval"/> milliseconds, threading <paramref name="data"/>
+  /// through as the callback's <c>user_data</c>. The source keeps firing while the callback returns
+  /// 1 (<c>G_SOURCE_CONTINUE</c>). <paramref name="notify"/> is a <c>GDestroyNotify</c> function
+  /// pointer (0 = none). Returns the source id for <see cref="g_source_remove"/>.
+  /// </summary>
+  [LibraryImport(GLib)]
+  internal static partial uint g_timeout_add_full(int priority, uint interval, nint function, nint data, nint notify);
+
+  /// <summary>Removes the main-loop source with the given id, stopping its callbacks. Returns <c>TRUE</c> (1) when found.</summary>
+  [LibraryImport(GLib)]
+  internal static partial int g_source_remove(uint tag);
+
+  /// <summary>
+  /// Registers <paramref name="function"/> (a <c>GSourceFunc</c> function pointer) to be invoked
+  /// once by the main loop when it is idle, threading <paramref name="data"/> through as the
+  /// callback's <c>user_data</c>. The callback returns 0 (<c>G_SOURCE_REMOVE</c>) to run exactly
+  /// once. <paramref name="notify"/> is a <c>GDestroyNotify</c> function pointer (0 = none).
+  /// Returns the source id.
+  /// </summary>
+  [LibraryImport(GLib)]
+  internal static partial uint g_idle_add_full(int priority, nint function, nint data, nint notify);
+
+  // --- Signals --------------------------------------------------------------------------------
+
+  /// <summary>The <c>GConnectFlags</c> bit that runs a handler after the signal's class closure.</summary>
+  internal const int G_CONNECT_AFTER = 1;
+
+  /// <summary>
+  /// Connects <paramref name="cHandler"/> (a C function pointer) to the named signal on
+  /// <paramref name="instance"/>, threading <paramref name="data"/> through as the callback's
+  /// <c>user_data</c>. <paramref name="destroyData"/> is a <c>GClosureNotify</c> function pointer
+  /// (0 = none) and <paramref name="connectFlags"/> is <c>GConnectFlags</c> (0 = default). The
+  /// returned handler id (<c>gulong</c>) is ignored here.
+  /// </summary>
+  [LibraryImport(GObject, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nuint g_signal_connect_data(
+      nint instance,
+      string detailedSignal,
+      nint cHandler,
+      nint data,
+      nint destroyData,
+      int connectFlags);
 }

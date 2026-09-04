@@ -24,125 +24,114 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// control.
 /// </para>
 /// </remarks>
-internal class CocoaCheckBoxPeer : CocoaControlPeer, ICheckBoxPeer
-{
-    /// <summary>NSButtonType: switch 3, radio 4.</summary>
-    private protected const nint _Switch = 3;
-    private protected const nint _Radio = 4;
+internal class CocoaCheckBoxPeer : CocoaControlPeer, ICheckBoxPeer {
+  /// <summary>NSButtonType: switch 3, radio 4.</summary>
+  private protected const nint _Switch = 3;
+  private protected const nint _Radio = 4;
 
-    private readonly nint _target;
+  private readonly nint _target;
 
-    private protected CocoaCheckBoxPeer(nint buttonType)
-        : base(Create(buttonType))
-    {
-        if (this.Handle == 0)
-            return;
+  private protected CocoaCheckBoxPeer(nint buttonType)
+      : base(Create(buttonType)) {
+    if (this.Handle == 0)
+      return;
 
-        _target = CocoaAction.Create(this.OnToggled);
-        if (_target == 0)
-            return;
+    _target = CocoaAction.Create(this.OnToggled);
+    if (_target == 0)
+      return;
 
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setTarget:"), _target);
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAction:"), CocoaAction.Selector);
-    }
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setTarget:"), _target);
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAction:"), CocoaAction.Selector);
+  }
 
-    public CocoaCheckBoxPeer()
-        : this(_Switch)
-    {
-    }
+  public CocoaCheckBoxPeer()
+      : this(_Switch) {
+  }
 
-    /// <inheritdoc/>
-    public event EventHandler? CheckedChanged;
+  /// <inheritdoc/>
+  public event EventHandler? CheckedChanged;
 
-    private static nint Create(nint buttonType)
-    {
-        var allocated = CocoaRuntime.Allocate("NSButton");
-        var button = allocated == 0
-            ? 0
-            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+  private static nint Create(nint buttonType) {
+    var allocated = CocoaRuntime.Allocate("NSButton");
+    var button = allocated == 0
+        ? 0
+        : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
 
-        if (button != 0)
-            CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setButtonType:"), buttonType);
+    if (button != 0)
+      CocoaRuntime.SendVoid(button, CocoaRuntime.sel_registerName("setButtonType:"), buttonType);
 
-        return button;
-    }
+    return button;
+  }
 
-    /// <summary>A button carries its caption as a title, not as a string value.</summary>
-    public override void SetText(string text)
-    {
-        if (this.Handle == 0)
-            return;
+  /// <summary>A button carries its caption as a title, not as a string value.</summary>
+  public override void SetText(string text) {
+    if (this.Handle == 0)
+      return;
 
-        var title = CocoaRuntime.NSString(text);
-        if (title == 0)
-            return;
+    var title = CocoaRuntime.NSString(text);
+    if (title == 0)
+      return;
 
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setTitle:"), title);
-        CocoaNative.CFRelease(title);
-    }
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setTitle:"), title);
+    CocoaNative.CFRelease(title);
+  }
 
-    /// <inheritdoc/>
-    public void SetChecked(bool value) => this.SetCheckState(value ? CheckState.Checked : CheckState.Unchecked);
+  /// <inheritdoc/>
+  public void SetChecked(bool value) => this.SetCheckState(value ? CheckState.Checked : CheckState.Unchecked);
 
-    /// <inheritdoc/>
-    public bool GetChecked() => this.GetCheckState() is not CheckState.Unchecked;
+  /// <inheritdoc/>
+  public bool GetChecked() => this.GetCheckState() is not CheckState.Unchecked;
 
-    /// <inheritdoc/>
-    /// <remarks>NSControlStateValue: mixed −1, off 0, on 1.</remarks>
-    public void SetCheckState(CheckState value)
-    {
-        _state = value;
-        if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setState:"), ToNative(value));
-    }
+  /// <inheritdoc/>
+  /// <remarks>NSControlStateValue: mixed −1, off 0, on 1.</remarks>
+  public void SetCheckState(CheckState value) {
+    _state = value;
+    if (this.Handle != 0)
+      CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setState:"), ToNative(value));
+  }
 
-    /// <inheritdoc/>
-    public CheckState GetCheckState()
-        => this.Handle == 0
-            ? _state
-            : CocoaRuntime.SendInteger(this.Handle, CocoaRuntime.sel_registerName("state")) switch
-            {
-                1 => CheckState.Checked,
-                -1 => CheckState.Indeterminate,
-                _ => CheckState.Unchecked,
-            };
+  /// <inheritdoc/>
+  public CheckState GetCheckState()
+      => this.Handle == 0
+          ? _state
+          : CocoaRuntime.SendInteger(this.Handle, CocoaRuntime.sel_registerName("state")) switch {
+            1 => CheckState.Checked,
+            -1 => CheckState.Indeterminate,
+            _ => CheckState.Unchecked,
+          };
 
-    /// <inheritdoc/>
-    /// <remarks>
-    /// <c>allowsMixedState</c> makes AppKit's own click cycle three-stepped — off, on, mixed — which is
-    /// the cycle <see cref="CheckBox"/> runs, so the state read back after a click keeps agreeing with
-    /// the core rather than needing to be corrected.
-    /// </remarks>
-    public void SetThreeState(bool value)
-    {
-        if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAllowsMixedState:"), value ? 1 : 0);
-    }
+  /// <inheritdoc/>
+  /// <remarks>
+  /// <c>allowsMixedState</c> makes AppKit's own click cycle three-stepped — off, on, mixed — which is
+  /// the cycle <see cref="CheckBox"/> runs, so the state read back after a click keeps agreeing with
+  /// the core rather than needing to be corrected.
+  /// </remarks>
+  public void SetThreeState(bool value) {
+    if (this.Handle != 0)
+      CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAllowsMixedState:"), value ? 1 : 0);
+  }
 
-    private CheckState _state;
+  private CheckState _state;
 
-    /// <summary>The widget reporting that the user worked it.</summary>
-    private void OnToggled()
-    {
-        _state = this.GetCheckState();
-        CheckedChanged?.Invoke(this, EventArgs.Empty);
-    }
+  /// <summary>The widget reporting that the user worked it.</summary>
+  private void OnToggled() {
+    _state = this.GetCheckState();
+    CheckedChanged?.Invoke(this, EventArgs.Empty);
+  }
 
-    /// <summary>Maps a state onto the <c>NSControlStateValue</c> carrying it.</summary>
-    private static nint ToNative(CheckState state)
-        => state switch
-        {
-            CheckState.Checked => 1,
-            CheckState.Indeterminate => -1,
-            _ => 0,
-        };
+  /// <summary>Maps a state onto the <c>NSControlStateValue</c> carrying it.</summary>
+  private static nint ToNative(CheckState state)
+      => state switch {
+        CheckState.Checked => 1,
+        CheckState.Indeterminate => -1,
+        _ => 0,
+      };
 
-    /// <inheritdoc/>
-    public override void Dispose()
-    {
-        CocoaAction.Forget(_target);
-        base.Dispose();
-    }
+  /// <inheritdoc/>
+  public override void Dispose() {
+    CocoaAction.Forget(_target);
+    base.Dispose();
+  }
 }
 
 /// <summary>A radio button: the same <c>NSButton</c>, wearing the radio type.</summary>
@@ -152,12 +141,10 @@ internal class CocoaCheckBoxPeer : CocoaControlPeer, ICheckBoxPeer
 /// two cannot reach different answers — which is why this asks for the real radio type rather than
 /// dressing a switch up as one and losing the platform's keyboard behaviour with it.
 /// </remarks>
-internal sealed class CocoaRadioButtonPeer : CocoaCheckBoxPeer, IRadioButtonPeer
-{
-    public CocoaRadioButtonPeer()
-        : base(_Radio)
-    {
-    }
+internal sealed class CocoaRadioButtonPeer : CocoaCheckBoxPeer, IRadioButtonPeer {
+  public CocoaRadioButtonPeer()
+      : base(_Radio) {
+  }
 }
 
 /// <summary>
@@ -182,79 +169,73 @@ internal sealed class CocoaRadioButtonPeer : CocoaCheckBoxPeer, IRadioButtonPeer
 /// drawn in the wrong half, which reads as a layout bug rather than a coordinate one.
 /// </para>
 /// </remarks>
-internal sealed class CocoaGroupBoxPeer : CocoaControlPeer, IGroupBoxPeer
-{
-    private readonly nint _box;
+internal sealed class CocoaGroupBoxPeer : CocoaControlPeer, IGroupBoxPeer {
+  private readonly nint _box;
 
-    public CocoaGroupBoxPeer()
-        : base(CocoaCanvasPeer.CreateFlippedView())
-    {
-        if (this.Handle == 0)
-            return;
+  public CocoaGroupBoxPeer()
+      : base(CocoaCanvasPeer.CreateFlippedView()) {
+    if (this.Handle == 0)
+      return;
 
-        var allocated = CocoaRuntime.Allocate("NSBox");
-        _box = allocated == 0
-            ? 0
-            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+    var allocated = CocoaRuntime.Allocate("NSBox");
+    _box = allocated == 0
+        ? 0
+        : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
 
-        if (_box != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("addSubview:"), _box);
-    }
+    if (_box != 0)
+      CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("addSubview:"), _box);
+  }
 
-    /// <inheritdoc/>
-    /// <remarks>The frame is stretched over the whole surface, which a plain view will not do for it.</remarks>
-    public override void SetBounds(Rectangle bounds)
-    {
-        base.SetBounds(bounds);
-        if (_box != 0)
-            CocoaRuntime.SendRectVoidOnly(_box, CocoaRuntime.sel_registerName("setFrame:"), new(0, 0, bounds.Width, bounds.Height));
-    }
+  /// <inheritdoc/>
+  /// <remarks>The frame is stretched over the whole surface, which a plain view will not do for it.</remarks>
+  public override void SetBounds(Rectangle bounds) {
+    base.SetBounds(bounds);
+    if (_box != 0)
+      CocoaRuntime.SendRectVoidOnly(_box, CocoaRuntime.sel_registerName("setFrame:"), new(0, 0, bounds.Width, bounds.Height));
+  }
 
-    /// <summary>The caption belongs to the box; the view behind it has nothing to say.</summary>
-    public override void SetText(string text)
-    {
-        if (_box == 0)
-            return;
+  /// <summary>The caption belongs to the box; the view behind it has nothing to say.</summary>
+  public override void SetText(string text) {
+    if (_box == 0)
+      return;
 
-        var title = CocoaRuntime.NSString(text);
-        if (title == 0)
-            return;
+    var title = CocoaRuntime.NSString(text);
+    if (title == 0)
+      return;
 
-        CocoaRuntime.SendVoid(_box, CocoaRuntime.sel_registerName("setTitle:"), title);
-        CocoaNative.CFRelease(title);
-    }
+    CocoaRuntime.SendVoid(_box, CocoaRuntime.sel_registerName("setTitle:"), title);
+    CocoaNative.CFRelease(title);
+  }
 
-    /// <inheritdoc/>
-    /// <remarks>
-    /// Neither object is an <c>NSControl</c>, so neither answers <c>setEnabled:</c> — and an
-    /// unrecognized selector does not fail quietly here, it ends the process. A group box has no
-    /// disabled look on macOS anyway; what a disabled group means is that its children are disabled,
-    /// and the core disables each of those itself.
-    /// </remarks>
-    public override void SetEnabled(bool enabled) { }
+  /// <inheritdoc/>
+  /// <remarks>
+  /// Neither object is an <c>NSControl</c>, so neither answers <c>setEnabled:</c> — and an
+  /// unrecognized selector does not fail quietly here, it ends the process. A group box has no
+  /// disabled look on macOS anyway; what a disabled group means is that its children are disabled,
+  /// and the core disables each of those itself.
+  /// </remarks>
+  public override void SetEnabled(bool enabled) { }
 
-    /// <inheritdoc/>
-    public void AddChild(IControlPeer child)
-    {
-        if (this.Handle == 0 || ViewOf(child) is not { } view)
-            return;
+  /// <inheritdoc/>
+  public void AddChild(IControlPeer child) {
+    if (this.Handle == 0 || ViewOf(child) is not { } view)
+      return;
 
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("addSubview:"), view);
-    }
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("addSubview:"), view);
+  }
 
-    /// <inheritdoc/>
-    /// <remarks>Bookkeeping only, and there is none: the child peer's own disposal takes its view out
-    /// of this one.</remarks>
-    public void RemoveChild(IControlPeer child) { }
+  /// <inheritdoc/>
+  /// <remarks>Bookkeeping only, and there is none: the child peer's own disposal takes its view out
+  /// of this one.</remarks>
+  public void RemoveChild(IControlPeer child) { }
 
-    /// <summary>The AppKit object behind a peer, whichever kind of peer it is.</summary>
-    private static nint? ViewOf(IControlPeer child)
-        => child switch
-        {
-            CocoaCanvasPeer canvas when canvas.Handle != 0 => canvas.Handle,
-            CocoaControlPeer control when control.Handle != 0 => control.Handle,
-            _ => null,
-        };
+  /// <summary>The AppKit object behind a peer, whichever kind of peer it is.</summary>
+  private static nint? ViewOf(IControlPeer child)
+      => child switch {
+        CocoaCanvasPeer canvas when canvas.Handle != 0 => canvas.Handle,
+        CocoaControlPeer control when control.Handle != 0 => control.Handle,
+        _ => null,
+      };
 }
 
 /// <summary>
@@ -283,172 +264,161 @@ internal sealed class CocoaGroupBoxPeer : CocoaControlPeer, IGroupBoxPeer
 /// one reach the same answer by the same arithmetic rather than by coincidence.
 /// </para>
 /// </remarks>
-internal sealed unsafe class CocoaLinkLabelPeer : CocoaControlPeer, ILinkLabelPeer
-{
-    private static readonly nint _Link = CocoaRuntime.Constant("NSLinkAttributeName");
-    private static readonly nint _Underline = CocoaRuntime.Constant("NSUnderlineStyleAttributeName");
-    private static readonly nint _Foreground = CocoaRuntime.Constant("NSForegroundColorAttributeName");
+internal sealed unsafe class CocoaLinkLabelPeer : CocoaControlPeer, ILinkLabelPeer {
+  private static readonly nint _Link = CocoaRuntime.Constant("NSLinkAttributeName");
+  private static readonly nint _Underline = CocoaRuntime.Constant("NSUnderlineStyleAttributeName");
+  private static readonly nint _Foreground = CocoaRuntime.Constant("NSForegroundColorAttributeName");
 
-    /// <summary>The runtime class, built on first use.</summary>
-    private static nint _class;
+  /// <summary>The runtime class, built on first use.</summary>
+  private static nint _class;
 
-    /// <summary>Live links by field pointer, so the static callback can find the one that was clicked.</summary>
-    private static readonly ConcurrentDictionary<nint, CocoaLinkLabelPeer> _links = new();
+  /// <summary>Live links by field pointer, so the static callback can find the one that was clicked.</summary>
+  private static readonly ConcurrentDictionary<nint, CocoaLinkLabelPeer> _links = new();
 
-    private string _text = string.Empty;
-    private bool _visited;
+  private string _text = string.Empty;
+  private bool _visited;
 
-    public CocoaLinkLabelPeer()
-        : base(Create())
-    {
-        if (this.Handle != 0)
-            _links[this.Handle] = this;
+  public CocoaLinkLabelPeer()
+      : base(Create()) {
+    if (this.Handle != 0)
+      _links[this.Handle] = this;
+  }
+
+  /// <inheritdoc/>
+  public event EventHandler? LinkActivated;
+
+  private static nint Create() {
+    EnsureClass();
+    if (_class == 0)
+      return 0;
+
+    var allocated = CocoaRuntime.SendPointer(_class, CocoaRuntime.sel_registerName("alloc"));
+    var field = allocated == 0
+        ? 0
+        : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+
+    if (field == 0)
+      return 0;
+
+    // Selectable is what makes the link clickable at all; editable would make it a text box.
+    CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setEditable:"), false);
+    CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setSelectable:"), true);
+    CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setBezeled:"), false);
+    CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setDrawsBackground:"), false);
+    CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setAllowsEditingTextAttributes:"), true);
+    return field;
+  }
+
+  private static void EnsureClass() {
+    if (_class != 0 || !CocoaRuntime.Available)
+      return;
+
+    var superclass = CocoaRuntime.objc_getClass("NSTextField");
+    if (superclass == 0)
+      return;
+
+    var created = CocoaRuntime.objc_allocateClassPair(superclass, "NativeFormsLinkField", 0);
+    if (created == 0)
+      return;
+
+    // "c@:@@Q": returns BOOL, takes self, _cmd, the field editor, the link and the character index.
+    CocoaRuntime.class_addMethod(
+        created,
+        CocoaRuntime.sel_registerName("textView:clickedOnLink:atIndex:"),
+        (nint)(delegate* unmanaged<nint, nint, nint, nint, nint, byte>)&ClickedOnLink,
+        "c@:@@Q");
+
+    CocoaRuntime.objc_registerClassPair(created);
+    _class = created;
+  }
+
+  [UnmanagedCallersOnly]
+  private static byte ClickedOnLink(nint self, nint selector, nint textView, nint link, nint index) {
+    if (!_links.TryGetValue(self, out var label))
+      return 0;
+
+    label.LinkActivated?.Invoke(label, EventArgs.Empty);
+    return 1; // handled: the application's LinkClicked is the hook, not the platform's browser
+  }
+
+  /// <inheritdoc/>
+  /// <remarks>The caption and the link are the same thing here, so setting one rebuilds the other.</remarks>
+  public override void SetText(string text) {
+    _text = text;
+    this.Restyle();
+  }
+
+  /// <inheritdoc/>
+  public void SetVisited(bool visited) {
+    _visited = visited;
+    this.Restyle();
+  }
+
+  /// <summary>Rebuilds the attributed caption: the link, its underline and the colour of the moment.</summary>
+  private void Restyle() {
+    if (this.Handle == 0 || _Link == 0)
+      return;
+
+    var value = CocoaRuntime.NSString(_text);
+    if (value == 0)
+      return;
+
+    var allocated = CocoaRuntime.Allocate("NSMutableAttributedString");
+    var styled = allocated == 0
+        ? 0
+        : CocoaRuntime.SendPointer(allocated, CocoaRuntime.sel_registerName("initWithString:"), value);
+
+    CocoaNative.CFRelease(value);
+    if (styled == 0)
+      return;
+
+    var range = new CocoaRuntime.NSRange { Location = 0, Length = _text.Length };
+    var add = CocoaRuntime.sel_registerName("addAttribute:value:range:");
+
+    // The link's value is the caption. Nothing reads it — the toolkit reports the activation and
+    // the application decides what it meant — but the attribute has to hold something, because an
+    // attribute with no value is no attribute and the click would never be a link click.
+    var target = CocoaRuntime.NSString(_text);
+    if (target != 0) {
+      CocoaRuntime.SendAttribute(styled, add, _Link, target, range);
+      CocoaNative.CFRelease(target);
     }
 
-    /// <inheritdoc/>
-    public event EventHandler? LinkActivated;
+    if (_Underline != 0
+        && CocoaRuntime.SendPointer(CocoaRuntime.objc_getClass("NSNumber"), CocoaRuntime.sel_registerName("numberWithInteger:"), 1) is var single
+        && single != 0)
+      CocoaRuntime.SendAttribute(styled, add, _Underline, single, range);
 
-    private static nint Create()
-    {
-        EnsureClass();
-        if (_class == 0)
-            return 0;
+    if (_Foreground != 0 && this.Colour() is var colour && colour != 0)
+      CocoaRuntime.SendAttribute(styled, add, _Foreground, colour, range);
 
-        var allocated = CocoaRuntime.SendPointer(_class, CocoaRuntime.sel_registerName("alloc"));
-        var field = allocated == 0
-            ? 0
-            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAttributedStringValue:"), styled);
+    CocoaRuntime.SendVoid(styled, CocoaRuntime.sel_registerName("release"));
+  }
 
-        if (field == 0)
-            return 0;
+  /// <summary>The link colour, dimmed halfway toward disabled text once the link has been followed.</summary>
+  private nint Colour() {
+    var link = CocoaRuntime.SendToClass("NSColor", "linkColor");
+    if (!_visited || link == 0)
+      return link;
 
-        // Selectable is what makes the link clickable at all; editable would make it a text box.
-        CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setEditable:"), false);
-        CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setSelectable:"), true);
-        CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setBezeled:"), false);
-        CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setDrawsBackground:"), false);
-        CocoaRuntime.SendVoid(field, CocoaRuntime.sel_registerName("setAllowsEditingTextAttributes:"), true);
-        return field;
-    }
+    var dim = CocoaRuntime.SendToClass("NSColor", "disabledControlTextColor");
+    if (dim == 0)
+      return link;
 
-    private static void EnsureClass()
-    {
-        if (_class != 0 || !CocoaRuntime.Available)
-            return;
+    // A blend across two colour spaces answers nil rather than failing, so the unblended colour is
+    // the fallback: a visited link that looks unvisited beats a caption with no colour at all.
+    var blended = CocoaRuntime.SendPointer(link, CocoaRuntime.sel_registerName("blendedColorWithFraction:ofColor:"), 0.5, dim);
+    return blended != 0 ? blended : link;
+  }
 
-        var superclass = CocoaRuntime.objc_getClass("NSTextField");
-        if (superclass == 0)
-            return;
+  /// <inheritdoc/>
+  public override void Dispose() {
+    if (this.Handle != 0)
+      _links.TryRemove(this.Handle, out _);
 
-        var created = CocoaRuntime.objc_allocateClassPair(superclass, "NativeFormsLinkField", 0);
-        if (created == 0)
-            return;
-
-        // "c@:@@Q": returns BOOL, takes self, _cmd, the field editor, the link and the character index.
-        CocoaRuntime.class_addMethod(
-            created,
-            CocoaRuntime.sel_registerName("textView:clickedOnLink:atIndex:"),
-            (nint)(delegate* unmanaged<nint, nint, nint, nint, nint, byte>)&ClickedOnLink,
-            "c@:@@Q");
-
-        CocoaRuntime.objc_registerClassPair(created);
-        _class = created;
-    }
-
-    [UnmanagedCallersOnly]
-    private static byte ClickedOnLink(nint self, nint selector, nint textView, nint link, nint index)
-    {
-        if (!_links.TryGetValue(self, out var label))
-            return 0;
-
-        label.LinkActivated?.Invoke(label, EventArgs.Empty);
-        return 1; // handled: the application's LinkClicked is the hook, not the platform's browser
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>The caption and the link are the same thing here, so setting one rebuilds the other.</remarks>
-    public override void SetText(string text)
-    {
-        _text = text;
-        this.Restyle();
-    }
-
-    /// <inheritdoc/>
-    public void SetVisited(bool visited)
-    {
-        _visited = visited;
-        this.Restyle();
-    }
-
-    /// <summary>Rebuilds the attributed caption: the link, its underline and the colour of the moment.</summary>
-    private void Restyle()
-    {
-        if (this.Handle == 0 || _Link == 0)
-            return;
-
-        var value = CocoaRuntime.NSString(_text);
-        if (value == 0)
-            return;
-
-        var allocated = CocoaRuntime.Allocate("NSMutableAttributedString");
-        var styled = allocated == 0
-            ? 0
-            : CocoaRuntime.SendPointer(allocated, CocoaRuntime.sel_registerName("initWithString:"), value);
-
-        CocoaNative.CFRelease(value);
-        if (styled == 0)
-            return;
-
-        var range = new CocoaRuntime.NSRange { Location = 0, Length = _text.Length };
-        var add = CocoaRuntime.sel_registerName("addAttribute:value:range:");
-
-        // The link's value is the caption. Nothing reads it — the toolkit reports the activation and
-        // the application decides what it meant — but the attribute has to hold something, because an
-        // attribute with no value is no attribute and the click would never be a link click.
-        var target = CocoaRuntime.NSString(_text);
-        if (target != 0)
-        {
-            CocoaRuntime.SendAttribute(styled, add, _Link, target, range);
-            CocoaNative.CFRelease(target);
-        }
-
-        if (_Underline != 0
-            && CocoaRuntime.SendPointer(CocoaRuntime.objc_getClass("NSNumber"), CocoaRuntime.sel_registerName("numberWithInteger:"), 1) is var single
-            && single != 0)
-            CocoaRuntime.SendAttribute(styled, add, _Underline, single, range);
-
-        if (_Foreground != 0 && this.Colour() is var colour && colour != 0)
-            CocoaRuntime.SendAttribute(styled, add, _Foreground, colour, range);
-
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setAttributedStringValue:"), styled);
-        CocoaRuntime.SendVoid(styled, CocoaRuntime.sel_registerName("release"));
-    }
-
-    /// <summary>The link colour, dimmed halfway toward disabled text once the link has been followed.</summary>
-    private nint Colour()
-    {
-        var link = CocoaRuntime.SendToClass("NSColor", "linkColor");
-        if (!_visited || link == 0)
-            return link;
-
-        var dim = CocoaRuntime.SendToClass("NSColor", "disabledControlTextColor");
-        if (dim == 0)
-            return link;
-
-        // A blend across two colour spaces answers nil rather than failing, so the unblended colour is
-        // the fallback: a visited link that looks unvisited beats a caption with no colour at all.
-        var blended = CocoaRuntime.SendPointer(link, CocoaRuntime.sel_registerName("blendedColorWithFraction:ofColor:"), 0.5, dim);
-        return blended != 0 ? blended : link;
-    }
-
-    /// <inheritdoc/>
-    public override void Dispose()
-    {
-        if (this.Handle != 0)
-            _links.TryRemove(this.Handle, out _);
-
-        base.Dispose();
-    }
+    base.Dispose();
+  }
 }
 
 /// <summary>A progress indicator: a real <c>NSProgressIndicator</c> in its bar style.</summary>
@@ -458,59 +428,54 @@ internal sealed unsafe class CocoaLinkLabelPeer : CocoaControlPeer, ILinkLabelPe
 /// Both are therefore refused rather than inherited: a progress bar has no caption to set, and macOS
 /// has no disabled look for one.
 /// </remarks>
-internal sealed class CocoaProgressBarPeer : CocoaControlPeer, IProgressBarPeer
-{
-    public CocoaProgressBarPeer()
-        : base(Create())
-    {
-    }
+internal sealed class CocoaProgressBarPeer : CocoaControlPeer, IProgressBarPeer {
+  public CocoaProgressBarPeer()
+      : base(Create()) {
+  }
 
-    private static nint Create()
-    {
-        var allocated = CocoaRuntime.Allocate("NSProgressIndicator");
-        var bar = allocated == 0
-            ? 0
-            : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
+  private static nint Create() {
+    var allocated = CocoaRuntime.Allocate("NSProgressIndicator");
+    var bar = allocated == 0
+        ? 0
+        : CocoaRuntime.SendRectInit(allocated, CocoaRuntime.sel_registerName("initWithFrame:"), new(0, 0, 1, 1));
 
-        if (bar == 0)
-            return 0;
+    if (bar == 0)
+      return 0;
 
-        // NSProgressIndicatorStyleBar, and a fraction rather than the toolkit's own range: the core
-        // has already reduced value/minimum/maximum to one number between nothing and everything.
-        CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setStyle:"), 0);
-        CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setIndeterminate:"), false);
-        CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setMinValue:"), 0.0);
-        CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setMaxValue:"), 1.0);
-        return bar;
-    }
+    // NSProgressIndicatorStyleBar, and a fraction rather than the toolkit's own range: the core
+    // has already reduced value/minimum/maximum to one number between nothing and everything.
+    CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setStyle:"), 0);
+    CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setIndeterminate:"), false);
+    CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setMinValue:"), 0.0);
+    CocoaRuntime.SendVoid(bar, CocoaRuntime.sel_registerName("setMaxValue:"), 1.0);
+    return bar;
+  }
 
-    /// <inheritdoc/>
-    public void SetFraction(double fraction)
-    {
-        if (this.Handle != 0)
-            CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setDoubleValue:"), fraction);
-    }
+  /// <inheritdoc/>
+  public void SetFraction(double fraction) {
+    if (this.Handle != 0)
+      CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setDoubleValue:"), fraction);
+  }
 
-    /// <inheritdoc/>
-    public void SetMarquee(bool marquee)
-    {
-        if (this.Handle == 0)
-            return;
+  /// <inheritdoc/>
+  public void SetMarquee(bool marquee) {
+    if (this.Handle == 0)
+      return;
 
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setIndeterminate:"), marquee);
-        CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName(marquee ? "startAnimation:" : "stopAnimation:"), 0);
-    }
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName("setIndeterminate:"), marquee);
+    CocoaRuntime.SendVoid(this.Handle, CocoaRuntime.sel_registerName(marquee ? "startAnimation:" : "stopAnimation:"), 0);
+  }
 
-    /// <inheritdoc/>
-    /// <remarks>
-    /// Nothing to do: an indeterminate <c>NSProgressIndicator</c> animates itself once started, so a
-    /// caller stepping it by hand would only be competing with the platform's own timing.
-    /// </remarks>
-    public void Pulse() { }
+  /// <inheritdoc/>
+  /// <remarks>
+  /// Nothing to do: an indeterminate <c>NSProgressIndicator</c> animates itself once started, so a
+  /// caller stepping it by hand would only be competing with the platform's own timing.
+  /// </remarks>
+  public void Pulse() { }
 
-    /// <inheritdoc cref="CocoaProgressBarPeer"/>
-    public override void SetText(string text) { }
+  /// <inheritdoc cref="CocoaProgressBarPeer"/>
+  public override void SetText(string text) { }
 
-    /// <inheritdoc cref="CocoaProgressBarPeer"/>
-    public override void SetEnabled(bool enabled) { }
+  /// <inheritdoc cref="CocoaProgressBarPeer"/>
+  public override void SetEnabled(bool enabled) { }
 }

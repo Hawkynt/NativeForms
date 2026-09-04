@@ -13,77 +13,76 @@ namespace Hawkynt.NativeForms.Drawing;
 /// for the primary monitor's current scale, so painting them 1:1 there is correct; mapping onto
 /// another monitor's scale goes through <see cref="Control.LogicalToDevice(int)"/>.
 /// </summary>
-public interface ITheme
-{
-    /// <summary>Background of a top-level window.</summary>
-    Color WindowBackground { get; }
+public interface ITheme {
+  /// <summary>Background of a top-level window.</summary>
+  Color WindowBackground { get; }
 
-    /// <summary>Background of a control surface (panels, buttons at rest).</summary>
-    Color ControlBackground { get; }
+  /// <summary>Background of a control surface (panels, buttons at rest).</summary>
+  Color ControlBackground { get; }
 
-    /// <summary>Primary text color on a control.</summary>
-    Color ControlText { get; }
+  /// <summary>Primary text color on a control.</summary>
+  Color ControlText { get; }
 
-    /// <summary>Text color for disabled elements.</summary>
-    Color DisabledText { get; }
+  /// <summary>Text color for disabled elements.</summary>
+  Color DisabledText { get; }
 
-    /// <summary>Background of editable/list fields (text boxes, list boxes, grid cells).</summary>
-    Color FieldBackground { get; }
+  /// <summary>Background of editable/list fields (text boxes, list boxes, grid cells).</summary>
+  Color FieldBackground { get; }
 
-    /// <summary>The system accent color (focus, checkmarks, selection tint).</summary>
-    Color Accent { get; }
+  /// <summary>The system accent color (focus, checkmarks, selection tint).</summary>
+  Color Accent { get; }
 
-    /// <summary>Background of a selected item.</summary>
-    Color SelectionBackground { get; }
+  /// <summary>Background of a selected item.</summary>
+  Color SelectionBackground { get; }
 
-    /// <summary>Text color on a selected item.</summary>
-    Color SelectionText { get; }
+  /// <summary>Text color on a selected item.</summary>
+  Color SelectionText { get; }
 
-    /// <summary>Border/separator color.</summary>
-    Color Border { get; }
+  /// <summary>Border/separator color.</summary>
+  Color Border { get; }
 
-    /// <summary>Grid line color for tabular controls.</summary>
-    Color GridLine { get; }
+  /// <summary>Grid line color for tabular controls.</summary>
+  Color GridLine { get; }
 
-    /// <summary>Background of a column/row header.</summary>
-    Color HeaderBackground { get; }
+  /// <summary>Background of a column/row header.</summary>
+  Color HeaderBackground { get; }
 
-    /// <summary>Text color of a header.</summary>
-    Color HeaderText { get; }
+  /// <summary>Text color of a header.</summary>
+  Color HeaderText { get; }
 
-    /// <summary>
-    /// Whether the desktop runs a high-contrast scheme (Windows: <c>SPI_GETHIGHCONTRAST</c>; GTK: a
-    /// HighContrast theme name). Owner-drawn chrome that would blend colors should fall back to the
-    /// plain palette entries while this is set.
-    /// </summary>
-    bool IsHighContrast { get; }
+  /// <summary>
+  /// Whether the desktop runs a high-contrast scheme (Windows: <c>SPI_GETHIGHCONTRAST</c>; GTK: a
+  /// HighContrast theme name). Owner-drawn chrome that would blend colors should fall back to the
+  /// plain palette entries while this is set.
+  /// </summary>
+  bool IsHighContrast { get; }
 
-    /// <summary>The default UI font.</summary>
-    Font DefaultFont { get; }
+  /// <summary>The default UI font.</summary>
+  Font DefaultFont { get; }
 
-    /// <summary>The natural height of a list/grid row, in logical pixels (primary-monitor scale).</summary>
-    int RowHeight { get; }
+  /// <summary>The natural height of a list/grid row, in logical pixels (primary-monitor scale).</summary>
+  int RowHeight { get; }
 
-    /// <summary>The thickness of a scrollbar, in logical pixels (primary-monitor scale).</summary>
-    int ScrollBarSize { get; }
+  /// <summary>The thickness of a scrollbar, in logical pixels (primary-monitor scale).</summary>
+  int ScrollBarSize { get; }
 
-    /// <summary>
-    /// The maximum interval, in milliseconds, between two clicks that count as a double-click —
-    /// the user's own setting (<c>GetDoubleClickTime</c> on Windows, the
-    /// <c>gtk-double-click-time</c> setting on GTK), 500 in the fallback theme.
-    /// </summary>
-    int DoubleClickTime { get; }
+  /// <summary>
+  /// The maximum interval, in milliseconds, between two clicks that count as a double-click —
+  /// the user's own setting (<c>GetDoubleClickTime</c> on Windows, the
+  /// <c>gtk-double-click-time</c> setting on GTK), 500 in the fallback theme.
+  /// </summary>
+  int DoubleClickTime { get; }
 
-    /// <summary>
-    /// The corner radius the desktop rounds a push button to, in logical pixels; 0 for square corners.
-    /// </summary>
-    /// <remarks>
-    /// Queried rather than chosen, and defaulted so a backend that has not been taught it keeps the
-    /// square face it drew before. An owner-drawn button face sits next to real ones — the gallery has
-    /// a painted button and a widget button side by side on its first page — and a square frame beside
-    /// a rounded one is the tell that gives an owner-drawn control away. It is on <see cref="ITheme"/>
-    /// rather than in the renderer because the answer belongs to the desktop: GTK reads it from the
-    /// button's own style context, so it follows the user's theme rather than a number picked here.
-    /// </remarks>
-    int ButtonCornerRadius => 0;
+  /// <summary>
+  /// The corner radius the desktop rounds a push button to, in logical pixels; 0 for square corners.
+  /// </summary>
+  /// <remarks>
+  /// Queried rather than chosen, and defaulted so a backend that has not been taught it keeps the
+  /// square face it drew before. An owner-drawn button face sits next to real ones — the gallery has
+  /// a painted button and a widget button side by side on its first page — and a square frame beside
+  /// a rounded one is the tell that gives an owner-drawn control away. It is on <see cref="ITheme"/>
+  /// rather than in the renderer because the answer belongs to the desktop: GTK reads it from the
+  /// button's own style context, so it follows the user's theme rather than a number picked here.
+  /// </remarks>
+  int ButtonCornerRadius => 0;
 }

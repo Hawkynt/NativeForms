@@ -12,752 +12,661 @@ namespace Hawkynt.NativeForms.Tests;
 /// by simulated input.
 /// </summary>
 [TestFixture]
-internal sealed class DataGridViewColumnTypesTests
-{
-    private const string _Accent = "#FF0078D4";
-    private const string _DisabledText = "#FF9A9A9A";
-    private const string _SelectionText = "#FFFFFFFF";
-
-    private sealed class Row
-    {
-        public string Name = string.Empty;
-        public bool Done;
-        public int Percent;
-        public string Code = string.Empty;
-        public string Status = string.Empty;
-        public Color Tint;
-    }
-
-    private static HeadlessBackend RealizeWithBackend(OwnerDrawnControl control)
-    {
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(control);
-        Application.Run(form, backend);
-        return backend;
-    }
-
-    private static HeadlessCanvasPeer Realize(OwnerDrawnControl control)
-    {
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(control);
-        Application.Run(form, backend);
-        return backend.Created.OfType<HeadlessCanvasPeer>().Single();
-    }
-
-    private static DataGridView MakeGrid(DataGridViewColumn column)
-    {
-        // 22px header + 4 rows at 22px; a single 100px column.
-        var grid = new DataGridView { Bounds = new(0, 0, 200, 110) };
-        grid.Columns.Add(column);
-        return grid;
-    }
-
-    [Test]
-    public void Check_column_paints_accent_checkmark_when_checked()
-    {
-        var grid = MakeGrid(new("Done", static o => null)
-        {
-            Kind = DataGridViewColumnKind.Check,
-            CheckedSelector = static o => ((Row)o!).Done,
-        });
-        grid.Items.Add(new Row { Done = true });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // 14px box centered in the 100x22 cell at y=22: box at (43,26).
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations, Does.Contain("fill #FFFFFFFF 43,26,14,14"), "glyph box");
-            Assert.That(g.Operations, Does.Contain($"rect {_Accent} 43,26,14,14"), "accent border");
-            Assert.That(g.Operations, Does.Contain($"line {_Accent} 46,33-49,36"), "checkmark stroke");
-            Assert.That(g.Operations, Does.Contain($"line {_Accent} 49,36-54,29"), "checkmark stroke");
-        });
-    }
-
-    [Test]
-    public void Check_column_paints_plain_border_when_unchecked()
-    {
-        var grid = MakeGrid(new("Done", static o => null)
-        {
-            Kind = DataGridViewColumnKind.Check,
-            CheckedSelector = static o => ((Row)o!).Done,
-        });
-        grid.Items.Add(new Row());
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 43,26,14,14"), "themed border");
-            Assert.That(g.Operations.Exists(o => o.StartsWith($"line {_Accent}")), Is.False, "no checkmark");
-        });
-    }
-
-    [Test]
-    public void Check_click_toggles_through_setter_and_raises_content_click()
-    {
-        var grid = MakeGrid(new("Done", static o => null)
-        {
-            Kind = DataGridViewColumnKind.Check,
-            CheckedSelector = static o => ((Row)o!).Done,
-            CheckedSetter = static (o, value) => ((Row)o!).Done = value,
-        });
-        var row = new Row();
-        grid.Items.Add(row);
-        DataGridViewCellEventArgs? content = null;
-        grid.CellContentClick += (_, e) => content = e;
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(50, 30); // row 0 cell
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(row.Done, Is.True, "toggled on");
-            Assert.That(content, Is.Not.Null);
-            Assert.That(content!.RowIndex, Is.EqualTo(0));
-            Assert.That(content.ColumnIndex, Is.EqualTo(0));
-        });
-
-        canvas.RaiseMouseDown(50, 30);
-        Assert.That(row.Done, Is.False, "toggled back off");
-    }
-
-    [Test]
-    public void Check_click_without_setter_raises_content_click_but_changes_nothing()
-    {
-        var grid = MakeGrid(new("Done", static o => null)
-        {
-            Kind = DataGridViewColumnKind.Check,
-            CheckedSelector = static o => ((Row)o!).Done,
-        });
-        var row = new Row();
-        grid.Items.Add(row);
-        var contentClicks = 0;
-        grid.CellContentClick += (_, _) => ++contentClicks;
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(50, 30);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(contentClicks, Is.EqualTo(1));
-            Assert.That(row.Done, Is.False);
-        });
-    }
-
-    [Test]
-    public void Check_toggle_is_blocked_by_read_only_but_content_click_still_fires()
-    {
-        var grid = MakeGrid(new("Done", static o => null)
-        {
-            Kind = DataGridViewColumnKind.Check,
-            CheckedSelector = static o => ((Row)o!).Done,
-            CheckedSetter = static (o, value) => ((Row)o!).Done = value,
-        });
-        grid.ReadOnly = true;
-        var row = new Row();
-        grid.Items.Add(row);
-        var contentClicks = 0;
-        grid.CellContentClick += (_, _) => ++contentClicks;
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(50, 30);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(row.Done, Is.False, "read-only blocks the toggle");
-            Assert.That(contentClicks, Is.EqualTo(1), "content click is raised regardless");
-        });
-    }
-
-    [Test]
-    public void Button_column_paints_face_border_and_centered_text()
-    {
-        var grid = MakeGrid(new("Action", static o => "Run")
-        {
-            Kind = DataGridViewColumnKind.Button,
-        });
-        grid.Items.Add(new Row());
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // Face inset 2px into the 100x22 cell at y=22.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations, Does.Contain("fill #FFFDFDFD 2,24,96,18"), "button face");
-            Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 2,24,96,18"), "button border");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Run\"") && o.Contains("MiddleCenter")), Is.True, "centered text");
-        });
-    }
-
-    [Test]
-    public void Button_click_raises_content_click_when_enabled()
-    {
-        var grid = MakeGrid(new("Action", static o => "Run")
-        {
-            Kind = DataGridViewColumnKind.Button,
-        });
-        grid.Items.Add(new Row());
-        DataGridViewCellEventArgs? content = null;
-        grid.CellContentClick += (_, e) => content = e;
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(50, 30);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(content, Is.Not.Null);
-            Assert.That(content!.RowIndex, Is.EqualTo(0));
-            Assert.That(content.ColumnIndex, Is.EqualTo(0));
-        });
-    }
-
-    [Test]
-    public void Disabled_button_greys_text_and_raises_no_content_click()
-    {
-        var grid = MakeGrid(new("Action", static o => "Run")
-        {
-            Kind = DataGridViewColumnKind.Button,
-            EnabledSelector = static _ => false,
-        });
-        grid.Items.Add(new Row());
-        var contentClicks = 0;
-        var cellClicks = 0;
-        grid.CellContentClick += (_, _) => ++contentClicks;
-        grid.CellClick += (_, _) => ++cellClicks;
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-        canvas.RaiseMouseDown(50, 30);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Run\"") && o.Contains(_DisabledText)), Is.True, "greyed text");
-            Assert.That(contentClicks, Is.Zero, "disabled button raises no content click");
-            Assert.That(cellClicks, Is.EqualTo(1), "the generic cell click still fires");
-        });
-    }
-
-    [Test]
-    public void Link_column_paints_accent_underlined_text_and_raises_content_click()
-    {
-        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
-        {
-            Kind = DataGridViewColumnKind.Link,
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        DataGridViewCellEventArgs? content = null;
-        grid.CellContentClick += (_, e) => content = e;
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-        canvas.RaiseMouseDown(50, 30);
-
-        // "Alice" measures 5*7=35px; MiddleLeft in the 22px row at y=22 puts the underline at y=40.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_Accent)), Is.True, "accent text");
-            Assert.That(g.Operations, Does.Contain($"line {_Accent} 4,40-39,40"), "underline");
-            Assert.That(content, Is.Not.Null);
-            Assert.That(content!.RowIndex, Is.EqualTo(0));
-        });
-    }
-
-    /// <summary>
-    /// The link is the one cell kind that puts the accent straight onto the row background — every
-    /// other kind either draws through the cell's fore color or lays down an opaque face of its own
-    /// first. A theme whose selection background <em>is</em> the accent (the default one, and GTK's
-    /// Adwaita) therefore paints the selected row's link in its own background colour and the text
-    /// disappears.
-    /// </summary>
-    [Test]
-    public void Link_column_on_the_selected_row_uses_the_selection_foreground()
-    {
-        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
-        {
-            Kind = DataGridViewColumnKind.Link,
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(50, 30);
-        var g = canvas.RaisePaint();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(grid.SelectedRowIndex, Is.Zero, "the click selected the row");
-            Assert.That(
-                g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_SelectionText)),
-                Is.True,
-                "the link text switches to the selection foreground");
-            Assert.That(g.Operations, Does.Contain($"line {_SelectionText} 4,40-39,40"), "and so does its underline");
-            Assert.That(
-                g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_Accent)),
-                Is.False,
-                "never accent text on an accent-coloured selection");
-        });
-    }
-
-    /// <summary>An explicit cell fore color still wins on a selected row, exactly as it does for text
-    /// cells — the selection default only applies where the style left the colour open.</summary>
-    [Test]
-    public void Link_column_honors_an_explicit_cell_fore_color_when_selected()
-    {
-        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
-        {
-            Kind = DataGridViewColumnKind.Link,
-            CellStyleSelector = static _ => new DataGridViewCellStyle(foreColor: Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(50, 30);
-        var g = canvas.RaisePaint();
-
-        Assert.That(
-            g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("#FF00FF00")),
-            Is.True,
-            "the explicit fore color survives selection");
-    }
-
-    /// <summary>
-    /// The rule under a link is measured, and it has to measure the string that was drawn rather than
-    /// the one that was asked for. Measuring the full text put the rule out past the cell and under the
-    /// column beside it — a link visibly underlined wider than its own visible glyphs.
-    /// </summary>
-    [Test]
-    public void Link_column_underlines_no_more_than_the_text_it_could_fit()
-    {
-        var grid = MakeGrid(new("Site", static o => ((Row)o!).Name)
-        {
-            Kind = DataGridViewColumnKind.Link,
-        });
-        grid.Items.Add(new Row { Name = "https://example.invalid/a/long/path" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // The 100px column leaves 96px past the padding, and a character measures 7px: thirteen of
-        // them fit, so twelve survive alongside the ellipsis and the rule runs 91px from x=4.
-        Assert.Multiple(() =>
-        {
-            Assert.That(
-                g.Operations.Exists(o => o.StartsWith("text \"https://exam…\"") && o.Contains(_Accent)),
-                Is.True,
-                "the link is shortened to its cell");
-            Assert.That(g.DrewText("https://example.invalid"), Is.False, "never the whole address");
-            Assert.That(g.Operations, Does.Contain($"line {_Accent} 4,40-95,40"), "the rule stops with the glyphs");
-        });
-    }
-
-    [Test]
-    public void Image_selector_paints_icon_before_the_cell_text()
-    {
-        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
-        {
-            ImageSelector = static _ => new HeadlessImage(8, 8),
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // 18px icon at the cell padding, text shifted right past icon + gap: 4 + 18 + 4 = 26.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @4,24")), Is.True, "icon before text");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@26,22")), Is.True, "text after icon");
-        });
-    }
-
-    [Test]
-    public void MultiImage_column_paints_icons_side_by_side()
-    {
-        var images = new IImage[] { new HeadlessImage(2, 2), new HeadlessImage(3, 3) };
-        var grid = MakeGrid(new("Flags", static o => null)
-        {
-            Kind = DataGridViewColumnKind.MultiImage,
-            ImagesSelector = _ => images,
-        });
-        grid.Items.Add(new Row());
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // 18px icons in 22px slots: first at x=4, second at x=26.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 2x2 @4,24")), Is.True);
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 3x3 @26,24")), Is.True);
-        });
-    }
-
-    [Test]
-    public void MultiImage_click_reports_the_icon_index()
-    {
-        var images = new IImage[] { new HeadlessImage(2, 2), new HeadlessImage(3, 3) };
-        var grid = MakeGrid(new("Flags", static o => null)
-        {
-            Kind = DataGridViewColumnKind.MultiImage,
-            ImagesSelector = _ => images,
-        });
-        grid.Items.Add(new Row());
-        DataGridViewCellEventArgs? content = null;
-        grid.CellContentClick += (_, e) => content = e;
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(30, 30); // inside the second 18px icon starting at x=26
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(content, Is.Not.Null);
-            Assert.That(content!.RowIndex, Is.EqualTo(0));
-            Assert.That(content.ColumnIndex, Is.EqualTo(0));
-            Assert.That(content.ContentIndex, Is.EqualTo(1));
-        });
-    }
-
-    [Test]
-    public void MultiImage_click_between_or_past_icons_raises_no_content_click()
-    {
-        var images = new IImage[] { new HeadlessImage(2, 2), new HeadlessImage(3, 3) };
-        var grid = MakeGrid(new("Flags", static o => null)
-        {
-            Kind = DataGridViewColumnKind.MultiImage,
-            ImagesSelector = _ => images,
-        });
-        grid.Items.Add(new Row());
-        var contentClicks = 0;
-        grid.CellContentClick += (_, _) => ++contentClicks;
-        var canvas = Realize(grid);
-
-        canvas.RaiseMouseDown(24, 30); // in the gap between icon 0 (ends at 22) and icon 1 (starts at 26)
-        canvas.RaiseMouseDown(90, 30); // past the last icon
-
-        Assert.That(contentClicks, Is.Zero);
-    }
-
-    [Test]
-    public void Progress_column_paints_a_proportional_accent_fill()
-    {
-        var grid = MakeGrid(new("Load", static o => null)
-        {
-            Kind = DataGridViewColumnKind.Progress,
-            ProgressSelector = static o => ((Row)o!).Percent,
-        });
-        grid.Items.Add(new Row { Percent = 50 });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // Bar inset 2px into the 100x22 cell: 94px track, 50% => 47px accent fill.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations, Does.Contain("fill #FFFFFFFF 2,24,96,18"), "track");
-            Assert.That(g.Operations, Does.Contain($"fill {_Accent} 3,25,47,16"), "proportional fill");
-            Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 2,24,95,17"), "border");
-        });
-    }
-
-    [Test]
-    public void MaskedText_editing_hosts_a_masked_box_and_commits_the_masked_rendering()
-    {
-        var grid = MakeGrid(new("Code", static o => ((Row)o!).Code)
-        {
-            Kind = DataGridViewColumnKind.MaskedText,
-            Mask = "00-00",
-            TextSetter = static (o, value) => ((Row)o!).Code = value,
-        });
-        var row = new Row { Code = "1234" };
-        grid.Items.Add(row);
-        var backend = RealizeWithBackend(grid);
-
-        grid.BeginEdit(0, 0);
-        Assert.Multiple(() =>
-        {
-            Assert.That(grid.EditingControl, Is.InstanceOf<MaskedTextBox>());
-            Assert.That(grid.EditingControl!.Text, Is.EqualTo("12-34"), "the raw value maps into the mask");
-        });
-
-        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("87-65");
-        grid.CommitEdit();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(row.Code, Is.EqualTo("87-65"), "the masked rendering commits through the text setter");
-            Assert.That(grid.IsEditing, Is.False);
-        });
-    }
-
-    [Test]
-    public void MaskedText_editor_rejects_input_the_mask_refuses()
-    {
-        var grid = MakeGrid(new("Code", static o => ((Row)o!).Code)
-        {
-            Kind = DataGridViewColumnKind.MaskedText,
-            Mask = "00-00",
-            TextSetter = static (o, value) => ((Row)o!).Code = value,
-        });
-        var row = new Row { Code = "1234" };
-        grid.Items.Add(row);
-        var backend = RealizeWithBackend(grid);
-        grid.BeginEdit(0, 0);
-
-        backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("ab-cd");
-
-        Assert.That(grid.EditingControl!.Text, Is.EqualTo("12-34"), "letters cannot fill digit slots, so the edit reverts");
-    }
-
-    [Test]
-    public void DomainUpDown_editing_steps_the_choices_and_commits_through_the_value_setter()
-    {
-        var choices = new object?[] { "Low", "Mid", "High" };
-        var grid = MakeGrid(new("Level", static o => ((Row)o!).Status)
-        {
-            Kind = DataGridViewColumnKind.DomainUpDown,
-            ItemsSelector = _ => choices,
-            ValueSetter = static (o, value) => ((Row)o!).Status = (string)value!,
-        });
-        var row = new Row { Status = "Mid" };
-        grid.Items.Add(row);
-        var backend = RealizeWithBackend(grid);
-        var canvas = backend.Created.OfType<HeadlessCanvasPeer>().First(static peer => peer is not HeadlessPopupPeer);
-
-        grid.BeginEdit(0, 0);
-        var editor = grid.EditingControl as DomainUpDown;
-        Assert.Multiple(() =>
-        {
-            Assert.That(editor, Is.Not.Null);
-            Assert.That(editor!.SelectedIndex, Is.EqualTo(1), "seeded on the current value");
-        });
-
-        canvas.RaiseKeyDown(Keys.Down); // the grid routes stepping into the hosted editor
-        canvas.RaiseKeyDown(Keys.Enter);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(row.Status, Is.EqualTo("High"), "the stepped choice commits through the value setter");
-            Assert.That(grid.IsEditing, Is.False);
-            Assert.That(grid.Controls, Is.Empty, "no hosted child left behind");
-        });
-    }
-
-    [Test]
-    public void Color_column_paints_a_bordered_swatch()
-    {
-        var grid = MakeGrid(new("Tint", static _ => null)
-        {
-            Kind = DataGridViewColumnKind.Color,
-            ColorSelector = static o => ((Row)o!).Tint,
-        });
-        grid.Items.Add(new Row { Tint = Color.FromArgb(0xFF, 0x0A, 0x14, 0x1E) });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // The swatch insets 4px into the 100x22 cell of row 0 (y 22..44).
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations, Does.Contain("fill #FF0A141E 4,26,92,14"), "swatch");
-            Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 4,26,92,14"), "outline");
-        });
-    }
-
-    [Test]
-    public void Color_editing_opens_the_native_dialog_and_commits_the_pick()
-    {
-        var grid = MakeGrid(new("Tint", static _ => null)
-        {
-            Kind = DataGridViewColumnKind.Color,
-            ColorSelector = static o => ((Row)o!).Tint,
-            ColorSetter = static (o, value) => ((Row)o!).Tint = value,
-        });
-        var row = new Row { Tint = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) };
-        grid.Items.Add(row);
-        var backend = RealizeWithBackend(grid);
-        backend.ColorDialogResult = Color.FromArgb(0xFF, 0x01, 0x02, 0x03);
-        var ended = 0;
-        grid.CellEndEdit += (_, _) => ++ended;
-
-        var edited = grid.BeginEdit(0, 0);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(edited, Is.True);
-            Assert.That(backend.LastColorDialogColor, Is.EqualTo(Color.FromArgb(0xFF, 0x11, 0x22, 0x33)), "seeded with the cell's color");
-            Assert.That(row.Tint, Is.EqualTo(Color.FromArgb(0xFF, 0x01, 0x02, 0x03)), "the pick wrote through the setter");
-            Assert.That(grid.IsEditing, Is.False, "the modal session never lingers");
-            Assert.That(ended, Is.EqualTo(1));
-        });
-    }
-
-    [Test]
-    public void Color_dialog_cancel_writes_nothing()
-    {
-        var grid = MakeGrid(new("Tint", static _ => null)
-        {
-            Kind = DataGridViewColumnKind.Color,
-            ColorSelector = static o => ((Row)o!).Tint,
-            ColorSetter = static (o, value) => ((Row)o!).Tint = value,
-        });
-        var row = new Row { Tint = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) };
-        grid.Items.Add(row);
-        var backend = RealizeWithBackend(grid);
-        backend.ColorDialogResult = null;
-        var ended = 0;
-        grid.CellEndEdit += (_, _) => ++ended;
-
-        var edited = grid.BeginEdit(0, 0);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(edited, Is.False, "a cancelled dialog picked nothing");
-            Assert.That(row.Tint, Is.EqualTo(Color.FromArgb(0xFF, 0x11, 0x22, 0x33)));
-            Assert.That(ended, Is.EqualTo(1), "the edit cycle still closes");
-        });
-    }
-
-    [Test]
-    public void TextBeforeImage_puts_the_icon_after_the_text()
-    {
-        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
-        {
-            ImageSelector = static _ => new HeadlessImage(8, 8),
-            TextImageRelation = TextImageRelation.TextBeforeImage,
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // The 18px icon box now trails the 35px text: 4 + 35 + 4 = 43.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @43,24")), Is.True, "icon after text");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@4,22")), Is.True, "text leads");
-        });
-    }
-
-    [Test]
-    public void An_explicit_ImageSize_letterboxes_the_icon_to_its_aspect_ratio()
-    {
-        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
-        {
-            ImageSelector = static _ => new HeadlessImage(8, 4),   // 2:1
-            ImageSize = new Size(20, 20),
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x4 @") && o.EndsWith(",20,10")), Is.True,
-            "a 2:1 icon in a 20x20 box is drawn 20x10, not stretched");
-    }
-
-    [Test]
-    public void KeepImageAspectRatio_false_stretches_into_the_box()
-    {
-        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
-        {
-            ImageSelector = static _ => new HeadlessImage(8, 4),
-            ImageSize = new Size(20, 20),
-            KeepImageAspectRatio = false,
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x4 @") && o.EndsWith(",20,20")), Is.True);
-    }
-
-    [Test]
-    public void MaxImageSize_caps_the_multi_image_icons_and_moves_the_hit_test_with_them()
-    {
-        var clicks = new List<int>();
-        var grid = MakeGrid(new("Icons", static o => null)
-        {
-            Kind = DataGridViewColumnKind.MultiImage,
-            ImagesSelector = static _ => new IImage[] { new HeadlessImage(8, 8), new HeadlessImage(8, 8) },
-            MaxImageSize = 10,
-            ImageGap = 6,
-        });
-        grid.Items.Add(new Row());
-        var canvas = Realize(grid);
-        grid.CellContentClick += (_, e) => clicks.Add(e.ContentIndex);
-
-        var g = canvas.RaisePaint();
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @4,") && o.EndsWith(",10,10")), Is.True, "first icon capped to 10px");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @20,") && o.EndsWith(",10,10")), Is.True, "second icon one 16px stride along");
-        });
-
-        canvas.RaiseMouseDown(22, 22 + 5); // inside the second icon
-        Assert.That(clicks, Is.EqualTo(new[] { 1 }), "the per-icon hit-test follows the same metrics");
-    }
-
-    [Test]
-    public void ImageTooltipSelector_gives_each_icon_its_own_tip()
-    {
-        var grid = MakeGrid(new("Icons", static o => null)
-        {
-            Kind = DataGridViewColumnKind.MultiImage,
-            ImagesSelector = static _ => new IImage[] { new HeadlessImage(8, 8), new HeadlessImage(8, 8) },
-            TooltipSelector = static _ => "whole cell",
-            ImageTooltipSelector = static (_, index) => index == 1 ? "second icon" : null,
-        });
-        grid.Items.Add(new Row());
-        Realize(grid);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(grid.GetCellTooltip(0, 0, 1), Is.EqualTo("second icon"));
-            Assert.That(grid.GetCellTooltip(0, 0, 0), Is.EqualTo("whole cell"), "a null per-icon tip falls back to the cell tip");
-            Assert.That(grid.GetCellTooltip(0, 0), Is.EqualTo("whole cell"), "the cell-wide overload is unchanged");
-        });
-    }
-
-    [Test]
-    public void Conditional_overlays_stack_on_the_cell_icon()
-    {
-        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
-        {
-            ImageSelector = static _ => new HeadlessImage(16, 16),
-            OverlayImagesSelector = static _ => new IImage[] { new HeadlessImage(4, 4), new HeadlessImage(5, 5) },
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        // 18px host icon at (4,24) -> 9px badges at its bottom-right, the second shifted one badge left.
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 4x4 @13,33,9,9")), Is.True, "first badge bottom-right");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 5x5 @4,33,9,9")), Is.True, "second badge stacks left");
-        });
-    }
-
-    [Test]
-    public void An_empty_overlay_list_draws_nothing_extra()
-    {
-        var grid = MakeGrid(new("Name", static o => ((Row)o!).Name)
-        {
-            ImageSelector = static _ => new HeadlessImage(16, 16),
-            OverlayImagesSelector = static _ => System.Array.Empty<IImage>(),
-        });
-        grid.Items.Add(new Row { Name = "Alice" });
-        var canvas = Realize(grid);
-
-        var g = canvas.RaisePaint();
-
-        Assert.That(g.Operations.FindAll(o => o.StartsWith("image")), Has.Count.EqualTo(1), "only the host icon");
-    }
+internal sealed class DataGridViewColumnTypesTests {
+  private const string _Accent = "#FF0078D4";
+  private const string _DisabledText = "#FF9A9A9A";
+  private const string _SelectionText = "#FFFFFFFF";
+
+  private sealed class Row {
+    public string Name = string.Empty;
+    public bool Done;
+    public int Percent;
+    public string Code = string.Empty;
+    public string Status = string.Empty;
+    public Color Tint;
+  }
+
+  private static HeadlessBackend RealizeWithBackend(OwnerDrawnControl control) {
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(control);
+    Application.Run(form, backend);
+    return backend;
+  }
+
+  private static HeadlessCanvasPeer Realize(OwnerDrawnControl control) {
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(control);
+    Application.Run(form, backend);
+    return backend.Created.OfType<HeadlessCanvasPeer>().Single();
+  }
+
+  private static DataGridView MakeGrid(DataGridViewColumn column) {
+    // 22px header + 4 rows at 22px; a single 100px column.
+    var grid = new DataGridView { Bounds = new(0, 0, 200, 110) };
+    grid.Columns.Add(column);
+    return grid;
+  }
+
+  [Test]
+  public void Check_column_paints_accent_checkmark_when_checked() {
+    var grid = MakeGrid(new("Done", static o => null) {
+      Kind = DataGridViewColumnKind.Check,
+      CheckedSelector = static o => ((Row)o!).Done,
+    });
+    grid.Items.Add(new Row { Done = true });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // 14px box centered in the 100x22 cell at y=22: box at (43,26).
+    Assert.Multiple(() => {
+      Assert.That(g.Operations, Does.Contain("fill #FFFFFFFF 43,26,14,14"), "glyph box");
+      Assert.That(g.Operations, Does.Contain($"rect {_Accent} 43,26,14,14"), "accent border");
+      Assert.That(g.Operations, Does.Contain($"line {_Accent} 46,33-49,36"), "checkmark stroke");
+      Assert.That(g.Operations, Does.Contain($"line {_Accent} 49,36-54,29"), "checkmark stroke");
+    });
+  }
+
+  [Test]
+  public void Check_column_paints_plain_border_when_unchecked() {
+    var grid = MakeGrid(new("Done", static o => null) {
+      Kind = DataGridViewColumnKind.Check,
+      CheckedSelector = static o => ((Row)o!).Done,
+    });
+    grid.Items.Add(new Row());
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    Assert.Multiple(() => {
+      Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 43,26,14,14"), "themed border");
+      Assert.That(g.Operations.Exists(o => o.StartsWith($"line {_Accent}")), Is.False, "no checkmark");
+    });
+  }
+
+  [Test]
+  public void Check_click_toggles_through_setter_and_raises_content_click() {
+    var grid = MakeGrid(new("Done", static o => null) {
+      Kind = DataGridViewColumnKind.Check,
+      CheckedSelector = static o => ((Row)o!).Done,
+      CheckedSetter = static (o, value) => ((Row)o!).Done = value,
+    });
+    var row = new Row();
+    grid.Items.Add(row);
+    DataGridViewCellEventArgs? content = null;
+    grid.CellContentClick += (_, e) => content = e;
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(50, 30); // row 0 cell
+
+    Assert.Multiple(() => {
+      Assert.That(row.Done, Is.True, "toggled on");
+      Assert.That(content, Is.Not.Null);
+      Assert.That(content!.RowIndex, Is.EqualTo(0));
+      Assert.That(content.ColumnIndex, Is.EqualTo(0));
+    });
+
+    canvas.RaiseMouseDown(50, 30);
+    Assert.That(row.Done, Is.False, "toggled back off");
+  }
+
+  [Test]
+  public void Check_click_without_setter_raises_content_click_but_changes_nothing() {
+    var grid = MakeGrid(new("Done", static o => null) {
+      Kind = DataGridViewColumnKind.Check,
+      CheckedSelector = static o => ((Row)o!).Done,
+    });
+    var row = new Row();
+    grid.Items.Add(row);
+    var contentClicks = 0;
+    grid.CellContentClick += (_, _) => ++contentClicks;
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(50, 30);
+
+    Assert.Multiple(() => {
+      Assert.That(contentClicks, Is.EqualTo(1));
+      Assert.That(row.Done, Is.False);
+    });
+  }
+
+  [Test]
+  public void Check_toggle_is_blocked_by_read_only_but_content_click_still_fires() {
+    var grid = MakeGrid(new("Done", static o => null) {
+      Kind = DataGridViewColumnKind.Check,
+      CheckedSelector = static o => ((Row)o!).Done,
+      CheckedSetter = static (o, value) => ((Row)o!).Done = value,
+    });
+    grid.ReadOnly = true;
+    var row = new Row();
+    grid.Items.Add(row);
+    var contentClicks = 0;
+    grid.CellContentClick += (_, _) => ++contentClicks;
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(50, 30);
+
+    Assert.Multiple(() => {
+      Assert.That(row.Done, Is.False, "read-only blocks the toggle");
+      Assert.That(contentClicks, Is.EqualTo(1), "content click is raised regardless");
+    });
+  }
+
+  [Test]
+  public void Button_column_paints_face_border_and_centered_text() {
+    var grid = MakeGrid(new("Action", static o => "Run") {
+      Kind = DataGridViewColumnKind.Button,
+    });
+    grid.Items.Add(new Row());
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // Face inset 2px into the 100x22 cell at y=22.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations, Does.Contain("fill #FFFDFDFD 2,24,96,18"), "button face");
+      Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 2,24,96,18"), "button border");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Run\"") && o.Contains("MiddleCenter")), Is.True, "centered text");
+    });
+  }
+
+  [Test]
+  public void Button_click_raises_content_click_when_enabled() {
+    var grid = MakeGrid(new("Action", static o => "Run") {
+      Kind = DataGridViewColumnKind.Button,
+    });
+    grid.Items.Add(new Row());
+    DataGridViewCellEventArgs? content = null;
+    grid.CellContentClick += (_, e) => content = e;
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(50, 30);
+
+    Assert.Multiple(() => {
+      Assert.That(content, Is.Not.Null);
+      Assert.That(content!.RowIndex, Is.EqualTo(0));
+      Assert.That(content.ColumnIndex, Is.EqualTo(0));
+    });
+  }
+
+  [Test]
+  public void Disabled_button_greys_text_and_raises_no_content_click() {
+    var grid = MakeGrid(new("Action", static o => "Run") {
+      Kind = DataGridViewColumnKind.Button,
+      EnabledSelector = static _ => false,
+    });
+    grid.Items.Add(new Row());
+    var contentClicks = 0;
+    var cellClicks = 0;
+    grid.CellContentClick += (_, _) => ++contentClicks;
+    grid.CellClick += (_, _) => ++cellClicks;
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+    canvas.RaiseMouseDown(50, 30);
+
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Run\"") && o.Contains(_DisabledText)), Is.True, "greyed text");
+      Assert.That(contentClicks, Is.Zero, "disabled button raises no content click");
+      Assert.That(cellClicks, Is.EqualTo(1), "the generic cell click still fires");
+    });
+  }
+
+  [Test]
+  public void Link_column_paints_accent_underlined_text_and_raises_content_click() {
+    var grid = MakeGrid(new("Site", static o => ((Row)o!).Name) {
+      Kind = DataGridViewColumnKind.Link,
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    DataGridViewCellEventArgs? content = null;
+    grid.CellContentClick += (_, e) => content = e;
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+    canvas.RaiseMouseDown(50, 30);
+
+    // "Alice" measures 5*7=35px; MiddleLeft in the 22px row at y=22 puts the underline at y=40.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_Accent)), Is.True, "accent text");
+      Assert.That(g.Operations, Does.Contain($"line {_Accent} 4,40-39,40"), "underline");
+      Assert.That(content, Is.Not.Null);
+      Assert.That(content!.RowIndex, Is.EqualTo(0));
+    });
+  }
+
+  /// <summary>
+  /// The link is the one cell kind that puts the accent straight onto the row background — every
+  /// other kind either draws through the cell's fore color or lays down an opaque face of its own
+  /// first. A theme whose selection background <em>is</em> the accent (the default one, and GTK's
+  /// Adwaita) therefore paints the selected row's link in its own background colour and the text
+  /// disappears.
+  /// </summary>
+  [Test]
+  public void Link_column_on_the_selected_row_uses_the_selection_foreground() {
+    var grid = MakeGrid(new("Site", static o => ((Row)o!).Name) {
+      Kind = DataGridViewColumnKind.Link,
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(50, 30);
+    var g = canvas.RaisePaint();
+
+    Assert.Multiple(() => {
+      Assert.That(grid.SelectedRowIndex, Is.Zero, "the click selected the row");
+      Assert.That(
+          g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_SelectionText)),
+          Is.True,
+          "the link text switches to the selection foreground");
+      Assert.That(g.Operations, Does.Contain($"line {_SelectionText} 4,40-39,40"), "and so does its underline");
+      Assert.That(
+          g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains(_Accent)),
+          Is.False,
+          "never accent text on an accent-coloured selection");
+    });
+  }
+
+  /// <summary>An explicit cell fore color still wins on a selected row, exactly as it does for text
+  /// cells — the selection default only applies where the style left the colour open.</summary>
+  [Test]
+  public void Link_column_honors_an_explicit_cell_fore_color_when_selected() {
+    var grid = MakeGrid(new("Site", static o => ((Row)o!).Name) {
+      Kind = DataGridViewColumnKind.Link,
+      CellStyleSelector = static _ => new DataGridViewCellStyle(foreColor: Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(50, 30);
+    var g = canvas.RaisePaint();
+
+    Assert.That(
+        g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("#FF00FF00")),
+        Is.True,
+        "the explicit fore color survives selection");
+  }
+
+  /// <summary>
+  /// The rule under a link is measured, and it has to measure the string that was drawn rather than
+  /// the one that was asked for. Measuring the full text put the rule out past the cell and under the
+  /// column beside it — a link visibly underlined wider than its own visible glyphs.
+  /// </summary>
+  [Test]
+  public void Link_column_underlines_no_more_than_the_text_it_could_fit() {
+    var grid = MakeGrid(new("Site", static o => ((Row)o!).Name) {
+      Kind = DataGridViewColumnKind.Link,
+    });
+    grid.Items.Add(new Row { Name = "https://example.invalid/a/long/path" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // The 100px column leaves 96px past the padding, and a character measures 7px: thirteen of
+    // them fit, so twelve survive alongside the ellipsis and the rule runs 91px from x=4.
+    Assert.Multiple(() => {
+      Assert.That(
+          g.Operations.Exists(o => o.StartsWith("text \"https://exam…\"") && o.Contains(_Accent)),
+          Is.True,
+          "the link is shortened to its cell");
+      Assert.That(g.DrewText("https://example.invalid"), Is.False, "never the whole address");
+      Assert.That(g.Operations, Does.Contain($"line {_Accent} 4,40-95,40"), "the rule stops with the glyphs");
+    });
+  }
+
+  [Test]
+  public void Image_selector_paints_icon_before_the_cell_text() {
+    var grid = MakeGrid(new("Name", static o => ((Row)o!).Name) {
+      ImageSelector = static _ => new HeadlessImage(8, 8),
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // 18px icon at the cell padding, text shifted right past icon + gap: 4 + 18 + 4 = 26.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @4,24")), Is.True, "icon before text");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@26,22")), Is.True, "text after icon");
+    });
+  }
+
+  [Test]
+  public void MultiImage_column_paints_icons_side_by_side() {
+    var images = new IImage[] { new HeadlessImage(2, 2), new HeadlessImage(3, 3) };
+    var grid = MakeGrid(new("Flags", static o => null) {
+      Kind = DataGridViewColumnKind.MultiImage,
+      ImagesSelector = _ => images,
+    });
+    grid.Items.Add(new Row());
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // 18px icons in 22px slots: first at x=4, second at x=26.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 2x2 @4,24")), Is.True);
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 3x3 @26,24")), Is.True);
+    });
+  }
+
+  [Test]
+  public void MultiImage_click_reports_the_icon_index() {
+    var images = new IImage[] { new HeadlessImage(2, 2), new HeadlessImage(3, 3) };
+    var grid = MakeGrid(new("Flags", static o => null) {
+      Kind = DataGridViewColumnKind.MultiImage,
+      ImagesSelector = _ => images,
+    });
+    grid.Items.Add(new Row());
+    DataGridViewCellEventArgs? content = null;
+    grid.CellContentClick += (_, e) => content = e;
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(30, 30); // inside the second 18px icon starting at x=26
+
+    Assert.Multiple(() => {
+      Assert.That(content, Is.Not.Null);
+      Assert.That(content!.RowIndex, Is.EqualTo(0));
+      Assert.That(content.ColumnIndex, Is.EqualTo(0));
+      Assert.That(content.ContentIndex, Is.EqualTo(1));
+    });
+  }
+
+  [Test]
+  public void MultiImage_click_between_or_past_icons_raises_no_content_click() {
+    var images = new IImage[] { new HeadlessImage(2, 2), new HeadlessImage(3, 3) };
+    var grid = MakeGrid(new("Flags", static o => null) {
+      Kind = DataGridViewColumnKind.MultiImage,
+      ImagesSelector = _ => images,
+    });
+    grid.Items.Add(new Row());
+    var contentClicks = 0;
+    grid.CellContentClick += (_, _) => ++contentClicks;
+    var canvas = Realize(grid);
+
+    canvas.RaiseMouseDown(24, 30); // in the gap between icon 0 (ends at 22) and icon 1 (starts at 26)
+    canvas.RaiseMouseDown(90, 30); // past the last icon
+
+    Assert.That(contentClicks, Is.Zero);
+  }
+
+  [Test]
+  public void Progress_column_paints_a_proportional_accent_fill() {
+    var grid = MakeGrid(new("Load", static o => null) {
+      Kind = DataGridViewColumnKind.Progress,
+      ProgressSelector = static o => ((Row)o!).Percent,
+    });
+    grid.Items.Add(new Row { Percent = 50 });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // Bar inset 2px into the 100x22 cell: 94px track, 50% => 47px accent fill.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations, Does.Contain("fill #FFFFFFFF 2,24,96,18"), "track");
+      Assert.That(g.Operations, Does.Contain($"fill {_Accent} 3,25,47,16"), "proportional fill");
+      Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 2,24,95,17"), "border");
+    });
+  }
+
+  [Test]
+  public void MaskedText_editing_hosts_a_masked_box_and_commits_the_masked_rendering() {
+    var grid = MakeGrid(new("Code", static o => ((Row)o!).Code) {
+      Kind = DataGridViewColumnKind.MaskedText,
+      Mask = "00-00",
+      TextSetter = static (o, value) => ((Row)o!).Code = value,
+    });
+    var row = new Row { Code = "1234" };
+    grid.Items.Add(row);
+    var backend = RealizeWithBackend(grid);
+
+    grid.BeginEdit(0, 0);
+    Assert.Multiple(() => {
+      Assert.That(grid.EditingControl, Is.InstanceOf<MaskedTextBox>());
+      Assert.That(grid.EditingControl!.Text, Is.EqualTo("12-34"), "the raw value maps into the mask");
+    });
+
+    backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("87-65");
+    grid.CommitEdit();
+
+    Assert.Multiple(() => {
+      Assert.That(row.Code, Is.EqualTo("87-65"), "the masked rendering commits through the text setter");
+      Assert.That(grid.IsEditing, Is.False);
+    });
+  }
+
+  [Test]
+  public void MaskedText_editor_rejects_input_the_mask_refuses() {
+    var grid = MakeGrid(new("Code", static o => ((Row)o!).Code) {
+      Kind = DataGridViewColumnKind.MaskedText,
+      Mask = "00-00",
+      TextSetter = static (o, value) => ((Row)o!).Code = value,
+    });
+    var row = new Row { Code = "1234" };
+    grid.Items.Add(row);
+    var backend = RealizeWithBackend(grid);
+    grid.BeginEdit(0, 0);
+
+    backend.Created.OfType<HeadlessTextBoxPeer>().Single().SimulateUserInput("ab-cd");
+
+    Assert.That(grid.EditingControl!.Text, Is.EqualTo("12-34"), "letters cannot fill digit slots, so the edit reverts");
+  }
+
+  [Test]
+  public void DomainUpDown_editing_steps_the_choices_and_commits_through_the_value_setter() {
+    var choices = new object?[] { "Low", "Mid", "High" };
+    var grid = MakeGrid(new("Level", static o => ((Row)o!).Status) {
+      Kind = DataGridViewColumnKind.DomainUpDown,
+      ItemsSelector = _ => choices,
+      ValueSetter = static (o, value) => ((Row)o!).Status = (string)value!,
+    });
+    var row = new Row { Status = "Mid" };
+    grid.Items.Add(row);
+    var backend = RealizeWithBackend(grid);
+    var canvas = backend.Created.OfType<HeadlessCanvasPeer>().First(static peer => peer is not HeadlessPopupPeer);
+
+    grid.BeginEdit(0, 0);
+    var editor = grid.EditingControl as DomainUpDown;
+    Assert.Multiple(() => {
+      Assert.That(editor, Is.Not.Null);
+      Assert.That(editor!.SelectedIndex, Is.EqualTo(1), "seeded on the current value");
+    });
+
+    canvas.RaiseKeyDown(Keys.Down); // the grid routes stepping into the hosted editor
+    canvas.RaiseKeyDown(Keys.Enter);
+
+    Assert.Multiple(() => {
+      Assert.That(row.Status, Is.EqualTo("High"), "the stepped choice commits through the value setter");
+      Assert.That(grid.IsEditing, Is.False);
+      Assert.That(grid.Controls, Is.Empty, "no hosted child left behind");
+    });
+  }
+
+  [Test]
+  public void Color_column_paints_a_bordered_swatch() {
+    var grid = MakeGrid(new("Tint", static _ => null) {
+      Kind = DataGridViewColumnKind.Color,
+      ColorSelector = static o => ((Row)o!).Tint,
+    });
+    grid.Items.Add(new Row { Tint = Color.FromArgb(0xFF, 0x0A, 0x14, 0x1E) });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // The swatch insets 4px into the 100x22 cell of row 0 (y 22..44).
+    Assert.Multiple(() => {
+      Assert.That(g.Operations, Does.Contain("fill #FF0A141E 4,26,92,14"), "swatch");
+      Assert.That(g.Operations, Does.Contain("rect #FFC8C8C8 4,26,92,14"), "outline");
+    });
+  }
+
+  [Test]
+  public void Color_editing_opens_the_native_dialog_and_commits_the_pick() {
+    var grid = MakeGrid(new("Tint", static _ => null) {
+      Kind = DataGridViewColumnKind.Color,
+      ColorSelector = static o => ((Row)o!).Tint,
+      ColorSetter = static (o, value) => ((Row)o!).Tint = value,
+    });
+    var row = new Row { Tint = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) };
+    grid.Items.Add(row);
+    var backend = RealizeWithBackend(grid);
+    backend.ColorDialogResult = Color.FromArgb(0xFF, 0x01, 0x02, 0x03);
+    var ended = 0;
+    grid.CellEndEdit += (_, _) => ++ended;
+
+    var edited = grid.BeginEdit(0, 0);
+
+    Assert.Multiple(() => {
+      Assert.That(edited, Is.True);
+      Assert.That(backend.LastColorDialogColor, Is.EqualTo(Color.FromArgb(0xFF, 0x11, 0x22, 0x33)), "seeded with the cell's color");
+      Assert.That(row.Tint, Is.EqualTo(Color.FromArgb(0xFF, 0x01, 0x02, 0x03)), "the pick wrote through the setter");
+      Assert.That(grid.IsEditing, Is.False, "the modal session never lingers");
+      Assert.That(ended, Is.EqualTo(1));
+    });
+  }
+
+  [Test]
+  public void Color_dialog_cancel_writes_nothing() {
+    var grid = MakeGrid(new("Tint", static _ => null) {
+      Kind = DataGridViewColumnKind.Color,
+      ColorSelector = static o => ((Row)o!).Tint,
+      ColorSetter = static (o, value) => ((Row)o!).Tint = value,
+    });
+    var row = new Row { Tint = Color.FromArgb(0xFF, 0x11, 0x22, 0x33) };
+    grid.Items.Add(row);
+    var backend = RealizeWithBackend(grid);
+    backend.ColorDialogResult = null;
+    var ended = 0;
+    grid.CellEndEdit += (_, _) => ++ended;
+
+    var edited = grid.BeginEdit(0, 0);
+
+    Assert.Multiple(() => {
+      Assert.That(edited, Is.False, "a cancelled dialog picked nothing");
+      Assert.That(row.Tint, Is.EqualTo(Color.FromArgb(0xFF, 0x11, 0x22, 0x33)));
+      Assert.That(ended, Is.EqualTo(1), "the edit cycle still closes");
+    });
+  }
+
+  [Test]
+  public void TextBeforeImage_puts_the_icon_after_the_text() {
+    var grid = MakeGrid(new("Name", static o => ((Row)o!).Name) {
+      ImageSelector = static _ => new HeadlessImage(8, 8),
+      TextImageRelation = TextImageRelation.TextBeforeImage,
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // The 18px icon box now trails the 35px text: 4 + 35 + 4 = 43.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @43,24")), Is.True, "icon after text");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Alice\"") && o.Contains("@4,22")), Is.True, "text leads");
+    });
+  }
+
+  [Test]
+  public void An_explicit_ImageSize_letterboxes_the_icon_to_its_aspect_ratio() {
+    var grid = MakeGrid(new("Name", static o => ((Row)o!).Name) {
+      ImageSelector = static _ => new HeadlessImage(8, 4),   // 2:1
+      ImageSize = new Size(20, 20),
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x4 @") && o.EndsWith(",20,10")), Is.True,
+        "a 2:1 icon in a 20x20 box is drawn 20x10, not stretched");
+  }
+
+  [Test]
+  public void KeepImageAspectRatio_false_stretches_into_the_box() {
+    var grid = MakeGrid(new("Name", static o => ((Row)o!).Name) {
+      ImageSelector = static _ => new HeadlessImage(8, 4),
+      ImageSize = new Size(20, 20),
+      KeepImageAspectRatio = false,
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x4 @") && o.EndsWith(",20,20")), Is.True);
+  }
+
+  [Test]
+  public void MaxImageSize_caps_the_multi_image_icons_and_moves_the_hit_test_with_them() {
+    var clicks = new List<int>();
+    var grid = MakeGrid(new("Icons", static o => null) {
+      Kind = DataGridViewColumnKind.MultiImage,
+      ImagesSelector = static _ => new IImage[] { new HeadlessImage(8, 8), new HeadlessImage(8, 8) },
+      MaxImageSize = 10,
+      ImageGap = 6,
+    });
+    grid.Items.Add(new Row());
+    var canvas = Realize(grid);
+    grid.CellContentClick += (_, e) => clicks.Add(e.ContentIndex);
+
+    var g = canvas.RaisePaint();
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @4,") && o.EndsWith(",10,10")), Is.True, "first icon capped to 10px");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 8x8 @20,") && o.EndsWith(",10,10")), Is.True, "second icon one 16px stride along");
+    });
+
+    canvas.RaiseMouseDown(22, 22 + 5); // inside the second icon
+    Assert.That(clicks, Is.EqualTo(new[] { 1 }), "the per-icon hit-test follows the same metrics");
+  }
+
+  [Test]
+  public void ImageTooltipSelector_gives_each_icon_its_own_tip() {
+    var grid = MakeGrid(new("Icons", static o => null) {
+      Kind = DataGridViewColumnKind.MultiImage,
+      ImagesSelector = static _ => new IImage[] { new HeadlessImage(8, 8), new HeadlessImage(8, 8) },
+      TooltipSelector = static _ => "whole cell",
+      ImageTooltipSelector = static (_, index) => index == 1 ? "second icon" : null,
+    });
+    grid.Items.Add(new Row());
+    Realize(grid);
+
+    Assert.Multiple(() => {
+      Assert.That(grid.GetCellTooltip(0, 0, 1), Is.EqualTo("second icon"));
+      Assert.That(grid.GetCellTooltip(0, 0, 0), Is.EqualTo("whole cell"), "a null per-icon tip falls back to the cell tip");
+      Assert.That(grid.GetCellTooltip(0, 0), Is.EqualTo("whole cell"), "the cell-wide overload is unchanged");
+    });
+  }
+
+  [Test]
+  public void Conditional_overlays_stack_on_the_cell_icon() {
+    var grid = MakeGrid(new("Name", static o => ((Row)o!).Name) {
+      ImageSelector = static _ => new HeadlessImage(16, 16),
+      OverlayImagesSelector = static _ => new IImage[] { new HeadlessImage(4, 4), new HeadlessImage(5, 5) },
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    // 18px host icon at (4,24) -> 9px badges at its bottom-right, the second shifted one badge left.
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 4x4 @13,33,9,9")), Is.True, "first badge bottom-right");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 5x5 @4,33,9,9")), Is.True, "second badge stacks left");
+    });
+  }
+
+  [Test]
+  public void An_empty_overlay_list_draws_nothing_extra() {
+    var grid = MakeGrid(new("Name", static o => ((Row)o!).Name) {
+      ImageSelector = static _ => new HeadlessImage(16, 16),
+      OverlayImagesSelector = static _ => System.Array.Empty<IImage>(),
+    });
+    grid.Items.Add(new Row { Name = "Alice" });
+    var canvas = Realize(grid);
+
+    var g = canvas.RaisePaint();
+
+    Assert.That(g.Operations.FindAll(o => o.StartsWith("image")), Has.Count.EqualTo(1), "only the host icon");
+  }
 }

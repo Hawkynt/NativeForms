@@ -13,96 +13,87 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// and attaches the bitmap via <c>STM_SETIMAGE</c>; a captioned label keeps its text and does not
 /// render the image. The image alignment has no <c>SS_BITMAP</c> mapping and is not rendered.
 /// </summary>
-internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer
-{
-    private ContentAlignment _textAlign;
-    private BorderStyle _borderStyle;
-    private bool _useMnemonic = true;
-    private Win32Image? _image;
+internal sealed class LabelPeer : Win32ChildPeer, ILabelPeer {
+  private ContentAlignment _textAlign;
+  private BorderStyle _borderStyle;
+  private bool _useMnemonic = true;
+  private Win32Image? _image;
 
-    /// <summary>Whether the static renders the bitmap instead of text.</summary>
-    private bool IsImageOnly => _image is not null && _text.Length == 0;
+  /// <summary>Whether the static renders the bitmap instead of text.</summary>
+  private bool IsImageOnly => _image is not null && _text.Length == 0;
 
-    /// <inheritdoc/>
-    protected override string WindowClass => "STATIC";
+  /// <inheritdoc/>
+  protected override string WindowClass => "STATIC";
 
-    /// <inheritdoc/>
-    protected override uint ExtraStyle
-    {
-        get
-        {
-            if (this.IsImageOnly)
-                return NativeMethods.SS_BITMAP | (_borderStyle != BorderStyle.None ? NativeMethods.WS_BORDER : 0);
+  /// <inheritdoc/>
+  protected override uint ExtraStyle {
+    get {
+      if (this.IsImageOnly)
+        return NativeMethods.SS_BITMAP | (_borderStyle != BorderStyle.None ? NativeMethods.WS_BORDER : 0);
 
-            var style = _textAlign switch
-            {
-                ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter
-                    => NativeMethods.SS_CENTER,
-                ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight
-                    => NativeMethods.SS_RIGHT,
-                _ => NativeMethods.SS_LEFT,
-            };
+      var style = _textAlign switch {
+        ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter
+            => NativeMethods.SS_CENTER,
+        ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight
+            => NativeMethods.SS_RIGHT,
+        _ => NativeMethods.SS_LEFT,
+      };
 
-            if (_textAlign is ContentAlignment.MiddleLeft or ContentAlignment.MiddleCenter or ContentAlignment.MiddleRight)
-                style |= NativeMethods.SS_CENTERIMAGE;
+      if (_textAlign is ContentAlignment.MiddleLeft or ContentAlignment.MiddleCenter or ContentAlignment.MiddleRight)
+        style |= NativeMethods.SS_CENTERIMAGE;
 
-            if (_borderStyle != BorderStyle.None)
-                style |= NativeMethods.WS_BORDER;
+      if (_borderStyle != BorderStyle.None)
+        style |= NativeMethods.WS_BORDER;
 
-            if (!_useMnemonic)
-                style |= NativeMethods.SS_NOPREFIX;
+      if (!_useMnemonic)
+        style |= NativeMethods.SS_NOPREFIX;
 
-            return style;
-        }
+      return style;
     }
+  }
 
-    /// <inheritdoc/>
-    internal override void CreateChildHandle(nint parent, int controlId)
-    {
-        base.CreateChildHandle(parent, controlId);
+  /// <inheritdoc/>
+  internal override void CreateChildHandle(nint parent, int controlId) {
+    base.CreateChildHandle(parent, controlId);
 
-        if (this.IsImageOnly && _image is { Handle: not 0 } image)
-            NativeMethods.SendMessageW(Handle, NativeMethods.STM_SETIMAGE, NativeMethods.IMAGE_BITMAP, image.Handle);
-    }
+    if (this.IsImageOnly && _image is { Handle: not 0 } image)
+      NativeMethods.SendMessageW(Handle, NativeMethods.STM_SETIMAGE, NativeMethods.IMAGE_BITMAP, image.Handle);
+  }
 
-    /// <inheritdoc/>
-    public void SetTextAlign(ContentAlignment alignment)
-    {
-        if (_textAlign == alignment)
-            return;
+  /// <inheritdoc/>
+  public void SetTextAlign(ContentAlignment alignment) {
+    if (_textAlign == alignment)
+      return;
 
-        _textAlign = alignment;
-        this.RecreateHandle();
-    }
+    _textAlign = alignment;
+    this.RecreateHandle();
+  }
 
-    /// <inheritdoc/>
-    public void SetBorderStyle(BorderStyle borderStyle)
-    {
-        if (_borderStyle == borderStyle)
-            return;
+  /// <inheritdoc/>
+  public void SetBorderStyle(BorderStyle borderStyle) {
+    if (_borderStyle == borderStyle)
+      return;
 
-        _borderStyle = borderStyle;
-        this.RecreateHandle();
-    }
+    _borderStyle = borderStyle;
+    this.RecreateHandle();
+  }
 
-    /// <inheritdoc/>
-    public void SetUseMnemonic(bool useMnemonic)
-    {
-        if (_useMnemonic == useMnemonic)
-            return;
+  /// <inheritdoc/>
+  public void SetUseMnemonic(bool useMnemonic) {
+    if (_useMnemonic == useMnemonic)
+      return;
 
-        _useMnemonic = useMnemonic;
-        this.RecreateHandle();
-    }
+    _useMnemonic = useMnemonic;
+    this.RecreateHandle();
+  }
 
-    /// <inheritdoc/>
-    public void SetImage(IImage? image, ContentAlignment imageAlign)
-    {
-        var native = image as Win32Image;
-        if (ReferenceEquals(_image, native))
-            return;
+  /// <inheritdoc/>
+  public void SetImage(IImage? image, ContentAlignment imageAlign) {
+    var native = image as Win32Image;
+    if (ReferenceEquals(_image, native))
+      return;
 
-        _image = native;
-        this.RecreateHandle();
-    }
+    _image = native;
+    this.RecreateHandle();
+  }
 }

@@ -18,194 +18,176 @@ namespace Hawkynt.NativeForms;
 /// routes through the owning <see cref="DockPanel"/>, so the layout tree, z-order and persistence stay
 /// consistent; before a manager adopts the pane those setters only record the intended state.
 /// </remarks>
-public class DockContent : Panel
-{
-    // Packed pane options — one byte instead of three bool fields, so an unshown pane stays cheap.
-    [Flags]
-    private enum Options : byte
-    {
-        None = 0,
-        AllowClose = 1,
-        AllowFloat = 2,
-        AllowAutoHide = 4,
-        Default = AllowClose | AllowFloat | AllowAutoHide,
+public class DockContent : Panel {
+  // Packed pane options — one byte instead of three bool fields, so an unshown pane stays cheap.
+  [Flags]
+  private enum Options : byte {
+    None = 0,
+    AllowClose = 1,
+    AllowFloat = 2,
+    AllowAutoHide = 4,
+    Default = AllowClose | AllowFloat | AllowAutoHide,
+  }
+
+  private Options _options = Options.Default;
+  private int _imageIndex = -1;
+  private DockState _dockState = DockState.Hidden;
+  private DockEdge _dockEdge = DockEdge.Left;
+
+  /// <summary>Creates an empty pane.</summary>
+  public DockContent() { }
+
+  /// <summary>Creates a pane with the given caption.</summary>
+  public DockContent(string title) => this.Text = title;
+
+  /// <summary>The caption shown in the pane's title bar or tab — an alias for <see cref="Control.Text"/>.</summary>
+  public string Title {
+    get => this.Text;
+    set => this.Text = value;
+  }
+
+  /// <summary>The index into the owning <see cref="DockPanel.ImageList"/> of the caption/tab icon,
+  /// or -1 for none.</summary>
+  public int ImageIndex {
+    get => _imageIndex;
+    set {
+      if (_imageIndex == value)
+        return;
+
+      _imageIndex = value;
+      this.DockPanel?.InvalidateChrome();
     }
+  }
 
-    private Options _options = Options.Default;
-    private int _imageIndex = -1;
-    private DockState _dockState = DockState.Hidden;
-    private DockEdge _dockEdge = DockEdge.Left;
+  /// <summary>The key of this content's icon in the owning <see cref="DockPanel.ImageList"/>, used when
+  /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
+  public string? ImageKey {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-    /// <summary>Creates an empty pane.</summary>
-    public DockContent() { }
-
-    /// <summary>Creates a pane with the given caption.</summary>
-    public DockContent(string title) => this.Text = title;
-
-    /// <summary>The caption shown in the pane's title bar or tab — an alias for <see cref="Control.Text"/>.</summary>
-    public string Title
-    {
-        get => this.Text;
-        set => this.Text = value;
+      field = value;
+      this.DockPanel?.InvalidateChrome();
     }
+  }
 
-    /// <summary>The index into the owning <see cref="DockPanel.ImageList"/> of the caption/tab icon,
-    /// or -1 for none.</summary>
-    public int ImageIndex
-    {
-        get => _imageIndex;
-        set
-        {
-            if (_imageIndex == value)
-                return;
+  /// <summary>Where this pane currently lives. Read freely; assign to move it (the owning
+  /// <see cref="DockPanel"/> performs the move so the layout stays consistent). Before a manager
+  /// owns the pane the setter only records the wish.</summary>
+  public DockState DockState {
+    get => _dockState;
+    set {
+      if (_dockState == value)
+        return;
 
-            _imageIndex = value;
-            this.DockPanel?.InvalidateChrome();
-        }
+      if (this.DockPanel is { } panel)
+        panel.SetContentState(this, value);
+      else
+        _dockState = value;
     }
+  }
 
-    /// <summary>The key of this content's icon in the owning <see cref="DockPanel.ImageList"/>, used when
-    /// <see cref="ImageIndex"/> is unset (&lt; 0). The index takes precedence when both are set.</summary>
-    public string? ImageKey
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>The edge a docked or auto-hidden pane clings to. Changing it re-docks the pane when it
+  /// is currently on an edge.</summary>
+  public DockEdge DockEdge {
+    get => _dockEdge;
+    set {
+      if (_dockEdge == value)
+        return;
 
-            field = value;
-            this.DockPanel?.InvalidateChrome();
-        }
+      _dockEdge = value;
+      if (this.DockPanel is { } panel && _dockState is DockState.Docked or DockState.AutoHide)
+        panel.ReDockToEdge(this, value);
     }
+  }
 
-    /// <summary>Where this pane currently lives. Read freely; assign to move it (the owning
-    /// <see cref="DockPanel"/> performs the move so the layout stays consistent). Before a manager
-    /// owns the pane the setter only records the wish.</summary>
-    public DockState DockState
-    {
-        get => _dockState;
-        set
-        {
-            if (_dockState == value)
-                return;
+  /// <summary>A stable key used by <see cref="DockPanel.SaveLayout"/>/<see cref="DockPanel.LoadLayout"/>
+  /// to identify this pane across a save/restore. Defaults to <see cref="Control.Name"/> when unset.</summary>
+  public string? PersistId { get; set; }
 
-            if (this.DockPanel is { } panel)
-                panel.SetContentState(this, value);
-            else
-                _dockState = value;
-        }
-    }
+  /// <summary>Whether the caption shows a close button.</summary>
+  public bool AllowClose {
+    get => (_options & Options.AllowClose) != 0;
+    set => this.SetOption(Options.AllowClose, value);
+  }
 
-    /// <summary>The edge a docked or auto-hidden pane clings to. Changing it re-docks the pane when it
-    /// is currently on an edge.</summary>
-    public DockEdge DockEdge
-    {
-        get => _dockEdge;
-        set
-        {
-            if (_dockEdge == value)
-                return;
+  /// <summary>Whether the caption shows a float button and the pane may be torn off into a window.</summary>
+  public bool AllowFloat {
+    get => (_options & Options.AllowFloat) != 0;
+    set => this.SetOption(Options.AllowFloat, value);
+  }
 
-            _dockEdge = value;
-            if (this.DockPanel is { } panel && _dockState is DockState.Docked or DockState.AutoHide)
-                panel.ReDockToEdge(this, value);
-        }
-    }
+  /// <summary>Whether the caption shows an auto-hide (pin) button.</summary>
+  public bool AllowAutoHide {
+    get => (_options & Options.AllowAutoHide) != 0;
+    set => this.SetOption(Options.AllowAutoHide, value);
+  }
 
-    /// <summary>A stable key used by <see cref="DockPanel.SaveLayout"/>/<see cref="DockPanel.LoadLayout"/>
-    /// to identify this pane across a save/restore. Defaults to <see cref="Control.Name"/> when unset.</summary>
-    public string? PersistId { get; set; }
+  /// <summary>The manager that owns this pane, or <see langword="null"/> while it is unowned.</summary>
+  public DockPanel? DockPanel { get; internal set; }
 
-    /// <summary>Whether the caption shows a close button.</summary>
-    public bool AllowClose
-    {
-        get => (_options & Options.AllowClose) != 0;
-        set => this.SetOption(Options.AllowClose, value);
-    }
+  /// <summary>Raised after <see cref="DockState"/> changes.</summary>
+  public event EventHandler? DockStateChanged;
 
-    /// <summary>Whether the caption shows a float button and the pane may be torn off into a window.</summary>
-    public bool AllowFloat
-    {
-        get => (_options & Options.AllowFloat) != 0;
-        set => this.SetOption(Options.AllowFloat, value);
-    }
+  /// <summary>Raised before the pane closes; cancelling keeps it where it is.</summary>
+  public event EventHandler<CancelEventArgs>? CloseRequested;
 
-    /// <summary>Whether the caption shows an auto-hide (pin) button.</summary>
-    public bool AllowAutoHide
-    {
-        get => (_options & Options.AllowAutoHide) != 0;
-        set => this.SetOption(Options.AllowAutoHide, value);
-    }
+  /// <summary>The effective persistence key: <see cref="PersistId"/> when set, else <see cref="Control.Name"/>.</summary>
+  internal string Key => string.IsNullOrEmpty(this.PersistId) ? this.Name : this.PersistId!;
 
-    /// <summary>The manager that owns this pane, or <see langword="null"/> while it is unowned.</summary>
-    public DockPanel? DockPanel { get; internal set; }
+  /// <summary>Removes the pane from the panel (raising <see cref="CloseRequested"/> first, which may
+  /// veto it). Without an owner this is a no-op.</summary>
+  public void Close() => this.DockPanel?.CloseContent(this);
 
-    /// <summary>Raised after <see cref="DockState"/> changes.</summary>
-    public event EventHandler? DockStateChanged;
+  /// <summary>Tears the pane off into its own floating window.</summary>
+  public void Float() => this.DockState = DockState.Floating;
 
-    /// <summary>Raised before the pane closes; cancelling keeps it where it is.</summary>
-    public event EventHandler<CancelEventArgs>? CloseRequested;
+  /// <summary>Collapses a docked pane to its auto-hide strip, or pins a collapsed one back.</summary>
+  public void ToggleAutoHide()
+      => this.DockState = _dockState == DockState.AutoHide ? DockState.Docked : DockState.AutoHide;
 
-    /// <summary>The effective persistence key: <see cref="PersistId"/> when set, else <see cref="Control.Name"/>.</summary>
-    internal string Key => string.IsNullOrEmpty(this.PersistId) ? this.Name : this.PersistId!;
+  /// <summary>Brings the pane to the front of its group and gives it the active caption.</summary>
+  public void Activate() => this.DockPanel?.ActivateContent(this);
 
-    /// <summary>Removes the pane from the panel (raising <see cref="CloseRequested"/> first, which may
-    /// veto it). Without an owner this is a no-op.</summary>
-    public void Close() => this.DockPanel?.CloseContent(this);
+  /// <summary>Sets the backing state without routing through the manager (the manager itself is the
+  /// caller during a move).</summary>
+  internal void SetStateInternal(DockState state) {
+    if (_dockState == state)
+      return;
 
-    /// <summary>Tears the pane off into its own floating window.</summary>
-    public void Float() => this.DockState = DockState.Floating;
+    _dockState = state;
+    this.OnDockStateChanged(EventArgs.Empty);
+  }
 
-    /// <summary>Collapses a docked pane to its auto-hide strip, or pins a collapsed one back.</summary>
-    public void ToggleAutoHide()
-        => this.DockState = _dockState == DockState.AutoHide ? DockState.Docked : DockState.AutoHide;
+  /// <summary>Sets the backing edge without re-docking (the manager is mid-move).</summary>
+  internal void SetEdgeInternal(DockEdge edge) => _dockEdge = edge;
 
-    /// <summary>Brings the pane to the front of its group and gives it the active caption.</summary>
-    public void Activate() => this.DockPanel?.ActivateContent(this);
+  /// <summary>Runs the vetoable close pipeline; returns whether the close may proceed.</summary>
+  internal bool RequestClose() {
+    if (this.CloseRequested is not { } handler)
+      return true;
 
-    /// <summary>Sets the backing state without routing through the manager (the manager itself is the
-    /// caller during a move).</summary>
-    internal void SetStateInternal(DockState state)
-    {
-        if (_dockState == state)
-            return;
+    var args = new CancelEventArgs();
+    handler(this, args);
+    return !args.Cancel;
+  }
 
-        _dockState = state;
-        this.OnDockStateChanged(EventArgs.Empty);
-    }
+  /// <summary>Raises <see cref="DockStateChanged"/>.</summary>
+  protected virtual void OnDockStateChanged(EventArgs e) => this.DockStateChanged?.Invoke(this, e);
 
-    /// <summary>Sets the backing edge without re-docking (the manager is mid-move).</summary>
-    internal void SetEdgeInternal(DockEdge edge) => _dockEdge = edge;
+  /// <inheritdoc/>
+  protected override void OnTextChanged(EventArgs e) {
+    base.OnTextChanged(e);
+    this.DockPanel?.InvalidateChrome();
+  }
 
-    /// <summary>Runs the vetoable close pipeline; returns whether the close may proceed.</summary>
-    internal bool RequestClose()
-    {
-        if (this.CloseRequested is not { } handler)
-            return true;
+  private void SetOption(Options option, bool on) {
+    var updated = on ? _options | option : _options & ~option;
+    if (updated == _options)
+      return;
 
-        var args = new CancelEventArgs();
-        handler(this, args);
-        return !args.Cancel;
-    }
-
-    /// <summary>Raises <see cref="DockStateChanged"/>.</summary>
-    protected virtual void OnDockStateChanged(EventArgs e) => this.DockStateChanged?.Invoke(this, e);
-
-    /// <inheritdoc/>
-    protected override void OnTextChanged(EventArgs e)
-    {
-        base.OnTextChanged(e);
-        this.DockPanel?.InvalidateChrome();
-    }
-
-    private void SetOption(Options option, bool on)
-    {
-        var updated = on ? _options | option : _options & ~option;
-        if (updated == _options)
-            return;
-
-        _options = updated;
-        this.DockPanel?.InvalidateChrome();
-    }
+    _options = updated;
+    this.DockPanel?.InvalidateChrome();
+  }
 }

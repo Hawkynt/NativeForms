@@ -9,51 +9,47 @@ namespace Hawkynt.NativeForms;
 /// in the column's alignment, a separator after every column and the bottom rule. One painter lives
 /// here so the band stays pixel-identical wherever it appears.
 /// </summary>
-internal static class HeaderRowPainter
-{
-    private const int _CellPad = 2;
+internal static class HeaderRowPainter {
+  private const int _CellPad = 2;
 
-    /// <summary>Draws the band across the top of a control that is <paramref name="width"/> pixels wide.</summary>
-    /// <param name="g">Where the band is painted.</param>
-    /// <param name="theme">Supplies the band's fill, its underline and the header cell face.</param>
-    /// <param name="columns">The headers to draw, in display order, each carrying its own width.</param>
-    /// <param name="width">How wide the control is, which is how far the band and its underline run.</param>
-    /// <param name="headerHeight">How tall the band is.</param>
-    /// <param name="offset">
-    /// How far the columns are scrolled sideways. The band and its underline stay put; only the
-    /// cells move, so a header scrolled halfway still looks like a header rather than like a row of
-    /// captions floating over the background.
-    /// </param>
-    /// <param name="frozen">
-    /// How many columns at the left are pinned. They are drawn where they belong and the rest are
-    /// drawn shifted, so a pinned caption stays over its own column while the others move.
-    /// </param>
-    public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight, int offset = 0, int frozen = 0)
-    {
-        // The band fill also covers the residual area beyond the last column; each cell face then
-        // comes from the shared header-cell primitive so the band matches every other header.
-        g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, width, headerHeight));
+  /// <summary>Draws the band across the top of a control that is <paramref name="width"/> pixels wide.</summary>
+  /// <param name="g">Where the band is painted.</param>
+  /// <param name="theme">Supplies the band's fill, its underline and the header cell face.</param>
+  /// <param name="columns">The headers to draw, in display order, each carrying its own width.</param>
+  /// <param name="width">How wide the control is, which is how far the band and its underline run.</param>
+  /// <param name="headerHeight">How tall the band is.</param>
+  /// <param name="offset">
+  /// How far the columns are scrolled sideways. The band and its underline stay put; only the
+  /// cells move, so a header scrolled halfway still looks like a header rather than like a row of
+  /// captions floating over the background.
+  /// </param>
+  /// <param name="frozen">
+  /// How many columns at the left are pinned. They are drawn where they belong and the rest are
+  /// drawn shifted, so a pinned caption stays over its own column while the others move.
+  /// </param>
+  public static void Draw(IGraphics g, ITheme theme, IReadOnlyList<ColumnHeader> columns, int width, int headerHeight, int offset = 0, int frozen = 0) {
+    // The band fill also covers the residual area beyond the last column; each cell face then
+    // comes from the shared header-cell primitive so the band matches every other header.
+    g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, width, headerHeight));
 
-        // The scrolling columns first, so a pinned one drawn afterwards covers whatever slid under it
-        // rather than being covered by it.
-        var x = -offset;
-        for (var c = 0; c < columns.Count; ++c)
-        {
-            var col = columns[c];
-            if (c >= frozen)
-                GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
+    // The scrolling columns first, so a pinned one drawn afterwards covers whatever slid under it
+    // rather than being covered by it.
+    var x = -offset;
+    for (var c = 0; c < columns.Count; ++c) {
+      var col = columns[c];
+      if (c >= frozen)
+        GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(x, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
 
-            x += col.Width;
-        }
-
-        var pinned = 0;
-        for (var c = 0; c < frozen && c < columns.Count; ++c)
-        {
-            var col = columns[c];
-            GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(pinned, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
-            pinned += col.Width;
-        }
-
-        g.DrawLine(theme.Border, 0, headerHeight - 1, width, headerHeight - 1);
+      x += col.Width;
     }
+
+    var pinned = 0;
+    for (var c = 0; c < frozen && c < columns.Count; ++c) {
+      var col = columns[c];
+      GlyphRenderer.DrawHeaderCell(g, theme, new Rectangle(pinned, 0, col.Width, headerHeight), col.Text, col.TextAlign, _CellPad, separator: true);
+      pinned += col.Width;
+    }
+
+    g.DrawLine(theme.Border, 0, headerHeight - 1, width, headerHeight - 1);
+  }
 }

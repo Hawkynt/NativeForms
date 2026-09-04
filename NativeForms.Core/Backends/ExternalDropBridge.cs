@@ -14,44 +14,40 @@ namespace Hawkynt.NativeForms.Backends;
 /// <see cref="Control.DragDrop"/> path. Backends may use the returned effect to acknowledge protocols
 /// that require an acceptance result.
 /// </remarks>
-public static class ExternalDropBridge
-{
-    private sealed class Root(Form form)
-    {
-        public Form Form { get; } = form;
-    }
+public static class ExternalDropBridge {
+  private sealed class Root(Form form) {
+    public Form Form { get; } = form;
+  }
 
-    private static readonly ConditionalWeakTable<IWindowPeer, Root> _roots = new();
+  private static readonly ConditionalWeakTable<IWindowPeer, Root> _roots = new();
 
-    /// <summary>Associates a realized native window with the managed form whose tree it hosts.</summary>
-    internal static void Attach(IWindowPeer window, Form form)
-    {
-        _roots.Remove(window);
-        _roots.Add(window, new Root(form));
-    }
+  /// <summary>Associates a realized native window with the managed form whose tree it hosts.</summary>
+  internal static void Attach(IWindowPeer window, Form form) {
+    _roots.Remove(window);
+    _roots.Add(window, new Root(form));
+  }
 
-    /// <summary>Removes a realization-time association before the peer is disposed.</summary>
-    internal static void Detach(IWindowPeer window) => _roots.Remove(window);
+  /// <summary>Removes a realization-time association before the peer is disposed.</summary>
+  internal static void Detach(IWindowPeer window) => _roots.Remove(window);
 
-    /// <summary>
-    /// Routes one native final-drop notification into the managed control tree.
-    /// </summary>
-    /// <param name="window">The top-level peer receiving the operating-system drop.</param>
-    /// <param name="data">The translated payload; native file-drop integrations pass a <c>string[]</c>.</param>
-    /// <param name="allowedEffects">Effects the native source/protocol permits.</param>
-    /// <param name="screenLocation">Pointer position in toolkit screen coordinates.</param>
-    /// <returns>The effect accepted by the managed target, or <see cref="DragDropEffects.None"/>.</returns>
-    public static DragDropEffects Route(
-        IWindowPeer window,
-        object data,
-        DragDropEffects allowedEffects,
-        Point screenLocation)
-    {
-        ArgumentNullException.ThrowIfNull(window);
-        ArgumentNullException.ThrowIfNull(data);
+  /// <summary>
+  /// Routes one native final-drop notification into the managed control tree.
+  /// </summary>
+  /// <param name="window">The top-level peer receiving the operating-system drop.</param>
+  /// <param name="data">The translated payload; native file-drop integrations pass a <c>string[]</c>.</param>
+  /// <param name="allowedEffects">Effects the native source/protocol permits.</param>
+  /// <param name="screenLocation">Pointer position in toolkit screen coordinates.</param>
+  /// <returns>The effect accepted by the managed target, or <see cref="DragDropEffects.None"/>.</returns>
+  public static DragDropEffects Route(
+      IWindowPeer window,
+      object data,
+      DragDropEffects allowedEffects,
+      Point screenLocation) {
+    ArgumentNullException.ThrowIfNull(window);
+    ArgumentNullException.ThrowIfNull(data);
 
-        return _roots.TryGetValue(window, out var root)
-            ? DragDropSession.RouteExternalDrop(root.Form, data, allowedEffects, screenLocation)
-            : DragDropEffects.None;
-    }
+    return _roots.TryGetValue(window, out var root)
+        ? DragDropSession.RouteExternalDrop(root.Form, data, allowedEffects, screenLocation)
+        : DragDropEffects.None;
+  }
 }

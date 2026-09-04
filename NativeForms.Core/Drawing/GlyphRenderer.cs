@@ -8,302 +8,283 @@ namespace Hawkynt.NativeForms.Drawing;
 /// cells), a button face, sort arrows and the current-row marker. Everything here is stroke/fill only —
 /// no allocation — so callers can use it on the paint path freely.
 /// </summary>
-internal static class GlyphRenderer
-{
-    /// <summary>The standard edge length of the themed check glyph in pixels.</summary>
-    public const int CheckBoxSize = 14;
+internal static class GlyphRenderer {
+  /// <summary>The standard edge length of the themed check glyph in pixels.</summary>
+  public const int CheckBoxSize = 14;
 
-    /// <summary>
-    /// The alert red shared by the controls that flag a problem — a path that names nothing, a drive
-    /// that is nearly full. Deliberately not an <see cref="ITheme"/> member: no desktop exposes an
-    /// "error" colour to query, so inventing a themed one would be a fiction. Controls that paint it
-    /// expose it as a property so an application can match its own palette.
-    /// </summary>
-    public static readonly Color Warning = Color.FromArgb(0xFF, 0xE8, 0x11, 0x23);
+  /// <summary>
+  /// The alert red shared by the controls that flag a problem — a path that names nothing, a drive
+  /// that is nearly full. Deliberately not an <see cref="ITheme"/> member: no desktop exposes an
+  /// "error" colour to query, so inventing a themed one would be a fiction. Controls that paint it
+  /// expose it as a property so an application can match its own palette.
+  /// </summary>
+  public static readonly Color Warning = Color.FromArgb(0xFF, 0xE8, 0x11, 0x23);
 
-    /// <summary>Draws a themed check box (field-colored box, themed border, accent checkmark when
-    /// checked) scaled into <paramref name="box"/>.</summary>
-    public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, bool isChecked)
-        => DrawCheckBox(g, theme, box, isChecked ? CheckState.Checked : CheckState.Unchecked);
+  /// <summary>Draws a themed check box (field-colored box, themed border, accent checkmark when
+  /// checked) scaled into <paramref name="box"/>.</summary>
+  public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, bool isChecked)
+      => DrawCheckBox(g, theme, box, isChecked ? CheckState.Checked : CheckState.Unchecked);
 
-    /// <summary>Draws a themed check box in any of its three states, scaled into
-    /// <paramref name="box"/>.</summary>
-    /// <remarks>
-    /// The indeterminate mark is a filled square rather than a greyed check: it has to read as "neither"
-    /// at a glance and at 14 pixels, and a dimmed checkmark reads as a disabled checked box instead.
-    /// Every desktop draws mixed this way for the same reason.
-    /// </remarks>
-    public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, CheckState state)
-    {
-        g.FillRectangle(theme.FieldBackground, box);
-        g.DrawRectangle(state is CheckState.Unchecked ? theme.Border : theme.Accent, box);
+  /// <summary>Draws a themed check box in any of its three states, scaled into
+  /// <paramref name="box"/>.</summary>
+  /// <remarks>
+  /// The indeterminate mark is a filled square rather than a greyed check: it has to read as "neither"
+  /// at a glance and at 14 pixels, and a dimmed checkmark reads as a disabled checked box instead.
+  /// Every desktop draws mixed this way for the same reason.
+  /// </remarks>
+  public static void DrawCheckBox(IGraphics g, ITheme theme, Rectangle box, CheckState state) {
+    g.FillRectangle(theme.FieldBackground, box);
+    g.DrawRectangle(state is CheckState.Unchecked ? theme.Border : theme.Accent, box);
 
-        var w = box.Width;
-        var h = box.Height;
-        switch (state)
-        {
-            case CheckState.Checked:
-                // A check mark: two strokes from the lower-left to the upper-right, in 14ths of the box.
-                var thickness = Math.Max(1, w / 7);
-                g.DrawLine(theme.Accent, box.X + (3 * w / 14), box.Y + (7 * h / 14), box.X + (6 * w / 14), box.Y + (10 * h / 14), thickness);
-                g.DrawLine(theme.Accent, box.X + (6 * w / 14), box.Y + (10 * h / 14), box.X + (11 * w / 14), box.Y + (3 * h / 14), thickness);
-                break;
+    var w = box.Width;
+    var h = box.Height;
+    switch (state) {
+      case CheckState.Checked:
+        // A check mark: two strokes from the lower-left to the upper-right, in 14ths of the box.
+        var thickness = Math.Max(1, w / 7);
+        g.DrawLine(theme.Accent, box.X + (3 * w / 14), box.Y + (7 * h / 14), box.X + (6 * w / 14), box.Y + (10 * h / 14), thickness);
+        g.DrawLine(theme.Accent, box.X + (6 * w / 14), box.Y + (10 * h / 14), box.X + (11 * w / 14), box.Y + (3 * h / 14), thickness);
+        break;
 
-            case CheckState.Indeterminate:
-                g.FillRectangle(theme.Accent, new(box.X + (4 * w / 14), box.Y + (4 * h / 14), Math.Max(1, 6 * w / 14), Math.Max(1, 6 * h / 14)));
-                break;
-        }
+      case CheckState.Indeterminate:
+        g.FillRectangle(theme.Accent, new(box.X + (4 * w / 14), box.Y + (4 * h / 14), Math.Max(1, 6 * w / 14), Math.Max(1, 6 * h / 14)));
+        break;
+    }
+  }
+
+  /// <summary>Draws a themed progress bar (field-colored track, accent fill proportional to
+  /// <paramref name="value"/> within [<paramref name="minimum"/>, <paramref name="maximum"/>],
+  /// themed border) into <paramref name="bounds"/>.</summary>
+  public static void DrawProgressBar(IGraphics g, ITheme theme, Rectangle bounds, int value, int minimum, int maximum)
+      => DrawProgressBar(g, theme, bounds, value, minimum, maximum, theme.Accent);
+
+  /// <summary>Draws the themed progress bar with an explicit fill colour — the seam a tile needs to
+  /// turn its bar red past a threshold without restating the track, the clamp or the border.</summary>
+  public static void DrawProgressBar(IGraphics g, ITheme theme, Rectangle bounds, int value, int minimum, int maximum, Color fill) {
+    g.FillRectangle(theme.FieldBackground, bounds);
+
+    var range = maximum - minimum;
+    if (range > 0 && bounds.Width > 2 && bounds.Height > 2) {
+      var track = bounds.Width - 2;
+      var filled = (int)((long)track * (Math.Clamp(value, minimum, maximum) - minimum) / range);
+      if (filled > 0)
+        g.FillRectangle(fill, new(bounds.X + 1, bounds.Y + 1, filled, bounds.Height - 2));
     }
 
-    /// <summary>Draws a themed progress bar (field-colored track, accent fill proportional to
-    /// <paramref name="value"/> within [<paramref name="minimum"/>, <paramref name="maximum"/>],
-    /// themed border) into <paramref name="bounds"/>.</summary>
-    public static void DrawProgressBar(IGraphics g, ITheme theme, Rectangle bounds, int value, int minimum, int maximum)
-        => DrawProgressBar(g, theme, bounds, value, minimum, maximum, theme.Accent);
+    g.DrawRectangle(theme.Border, new(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
+  }
 
-    /// <summary>Draws the themed progress bar with an explicit fill colour — the seam a tile needs to
-    /// turn its bar red past a threshold without restating the track, the clamp or the border.</summary>
-    public static void DrawProgressBar(IGraphics g, ITheme theme, Rectangle bounds, int value, int minimum, int maximum, Color fill)
-    {
-        g.FillRectangle(theme.FieldBackground, bounds);
+  /// <summary>Draws a themed push-button face (control-colored fill, themed border, centered text;
+  /// greyed text when disabled) into <paramref name="bounds"/>.</summary>
+  public static void DrawButtonFace(IGraphics g, ITheme theme, Rectangle bounds, string text, bool enabled) {
+    DrawButtonFace(g, theme, bounds, enabled);
+    g.DrawText(text, theme.DefaultFont, enabled ? theme.ControlText : theme.DisabledText, bounds, ContentAlignment.MiddleCenter);
+  }
 
-        var range = maximum - minimum;
-        if (range > 0 && bounds.Width > 2 && bounds.Height > 2)
-        {
-            var track = bounds.Width - 2;
-            var filled = (int)((long)track * (Math.Clamp(value, minimum, maximum) - minimum) / range);
-            if (filled > 0)
-                g.FillRectangle(fill, new(bounds.X + 1, bounds.Y + 1, filled, bounds.Height - 2));
-        }
-
-        g.DrawRectangle(theme.Border, new(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
+  /// <summary>
+  /// Draws the button face alone — fill and frame, rounded to <see cref="ITheme.ButtonCornerRadius"/>
+  /// — leaving the content to the caller.
+  /// </summary>
+  /// <remarks>
+  /// The radius is what keeps a painted face from giving itself away beside a real one: the gallery
+  /// puts an owner-drawn button next to a widget button on its first page, and on a desktop that
+  /// rounds its buttons a square frame is the tell. A theme that reports 0 takes the plain
+  /// rectangle, which is the same drawing this always did.
+  /// </remarks>
+  public static void DrawButtonFace(IGraphics g, ITheme theme, Rectangle bounds, bool enabled, Color? fill = null) {
+    var face = fill ?? theme.ControlBackground;
+    var radius = theme.ButtonCornerRadius;
+    if (radius <= 0) {
+      g.FillRectangle(face, bounds);
+      g.DrawRectangle(theme.Border, bounds);
+      return;
     }
 
-    /// <summary>Draws a themed push-button face (control-colored fill, themed border, centered text;
-    /// greyed text when disabled) into <paramref name="bounds"/>.</summary>
-    public static void DrawButtonFace(IGraphics g, ITheme theme, Rectangle bounds, string text, bool enabled)
-    {
-        DrawButtonFace(g, theme, bounds, enabled);
-        g.DrawText(text, theme.DefaultFont, enabled ? theme.ControlText : theme.DisabledText, bounds, ContentAlignment.MiddleCenter);
+    g.FillRoundedRectangle(face, bounds, radius);
+    g.DrawRoundedRectangle(theme.Border, bounds, radius);
+  }
+
+  /// <summary>Draws a small sort-direction triangle centered in <paramref name="bounds"/>, pointing
+  /// up for ascending and down for descending.</summary>
+  public static void DrawSortArrow(IGraphics g, Color color, Rectangle bounds, bool ascending) {
+    var cx = bounds.X + (bounds.Width / 2);
+    var top = bounds.Y + ((bounds.Height - 4) / 2);
+    for (var i = 0; i < 4; ++i) {
+      var y = ascending ? top + i : top + 3 - i;
+      g.DrawLine(color, cx - i, y, cx + i + 1, y);
+    }
+  }
+
+  /// <summary>Draws a small right-pointing triangle (the current-row marker) centered in
+  /// <paramref name="bounds"/>.</summary>
+  public static void DrawRowMarker(IGraphics g, Color color, Rectangle bounds) {
+    var left = bounds.X + ((bounds.Width - 4) / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+    for (var i = 0; i < 4; ++i)
+      g.DrawLine(color, left + i, cy - 3 + i, left + i, cy + 4 - i);
+  }
+
+  /// <summary>The number of stacked-line rows in the themed drop-down arrow.</summary>
+  private const int _ComboArrowRows = 5;
+
+  /// <summary>Draws the drop-down arrow every combo-style field shows: a downward triangle of five
+  /// stacked lines, centered in <paramref name="bounds"/>.</summary>
+  public static void DrawComboArrow(IGraphics g, Color color, Rectangle bounds) {
+    var centerX = bounds.X + (bounds.Width / 2);
+    var top = bounds.Y + ((bounds.Height - _ComboArrowRows) / 2);
+    for (var i = 0; i < _ComboArrowRows; ++i)
+      g.DrawLine(color, centerX - _ComboArrowRows + 1 + i, top + i, centerX + _ComboArrowRows - 1 - i, top + i);
+  }
+
+  /// <summary>Draws one column-header cell: header-colored face, the caption clipped and padded
+  /// inside it, and optionally the separator after its trailing edge.</summary>
+  /// <param name="g">Where the cell is painted.</param>
+  /// <param name="theme">Supplies the face, the caption colour and the separator colour.</param>
+  /// <param name="bounds">The cell, face and all.</param>
+  /// <param name="text">The caption.</param>
+  /// <param name="alignment">Where the caption sits inside what is left of the cell after padding.</param>
+  /// <param name="textPadding">How far the caption is inset from both the leading and trailing edges.</param>
+  /// <param name="separator">Whether to draw the divider after the cell's trailing edge.</param>
+  /// <param name="trailingReserve">
+  /// Width kept clear at the trailing edge for glyphs the caller paints there — a sort arrow, a
+  /// filter funnel. The face still fills the whole cell; only the caption gives way. Without it a
+  /// right-aligned caption runs straight under those glyphs, which is invisible in a headless test
+  /// and obvious on screen.
+  /// </param>
+  /// <param name="font">The caption's font; <see langword="null"/> takes the theme's.</param>
+  public static void DrawHeaderCell(
+      IGraphics g,
+      ITheme theme,
+      Rectangle bounds,
+      string text,
+      ContentAlignment alignment,
+      int textPadding,
+      bool separator,
+      int trailingReserve = 0,
+      Font? font = null) {
+    g.FillRectangle(theme.HeaderBackground, bounds);
+    g.PushClip(bounds);
+    var textRect = new Rectangle(bounds.X + textPadding, bounds.Y, Math.Max(0, bounds.Width - (2 * textPadding) - trailingReserve), bounds.Height);
+    // A caller that has a font of its own passes it, so a header follows the application's font
+    // the way the cells under it do; the rest keep the theme's.
+    g.DrawText(text, font ?? theme.DefaultFont, theme.HeaderText, textRect, alignment);
+    g.PopClip();
+
+    if (separator)
+      g.DrawLine(theme.Border, bounds.Right, bounds.Y, bounds.Right, bounds.Bottom);
+  }
+
+  /// <summary>Draws the keyboard-focus ring: a one-pixel rectangle in a faint accent (accent blended
+  /// halfway toward the control background) — the modern take on the classic dotted marquee, and
+  /// arithmetic rather than alpha so it renders identically on GDI. Under high contrast the blend
+  /// is skipped and the full accent is used.</summary>
+  public static void DrawFocusRing(IGraphics g, ITheme theme, Rectangle bounds, int radius = 0) {
+    var accent = theme.Accent;
+    var color = theme.IsHighContrast ? accent : Blend(accent, theme.ControlBackground);
+    if (radius > 0)
+      g.DrawRoundedRectangle(color, bounds, radius);
+    else
+      g.DrawRectangle(color, bounds);
+  }
+
+  /// <summary>Fills the themed selected-item highlight behind an item, row or cell.</summary>
+  public static void FillSelection(IGraphics g, ITheme theme, Rectangle bounds)
+      => g.FillRectangle(theme.SelectionBackground, bounds);
+
+  /// <summary>Draws the rubber-band rectangle of a marquee selection: a quarter-strength accent wash
+  /// under a full-accent outline. The wash is arithmetic rather than alpha, like the focus ring, so
+  /// it renders identically on GDI; under high contrast it is dropped altogether, where a wash over
+  /// text costs more legibility than the outline alone gives back.</summary>
+  /// <summary>
+  /// The rubber band: a wash of the accent colour inside an accent outline.
+  /// </summary>
+  /// <param name="g">Where the band is painted.</param>
+  /// <param name="theme">Supplies the accent the wash and the outline are made from.</param>
+  /// <param name="band">The rectangle the drag has swept out.</param>
+  /// <param name="over">
+  /// The surface the band is being drawn on top of. The wash is a pre-mixed opaque colour rather
+  /// than a translucent one — the Win32 <c>FillRect</c> path takes a solid brush and drops alpha
+  /// entirely — so the mix has to be made against the right backdrop. It was always made against
+  /// <see cref="ITheme.ControlBackground"/>, while a grid draws its band over rows sitting on
+  /// <see cref="ITheme.FieldBackground"/>: over the rows the wash was the wrong tint and read as a
+  /// solid block rather than a see-through one, and it only looked right where the band happened to
+  /// cross the empty area below the last row.
+  /// </param>
+  public static void DrawSelectionBand(IGraphics g, ITheme theme, Rectangle band, Color? over = null) {
+    if (band.Width <= 0 || band.Height <= 0)
+      return;
+
+    var accent = theme.Accent;
+    if (!theme.IsHighContrast) {
+      var beneath = over ?? theme.ControlBackground;
+      g.FillRectangle(Blend(Blend(accent, beneath), beneath), band);
     }
 
-    /// <summary>
-    /// Draws the button face alone — fill and frame, rounded to <see cref="ITheme.ButtonCornerRadius"/>
-    /// — leaving the content to the caller.
-    /// </summary>
-    /// <remarks>
-    /// The radius is what keeps a painted face from giving itself away beside a real one: the gallery
-    /// puts an owner-drawn button next to a widget button on its first page, and on a desktop that
-    /// rounds its buttons a square frame is the tell. A theme that reports 0 takes the plain
-    /// rectangle, which is the same drawing this always did.
-    /// </remarks>
-    public static void DrawButtonFace(IGraphics g, ITheme theme, Rectangle bounds, bool enabled, Color? fill = null)
-    {
-        var face = fill ?? theme.ControlBackground;
-        var radius = theme.ButtonCornerRadius;
-        if (radius <= 0)
-        {
-            g.FillRectangle(face, bounds);
-            g.DrawRectangle(theme.Border, bounds);
-            return;
-        }
+    g.DrawRectangle(accent, band);
+  }
 
-        g.FillRoundedRectangle(face, bounds, radius);
-        g.DrawRoundedRectangle(theme.Border, bounds, radius);
+  /// <summary>The width of a search field's leading zone, which carries the magnifier glyph.</summary>
+  public const int SearchGlyphZoneWidth = 20;
+
+  /// <summary>The width of a search field's trailing zone, which carries the clear (×) glyph.</summary>
+  public const int SearchClearZoneWidth = 20;
+
+  /// <summary>The stroke half-length of the × glyph.</summary>
+  private const int _ClearArm = 3;
+
+  /// <summary>
+  /// Draws the chrome of a search field — sunken face, magnifier at the left, a clear (×) at the
+  /// right while there is something to clear, and a border — leaving the text to the caller, which
+  /// is a hosted native editor in <see cref="SearchBox"/> and painted text in a filterable menu.
+  /// </summary>
+  /// <remarks>
+  /// Shared so the two surfaces cannot drift into looking like two different controls: a user who
+  /// learns that the × empties the box in one has learned it for both.
+  /// </remarks>
+  public static void DrawSearchField(IGraphics g, ITheme theme, Rectangle bounds, bool enabled, bool showClear) {
+    g.FillRectangle(theme.FieldBackground, bounds);
+
+    // The magnifier: a stroked lens circle with a short handle toward the lower right.
+    var color = enabled ? theme.ControlText : theme.DisabledText;
+    var middle = bounds.Y + (bounds.Height / 2);
+    g.DrawEllipse(color, new(bounds.X + 5, middle - 6, 8, 8));
+    g.DrawLine(color, bounds.X + 12, middle + 1, bounds.X + 15, middle + 4);
+
+    if (showClear) {
+      var center = bounds.Right - (SearchClearZoneWidth / 2);
+      g.DrawLine(color, center - _ClearArm, middle - _ClearArm, center + _ClearArm, middle + _ClearArm);
+      g.DrawLine(color, center - _ClearArm, middle + _ClearArm, center + _ClearArm, middle - _ClearArm);
     }
 
-    /// <summary>Draws a small sort-direction triangle centered in <paramref name="bounds"/>, pointing
-    /// up for ascending and down for descending.</summary>
-    public static void DrawSortArrow(IGraphics g, Color color, Rectangle bounds, bool ascending)
-    {
-        var cx = bounds.X + (bounds.Width / 2);
-        var top = bounds.Y + ((bounds.Height - 4) / 2);
-        for (var i = 0; i < 4; ++i)
-        {
-            var y = ascending ? top + i : top + 3 - i;
-            g.DrawLine(color, cx - i, y, cx + i + 1, y);
-        }
-    }
+    g.DrawRectangle(theme.Border, new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
+  }
 
-    /// <summary>Draws a small right-pointing triangle (the current-row marker) centered in
-    /// <paramref name="bounds"/>.</summary>
-    public static void DrawRowMarker(IGraphics g, Color color, Rectangle bounds)
-    {
-        var left = bounds.X + ((bounds.Width - 4) / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-        for (var i = 0; i < 4; ++i)
-            g.DrawLine(color, left + i, cy - 3 + i, left + i, cy + 4 - i);
-    }
+  /// <summary>
+  /// Draws the filter funnel a column header shows: a tapering stack of lines over a short stem,
+  /// filled solid once a filter is actually narrowing the rows so the header says so at a glance.
+  /// </summary>
+  public static void DrawFilterFunnel(IGraphics g, Color color, Rectangle bounds, bool active) {
+    var left = bounds.X;
+    var width = Math.Max(6, Math.Min(bounds.Width, 8));
+    var top = bounds.Y + ((bounds.Height - 7) / 2);
+    var stem = left + (width / 2);
 
-    /// <summary>The number of stacked-line rows in the themed drop-down arrow.</summary>
-    private const int _ComboArrowRows = 5;
+    // The outline: a rim, two sides tapering to the stem, and the stem below it.
+    g.DrawLine(color, left, top, left + width, top);
+    g.DrawLine(color, left, top, stem, top + 4);
+    g.DrawLine(color, left + width, top, stem, top + 4);
+    g.DrawLine(color, stem, top + 4, stem, top + 6);
 
-    /// <summary>Draws the drop-down arrow every combo-style field shows: a downward triangle of five
-    /// stacked lines, centered in <paramref name="bounds"/>.</summary>
-    public static void DrawComboArrow(IGraphics g, Color color, Rectangle bounds)
-    {
-        var centerX = bounds.X + (bounds.Width / 2);
-        var top = bounds.Y + ((bounds.Height - _ComboArrowRows) / 2);
-        for (var i = 0; i < _ComboArrowRows; ++i)
-            g.DrawLine(color, centerX - _ComboArrowRows + 1 + i, top + i, centerX + _ComboArrowRows - 1 - i, top + i);
-    }
+    if (!active)
+      return;
 
-    /// <summary>Draws one column-header cell: header-colored face, the caption clipped and padded
-    /// inside it, and optionally the separator after its trailing edge.</summary>
-    /// <param name="g">Where the cell is painted.</param>
-    /// <param name="theme">Supplies the face, the caption colour and the separator colour.</param>
-    /// <param name="bounds">The cell, face and all.</param>
-    /// <param name="text">The caption.</param>
-    /// <param name="alignment">Where the caption sits inside what is left of the cell after padding.</param>
-    /// <param name="textPadding">How far the caption is inset from both the leading and trailing edges.</param>
-    /// <param name="separator">Whether to draw the divider after the cell's trailing edge.</param>
-    /// <param name="trailingReserve">
-    /// Width kept clear at the trailing edge for glyphs the caller paints there — a sort arrow, a
-    /// filter funnel. The face still fills the whole cell; only the caption gives way. Without it a
-    /// right-aligned caption runs straight under those glyphs, which is invisible in a headless test
-    /// and obvious on screen.
-    /// </param>
-    /// <param name="font">The caption's font; <see langword="null"/> takes the theme's.</param>
-    public static void DrawHeaderCell(
-        IGraphics g,
-        ITheme theme,
-        Rectangle bounds,
-        string text,
-        ContentAlignment alignment,
-        int textPadding,
-        bool separator,
-        int trailingReserve = 0,
-        Font? font = null)
-    {
-        g.FillRectangle(theme.HeaderBackground, bounds);
-        g.PushClip(bounds);
-        var textRect = new Rectangle(bounds.X + textPadding, bounds.Y, Math.Max(0, bounds.Width - (2 * textPadding) - trailingReserve), bounds.Height);
-        // A caller that has a font of its own passes it, so a header follows the application's font
-        // the way the cells under it do; the rest keep the theme's.
-        g.DrawText(text, font ?? theme.DefaultFont, theme.HeaderText, textRect, alignment);
-        g.PopClip();
+    // An active filter fills the bowl. Shape rather than colour, so the header still says which
+    // columns are narrowing under high contrast or on a monochrome print of a bug report.
+    for (var row = 1; row < 4; ++row)
+      g.DrawLine(color, left + row, top + row, left + width - row, top + row);
+  }
 
-        if (separator)
-            g.DrawLine(theme.Border, bounds.Right, bounds.Y, bounds.Right, bounds.Bottom);
-    }
-
-    /// <summary>Draws the keyboard-focus ring: a one-pixel rectangle in a faint accent (accent blended
-    /// halfway toward the control background) — the modern take on the classic dotted marquee, and
-    /// arithmetic rather than alpha so it renders identically on GDI. Under high contrast the blend
-    /// is skipped and the full accent is used.</summary>
-    public static void DrawFocusRing(IGraphics g, ITheme theme, Rectangle bounds, int radius = 0)
-    {
-        var accent = theme.Accent;
-        var color = theme.IsHighContrast ? accent : Blend(accent, theme.ControlBackground);
-        if (radius > 0)
-            g.DrawRoundedRectangle(color, bounds, radius);
-        else
-            g.DrawRectangle(color, bounds);
-    }
-
-    /// <summary>Fills the themed selected-item highlight behind an item, row or cell.</summary>
-    public static void FillSelection(IGraphics g, ITheme theme, Rectangle bounds)
-        => g.FillRectangle(theme.SelectionBackground, bounds);
-
-    /// <summary>Draws the rubber-band rectangle of a marquee selection: a quarter-strength accent wash
-    /// under a full-accent outline. The wash is arithmetic rather than alpha, like the focus ring, so
-    /// it renders identically on GDI; under high contrast it is dropped altogether, where a wash over
-    /// text costs more legibility than the outline alone gives back.</summary>
-    /// <summary>
-    /// The rubber band: a wash of the accent colour inside an accent outline.
-    /// </summary>
-    /// <param name="g">Where the band is painted.</param>
-    /// <param name="theme">Supplies the accent the wash and the outline are made from.</param>
-    /// <param name="band">The rectangle the drag has swept out.</param>
-    /// <param name="over">
-    /// The surface the band is being drawn on top of. The wash is a pre-mixed opaque colour rather
-    /// than a translucent one — the Win32 <c>FillRect</c> path takes a solid brush and drops alpha
-    /// entirely — so the mix has to be made against the right backdrop. It was always made against
-    /// <see cref="ITheme.ControlBackground"/>, while a grid draws its band over rows sitting on
-    /// <see cref="ITheme.FieldBackground"/>: over the rows the wash was the wrong tint and read as a
-    /// solid block rather than a see-through one, and it only looked right where the band happened to
-    /// cross the empty area below the last row.
-    /// </param>
-    public static void DrawSelectionBand(IGraphics g, ITheme theme, Rectangle band, Color? over = null)
-    {
-        if (band.Width <= 0 || band.Height <= 0)
-            return;
-
-        var accent = theme.Accent;
-        if (!theme.IsHighContrast)
-        {
-            var beneath = over ?? theme.ControlBackground;
-            g.FillRectangle(Blend(Blend(accent, beneath), beneath), band);
-        }
-
-        g.DrawRectangle(accent, band);
-    }
-
-    /// <summary>The width of a search field's leading zone, which carries the magnifier glyph.</summary>
-    public const int SearchGlyphZoneWidth = 20;
-
-    /// <summary>The width of a search field's trailing zone, which carries the clear (×) glyph.</summary>
-    public const int SearchClearZoneWidth = 20;
-
-    /// <summary>The stroke half-length of the × glyph.</summary>
-    private const int _ClearArm = 3;
-
-    /// <summary>
-    /// Draws the chrome of a search field — sunken face, magnifier at the left, a clear (×) at the
-    /// right while there is something to clear, and a border — leaving the text to the caller, which
-    /// is a hosted native editor in <see cref="SearchBox"/> and painted text in a filterable menu.
-    /// </summary>
-    /// <remarks>
-    /// Shared so the two surfaces cannot drift into looking like two different controls: a user who
-    /// learns that the × empties the box in one has learned it for both.
-    /// </remarks>
-    public static void DrawSearchField(IGraphics g, ITheme theme, Rectangle bounds, bool enabled, bool showClear)
-    {
-        g.FillRectangle(theme.FieldBackground, bounds);
-
-        // The magnifier: a stroked lens circle with a short handle toward the lower right.
-        var color = enabled ? theme.ControlText : theme.DisabledText;
-        var middle = bounds.Y + (bounds.Height / 2);
-        g.DrawEllipse(color, new(bounds.X + 5, middle - 6, 8, 8));
-        g.DrawLine(color, bounds.X + 12, middle + 1, bounds.X + 15, middle + 4);
-
-        if (showClear)
-        {
-            var center = bounds.Right - (SearchClearZoneWidth / 2);
-            g.DrawLine(color, center - _ClearArm, middle - _ClearArm, center + _ClearArm, middle + _ClearArm);
-            g.DrawLine(color, center - _ClearArm, middle + _ClearArm, center + _ClearArm, middle - _ClearArm);
-        }
-
-        g.DrawRectangle(theme.Border, new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1));
-    }
-
-    /// <summary>
-    /// Draws the filter funnel a column header shows: a tapering stack of lines over a short stem,
-    /// filled solid once a filter is actually narrowing the rows so the header says so at a glance.
-    /// </summary>
-    public static void DrawFilterFunnel(IGraphics g, Color color, Rectangle bounds, bool active)
-    {
-        var left = bounds.X;
-        var width = Math.Max(6, Math.Min(bounds.Width, 8));
-        var top = bounds.Y + ((bounds.Height - 7) / 2);
-        var stem = left + (width / 2);
-
-        // The outline: a rim, two sides tapering to the stem, and the stem below it.
-        g.DrawLine(color, left, top, left + width, top);
-        g.DrawLine(color, left, top, stem, top + 4);
-        g.DrawLine(color, left + width, top, stem, top + 4);
-        g.DrawLine(color, stem, top + 4, stem, top + 6);
-
-        if (!active)
-            return;
-
-        // An active filter fills the bowl. Shape rather than colour, so the header still says which
-        // columns are narrowing under high contrast or on a monochrome print of a bug report.
-        for (var row = 1; row < 4; ++row)
-            g.DrawLine(color, left + row, top + row, left + width - row, top + row);
-    }
-
-    /// <summary>Mixes two opaque colors 50:50, channel-wise.</summary>
-    private static Color Blend(Color a, Color b)
-        => Color.FromArgb(0xFF, (a.R + b.R) / 2, (a.G + b.G) / 2, (a.B + b.B) / 2);
+  /// <summary>Mixes two opaque colors 50:50, channel-wise.</summary>
+  private static Color Blend(Color a, Color b)
+      => Color.FromArgb(0xFF, (a.R + b.R) / 2, (a.G + b.G) / 2, (a.B + b.B) / 2);
 }

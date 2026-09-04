@@ -18,155 +18,139 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// latched by the first and consumed by the second.
 /// </para>
 /// </remarks>
-internal sealed class GtkScrollBarPeer : GtkControlPeer, IScrollBarPeer
-{
-    private readonly bool _vertical;
-    private int _minimum;
-    private int _maximum = 100;
-    private int _largeChange = 10;
-    private int _smallChange = 1;
-    private int _value;
-    private bool _suppress;
-    private ScrollEventType _pendingType = ScrollEventType.ThumbTrack;
+internal sealed class GtkScrollBarPeer : GtkControlPeer, IScrollBarPeer {
+  private readonly bool _vertical;
+  private int _minimum;
+  private int _maximum = 100;
+  private int _largeChange = 10;
+  private int _smallChange = 1;
+  private int _value;
+  private bool _suppress;
+  private ScrollEventType _pendingType = ScrollEventType.ThumbTrack;
 
-    /// <summary>Creates a peer for a bar running along the given axis.</summary>
-    /// <param name="vertical">Whether the bar is vertical; GTK fixes this at construction.</param>
-    public GtkScrollBarPeer(bool vertical) => _vertical = vertical;
+  /// <summary>Creates a peer for a bar running along the given axis.</summary>
+  /// <param name="vertical">Whether the bar is vertical; GTK fixes this at construction.</param>
+  public GtkScrollBarPeer(bool vertical) => _vertical = vertical;
 
-    /// <inheritdoc />
-    public event EventHandler<ScrollEventType>? Scrolled;
+  /// <inheritdoc />
+  public event EventHandler<ScrollEventType>? Scrolled;
 
-    /// <inheritdoc />
-    protected override nint CreateWidget() => NativeMethods.gtk_scrollbar_new(_vertical ? 1 : 0, 0);
+  /// <inheritdoc />
+  protected override nint CreateWidget() => NativeMethods.gtk_scrollbar_new(_vertical ? 1 : 0, 0);
 
-    /// <inheritdoc />
-    protected override void ApplyText(string text) { }
+  /// <inheritdoc />
+  protected override void ApplyText(string text) { }
 
-    /// <inheritdoc />
-    public void SetRange(int minimum, int maximum, int largeChange, int smallChange)
-    {
-        _minimum = minimum;
-        _maximum = maximum;
-        _largeChange = largeChange;
-        _smallChange = smallChange;
-        this.PushRange();
+  /// <inheritdoc />
+  public void SetRange(int minimum, int maximum, int largeChange, int smallChange) {
+    _minimum = minimum;
+    _maximum = maximum;
+    _largeChange = largeChange;
+    _smallChange = smallChange;
+    this.PushRange();
+  }
+
+  /// <inheritdoc />
+  public void SetValue(int value) {
+    _value = value;
+    if (_widget == 0)
+      return;
+
+    _suppress = true;
+    try {
+      NativeMethods.gtk_range_set_value(_widget, value);
+    } finally {
+      _suppress = false;
     }
+  }
 
-    /// <inheritdoc />
-    public void SetValue(int value)
-    {
-        _value = value;
-        if (_widget == 0)
-            return;
+  /// <inheritdoc />
+  public int GetValue() => _widget == 0 ? _value : (int)Math.Round(NativeMethods.gtk_range_get_value(_widget));
 
-        _suppress = true;
-        try
-        {
-            NativeMethods.gtk_range_set_value(_widget, value);
-        }
-        finally
-        {
-            _suppress = false;
-        }
+  /// <inheritdoc />
+  protected override void OnWidgetRealized() {
+    this.PushRange();
+    this.SetValue(_value);
+
+    var data = this.PinSelf();
+    unsafe {
+      var change = (nint)(delegate* unmanaged[Cdecl]<nint, int, double, nint, int>)&OnChangeValue;
+      NativeMethods.g_signal_connect_data(_widget, "change-value", change, data, 0, 0);
+
+      var changed = (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnValueChanged;
+      NativeMethods.g_signal_connect_data(_widget, "value-changed", changed, data, 0, 0);
     }
+  }
 
-    /// <inheritdoc />
-    public int GetValue() => _widget == 0 ? _value : (int)Math.Round(NativeMethods.gtk_range_get_value(_widget));
+  /// <summary>Writes the whole adjustment in one go; the members are interdependent.</summary>
+  private void PushRange() {
+    if (_widget == 0)
+      return;
 
-    /// <inheritdoc />
-    protected override void OnWidgetRealized()
-    {
-        this.PushRange();
-        this.SetValue(_value);
+    var adjustment = NativeMethods.gtk_range_get_adjustment(_widget);
+    if (adjustment == 0)
+      return;
 
-        var data = this.PinSelf();
-        unsafe
-        {
-            var change = (nint)(delegate* unmanaged[Cdecl]<nint, int, double, nint, int>)&OnChangeValue;
-            NativeMethods.g_signal_connect_data(_widget, "change-value", change, data, 0, 0);
-
-            var changed = (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnValueChanged;
-            NativeMethods.g_signal_connect_data(_widget, "value-changed", changed, data, 0, 0);
-        }
+    _suppress = true;
+    try {
+      NativeMethods.gtk_adjustment_configure(
+          adjustment,
+          _value,
+          _minimum,
+          _maximum + 1,
+          _smallChange,
+          _largeChange,
+          _largeChange);
+    } finally {
+      _suppress = false;
     }
+  }
 
-    /// <summary>Writes the whole adjustment in one go; the members are interdependent.</summary>
-    private void PushRange()
-    {
-        if (_widget == 0)
-            return;
+  /// <summary>Latches the gesture the pending value change came from.</summary>
+  private void LatchScrollType(int scrollType) => _pendingType = Translate(scrollType);
 
-        var adjustment = NativeMethods.gtk_range_get_adjustment(_widget);
-        if (adjustment == 0)
-            return;
+  /// <summary>Reports the completed value change, consuming the latched gesture.</summary>
+  private void RaiseValueChanged() {
+    if (_suppress)
+      return;
 
-        _suppress = true;
-        try
-        {
-            NativeMethods.gtk_adjustment_configure(
-                adjustment,
-                _value,
-                _minimum,
-                _maximum + 1,
-                _smallChange,
-                _largeChange,
-                _largeChange);
-        }
-        finally
-        {
-            _suppress = false;
-        }
-    }
+    var type = _pendingType;
+    _pendingType = ScrollEventType.ThumbTrack;
+    _value = this.GetValue();
+    Scrolled?.Invoke(this, type);
+  }
 
-    /// <summary>Latches the gesture the pending value change came from.</summary>
-    private void LatchScrollType(int scrollType) => _pendingType = Translate(scrollType);
+  /// <summary>Maps a <c>GtkScrollType</c> onto the Windows Forms gesture the core reports.</summary>
+  private static ScrollEventType Translate(int scrollType)
+      => scrollType switch {
+        2 or 6 or 10 => ScrollEventType.SmallDecrement, // STEP_BACKWARD, STEP_UP, STEP_LEFT
+        3 or 7 or 11 => ScrollEventType.SmallIncrement, // STEP_FORWARD, STEP_DOWN, STEP_RIGHT
+        4 or 8 or 12 => ScrollEventType.LargeDecrement, // PAGE_BACKWARD, PAGE_UP, PAGE_LEFT
+        5 or 9 or 13 => ScrollEventType.LargeIncrement, // PAGE_FORWARD, PAGE_DOWN, PAGE_RIGHT
+        14 => ScrollEventType.First,
+        15 => ScrollEventType.Last,
+        _ => ScrollEventType.ThumbTrack,                // NONE, JUMP — a drag or a trough click
+      };
 
-    /// <summary>Reports the completed value change, consuming the latched gesture.</summary>
-    private void RaiseValueChanged()
-    {
-        if (_suppress)
-            return;
+  /// <summary>
+  /// Native handler for "change-value", shaped as
+  /// <c>gboolean (GtkRange *, GtkScrollType, gdouble, gpointer)</c>. Returns <c>FALSE</c> so GTK still
+  /// applies the move; this only records how it was asked for.
+  /// </summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static int OnChangeValue(nint range, int scrollType, double value, nint userData) {
+    if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkScrollBarPeer peer)
+      peer.LatchScrollType(scrollType);
 
-        var type = _pendingType;
-        _pendingType = ScrollEventType.ThumbTrack;
-        _value = this.GetValue();
-        Scrolled?.Invoke(this, type);
-    }
+    return 0;
+  }
 
-    /// <summary>Maps a <c>GtkScrollType</c> onto the Windows Forms gesture the core reports.</summary>
-    private static ScrollEventType Translate(int scrollType)
-        => scrollType switch
-        {
-            2 or 6 or 10 => ScrollEventType.SmallDecrement, // STEP_BACKWARD, STEP_UP, STEP_LEFT
-            3 or 7 or 11 => ScrollEventType.SmallIncrement, // STEP_FORWARD, STEP_DOWN, STEP_RIGHT
-            4 or 8 or 12 => ScrollEventType.LargeDecrement, // PAGE_BACKWARD, PAGE_UP, PAGE_LEFT
-            5 or 9 or 13 => ScrollEventType.LargeIncrement, // PAGE_FORWARD, PAGE_DOWN, PAGE_RIGHT
-            14 => ScrollEventType.First,
-            15 => ScrollEventType.Last,
-            _ => ScrollEventType.ThumbTrack,                // NONE, JUMP — a drag or a trough click
-        };
-
-    /// <summary>
-    /// Native handler for "change-value", shaped as
-    /// <c>gboolean (GtkRange *, GtkScrollType, gdouble, gpointer)</c>. Returns <c>FALSE</c> so GTK still
-    /// applies the move; this only records how it was asked for.
-    /// </summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnChangeValue(nint range, int scrollType, double value, nint userData)
-    {
-        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkScrollBarPeer peer)
-            peer.LatchScrollType(scrollType);
-
-        return 0;
-    }
-
-    /// <summary>
-    /// Native handler for "value-changed", shaped as <c>void (GtkRange *, gpointer)</c>.
-    /// </summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static void OnValueChanged(nint range, nint userData)
-    {
-        if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkScrollBarPeer peer)
-            peer.RaiseValueChanged();
-    }
+  /// <summary>
+  /// Native handler for "value-changed", shaped as <c>void (GtkRange *, gpointer)</c>.
+  /// </summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static void OnValueChanged(nint range, nint userData) {
+    if (userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkScrollBarPeer peer)
+      peer.RaiseValueChanged();
+  }
 }

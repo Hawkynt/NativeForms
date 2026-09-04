@@ -6,18 +6,16 @@ namespace Hawkynt.NativeForms;
 /// button — <see cref="ToolStripItem.Command"/> executes on click and its guard drives the enabled
 /// state.
 /// </summary>
-public class RibbonButton : RibbonItem
-{
-    /// <summary>Creates an empty ribbon button.</summary>
-    public RibbonButton() { }
+public class RibbonButton : RibbonItem {
+  /// <summary>Creates an empty ribbon button.</summary>
+  public RibbonButton() { }
 
-    /// <summary>Creates a large ribbon button with the given caption.</summary>
-    public RibbonButton(string text) => this.Text = text;
+  /// <summary>Creates a large ribbon button with the given caption.</summary>
+  public RibbonButton(string text) => this.Text = text;
 
-    /// <summary>Creates a ribbon button with the given caption and size.</summary>
-    public RibbonButton(string text, RibbonItemSize size)
-    {
-        this.Text = text;
-        this.ItemSize = size;
-    }
+  /// <summary>Creates a ribbon button with the given caption and size.</summary>
+  public RibbonButton(string text, RibbonItemSize size) {
+    this.Text = text;
+    this.ItemSize = size;
+  }
 }

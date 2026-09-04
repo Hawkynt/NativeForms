@@ -13,720 +13,671 @@ namespace Hawkynt.NativeForms.Benchmarks;
 /// job fails loudly instead of drifting quietly. Thresholds carry 2× headroom over the PRD budgets
 /// to stay stable across runners.
 /// </summary>
-internal static class Program
-{
-    /// <summary>2× the §4 unrealized-control budget (512 B), the nightly regression gate.</summary>
-    private const int _PlainConstructionBudget = 1024;
+internal static class Program {
+  /// <summary>2× the §4 unrealized-control budget (512 B), the nightly regression gate.</summary>
+  private const int _PlainConstructionBudget = 1024;
 
-    /// <summary>2× the §4 owner-drawn construction budget (768 B).</summary>
-    private const int _OwnerDrawnConstructionBudget = 1536;
+  /// <summary>2× the §4 owner-drawn construction budget (768 B).</summary>
+  private const int _OwnerDrawnConstructionBudget = 1536;
 
-    /// <summary>2× the §4 hosted-editor composite budget (1024 B) — a shell plus a native editor.</summary>
-    private const int _CompositeConstructionBudget = 2048;
+  /// <summary>2× the §4 hosted-editor composite budget (1024 B) — a shell plus a native editor.</summary>
+  private const int _CompositeConstructionBudget = 2048;
 
-    /// <summary>2× the §4 empty-form realization budget (8 KB).</summary>
-    private const int _EmptyFormRealizeBudget = 16384;
+  /// <summary>2× the §4 empty-form realization budget (8 KB).</summary>
+  private const int _EmptyFormRealizeBudget = 16384;
 
-    private const int _ConstructionCount = 4000;
-    private const int _PaintAllocationFrames = 100;
-    private const int _PaintThroughputFrames = 2000;
-    private const int _TraversalRows = 100_000;
+  private const int _ConstructionCount = 4000;
+  private const int _PaintAllocationFrames = 100;
+  private const int _PaintThroughputFrames = 2000;
+  private const int _TraversalRows = 100_000;
 
-    private static readonly List<string> _failures = [];
-    private static readonly List<(string Metric, string Value)> _table = [];
+  private static readonly List<string> _failures = [];
+  private static readonly List<(string Metric, string Value)> _table = [];
 
-    private sealed record Row(string Name, int Value);
+  private sealed record Row(string Name, int Value);
 
-    private static int Main()
-    {
-        // Construction: what a bare `new` costs per §4-governed control class.
-        Construct("Button", static () => new Button(), _PlainConstructionBudget);
-        Construct("Label", static () => new Label(), _PlainConstructionBudget);
-        Construct("TextBox", static () => new TextBox(), _PlainConstructionBudget);
-        Construct("CheckBox", static () => new CheckBox(), _OwnerDrawnConstructionBudget);
-        Construct("ListBox", static () => new ListBox(), _OwnerDrawnConstructionBudget);
-        Construct("ListView", static () => new ListView(), _OwnerDrawnConstructionBudget);
-        Construct("TreeView", static () => new TreeView(), _OwnerDrawnConstructionBudget);
-        Construct("DataGridView", static () => new DataGridView(), _OwnerDrawnConstructionBudget);
-        Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
-        Construct("TimePicker", static () => new TimePicker(), _OwnerDrawnConstructionBudget);
-        Construct("ClockFace", static () => new ClockFace(), _OwnerDrawnConstructionBudget);
-        Construct("MonthCalendar", static () => new MonthCalendar(), _OwnerDrawnConstructionBudget);
-        Construct("CalendarView", static () => new CalendarView(), _OwnerDrawnConstructionBudget);
-        Construct("IconLabel", static () => new IconLabel(), _OwnerDrawnConstructionBudget);
-        Construct("ProgressTile", static () => new ProgressTile(), _OwnerDrawnConstructionBudget);
-        Construct("FilePicker", static () => new FilePicker(), _CompositeConstructionBudget);
-        Construct("FolderPicker", static () => new FolderPicker(), _CompositeConstructionBudget);
-        Construct("Accordion", static () => new Accordion(), _OwnerDrawnConstructionBudget);
-        Construct("Ribbon", static () => new Ribbon(), _OwnerDrawnConstructionBudget);
-        Construct("GridPicker", static () => new GridPicker(), _OwnerDrawnConstructionBudget);
-        Construct("DockPanel", static () => new DockPanel(), _OwnerDrawnConstructionBudget);
-        Construct("DockContent", static () => new DockContent(), _OwnerDrawnConstructionBudget);
+  private static int Main() {
+    // Construction: what a bare `new` costs per §4-governed control class.
+    Construct("Button", static () => new Button(), _PlainConstructionBudget);
+    Construct("Label", static () => new Label(), _PlainConstructionBudget);
+    Construct("TextBox", static () => new TextBox(), _PlainConstructionBudget);
+    Construct("CheckBox", static () => new CheckBox(), _OwnerDrawnConstructionBudget);
+    Construct("ListBox", static () => new ListBox(), _OwnerDrawnConstructionBudget);
+    Construct("ListView", static () => new ListView(), _OwnerDrawnConstructionBudget);
+    Construct("TreeView", static () => new TreeView(), _OwnerDrawnConstructionBudget);
+    Construct("DataGridView", static () => new DataGridView(), _OwnerDrawnConstructionBudget);
+    Construct("TabControl", static () => new TabControl(), _OwnerDrawnConstructionBudget);
+    Construct("TimePicker", static () => new TimePicker(), _OwnerDrawnConstructionBudget);
+    Construct("ClockFace", static () => new ClockFace(), _OwnerDrawnConstructionBudget);
+    Construct("MonthCalendar", static () => new MonthCalendar(), _OwnerDrawnConstructionBudget);
+    Construct("CalendarView", static () => new CalendarView(), _OwnerDrawnConstructionBudget);
+    Construct("IconLabel", static () => new IconLabel(), _OwnerDrawnConstructionBudget);
+    Construct("ProgressTile", static () => new ProgressTile(), _OwnerDrawnConstructionBudget);
+    Construct("FilePicker", static () => new FilePicker(), _CompositeConstructionBudget);
+    Construct("FolderPicker", static () => new FolderPicker(), _CompositeConstructionBudget);
+    Construct("Accordion", static () => new Accordion(), _OwnerDrawnConstructionBudget);
+    Construct("Ribbon", static () => new Ribbon(), _OwnerDrawnConstructionBudget);
+    Construct("GridPicker", static () => new GridPicker(), _OwnerDrawnConstructionBudget);
+    Construct("DockPanel", static () => new DockPanel(), _OwnerDrawnConstructionBudget);
+    Construct("DockContent", static () => new DockContent(), _OwnerDrawnConstructionBudget);
 
-        // Item models carry no peer, so they have no §4 control budget — but a ribbon is made of
-        // hundreds of them, so their per-instance cost is tracked all the same.
-        ConstructItem("AccordionPane", static () => new AccordionPane("Mail"));
-        ConstructItem("RibbonTab", static () => new RibbonTab("Home"));
-        ConstructItem("RibbonGroup", static () => new RibbonGroup("Clipboard"));
-        ConstructItem("RibbonButton", static () => new RibbonButton("Paste"));
-        ConstructItem("RibbonToggleButton", static () => new RibbonToggleButton("Bold", RibbonItemSize.Small));
+    // Item models carry no peer, so they have no §4 control budget — but a ribbon is made of
+    // hundreds of them, so their per-instance cost is tracked all the same.
+    ConstructItem("AccordionPane", static () => new AccordionPane("Mail"));
+    ConstructItem("RibbonTab", static () => new RibbonTab("Home"));
+    ConstructItem("RibbonGroup", static () => new RibbonGroup("Clipboard"));
+    ConstructItem("RibbonButton", static () => new RibbonButton("Paste"));
+    ConstructItem("RibbonToggleButton", static () => new RibbonToggleButton("Bold", RibbonItemSize.Small));
 
-        // The two structure-heavy containers, measured populated: what a real navigation pane and a
-        // real ribbon cost to build, not what their empty shells do.
-        ConstructAggregate("accordion3", static () => MakeAccordion());
-        ConstructAggregate("ribbon3x2", static () => MakeRibbon());
+    // The two structure-heavy containers, measured populated: what a real navigation pane and a
+    // real ribbon cost to build, not what their empty shells do.
+    ConstructAggregate("accordion3", static () => MakeAccordion());
+    ConstructAggregate("ribbon3x2", static () => MakeRibbon());
 
-        RealizeEmptyForm();
-        RealizeHundredControlForm();
+    RealizeEmptyForm();
+    RealizeHundredControlForm();
 
-        // Steady-state repaint throughput of the data-heavy controls; a warmed frame must allocate 0.
-        PaintThroughput("ListBox", MakeListBox(1000));
-        PaintThroughput("ListView", MakeListView(1000));
-        PaintThroughput("TreeView", MakeTreeView(1000));
-        PaintThroughput("DataGridView", MakeDataGridView(1000));
-        PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
-        PaintThroughput("TimePicker", MakeTimePicker());
-        PaintThroughput("ClockFace", MakeClockFace());
-        PaintThroughput("MonthCalendar", MakeMonthCalendar());
-        PaintThroughput("CalendarViewDay", MakeCalendarView(CalendarViewMode.Day, 1000));
-        PaintThroughput("CalendarViewWeek", MakeCalendarView(CalendarViewMode.Week, 1000));
-        PaintThroughput("CalendarViewMonth", MakeCalendarView(CalendarViewMode.Month, 1000));
-        PaintThroughput("IconLabel", MakeIconLabel());
-        PaintThroughput("ProgressTile", MakeProgressTile());
-        PaintThroughput("FilePicker", MakeFilePicker());
-        PaintThroughput("Accordion", MakeAccordion());
-        PaintThroughput("Ribbon", MakeRibbon());
-        PaintThroughput("GridPicker", MakeGridPicker());
-        PaintThroughput("DockPanel", MakeDockPanel());
+    // Steady-state repaint throughput of the data-heavy controls; a warmed frame must allocate 0.
+    PaintThroughput("ListBox", MakeListBox(1000));
+    PaintThroughput("ListView", MakeListView(1000));
+    PaintThroughput("TreeView", MakeTreeView(1000));
+    PaintThroughput("DataGridView", MakeDataGridView(1000));
+    PaintThroughput("DataGridViewLists", MakeListColumnGrid(1000));
+    PaintThroughput("TimePicker", MakeTimePicker());
+    PaintThroughput("ClockFace", MakeClockFace());
+    PaintThroughput("MonthCalendar", MakeMonthCalendar());
+    PaintThroughput("CalendarViewDay", MakeCalendarView(CalendarViewMode.Day, 1000));
+    PaintThroughput("CalendarViewWeek", MakeCalendarView(CalendarViewMode.Week, 1000));
+    PaintThroughput("CalendarViewMonth", MakeCalendarView(CalendarViewMode.Month, 1000));
+    PaintThroughput("IconLabel", MakeIconLabel());
+    PaintThroughput("ProgressTile", MakeProgressTile());
+    PaintThroughput("FilePicker", MakeFilePicker());
+    PaintThroughput("Accordion", MakeAccordion());
+    PaintThroughput("Ribbon", MakeRibbon());
+    PaintThroughput("GridPicker", MakeGridPicker());
+    PaintThroughput("DockPanel", MakeDockPanel());
 
-        // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
-        ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
-        ScrollTraversal("DataGridView", MakeDataGridView(_TraversalRows), Keys.PageDown);
-        ScrollTraversal("DataGridViewLists", MakeListColumnGrid(_TraversalRows), Keys.PageDown);
-        ScrollTraversal("TreeView", MakeTreeView(_TraversalRows), key: null);
-        ScrollTraversal("CalendarView", MakeCalendarView(CalendarViewMode.Week, _TraversalRows), Keys.PageDown);
+    // Full traversal of a 100k-row control, painting every step — the "no GC in scroll" story.
+    ScrollTraversal("ListView", MakeListView(_TraversalRows), Keys.PageDown);
+    ScrollTraversal("DataGridView", MakeDataGridView(_TraversalRows), Keys.PageDown);
+    ScrollTraversal("DataGridViewLists", MakeListColumnGrid(_TraversalRows), Keys.PageDown);
+    ScrollTraversal("TreeView", MakeTreeView(_TraversalRows), key: null);
+    ScrollTraversal("CalendarView", MakeCalendarView(CalendarViewMode.Week, _TraversalRows), Keys.PageDown);
 
-        // Scale: thousands of controls / children / rows — the "does it stay linear" story. Reported
-        // in pairs so a super-linear (quadratic) cost shows as a >2x jump for a 2x input.
-        BuildForm(1000, loop: true);
-        BuildForm(2000, loop: true, budgetMs: 8);   // ~0.5 ms linear; ~46 ms if it went quadratic
-        BuildForm(2000, loop: false, budgetMs: 8);  // AddRange, same gate
-        RealizeManyControlForm(2000);
-        ResizeManyControlForm(2000);
-        ScrollManyChildPanel(1000);
-        ScrollManyChildPanel(2000, budgetUs: 4000); // ~0.3 ms linear; ~16 ms if it went quadratic
-        BindLargeGrid(10_000);
-        BindLargeGrid(50_000);
+    // Scale: thousands of controls / children / rows — the "does it stay linear" story. Reported
+    // in pairs so a super-linear (quadratic) cost shows as a >2x jump for a 2x input.
+    BuildForm(1000, loop: true);
+    BuildForm(2000, loop: true, budgetMs: 8);   // ~0.5 ms linear; ~46 ms if it went quadratic
+    BuildForm(2000, loop: false, budgetMs: 8);  // AddRange, same gate
+    RealizeManyControlForm(2000);
+    ResizeManyControlForm(2000);
+    ScrollManyChildPanel(1000);
+    ScrollManyChildPanel(2000, budgetUs: 4000); // ~0.3 ms linear; ~16 ms if it went quadratic
+    BindLargeGrid(10_000);
+    BindLargeGrid(50_000);
 
-        // Complex controls populated to thousands of items — building must stay linear.
-        BuildTree(5000);
-        ExpandBigNode(5000);
-        BuildListView(5000);
-        BuildTreeList(5000);
-        BuildCalendar(5000);
-        BuildAccordion(1000, budgetMs: 15); // ~3.6 ms linear; ~42 ms if it went quadratic
-        BuildDockPanel(1000, budgetMs: 15); // ~4 ms linear; ~26 ms if it went quadratic
+    // Complex controls populated to thousands of items — building must stay linear.
+    BuildTree(5000);
+    ExpandBigNode(5000);
+    BuildListView(5000);
+    BuildTreeList(5000);
+    BuildCalendar(5000);
+    BuildAccordion(1000, budgetMs: 15); // ~3.6 ms linear; ~42 ms if it went quadratic
+    BuildDockPanel(1000, budgetMs: 15); // ~4 ms linear; ~26 ms if it went quadratic
 
-        PrintTable();
+    PrintTable();
 
-        if (_failures.Count == 0)
-            return 0;
+    if (_failures.Count == 0)
+      return 0;
 
-        Console.WriteLine();
-        Console.WriteLine("§4 regression thresholds crossed:");
-        foreach (var failure in _failures)
-            Console.WriteLine($"  FAIL {failure}");
+    Console.WriteLine();
+    Console.WriteLine("§4 regression thresholds crossed:");
+    foreach (var failure in _failures)
+      Console.WriteLine($"  FAIL {failure}");
 
-        return 1;
+    return 1;
+  }
+
+  // ---- Metric: construction ----
+
+  private static void Construct(string name, Func<Control> factory, int byteBudget) {
+    var sink = new Control[_ConstructionCount];
+    for (var i = 0; i < _ConstructionCount; ++i)
+      sink[i] = factory(); // warm-up: JIT + static cctors stay out of the measurement
+
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < _ConstructionCount; ++i)
+      sink[i] = factory();
+    watch.Stop();
+    var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+    var nsPerOp = watch.Elapsed.TotalNanoseconds / _ConstructionCount;
+    var bytesPerOp = (double)bytes / _ConstructionCount;
+    Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytesPerOp)}}}",
+        $"{nsPerOp,8:F0} ns/op  {bytesPerOp,6:F0} B/op");
+
+    if (bytesPerOp >= byteBudget)
+      _failures.Add($"construct.{name}: {bytesPerOp:F0} B/op exceeds the {byteBudget} B budget");
+  }
+
+  /// <summary>Per-instance construction cost of a peerless item model.</summary>
+  private static void ConstructItem(string name, Func<object> factory) {
+    var sink = new object[_ConstructionCount];
+    for (var i = 0; i < _ConstructionCount; ++i)
+      sink[i] = factory(); // warm-up
+
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < _ConstructionCount; ++i)
+      sink[i] = factory();
+    watch.Stop();
+    var bytes = (double)(GC.GetAllocatedBytesForCurrentThread() - before) / _ConstructionCount;
+
+    var nsPerOp = watch.Elapsed.TotalNanoseconds / _ConstructionCount;
+    Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytes)}}}",
+        $"{nsPerOp,8:F0} ns/op  {bytes,6:F0} B/op");
+  }
+
+  /// <summary>Construction cost of a whole populated control tree — reported, not gated, because
+  /// the number is a design signal rather than a per-instance budget.</summary>
+  private static void ConstructAggregate(string name, Func<Control> factory) {
+    for (var i = 0; i < 64; ++i)
+      factory(); // warm-up
+
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < 64; ++i)
+      factory();
+    watch.Stop();
+    var bytes = (GC.GetAllocatedBytesForCurrentThread() - before) / 64.0;
+
+    var nsPerOp = watch.Elapsed.TotalNanoseconds / 64;
+    Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytes)}}}",
+        $"{nsPerOp,8:F0} ns/op  {bytes,6:F0} B/op");
+  }
+
+  // ---- Metric: realization ----
+
+  private static void RealizeEmptyForm() {
+    // One warm-up pass, then a fresh form + backend per measured pass, like the unit test.
+    Realize(new Form());
+
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    var watch = Stopwatch.StartNew();
+    Realize(new Form());
+    watch.Stop();
+    var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+    var micros = watch.Elapsed.TotalMicroseconds;
+    Emit("realize.emptyForm", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
+
+    if (bytes >= _EmptyFormRealizeBudget)
+      _failures.Add($"realize.emptyForm: {bytes} B exceeds the {_EmptyFormRealizeBudget} B budget");
+  }
+
+  private static void RealizeHundredControlForm() {
+    Realize(MakeHundredControlForm()); // warm-up
+
+    var form = MakeHundredControlForm();
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    var watch = Stopwatch.StartNew();
+    Realize(form);
+    watch.Stop();
+    var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+    var micros = watch.Elapsed.TotalMicroseconds;
+    Emit("realize.form100", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
+  }
+
+  // ---- Metric: scale (thousands of controls / children / rows) ----
+
+  /// <summary>A form of <paramref name="n"/> absolutely-positioned labels, built by a Controls.Add
+  /// loop or one AddRange — the pattern that turns quadratic if every add re-lays the whole form.</summary>
+  private static Form BuildManyControlForm(int n, bool loop) {
+    var form = new Form { Bounds = new(0, 0, 900, 700) };
+    if (loop) {
+      for (var i = 0; i < n; ++i)
+        form.Controls.Add(new Label { Text = "L", Bounds = new((i % 8) * 110, (i / 8) * 20, 100, 18) });
+    } else {
+      var many = new Control[n];
+      for (var i = 0; i < n; ++i)
+        many[i] = new Label { Text = "L", Bounds = new((i % 8) * 110, (i / 8) * 20, 100, 18) };
+      form.Controls.AddRange(many);
     }
 
-    // ---- Metric: construction ----
+    return form;
+  }
 
-    private static void Construct(string name, Func<Control> factory, int byteBudget)
-    {
-        var sink = new Control[_ConstructionCount];
-        for (var i = 0; i < _ConstructionCount; ++i)
-            sink[i] = factory(); // warm-up: JIT + static cctors stay out of the measurement
+  private static void BuildForm(int n, bool loop, double budgetMs = double.MaxValue) {
+    BuildManyControlForm(64, loop); // warm-up
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < _ConstructionCount; ++i)
-            sink[i] = factory();
-        watch.Stop();
-        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+    var watch = Stopwatch.StartNew();
+    BuildManyControlForm(n, loop);
+    watch.Stop();
 
-        var nsPerOp = watch.Elapsed.TotalNanoseconds / _ConstructionCount;
-        var bytesPerOp = (double)bytes / _ConstructionCount;
-        Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytesPerOp)}}}",
-            $"{nsPerOp,8:F0} ns/op  {bytesPerOp,6:F0} B/op");
+    var ms = watch.Elapsed.TotalMilliseconds;
+    var label = loop ? "loop" : "range";
+    Emit($"scale.build{label}{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   ({n} controls, {label})");
 
-        if (bytesPerOp >= byteBudget)
-            _failures.Add($"construct.{name}: {bytesPerOp:F0} B/op exceeds the {byteBudget} B budget");
+    // A linear build stays far under this; a per-add full layout (quadratic) blows past it.
+    if (ms > budgetMs)
+      _failures.Add($"scale.build{label}{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
+  }
+
+  private static void RealizeManyControlForm(int n) {
+    Realize(BuildManyControlForm(n, loop: false)); // warm-up
+
+    var form = BuildManyControlForm(n, loop: false);
+    var watch = Stopwatch.StartNew();
+    Realize(form);
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.realize{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (realize {n} controls)");
+  }
+
+  private static void ResizeManyControlForm(int n) {
+    var form = BuildManyControlForm(n, loop: false);
+    Application.Run(form, new BenchBackend());
+
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < 100; ++i)
+      form.Bounds = new(0, 0, 900 + (i % 2), 700); // toggle width to force a relayout each time
+    watch.Stop();
+
+    var us = watch.Elapsed.TotalMicroseconds / 100;
+    Emit($"scale.resize{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   (relayout {n} controls, per resize)");
+  }
+
+  private static void ScrollManyChildPanel(int n, double budgetUs = double.MaxValue) {
+    var panel = new Panel { Bounds = new(0, 0, 400, 600), AutoScroll = true };
+    for (var i = 0; i < n; ++i)
+      panel.Controls.Add(new Label { Text = "Item " + i, Bounds = new(4, i * 20, 200, 18) });
+    var form = new Form { Bounds = new(0, 0, 420, 640) };
+    form.Controls.Add(panel);
+    Application.Run(form, new BenchBackend());
+
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < 200; ++i)
+      panel.AutoScrollPosition = new(0, (i % 100) * 20); // scroll up and down repeatedly
+    watch.Stop();
+
+    var us = watch.Elapsed.TotalMicroseconds / 200;
+    Emit($"scale.scrollPanel{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   ({n} children, per scroll)");
+
+    // Re-deriving the content extent per child (quadratic) would be an order of magnitude over this.
+    if (us > budgetUs)
+      _failures.Add($"scale.scrollPanel{n}: {us:F0} µs/scroll exceeds the {budgetUs} µs linear-scale gate (quadratic regression?)");
+  }
+
+  private static void BindLargeGrid(int rows) {
+    var list = new Hawkynt.NativeForms.ComponentModel.ObservableList<object?>();
+    for (var i = 0; i < rows; ++i)
+      list.Add(new Row("Row " + i, i));
+
+    var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
+    grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
+    grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
+    Application.Run(new Form { Bounds = new(0, 0, 520, 480), Controls = { grid } }, new BenchBackend());
+
+    var watch = Stopwatch.StartNew();
+    grid.DataSource = list;
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.bindGrid{rows}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {rows} rows)");
+  }
+
+  private static void BuildTree(int n) {
+    { var w = new TreeView(); for (var i = 0; i < 64; ++i) w.Nodes.Add("N"); } // warm-up
+
+    var watch = Stopwatch.StartNew();
+    var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
+    for (var i = 0; i < n; ++i)
+      tree.Nodes.Add("Node " + i);
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.buildTree{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} tree nodes)");
+  }
+
+  private static void ExpandBigNode(int n) {
+    var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
+    var root = tree.Nodes.Add("Root");
+    for (var i = 0; i < n; ++i)
+      root.Nodes.Add("Child " + i);
+    Application.Run(new Form { Bounds = new(0, 0, 360, 480), Controls = { tree } }, new BenchBackend());
+
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < 200; ++i)
+      root.Toggle();
+    watch.Stop();
+
+    var us = watch.Elapsed.TotalMicroseconds / 200;
+    Emit($"scale.expandTree{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   (toggle a {n}-child node)");
+  }
+
+  private static void BuildListView(int n) {
+    var watch = Stopwatch.StartNew();
+    var list = new ListView { Bounds = new(0, 0, 480, 440) };
+    list.Columns.Add(new ColumnHeader("Name", 240));
+    for (var i = 0; i < n; ++i)
+      list.Items.Add(new ListViewItem("Row " + i));
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.buildListView{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} list items)");
+  }
+
+  private static void BuildTreeList(int n) {
+    var watch = Stopwatch.StartNew();
+    var tree = new TreeListView { Bounds = new(0, 0, 480, 440) };
+    for (var i = 0; i < n; ++i)
+      tree.Nodes.Add("Row " + i);
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.buildTreeList{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} tree-list rows)");
+  }
+
+  private static void BuildCalendar(int n) {
+    MakeCalendarView(CalendarViewMode.Week, 64); // warm-up
+
+    var watch = Stopwatch.StartNew();
+    MakeCalendarView(CalendarViewMode.Week, n);
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.buildCalendar{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {n} appointments)");
+  }
+
+  private static void BuildAccordion(int n, double budgetMs = double.MaxValue) {
+    var watch = Stopwatch.StartNew();
+    var accordion = new Accordion { Bounds = new(0, 0, 300, 600) };
+    for (var i = 0; i < n; ++i)
+      accordion.Panes.Add(new AccordionPane("Pane " + i));
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.buildAccordion{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} accordion panes)");
+    if (ms > budgetMs)
+      _failures.Add($"scale.buildAccordion{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
+  }
+
+  private static void BuildDockPanel(int n, double budgetMs = double.MaxValue) {
+    var watch = Stopwatch.StartNew();
+    var dock = new DockPanel { Bounds = new(0, 0, 900, 600) };
+    for (var i = 0; i < n; ++i)
+      dock.AddDocument(new DockContent("Doc " + i));
+    watch.Stop();
+
+    var ms = watch.Elapsed.TotalMilliseconds;
+    Emit($"scale.buildDockPanel{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} dock documents)");
+    if (ms > budgetMs)
+      _failures.Add($"scale.buildDockPanel{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
+  }
+
+  private static Form MakeHundredControlForm() {
+    var form = new Form { Bounds = new(0, 0, 1200, 800) };
+    for (var i = 0; i < 25; ++i) {
+      form.Controls.Add(new Button { Text = "Button", Bounds = new(0, i * 30, 100, 26) });
+      form.Controls.Add(new Label { Text = "Label", Bounds = new(110, i * 30, 100, 20) });
+      form.Controls.Add(new TextBox { Text = "Text", Bounds = new(220, i * 30, 100, 24) });
+      form.Controls.Add(new CheckBox { Text = "Check", Bounds = new(330, i * 30, 100, 20) });
     }
 
-    /// <summary>Per-instance construction cost of a peerless item model.</summary>
-    private static void ConstructItem(string name, Func<object> factory)
-    {
-        var sink = new object[_ConstructionCount];
-        for (var i = 0; i < _ConstructionCount; ++i)
-            sink[i] = factory(); // warm-up
+    return form;
+  }
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < _ConstructionCount; ++i)
-            sink[i] = factory();
-        watch.Stop();
-        var bytes = (double)(GC.GetAllocatedBytesForCurrentThread() - before) / _ConstructionCount;
+  // ---- Metric: steady-state repaint ----
 
-        var nsPerOp = watch.Elapsed.TotalNanoseconds / _ConstructionCount;
-        Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytes)}}}",
-            $"{nsPerOp,8:F0} ns/op  {bytes,6:F0} B/op");
+  private static void PaintThroughput(string name, OwnerDrawnControl control) {
+    var canvas = RealizeOnCanvas(control);
+    canvas.PerformPaint();
+    canvas.PerformPaint(); // warm-up: JIT the paint path and build caches/reused args
+
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    for (var i = 0; i < _PaintAllocationFrames; ++i)
+      canvas.PerformPaint();
+    var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < _PaintThroughputFrames; ++i)
+      canvas.PerformPaint();
+    watch.Stop();
+
+    var paintsPerSecond = _PaintThroughputFrames / watch.Elapsed.TotalSeconds;
+    Emit($"paint.{name}", $"{{\"paints_per_sec\":{F(paintsPerSecond)},\"bytes_per_frame\":{F((double)bytes / _PaintAllocationFrames)}}}",
+        $"{paintsPerSecond,8:F0} paints/s  {(double)bytes / _PaintAllocationFrames,4:F0} B/frame");
+
+    if (bytes != 0)
+      _failures.Add($"paint.{name}: {bytes} B allocated over {_PaintAllocationFrames} steady-state frames (must be 0)");
+  }
+
+  // ---- Metric: scroll traversal ----
+
+  private static void ScrollTraversal(string name, OwnerDrawnControl control, Keys? key) {
+    var canvas = RealizeOnCanvas(control);
+    canvas.PerformPaint(); // warm-up frame
+
+    // Page keys cover a viewport per step; the wheel-driven fallback covers 3 rows per notch.
+    var steps = key is null ? _TraversalRows / 3 + 1 : _TraversalRows / 10 + 1;
+    var watch = Stopwatch.StartNew();
+    for (var i = 0; i < steps; ++i) {
+      if (key is { } k)
+        canvas.PerformKeyDown(k);
+      else
+        canvas.PerformMouseWheel(-120);
+
+      canvas.PerformPaint();
     }
 
-    /// <summary>Construction cost of a whole populated control tree — reported, not gated, because
-    /// the number is a design signal rather than a per-instance budget.</summary>
-    private static void ConstructAggregate(string name, Func<Control> factory)
-    {
-        for (var i = 0; i < 64; ++i)
-            factory(); // warm-up
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < 64; ++i)
-            factory();
-        watch.Stop();
-        var bytes = (GC.GetAllocatedBytesForCurrentThread() - before) / 64.0;
-
-        var nsPerOp = watch.Elapsed.TotalNanoseconds / 64;
-        Emit($"construct.{name}", $"{{\"ns_per_op\":{F(nsPerOp)},\"bytes_per_op\":{F(bytes)}}}",
-            $"{nsPerOp,8:F0} ns/op  {bytes,6:F0} B/op");
-    }
-
-    // ---- Metric: realization ----
-
-    private static void RealizeEmptyForm()
-    {
-        // One warm-up pass, then a fresh form + backend per measured pass, like the unit test.
-        Realize(new Form());
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
-        Realize(new Form());
-        watch.Stop();
-        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        var micros = watch.Elapsed.TotalMicroseconds;
-        Emit("realize.emptyForm", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
-
-        if (bytes >= _EmptyFormRealizeBudget)
-            _failures.Add($"realize.emptyForm: {bytes} B exceeds the {_EmptyFormRealizeBudget} B budget");
-    }
-
-    private static void RealizeHundredControlForm()
-    {
-        Realize(MakeHundredControlForm()); // warm-up
-
-        var form = MakeHundredControlForm();
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
-        Realize(form);
-        watch.Stop();
-        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        var micros = watch.Elapsed.TotalMicroseconds;
-        Emit("realize.form100", $"{{\"us\":{F(micros)},\"bytes\":{bytes}}}", $"{micros,8:F0} µs     {bytes,6} B");
-    }
-
-    // ---- Metric: scale (thousands of controls / children / rows) ----
-
-    /// <summary>A form of <paramref name="n"/> absolutely-positioned labels, built by a Controls.Add
-    /// loop or one AddRange — the pattern that turns quadratic if every add re-lays the whole form.</summary>
-    private static Form BuildManyControlForm(int n, bool loop)
-    {
-        var form = new Form { Bounds = new(0, 0, 900, 700) };
-        if (loop)
-        {
-            for (var i = 0; i < n; ++i)
-                form.Controls.Add(new Label { Text = "L", Bounds = new((i % 8) * 110, (i / 8) * 20, 100, 18) });
-        }
-        else
-        {
-            var many = new Control[n];
-            for (var i = 0; i < n; ++i)
-                many[i] = new Label { Text = "L", Bounds = new((i % 8) * 110, (i / 8) * 20, 100, 18) };
-            form.Controls.AddRange(many);
-        }
-
-        return form;
-    }
-
-    private static void BuildForm(int n, bool loop, double budgetMs = double.MaxValue)
-    {
-        BuildManyControlForm(64, loop); // warm-up
-
-        var watch = Stopwatch.StartNew();
-        BuildManyControlForm(n, loop);
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        var label = loop ? "loop" : "range";
-        Emit($"scale.build{label}{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   ({n} controls, {label})");
-
-        // A linear build stays far under this; a per-add full layout (quadratic) blows past it.
-        if (ms > budgetMs)
-            _failures.Add($"scale.build{label}{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
-    }
-
-    private static void RealizeManyControlForm(int n)
-    {
-        Realize(BuildManyControlForm(n, loop: false)); // warm-up
-
-        var form = BuildManyControlForm(n, loop: false);
-        var watch = Stopwatch.StartNew();
-        Realize(form);
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.realize{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (realize {n} controls)");
-    }
-
-    private static void ResizeManyControlForm(int n)
-    {
-        var form = BuildManyControlForm(n, loop: false);
-        Application.Run(form, new BenchBackend());
-
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < 100; ++i)
-            form.Bounds = new(0, 0, 900 + (i % 2), 700); // toggle width to force a relayout each time
-        watch.Stop();
-
-        var us = watch.Elapsed.TotalMicroseconds / 100;
-        Emit($"scale.resize{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   (relayout {n} controls, per resize)");
-    }
-
-    private static void ScrollManyChildPanel(int n, double budgetUs = double.MaxValue)
-    {
-        var panel = new Panel { Bounds = new(0, 0, 400, 600), AutoScroll = true };
-        for (var i = 0; i < n; ++i)
-            panel.Controls.Add(new Label { Text = "Item " + i, Bounds = new(4, i * 20, 200, 18) });
-        var form = new Form { Bounds = new(0, 0, 420, 640) };
-        form.Controls.Add(panel);
-        Application.Run(form, new BenchBackend());
-
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < 200; ++i)
-            panel.AutoScrollPosition = new(0, (i % 100) * 20); // scroll up and down repeatedly
-        watch.Stop();
-
-        var us = watch.Elapsed.TotalMicroseconds / 200;
-        Emit($"scale.scrollPanel{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   ({n} children, per scroll)");
-
-        // Re-deriving the content extent per child (quadratic) would be an order of magnitude over this.
-        if (us > budgetUs)
-            _failures.Add($"scale.scrollPanel{n}: {us:F0} µs/scroll exceeds the {budgetUs} µs linear-scale gate (quadratic regression?)");
-    }
-
-    private static void BindLargeGrid(int rows)
-    {
-        var list = new Hawkynt.NativeForms.ComponentModel.ObservableList<object?>();
-        for (var i = 0; i < rows; ++i)
-            list.Add(new Row("Row " + i, i));
-
-        var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
-        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
-        grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
-        Application.Run(new Form { Bounds = new(0, 0, 520, 480), Controls = { grid } }, new BenchBackend());
-
-        var watch = Stopwatch.StartNew();
-        grid.DataSource = list;
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.bindGrid{rows}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {rows} rows)");
-    }
-
-    private static void BuildTree(int n)
-    {
-        { var w = new TreeView(); for (var i = 0; i < 64; ++i) w.Nodes.Add("N"); } // warm-up
-
-        var watch = Stopwatch.StartNew();
-        var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
-        for (var i = 0; i < n; ++i)
-            tree.Nodes.Add("Node " + i);
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.buildTree{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} tree nodes)");
-    }
-
-    private static void ExpandBigNode(int n)
-    {
-        var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
-        var root = tree.Nodes.Add("Root");
-        for (var i = 0; i < n; ++i)
-            root.Nodes.Add("Child " + i);
-        Application.Run(new Form { Bounds = new(0, 0, 360, 480), Controls = { tree } }, new BenchBackend());
-
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < 200; ++i)
-            root.Toggle();
-        watch.Stop();
-
-        var us = watch.Elapsed.TotalMicroseconds / 200;
-        Emit($"scale.expandTree{n}", $"{{\"us\":{F(us)}}}", $"{us,10:F1} µs   (toggle a {n}-child node)");
-    }
-
-    private static void BuildListView(int n)
-    {
-        var watch = Stopwatch.StartNew();
-        var list = new ListView { Bounds = new(0, 0, 480, 440) };
-        list.Columns.Add(new ColumnHeader("Name", 240));
-        for (var i = 0; i < n; ++i)
-            list.Items.Add(new ListViewItem("Row " + i));
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.buildListView{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} list items)");
-    }
-
-    private static void BuildTreeList(int n)
-    {
-        var watch = Stopwatch.StartNew();
-        var tree = new TreeListView { Bounds = new(0, 0, 480, 440) };
-        for (var i = 0; i < n; ++i)
-            tree.Nodes.Add("Row " + i);
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.buildTreeList{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} tree-list rows)");
-    }
-
-    private static void BuildCalendar(int n)
-    {
-        MakeCalendarView(CalendarViewMode.Week, 64); // warm-up
-
-        var watch = Stopwatch.StartNew();
-        MakeCalendarView(CalendarViewMode.Week, n);
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.buildCalendar{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (bind {n} appointments)");
-    }
-
-    private static void BuildAccordion(int n, double budgetMs = double.MaxValue)
-    {
-        var watch = Stopwatch.StartNew();
-        var accordion = new Accordion { Bounds = new(0, 0, 300, 600) };
-        for (var i = 0; i < n; ++i)
-            accordion.Panes.Add(new AccordionPane("Pane " + i));
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.buildAccordion{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} accordion panes)");
-        if (ms > budgetMs)
-            _failures.Add($"scale.buildAccordion{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
-    }
-
-    private static void BuildDockPanel(int n, double budgetMs = double.MaxValue)
-    {
-        var watch = Stopwatch.StartNew();
-        var dock = new DockPanel { Bounds = new(0, 0, 900, 600) };
-        for (var i = 0; i < n; ++i)
-            dock.AddDocument(new DockContent("Doc " + i));
-        watch.Stop();
-
-        var ms = watch.Elapsed.TotalMilliseconds;
-        Emit($"scale.buildDockPanel{n}", $"{{\"ms\":{F(ms)}}}", $"{ms,10:F2} ms   (build {n} dock documents)");
-        if (ms > budgetMs)
-            _failures.Add($"scale.buildDockPanel{n}: {ms:F1} ms exceeds the {budgetMs} ms linear-scale gate (quadratic regression?)");
-    }
-
-    private static Form MakeHundredControlForm()
-    {
-        var form = new Form { Bounds = new(0, 0, 1200, 800) };
-        for (var i = 0; i < 25; ++i)
-        {
-            form.Controls.Add(new Button { Text = "Button", Bounds = new(0, i * 30, 100, 26) });
-            form.Controls.Add(new Label { Text = "Label", Bounds = new(110, i * 30, 100, 20) });
-            form.Controls.Add(new TextBox { Text = "Text", Bounds = new(220, i * 30, 100, 24) });
-            form.Controls.Add(new CheckBox { Text = "Check", Bounds = new(330, i * 30, 100, 20) });
-        }
-
-        return form;
-    }
-
-    // ---- Metric: steady-state repaint ----
-
-    private static void PaintThroughput(string name, OwnerDrawnControl control)
-    {
-        var canvas = RealizeOnCanvas(control);
-        canvas.PerformPaint();
-        canvas.PerformPaint(); // warm-up: JIT the paint path and build caches/reused args
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < _PaintAllocationFrames; ++i)
-            canvas.PerformPaint();
-        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < _PaintThroughputFrames; ++i)
-            canvas.PerformPaint();
-        watch.Stop();
-
-        var paintsPerSecond = _PaintThroughputFrames / watch.Elapsed.TotalSeconds;
-        Emit($"paint.{name}", $"{{\"paints_per_sec\":{F(paintsPerSecond)},\"bytes_per_frame\":{F((double)bytes / _PaintAllocationFrames)}}}",
-            $"{paintsPerSecond,8:F0} paints/s  {(double)bytes / _PaintAllocationFrames,4:F0} B/frame");
-
-        if (bytes != 0)
-            _failures.Add($"paint.{name}: {bytes} B allocated over {_PaintAllocationFrames} steady-state frames (must be 0)");
-    }
-
-    // ---- Metric: scroll traversal ----
-
-    private static void ScrollTraversal(string name, OwnerDrawnControl control, Keys? key)
-    {
-        var canvas = RealizeOnCanvas(control);
-        canvas.PerformPaint(); // warm-up frame
-
-        // Page keys cover a viewport per step; the wheel-driven fallback covers 3 rows per notch.
-        var steps = key is null ? _TraversalRows / 3 + 1 : _TraversalRows / 10 + 1;
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < steps; ++i)
-        {
-            if (key is { } k)
-                canvas.PerformKeyDown(k);
-            else
-                canvas.PerformMouseWheel(-120);
-
-            canvas.PerformPaint();
-        }
-
-        watch.Stop();
-        var rowsPerSecond = _TraversalRows / watch.Elapsed.TotalSeconds;
-        Emit($"scroll.{name}", $"{{\"rows\":{_TraversalRows},\"ms\":{F(watch.Elapsed.TotalMilliseconds)},\"rows_per_sec\":{F(rowsPerSecond)}}}",
-            $"{watch.Elapsed.TotalMilliseconds,8:F0} ms     {rowsPerSecond,10:F0} rows/s");
-    }
-
-    // ---- Control factories ----
-
-    private static ListBox MakeListBox(int rows)
-    {
-        var list = new ListBox { Bounds = new(0, 0, 320, 440) };
-        for (var i = 0; i < rows; ++i)
-            list.Items.Add("Row " + i);
-        list.SelectedIndex = 0;
-        return list;
-    }
-
-    private static ListView MakeListView(int rows)
-    {
-        var list = new ListView { Bounds = new(0, 0, 480, 440) };
-        list.Columns.Add(new ColumnHeader("Name", 240));
-        list.Columns.Add(new ColumnHeader("Size", 120));
-        for (var i = 0; i < rows; ++i)
-            list.Items.Add(new ListViewItem("Row " + i, "1 KB"));
-        list.SelectedIndex = 0;
-        return list;
-    }
-
-    private static TreeView MakeTreeView(int rows)
-    {
-        var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
-        for (var i = 0; i < rows; ++i)
-            tree.Nodes.Add("Node " + i);
-        return tree;
-    }
-
-    /// <summary>The busiest time field: twelve-hour, seconds shown, so every part paints.</summary>
-    private static TimePicker MakeTimePicker()
-        => new() { Bounds = new(0, 0, 200, 26), Value = new(14, 30, 5), Use24HourClock = false };
-
-    private static MonthCalendar MakeMonthCalendar()
-        => new() { Bounds = new(0, 0, 240, 200), TodayDate = new(2026, 7, 19) };
-
-    /// <summary>The busiest dial: twelve-hour, seconds shown, minute stage so a full labelled ring
-    /// and the AM/PM header paint every frame.</summary>
-    private static ClockFace MakeClockFace()
-        => new() { Bounds = new(0, 0, 192, 236), Value = new(14, 30, 5), Use24HourClock = false, ShowSeconds = true, Stage = ClockFaceStage.Minute };
-
-    /// <summary>A scheduler bound to <paramref name="rows"/> appointments spread across time, centred on
-    /// a week that holds a busy day — the paint and scroll benchmarks' populated instance.</summary>
-    private static CalendarView MakeCalendarView(CalendarViewMode mode, int rows)
-    {
-        var calendar = new CalendarView
-        {
-            Bounds = new(0, 0, 640, 440),
-            ViewMode = mode,
-            SelectedDate = new(2020, 1, 1),
-            Now = new(2020, 1, 1, 10, 30, 0),
-        };
-
-        var appts = new Appointment[rows];
-        var start = new DateTime(2020, 1, 1, 8, 0, 0);
-        for (var i = 0; i < rows; ++i)
-        {
-            // Stagger starts by 37 minutes so several land on the same day and overlap — the column
-            // packing runs — while the whole set spans years so a page touches only a slice.
-            var when = start.AddMinutes(i * 37);
-            appts[i] = new Appointment("Item " + i, when, when.AddMinutes(45));
-        }
-
-        calendar.SetAppointments(appts);
-        return calendar;
-    }
-    /// <summary>A three-pane navigation stack with real children in the open pane.</summary>
-    private static Accordion MakeAccordion()
-    {
-        var accordion = new Accordion { Bounds = new(0, 0, 240, 440) };
-        var mail = new AccordionPane("Mail");
-        mail.Controls.Add(new CheckBox { Text = "Unread only", Bounds = new(8, 8, 160, 20) });
-        mail.Controls.Add(new Button { Text = "Compose", Bounds = new(8, 34, 100, 26) });
-        var calendar = new AccordionPane("Calendar");
-        calendar.Controls.Add(new RadioButton { Text = "Week", Bounds = new(8, 8, 120, 20) });
-        accordion.Panes.AddRange(mail, calendar, new AccordionPane("Contacts"));
-        return accordion;
-    }
-
-    /// <summary>A three-tab, six-group ribbon mixing both item sizes and a hosted control.</summary>
-    private static Ribbon MakeRibbon()
-    {
-        var ribbon = new Ribbon { Bounds = new(0, 0, 900, 120) };
-        for (var t = 0; t < 3; ++t)
-        {
-            var tab = new RibbonTab("Tab " + t);
-            for (var g = 0; g < 2; ++g)
-            {
-                var group = new RibbonGroup("Group " + g);
-                group.Items.AddRange(
-                    new RibbonButton("Large"),
-                    new RibbonButton("One", RibbonItemSize.Small),
-                    new RibbonButton("Two", RibbonItemSize.Small),
-                    new RibbonToggleButton("Three", RibbonItemSize.Small));
-                tab.Groups.Add(group);
-            }
-
-            ribbon.Tabs.Add(tab);
-        }
-
-        return ribbon;
-    }
-
-    /// <summary>A table-size picker with a live "C × R" caption, so the caption cache is exercised.</summary>
-    private static GridPicker MakeGridPicker()
-    {
-        var picker = new GridPicker { Bounds = new(0, 0, 200, 200), MaxColumns = 8, MaxRows = 6 };
-        picker.SetSelection(3, 4);
-        return picker;
-    }
-
-    /// <summary>An IDE-shaped dock layout: two document tabs, three docked tool panes and two splitters.</summary>
-    private static DockPanel MakeDockPanel()
-    {
-        var dock = new DockPanel { Bounds = new(0, 0, 900, 600) };
-        dock.AddDocument(new DockContent("Program.cs") { Name = "d1" });
-        dock.AddDocument(new DockContent("Readme.md") { Name = "d2" });
-        dock.Add(new DockContent("Solution") { Name = "sol" }, DockState.Docked, DockEdge.Left);
-        dock.Add(new DockContent("Properties") { Name = "props" }, DockState.Docked, DockEdge.Right);
-        dock.Add(new DockContent("Output") { Name = "out" }, DockState.Docked, DockEdge.Bottom);
-        return dock;
-    }
-
-    private static DataGridView MakeDataGridView(int rows)
-    {
-        var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
-        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
-        grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
-        for (var i = 0; i < rows; ++i)
-            grid.Items.Add(new Row("Row " + i, i));
-        grid.SelectedRowIndex = 0;
-        return grid;
-    }
-
-    /// <summary>
-    /// A grid carrying the popup-list column kinds: a single-select list mapped through an item
-    /// display selector, plus the two set-valued ones whose closed cells summarise a whole item
-    /// collection. Their per-row work must stay behind the display-text cache, so this grid has to
-    /// paint as cheaply — and as allocation-free — as the plain one above.
-    /// </summary>
-    private static DataGridView MakeListColumnGrid(int rows)
-    {
-        var choices = new object?[] { "Alpha", "Beta", "Gamma", "Delta" };
-        var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
-        grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name) { Width = 120 });
-        grid.Columns.Add(new DataGridViewColumn("Pick", static o => ((Row)o!).Name)
-        {
-            Kind = DataGridViewColumnKind.ListBox,
-            Width = 120,
-            ItemsSelector = _ => choices,
-            ItemDisplaySelector = static c => (string)c!,
-            ValueSetter = static (_, _) => { },
-        });
-        grid.Columns.Add(new DataGridViewColumn("Picks", static _ => null)
-        {
-            Kind = DataGridViewColumnKind.ListBox,
-            SelectionMode = SelectionMode.MultiExtended,
-            Width = 120,
-            ItemsSelector = _ => choices,
-            CheckedItemsSelector = _ => choices,
-            CheckedItemsSetter = static (_, _) => { },
-        });
-        grid.Columns.Add(new DataGridViewColumn("Tags", static _ => null)
-        {
-            Kind = DataGridViewColumnKind.CheckedListBox,
-            Width = 120,
-            ItemsSelector = _ => choices,
-            CheckedItemsSelector = _ => choices,
-            CheckedItemsSetter = static (_, _) => { },
-        });
-        for (var i = 0; i < rows; ++i)
-            grid.Items.Add(new Row("Row " + i, i));
-        grid.SelectedRowIndex = 0;
-        return grid;
-    }
-    private static IconLabel MakeIconLabel()
-        => new() { Text = "Documents", Image = new BenchImage(16, 16), Bounds = new(0, 0, 200, 24) };
-
-    private static ProgressTile MakeProgressTile() => new()
-    {
-        Text = "Windows (C:)",
-        SecondaryText = "45.2 GB free of 128 GB",
-        Image = new BenchImage(24, 24),
-        Bounds = new(0, 0, 220, 64),
-        Maximum = 128,
-        Value = 118,
-        WarningThreshold = 115,
+    watch.Stop();
+    var rowsPerSecond = _TraversalRows / watch.Elapsed.TotalSeconds;
+    Emit($"scroll.{name}", $"{{\"rows\":{_TraversalRows},\"ms\":{F(watch.Elapsed.TotalMilliseconds)},\"rows_per_sec\":{F(rowsPerSecond)}}}",
+        $"{watch.Elapsed.TotalMilliseconds,8:F0} ms     {rowsPerSecond,10:F0} rows/s");
+  }
+
+  // ---- Control factories ----
+
+  private static ListBox MakeListBox(int rows) {
+    var list = new ListBox { Bounds = new(0, 0, 320, 440) };
+    for (var i = 0; i < rows; ++i)
+      list.Items.Add("Row " + i);
+    list.SelectedIndex = 0;
+    return list;
+  }
+
+  private static ListView MakeListView(int rows) {
+    var list = new ListView { Bounds = new(0, 0, 480, 440) };
+    list.Columns.Add(new ColumnHeader("Name", 240));
+    list.Columns.Add(new ColumnHeader("Size", 120));
+    for (var i = 0; i < rows; ++i)
+      list.Items.Add(new ListViewItem("Row " + i, "1 KB"));
+    list.SelectedIndex = 0;
+    return list;
+  }
+
+  private static TreeView MakeTreeView(int rows) {
+    var tree = new TreeView { Bounds = new(0, 0, 320, 440) };
+    for (var i = 0; i < rows; ++i)
+      tree.Nodes.Add("Node " + i);
+    return tree;
+  }
+
+  /// <summary>The busiest time field: twelve-hour, seconds shown, so every part paints.</summary>
+  private static TimePicker MakeTimePicker()
+      => new() { Bounds = new(0, 0, 200, 26), Value = new(14, 30, 5), Use24HourClock = false };
+
+  private static MonthCalendar MakeMonthCalendar()
+      => new() { Bounds = new(0, 0, 240, 200), TodayDate = new(2026, 7, 19) };
+
+  /// <summary>The busiest dial: twelve-hour, seconds shown, minute stage so a full labelled ring
+  /// and the AM/PM header paint every frame.</summary>
+  private static ClockFace MakeClockFace()
+      => new() { Bounds = new(0, 0, 192, 236), Value = new(14, 30, 5), Use24HourClock = false, ShowSeconds = true, Stage = ClockFaceStage.Minute };
+
+  /// <summary>A scheduler bound to <paramref name="rows"/> appointments spread across time, centred on
+  /// a week that holds a busy day — the paint and scroll benchmarks' populated instance.</summary>
+  private static CalendarView MakeCalendarView(CalendarViewMode mode, int rows) {
+    var calendar = new CalendarView {
+      Bounds = new(0, 0, 640, 440),
+      ViewMode = mode,
+      SelectedDate = new(2020, 1, 1),
+      Now = new(2020, 1, 1, 10, 30, 0),
     };
 
-    private static FilePicker MakeFilePicker()
-        => new() { Bounds = new(0, 0, 240, 26), SelectedPath = "/tmp/missing.txt" };
-
-    // ---- Plumbing ----
-
-    private static void Realize(Form form) => Application.Run(form, new BenchBackend());
-
-    private static BenchCanvasPeer RealizeOnCanvas(OwnerDrawnControl control)
-    {
-        var backend = new BenchBackend();
-        var form = new Form { Bounds = new(0, 0, 640, 480) };
-        form.Controls.Add(control);
-        Application.Run(form, backend);
-        return backend.Canvases[0];
+    var appts = new Appointment[rows];
+    var start = new DateTime(2020, 1, 1, 8, 0, 0);
+    for (var i = 0; i < rows; ++i) {
+      // Stagger starts by 37 minutes so several land on the same day and overlap — the column
+      // packing runs — while the whole set spans years so a page touches only a slice.
+      var when = start.AddMinutes(i * 37);
+      appts[i] = new Appointment("Item " + i, when, when.AddMinutes(45));
     }
 
-    private static string F(double value) => value.ToString("F1", CultureInfo.InvariantCulture);
+    calendar.SetAppointments(appts);
+    return calendar;
+  }
+  /// <summary>A three-pane navigation stack with real children in the open pane.</summary>
+  private static Accordion MakeAccordion() {
+    var accordion = new Accordion { Bounds = new(0, 0, 240, 440) };
+    var mail = new AccordionPane("Mail");
+    mail.Controls.Add(new CheckBox { Text = "Unread only", Bounds = new(8, 8, 160, 20) });
+    mail.Controls.Add(new Button { Text = "Compose", Bounds = new(8, 34, 100, 26) });
+    var calendar = new AccordionPane("Calendar");
+    calendar.Controls.Add(new RadioButton { Text = "Week", Bounds = new(8, 8, 120, 20) });
+    accordion.Panes.AddRange(mail, calendar, new AccordionPane("Contacts"));
+    return accordion;
+  }
 
-    private static void Emit(string metric, string jsonBody, string human)
-    {
-        Console.WriteLine($"{{\"metric\":\"{metric}\",{jsonBody[1..]}");
-        _table.Add((metric, human));
+  /// <summary>A three-tab, six-group ribbon mixing both item sizes and a hosted control.</summary>
+  private static Ribbon MakeRibbon() {
+    var ribbon = new Ribbon { Bounds = new(0, 0, 900, 120) };
+    for (var t = 0; t < 3; ++t) {
+      var tab = new RibbonTab("Tab " + t);
+      for (var g = 0; g < 2; ++g) {
+        var group = new RibbonGroup("Group " + g);
+        group.Items.AddRange(
+            new RibbonButton("Large"),
+            new RibbonButton("One", RibbonItemSize.Small),
+            new RibbonButton("Two", RibbonItemSize.Small),
+            new RibbonToggleButton("Three", RibbonItemSize.Small));
+        tab.Groups.Add(group);
+      }
+
+      ribbon.Tabs.Add(tab);
     }
 
-    private static void PrintTable()
-    {
-        Console.WriteLine();
-        Console.WriteLine($"{"metric",-22} value");
-        Console.WriteLine(new string('-', 60));
-        foreach (var (metric, value) in _table)
-            Console.WriteLine($"{metric,-22} {value}");
-    }
+    return ribbon;
+  }
+
+  /// <summary>A table-size picker with a live "C × R" caption, so the caption cache is exercised.</summary>
+  private static GridPicker MakeGridPicker() {
+    var picker = new GridPicker { Bounds = new(0, 0, 200, 200), MaxColumns = 8, MaxRows = 6 };
+    picker.SetSelection(3, 4);
+    return picker;
+  }
+
+  /// <summary>An IDE-shaped dock layout: two document tabs, three docked tool panes and two splitters.</summary>
+  private static DockPanel MakeDockPanel() {
+    var dock = new DockPanel { Bounds = new(0, 0, 900, 600) };
+    dock.AddDocument(new DockContent("Program.cs") { Name = "d1" });
+    dock.AddDocument(new DockContent("Readme.md") { Name = "d2" });
+    dock.Add(new DockContent("Solution") { Name = "sol" }, DockState.Docked, DockEdge.Left);
+    dock.Add(new DockContent("Properties") { Name = "props" }, DockState.Docked, DockEdge.Right);
+    dock.Add(new DockContent("Output") { Name = "out" }, DockState.Docked, DockEdge.Bottom);
+    return dock;
+  }
+
+  private static DataGridView MakeDataGridView(int rows) {
+    var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
+    grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name));
+    grid.Columns.Add(new DataGridViewColumn("Value", static o => ((Row)o!).Value) { Width = 80 });
+    for (var i = 0; i < rows; ++i)
+      grid.Items.Add(new Row("Row " + i, i));
+    grid.SelectedRowIndex = 0;
+    return grid;
+  }
+
+  /// <summary>
+  /// A grid carrying the popup-list column kinds: a single-select list mapped through an item
+  /// display selector, plus the two set-valued ones whose closed cells summarise a whole item
+  /// collection. Their per-row work must stay behind the display-text cache, so this grid has to
+  /// paint as cheaply — and as allocation-free — as the plain one above.
+  /// </summary>
+  private static DataGridView MakeListColumnGrid(int rows) {
+    var choices = new object?[] { "Alpha", "Beta", "Gamma", "Delta" };
+    var grid = new DataGridView { Bounds = new(0, 0, 480, 440) };
+    grid.Columns.Add(new DataGridViewColumn("Name", static o => ((Row)o!).Name) { Width = 120 });
+    grid.Columns.Add(new DataGridViewColumn("Pick", static o => ((Row)o!).Name) {
+      Kind = DataGridViewColumnKind.ListBox,
+      Width = 120,
+      ItemsSelector = _ => choices,
+      ItemDisplaySelector = static c => (string)c!,
+      ValueSetter = static (_, _) => { },
+    });
+    grid.Columns.Add(new DataGridViewColumn("Picks", static _ => null) {
+      Kind = DataGridViewColumnKind.ListBox,
+      SelectionMode = SelectionMode.MultiExtended,
+      Width = 120,
+      ItemsSelector = _ => choices,
+      CheckedItemsSelector = _ => choices,
+      CheckedItemsSetter = static (_, _) => { },
+    });
+    grid.Columns.Add(new DataGridViewColumn("Tags", static _ => null) {
+      Kind = DataGridViewColumnKind.CheckedListBox,
+      Width = 120,
+      ItemsSelector = _ => choices,
+      CheckedItemsSelector = _ => choices,
+      CheckedItemsSetter = static (_, _) => { },
+    });
+    for (var i = 0; i < rows; ++i)
+      grid.Items.Add(new Row("Row " + i, i));
+    grid.SelectedRowIndex = 0;
+    return grid;
+  }
+  private static IconLabel MakeIconLabel()
+      => new() { Text = "Documents", Image = new BenchImage(16, 16), Bounds = new(0, 0, 200, 24) };
+
+  private static ProgressTile MakeProgressTile() => new() {
+    Text = "Windows (C:)",
+    SecondaryText = "45.2 GB free of 128 GB",
+    Image = new BenchImage(24, 24),
+    Bounds = new(0, 0, 220, 64),
+    Maximum = 128,
+    Value = 118,
+    WarningThreshold = 115,
+  };
+
+  private static FilePicker MakeFilePicker()
+      => new() { Bounds = new(0, 0, 240, 26), SelectedPath = "/tmp/missing.txt" };
+
+  // ---- Plumbing ----
+
+  private static void Realize(Form form) => Application.Run(form, new BenchBackend());
+
+  private static BenchCanvasPeer RealizeOnCanvas(OwnerDrawnControl control) {
+    var backend = new BenchBackend();
+    var form = new Form { Bounds = new(0, 0, 640, 480) };
+    form.Controls.Add(control);
+    Application.Run(form, backend);
+    return backend.Canvases[0];
+  }
+
+  private static string F(double value) => value.ToString("F1", CultureInfo.InvariantCulture);
+
+  private static void Emit(string metric, string jsonBody, string human) {
+    Console.WriteLine($"{{\"metric\":\"{metric}\",{jsonBody[1..]}");
+    _table.Add((metric, human));
+  }
+
+  private static void PrintTable() {
+    Console.WriteLine();
+    Console.WriteLine($"{"metric",-22} value");
+    Console.WriteLine(new string('-', 60));
+    foreach (var (metric, value) in _table)
+      Console.WriteLine($"{metric,-22} {value}");
+  }
 }

@@ -4,306 +4,286 @@ using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Demo;
 
-internal sealed partial class MainForm
-{
-    /// <summary>
-    /// The Basics page: the MVVM click counter (command in, bound label and progress bar out), a
-    /// button opening a modal message box and echoing its <see cref="DialogResult"/>, labels with
-    /// <see cref="Label.AutoSize"/> and <see cref="Label.TextAlign"/>, a link label, check boxes
-    /// (one with a generated icon), a toggle switch, a radio-button group nested in a real
-    /// <see cref="GroupBox"/>, progress bars at 0/50/100 plus a marquee, and a picture box showing a
-    /// generated ARGB gradient with a context menu.
-    /// </summary>
-    private TabPage BuildBasicsPage()
-    {
-        var page = new TabPage("Basics") { ImageIndex = _IconBlue };
+internal sealed partial class MainForm {
+  /// <summary>
+  /// The Basics page: the MVVM click counter (command in, bound label and progress bar out), a
+  /// button opening a modal message box and echoing its <see cref="DialogResult"/>, labels with
+  /// <see cref="Label.AutoSize"/> and <see cref="Label.TextAlign"/>, a link label, check boxes
+  /// (one with a generated icon), a toggle switch, a radio-button group nested in a real
+  /// <see cref="GroupBox"/>, progress bars at 0/50/100 plus a marquee, and a picture box showing a
+  /// generated ARGB gradient with a context menu.
+  /// </summary>
+  private TabPage BuildBasicsPage() {
+    var page = new TabPage("Basics") { ImageIndex = _IconBlue };
 
-        // --- Column 1: buttons and the MVVM counter ---------------------------------------------
+    // --- Column 1: buttons and the MVVM counter ---------------------------------------------
 
-        var counterLabel = new Label { Bounds = new(16, 36, 300, 22), Text = _viewModel.Display };
-        var counterBar = new ProgressBar { Bounds = new(16, 62, 300, 16) };
-        var clickButton = new Button { Bounds = new(16, 88, 145, 30), Text = "Click me 🎨", Image = this.SquareImage(Color.MediumSeaGreen) };
-        clickButton.Click += (_, _) => _viewModel.Increment.Execute(null);
-        var disabledButton = new Button { Bounds = new(171, 88, 145, 30), Text = "Disabled", Enabled = false };
-        _toolTip.SetToolTip(clickButton, "Executes the view-model's RelayCommand.");
+    var counterLabel = new Label { Bounds = new(16, 36, 300, 22), Text = _viewModel.Display };
+    var counterBar = new ProgressBar { Bounds = new(16, 62, 300, 16) };
+    var clickButton = new Button { Bounds = new(16, 88, 145, 30), Text = "Click me 🎨", Image = this.SquareImage(Color.MediumSeaGreen) };
+    clickButton.Click += (_, _) => _viewModel.Increment.Execute(null);
+    var disabledButton = new Button { Bounds = new(171, 88, 145, 30), Text = "Disabled", Enabled = false };
+    _toolTip.SetToolTip(clickButton, "Executes the view-model's RelayCommand.");
 
-        _labelBinding = new(
-            _viewModel,
-            nameof(CounterViewModel.Count),
-            () => _viewModel.Display,
-            text => counterLabel.Text = text);
-        _progressBinding = new(
-            _viewModel,
-            nameof(CounterViewModel.Count),
-            () => _viewModel.Count * 10,
-            value => counterBar.Value = value);
+    _labelBinding = new(
+        _viewModel,
+        nameof(CounterViewModel.Count),
+        () => _viewModel.Display,
+        text => counterLabel.Text = text);
+    _progressBinding = new(
+        _viewModel,
+        nameof(CounterViewModel.Count),
+        () => _viewModel.Count * 10,
+        value => counterBar.Value = value);
 
-        var dialogButton = new Button { Bounds = new(16, 158, 300, 30), Text = "Show a modal MessageBox…" };
-        var dialogResultLabel = new Label { Bounds = new(16, 194, 300, 22), Text = "Result: (not asked yet)" };
-        dialogButton.Click += (_, _) =>
-        {
-            var result = MessageBox.Show(
-                "Keep the unsaved gallery changes?",
-                "NativeForms",
-                MessageBoxButtons.YesNoCancel,
-                MessageBoxIcon.Question);
-            dialogResultLabel.Text = $"Result: {result}";
-        };
+    var dialogButton = new Button { Bounds = new(16, 158, 300, 30), Text = "Show a modal MessageBox…" };
+    var dialogResultLabel = new Label { Bounds = new(16, 194, 300, 22), Text = "Result: (not asked yet)" };
+    dialogButton.Click += (_, _) => {
+      var result = MessageBox.Show(
+          "Keep the unsaved gallery changes?",
+          "NativeForms",
+          MessageBoxButtons.YesNoCancel,
+          MessageBoxIcon.Question);
+      dialogResultLabel.Text = $"Result: {result}";
+    };
 
-        // The owner-drawn message box: a custom animated icon and arbitrary button labels — neither of
-        // which the native dialog can show. Returns the index of the button pressed.
-        var customDialogButton = new Button { Bounds = new(16, 224, 300, 30), Text = "Custom MessageBox…" };
-        customDialogButton.Click += (_, _) =>
-        {
-            var choice = MessageBox.Show(
-                "The gallery is rebuilding its thumbnails.",
-                "Please wait",
-                ["Run in background", "Pause", "Cancel"],
-                BuildSpinner());
-            dialogResultLabel.Text = choice >= 0 ? $"Result: button {choice}" : "Result: dismissed";
-        };
+    // The owner-drawn message box: a custom animated icon and arbitrary button labels — neither of
+    // which the native dialog can show. Returns the index of the button pressed.
+    var customDialogButton = new Button { Bounds = new(16, 224, 300, 30), Text = "Custom MessageBox…" };
+    customDialogButton.Click += (_, _) => {
+      var choice = MessageBox.Show(
+          "The gallery is rebuilding its thumbnails.",
+          "Please wait",
+          ["Run in background", "Pause", "Cancel"],
+          BuildSpinner());
+      dialogResultLabel.Text = choice >= 0 ? $"Result: button {choice}" : "Result: dismissed";
+    };
 
-        // The two faces no platform button offers, so both are painted (PRD §12). They want to be on a
-        // page somebody photographs, and next to the two widget buttons above them, because the point
-        // of the painted half is that the difference is the one the style asks for and nothing else.
-        var flatButton = new Button { Bounds = new(16, 290, 145, 30), Text = "Flat", FlatStyle = FlatStyle.Flat };
-        var popupButton = new Button { Bounds = new(171, 290, 145, 30), Text = "Popup", FlatStyle = FlatStyle.Popup };
-        _toolTip.SetToolTip(flatButton, "FlatStyle.Flat — no frame until it is pressed.");
-        _toolTip.SetToolTip(popupButton, "FlatStyle.Popup — flat until the pointer arrives, then it wears the button frame.");
-        flatButton.Click += (_, _) => this.SetStatus("The flat button was clicked.");
-        popupButton.Click += (_, _) => this.SetStatus("The popup button was clicked.");
+    // The two faces no platform button offers, so both are painted (PRD §12). They want to be on a
+    // page somebody photographs, and next to the two widget buttons above them, because the point
+    // of the painted half is that the difference is the one the style asks for and nothing else.
+    var flatButton = new Button { Bounds = new(16, 290, 145, 30), Text = "Flat", FlatStyle = FlatStyle.Flat };
+    var popupButton = new Button { Bounds = new(171, 290, 145, 30), Text = "Popup", FlatStyle = FlatStyle.Popup };
+    _toolTip.SetToolTip(flatButton, "FlatStyle.Flat — no frame until it is pressed.");
+    _toolTip.SetToolTip(popupButton, "FlatStyle.Popup — flat until the pointer arrives, then it wears the button frame.");
+    flatButton.Click += (_, _) => this.SetStatus("The flat button was clicked.");
+    popupButton.Click += (_, _) => this.SetStatus("The popup button was clicked.");
 
-        page.Controls.AddRange(
-            Caption("Button + MVVM counter", 16, 12),
-            counterLabel, counterBar, clickButton, disabledButton,
-            Caption("Button → modal dialog", 16, 134),
-            dialogButton, dialogResultLabel, customDialogButton,
-            Caption("Button: FlatStyle (painted)", 16, 266),
-            flatButton, popupButton);
+    page.Controls.AddRange(
+        Caption("Button + MVVM counter", 16, 12),
+        counterLabel, counterBar, clickButton, disabledButton,
+        Caption("Button → modal dialog", 16, 134),
+        dialogButton, dialogResultLabel, customDialogButton,
+        Caption("Button: FlatStyle (painted)", 16, 266),
+        flatButton, popupButton);
 
-        this.Publish("basics.customDialog", customDialogButton);
-        this.Publish("basics.flat", flatButton);
-        this.Publish("basics.popup", popupButton);
+    this.Publish("basics.customDialog", customDialogButton);
+    this.Publish("basics.flat", flatButton);
+    this.Publish("basics.popup", popupButton);
 
-        // --- Column 2: labels, link, check boxes, toggle switch ---------------------------------
+    // --- Column 2: labels, link, check boxes, toggle switch ---------------------------------
 
-        var autoLabel = new Label
-        {
-            Bounds = new(340, 36, 10, 10),
-            Text = "AutoSize measures this label.",
-            AutoSize = true,
-        };
-        var centeredLabel = new Label
-        {
-            Bounds = new(340, 62, 300, 26),
-            Text = "TextAlign = MiddleCenter",
-            TextAlign = ContentAlignment.MiddleCenter,
-            BorderStyle = BorderStyle.FixedSingle,
-        };
+    var autoLabel = new Label {
+      Bounds = new(340, 36, 10, 10),
+      Text = "AutoSize measures this label.",
+      AutoSize = true,
+    };
+    var centeredLabel = new Label {
+      Bounds = new(340, 62, 300, 26),
+      Text = "TextAlign = MiddleCenter",
+      TextAlign = ContentAlignment.MiddleCenter,
+      BorderStyle = BorderStyle.FixedSingle,
+    };
 
-        var link = new LinkLabel { Bounds = new(340, 114, 300, 20), Text = "Open the project page 🔗" };
-        link.LinkClicked += (_, _) =>
-        {
-            link.LinkVisited = true;
-            this.SetStatus("LinkLabel clicked — now painted as visited.");
-        };
+    var link = new LinkLabel { Bounds = new(340, 114, 300, 20), Text = "Open the project page 🔗" };
+    link.LinkClicked += (_, _) => {
+      link.LinkVisited = true;
+      this.SetStatus("LinkLabel clicked — now painted as visited.");
+    };
 
-        var plainCheck = new CheckBox { Bounds = new(340, 166, 300, 20), Text = "Plain check box ☑️" };
-        plainCheck.CheckedChanged += (_, _)
-            => this.SetStatus($"The plain check box is {(plainCheck.Checked ? "checked" : "unchecked")}.");
-        var preChecked = new CheckBox { Bounds = new(340, 192, 300, 20), Text = "Checked from the start", Checked = true };
-        var iconCheck = new CheckBox
-        {
-            Bounds = new(340, 218, 300, 20),
-            Text = "With an animated icon",
-            Image = BuildSpinner(),
-        };
-        var disabledCheck = new CheckBox { Bounds = new(340, 244, 300, 20), Text = "Disabled", Enabled = false };
+    var plainCheck = new CheckBox { Bounds = new(340, 166, 300, 20), Text = "Plain check box ☑️" };
+    plainCheck.CheckedChanged += (_, _)
+        => this.SetStatus($"The plain check box is {(plainCheck.Checked ? "checked" : "unchecked")}.");
+    var preChecked = new CheckBox { Bounds = new(340, 192, 300, 20), Text = "Checked from the start", Checked = true };
+    var iconCheck = new CheckBox {
+      Bounds = new(340, 218, 300, 20),
+      Text = "With an animated icon",
+      Image = BuildSpinner(),
+    };
+    var disabledCheck = new CheckBox { Bounds = new(340, 244, 300, 20), Text = "Disabled", Enabled = false };
 
-        // The third state is the one case where the three platforms disagree about who runs the click
-        // cycle — Win32 and AppKit walk it themselves, GTK will not — so it wants to be on a page the
-        // shooter photographs on all three, showing the mixed mark rather than only the two plain ones.
-        var triState = new CheckBox
-        {
-            Bounds = new(340, 270, 300, 20),
-            Text = "Tri-state (click me: on → mixed → off)",
-            ThreeState = true,
-            CheckState = CheckState.Indeterminate,
-        };
-        triState.CheckStateChanged += (_, _) => this.SetStatus($"The tri-state box is {triState.CheckState}.");
+    // The third state is the one case where the three platforms disagree about who runs the click
+    // cycle — Win32 and AppKit walk it themselves, GTK will not — so it wants to be on a page the
+    // shooter photographs on all three, showing the mixed mark rather than only the two plain ones.
+    var triState = new CheckBox {
+      Bounds = new(340, 270, 300, 20),
+      Text = "Tri-state (click me: on → mixed → off)",
+      ThreeState = true,
+      CheckState = CheckState.Indeterminate,
+    };
+    triState.CheckStateChanged += (_, _) => this.SetStatus($"The tri-state box is {triState.CheckState}.");
 
-        var toggle = new ToggleSwitch { Bounds = new(340, 322, 300, 24), Text = "Notifications 🔔 (colour emoji)", Checked = true };
-        toggle.CheckedChanged += (_, _)
-            => this.SetStatus($"Notifications are {(toggle.Checked ? "on" : "off")}.");
-        _toolTip.SetToolTip(toggle, "An owner-drawn on/off switch.");
+    var toggle = new ToggleSwitch { Bounds = new(340, 322, 300, 24), Text = "Notifications 🔔 (colour emoji)", Checked = true };
+    toggle.CheckedChanged += (_, _)
+        => this.SetStatus($"Notifications are {(toggle.Checked ? "on" : "off")}.");
+    _toolTip.SetToolTip(toggle, "An owner-drawn on/off switch.");
 
-        // The two label properties nothing else in the gallery asks for. A mnemonic is drawn very
-        // differently by the three platforms — a style bit, a markup convention, an attributed string —
-        // and an image on a label is the case where none of them can keep the widget at all, so the
-        // label is painted instead and has to come out the same on all three. Both want a control on a
-        // page somebody photographs.
-        var mnemonicLabel = new Label { Bounds = new(340, 396, 190, 22), Text = "&Underlined mnemonic" };
-        var literalLabel = new Label { Bounds = new(536, 396, 104, 22), Text = "&Literal", UseMnemonic = false };
-        var imageLabel = new Label { Bounds = new(340, 424, 24, 24), Image = this.DiscImage(Color.MediumOrchid) };
-        var captionedImageLabel = new Label
-        {
-            Bounds = new(340, 452, 300, 24),
-            Text = "…and one with a &caption beside it",
-            Image = this.DiscImage(Color.SeaGreen),
-            TextAlign = ContentAlignment.MiddleLeft,
-        };
+    // The two label properties nothing else in the gallery asks for. A mnemonic is drawn very
+    // differently by the three platforms — a style bit, a markup convention, an attributed string —
+    // and an image on a label is the case where none of them can keep the widget at all, so the
+    // label is painted instead and has to come out the same on all three. Both want a control on a
+    // page somebody photographs.
+    var mnemonicLabel = new Label { Bounds = new(340, 396, 190, 22), Text = "&Underlined mnemonic" };
+    var literalLabel = new Label { Bounds = new(536, 396, 104, 22), Text = "&Literal", UseMnemonic = false };
+    var imageLabel = new Label { Bounds = new(340, 424, 24, 24), Image = this.DiscImage(Color.MediumOrchid) };
+    var captionedImageLabel = new Label {
+      Bounds = new(340, 452, 300, 24),
+      Text = "…and one with a &caption beside it",
+      Image = this.DiscImage(Color.SeaGreen),
+      TextAlign = ContentAlignment.MiddleLeft,
+    };
 
-        page.Controls.AddRange(
-            Caption("Label", 340, 12),
-            autoLabel, centeredLabel,
-            Caption("LinkLabel", 340, 90),
-            link,
-            Caption("CheckBox", 340, 142),
-            plainCheck, preChecked, iconCheck, disabledCheck, triState,
-            Caption("ToggleSwitch", 340, 298),
-            toggle,
-            Caption("Label: mnemonic and image", 340, 372),
-            mnemonicLabel, literalLabel, imageLabel,
-            new Label { Bounds = new(372, 426, 268, 20), Text = "…a picture, and no caption at all" },
-            captionedImageLabel);
+    page.Controls.AddRange(
+        Caption("Label", 340, 12),
+        autoLabel, centeredLabel,
+        Caption("LinkLabel", 340, 90),
+        link,
+        Caption("CheckBox", 340, 142),
+        plainCheck, preChecked, iconCheck, disabledCheck, triState,
+        Caption("ToggleSwitch", 340, 298),
+        toggle,
+        Caption("Label: mnemonic and image", 340, 372),
+        mnemonicLabel, literalLabel, imageLabel,
+        new Label { Bounds = new(372, 426, 268, 20), Text = "…a picture, and no caption at all" },
+        captionedImageLabel);
 
-        // --- Column 3: grouped radios, progress bars, picture box -------------------------------
+    // --- Column 3: grouped radios, progress bars, picture box -------------------------------
 
-        var group = new GroupBox
-        {
-            Bounds = new(664, 36, 300, 108),
-            Text = "Size 📏",
-            Image = this.DiscImage(Color.SteelBlue), // a header icon, before the caption by default
-        };
-        var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small 🐣", Image = this.SquareImage(Color.MediumSeaGreen) };
-        var medium = new RadioButton { Bounds = new(16, 52, 260, 20), Text = "Medium", Image = this.SquareImage(Color.Goldenrod) };
-        var large = new RadioButton { Bounds = new(16, 78, 260, 20), Text = "Large", Image = this.SquareImage(Color.Crimson) };
-        void Report(RadioButton radio) => radio.CheckedChanged += (_, _) =>
-        {
-            if (radio.Checked)
-                this.SetStatus($"Selected size: {radio.Text}");
-        };
-        Report(small);
-        Report(medium);
-        Report(large);
-        group.Controls.AddRange(small, medium, large);
-        medium.Checked = true;
+    var group = new GroupBox {
+      Bounds = new(664, 36, 300, 108),
+      Text = "Size 📏",
+      Image = this.DiscImage(Color.SteelBlue), // a header icon, before the caption by default
+    };
+    var small = new RadioButton { Bounds = new(16, 26, 260, 20), Text = "Small 🐣", Image = this.SquareImage(Color.MediumSeaGreen) };
+    var medium = new RadioButton { Bounds = new(16, 52, 260, 20), Text = "Medium", Image = this.SquareImage(Color.Goldenrod) };
+    var large = new RadioButton { Bounds = new(16, 78, 260, 20), Text = "Large", Image = this.SquareImage(Color.Crimson) };
+    void Report(RadioButton radio) => radio.CheckedChanged += (_, _) => {
+      if (radio.Checked)
+        this.SetStatus($"Selected size: {radio.Text}");
+    };
+    Report(small);
+    Report(medium);
+    Report(large);
+    group.Controls.AddRange(small, medium, large);
+    medium.Checked = true;
 
-        var empty = new ProgressBar { Bounds = new(664, 182, 240, 16), Value = 0 };
-        var half = new ProgressBar { Bounds = new(664, 204, 240, 16), Value = 50 };
-        var full = new ProgressBar { Bounds = new(664, 226, 240, 16), Value = 100 };
-        var marquee = new ProgressBar { Bounds = new(664, 248, 240, 16), Style = ProgressBarStyle.Marquee };
-        var emptyLabel = new Label { Bounds = new(914, 180, 50, 18), Text = "0 %" };
-        var halfLabel = new Label { Bounds = new(914, 202, 50, 18), Text = "50 %" };
-        var fullLabel = new Label { Bounds = new(914, 224, 50, 18), Text = "100 %" };
-        _toolTip.SetToolTip(marquee, "Style = Marquee sweeps forever.");
+    var empty = new ProgressBar { Bounds = new(664, 182, 240, 16), Value = 0 };
+    var half = new ProgressBar { Bounds = new(664, 204, 240, 16), Value = 50 };
+    var full = new ProgressBar { Bounds = new(664, 226, 240, 16), Value = 100 };
+    var marquee = new ProgressBar { Bounds = new(664, 248, 240, 16), Style = ProgressBarStyle.Marquee };
+    var emptyLabel = new Label { Bounds = new(914, 180, 50, 18), Text = "0 %" };
+    var halfLabel = new Label { Bounds = new(914, 202, 50, 18), Text = "50 %" };
+    var fullLabel = new Label { Bounds = new(914, 224, 50, 18), Text = "100 %" };
+    _toolTip.SetToolTip(marquee, "Style = Marquee sweeps forever.");
 
-        // Shows a procedural gradient by default; the context menu swaps in the shared-clock spinner
-        // animation, the other gradient, or clears it.
-        var picture = new PictureBox
-        {
-            Bounds = new(664, 296, 300, 140),
-            SizeMode = PictureBoxSizeMode.Zoom,
-            BorderStyle = BorderStyle.FixedSingle,
-            Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid)),
-        };
-        var pictureMenu = new ContextMenuStrip();
-        var spin = new ToolStripMenuItem("Animated spinner");
-        spin.Click += (_, _) =>
-        {
-            picture.Image = BuildSpinner();
-            this.SetStatus("PictureBox: animated spinner (shared clock).");
-        };
-        var cool = new ToolStripMenuItem("Blue → orange gradient");
-        cool.Click += (_, _) =>
-        {
-            picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.RoyalBlue, Color.Orange));
-            this.SetStatus("PictureBox: blue → orange gradient.");
-        };
-        var warm = new ToolStripMenuItem("Green → purple gradient");
-        warm.Click += (_, _) =>
-        {
-            picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid));
-            this.SetStatus("PictureBox: green → purple gradient.");
-        };
-        var clear = new ToolStripMenuItem("Clear image");
-        clear.Click += (_, _) =>
-        {
-            picture.Image = null;
-            this.SetStatus("PictureBox: image cleared.");
-        };
-        // Rich context-menu items: a check-on-click toggle and a colour submenu with swatch icons.
-        var border = new ToolStripMenuItem("Fixed border") { CheckOnClick = true, Checked = true };
-        border.CheckedChanged += (_, _) =>
-        {
-            picture.BorderStyle = border.Checked ? BorderStyle.FixedSingle : BorderStyle.None;
-            this.SetStatus($"PictureBox: border {(border.Checked ? "on" : "off")}.");
-        };
-        var tint = new ToolStripMenuItem("Accent colour");
-        foreach (var (name, swatch) in new (string, Color)[] { ("Red", Color.Red), ("Green", Color.SeaGreen), ("Blue", Color.RoyalBlue), ("Gold", Color.Goldenrod) })
-        {
-            var choice = new ToolStripMenuItem(name) { Image = this.SquareImage(swatch) };
-            choice.Click += (_, _) => this.SetStatus($"PictureBox: accent set to {name}.");
-            tint.DropDownItems.Add(choice);
-        }
-
-        pictureMenu.Items.AddRange(spin, cool, warm, new ToolStripSeparator(), clear, new ToolStripSeparator(), border, tint);
-        picture.ContextMenuStrip = pictureMenu;
-        _toolTip.SetToolTip(picture, "Right-click to switch between the animation and gradients.");
-
-        page.Controls.AddRange(
-            Caption("RadioButton (nested in a GroupBox)", 664, 12),
-            group,
-            Caption("ProgressBar", 664, 158),
-            empty, half, full, marquee, emptyLabel, halfLabel, fullLabel,
-            Caption("PictureBox (animated + gradients)", 664, 272),
-            picture);
-
-        // Everything the walkthrough moves on this page, snapshotted the instant it was authored so
-        // the restore can never drift away from the values above.
-        var linkVisited = link.LinkVisited;
-        var plainChecked = plainCheck.Checked;
-        var toggleChecked = toggle.Checked;
-        var smallChecked = small.Checked;
-        var mediumChecked = medium.Checked;
-        var largeChecked = large.Checked;
-        var dialogResult = dialogResultLabel.Text;
-        var pictureImage = picture.Image;
-        this.OnReset(() =>
-        {
-            _viewModel.Count = 0;
-            link.LinkVisited = linkVisited;
-            plainCheck.Checked = plainChecked;
-            toggle.Checked = toggleChecked;
-
-            // The group is exclusive, so the one that was authored checked goes last: setting it
-            // clears whichever sibling the walkthrough left selected.
-            small.Checked = smallChecked;
-            large.Checked = largeChecked;
-            medium.Checked = mediumChecked;
-            dialogResultLabel.Text = dialogResult;
-            picture.Image = pictureImage;
-        });
-
-        this.Publish("basics.page", page);
-        this.Publish("basics.counterLabel", counterLabel);
-        this.Publish("basics.counterBar", counterBar);
-        this.Publish("basics.click", clickButton);
-        this.Publish("basics.disabled", disabledButton);
-        this.Publish("basics.dialog", dialogButton);
-        this.Publish("basics.dialogResult", dialogResultLabel);
-        this.Publish("basics.link", link);
-        this.Publish("basics.check", plainCheck);
-        this.Publish("basics.progressHalf", half);
-        this.Publish("basics.checkDisabled", disabledCheck);
-        this.Publish("basics.toggle", toggle);
-        this.Publish("basics.radioSmall", small);
-        this.Publish("basics.radioMedium", medium);
-        this.Publish("basics.radioLarge", large);
-        this.Publish("basics.picture", picture);
-        this.Publish("basics.pictureMenu", pictureMenu);
-        this.Publish("basics.viewModel", _viewModel);
-
-        return page;
+    // Shows a procedural gradient by default; the context menu swaps in the shared-clock spinner
+    // animation, the other gradient, or clears it.
+    var picture = new PictureBox {
+      Bounds = new(664, 296, 300, 140),
+      SizeMode = PictureBoxSizeMode.Zoom,
+      BorderStyle = BorderStyle.FixedSingle,
+      Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid)),
+    };
+    var pictureMenu = new ContextMenuStrip();
+    var spin = new ToolStripMenuItem("Animated spinner");
+    spin.Click += (_, _) => {
+      picture.Image = BuildSpinner();
+      this.SetStatus("PictureBox: animated spinner (shared clock).");
+    };
+    var cool = new ToolStripMenuItem("Blue → orange gradient");
+    cool.Click += (_, _) => {
+      picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.RoyalBlue, Color.Orange));
+      this.SetStatus("PictureBox: blue → orange gradient.");
+    };
+    var warm = new ToolStripMenuItem("Green → purple gradient");
+    warm.Click += (_, _) => {
+      picture.Image = _backend.CreateImage(150, 70, GradientPixels(150, 70, Color.SeaGreen, Color.MediumOrchid));
+      this.SetStatus("PictureBox: green → purple gradient.");
+    };
+    var clear = new ToolStripMenuItem("Clear image");
+    clear.Click += (_, _) => {
+      picture.Image = null;
+      this.SetStatus("PictureBox: image cleared.");
+    };
+    // Rich context-menu items: a check-on-click toggle and a colour submenu with swatch icons.
+    var border = new ToolStripMenuItem("Fixed border") { CheckOnClick = true, Checked = true };
+    border.CheckedChanged += (_, _) => {
+      picture.BorderStyle = border.Checked ? BorderStyle.FixedSingle : BorderStyle.None;
+      this.SetStatus($"PictureBox: border {(border.Checked ? "on" : "off")}.");
+    };
+    var tint = new ToolStripMenuItem("Accent colour");
+    foreach (var (name, swatch) in new (string, Color)[] { ("Red", Color.Red), ("Green", Color.SeaGreen), ("Blue", Color.RoyalBlue), ("Gold", Color.Goldenrod) }) {
+      var choice = new ToolStripMenuItem(name) { Image = this.SquareImage(swatch) };
+      choice.Click += (_, _) => this.SetStatus($"PictureBox: accent set to {name}.");
+      tint.DropDownItems.Add(choice);
     }
+
+    pictureMenu.Items.AddRange(spin, cool, warm, new ToolStripSeparator(), clear, new ToolStripSeparator(), border, tint);
+    picture.ContextMenuStrip = pictureMenu;
+    _toolTip.SetToolTip(picture, "Right-click to switch between the animation and gradients.");
+
+    page.Controls.AddRange(
+        Caption("RadioButton (nested in a GroupBox)", 664, 12),
+        group,
+        Caption("ProgressBar", 664, 158),
+        empty, half, full, marquee, emptyLabel, halfLabel, fullLabel,
+        Caption("PictureBox (animated + gradients)", 664, 272),
+        picture);
+
+    // Everything the walkthrough moves on this page, snapshotted the instant it was authored so
+    // the restore can never drift away from the values above.
+    var linkVisited = link.LinkVisited;
+    var plainChecked = plainCheck.Checked;
+    var toggleChecked = toggle.Checked;
+    var smallChecked = small.Checked;
+    var mediumChecked = medium.Checked;
+    var largeChecked = large.Checked;
+    var dialogResult = dialogResultLabel.Text;
+    var pictureImage = picture.Image;
+    this.OnReset(() => {
+      _viewModel.Count = 0;
+      link.LinkVisited = linkVisited;
+      plainCheck.Checked = plainChecked;
+      toggle.Checked = toggleChecked;
+
+      // The group is exclusive, so the one that was authored checked goes last: setting it
+      // clears whichever sibling the walkthrough left selected.
+      small.Checked = smallChecked;
+      large.Checked = largeChecked;
+      medium.Checked = mediumChecked;
+      dialogResultLabel.Text = dialogResult;
+      picture.Image = pictureImage;
+    });
+
+    this.Publish("basics.page", page);
+    this.Publish("basics.counterLabel", counterLabel);
+    this.Publish("basics.counterBar", counterBar);
+    this.Publish("basics.click", clickButton);
+    this.Publish("basics.disabled", disabledButton);
+    this.Publish("basics.dialog", dialogButton);
+    this.Publish("basics.dialogResult", dialogResultLabel);
+    this.Publish("basics.link", link);
+    this.Publish("basics.check", plainCheck);
+    this.Publish("basics.progressHalf", half);
+    this.Publish("basics.checkDisabled", disabledCheck);
+    this.Publish("basics.toggle", toggle);
+    this.Publish("basics.radioSmall", small);
+    this.Publish("basics.radioMedium", medium);
+    this.Publish("basics.radioLarge", large);
+    this.Publish("basics.picture", picture);
+    this.Publish("basics.pictureMenu", pictureMenu);
+    this.Publish("basics.viewModel", _viewModel);
+
+    return page;
+  }
 }

@@ -16,217 +16,196 @@ namespace Hawkynt.NativeForms;
 /// the ambient <see cref="Control.Font"/> and <see cref="Control.ForeColor"/> so it still matches
 /// the desktop. Like <see cref="Label"/> it takes no focus and handles no input.
 /// </remarks>
-public class IconLabel : OwnerDrawnControl
-{
-    /// <summary>The image shown beside the caption, or <see langword="null"/> for text only.</summary>
-    public IImage? Image
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+public class IconLabel : OwnerDrawnControl {
+  /// <summary>The image shown beside the caption, or <see langword="null"/> for text only.</summary>
+  public IImage? Image {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            this.UpdateImageAnimation();
-            this.ApplyAutoSize();
-            this.Invalidate();
-        }
+      field = value;
+      this.UpdateImageAnimation();
+      this.ApplyAutoSize();
+      this.Invalidate();
+    }
+  }
+
+  /// <inheritdoc/>
+  private protected override IImage? AnimatedImageSlot => this.Image;
+
+  /// <summary>
+  /// Where the whole image+text block anchors within the control's bounds. Defaults to
+  /// <see cref="ContentAlignment.MiddleLeft"/>, the reading position a captioned icon wants.
+  /// </summary>
+  public ContentAlignment TextAlign {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.Invalidate();
+    }
+  } = ContentAlignment.MiddleLeft;
+
+  /// <summary>
+  /// Where the image anchors when it is the only content — a text-less <see cref="IconLabel"/>
+  /// places its image by this rather than by <see cref="TextAlign"/>, matching Windows Forms.
+  /// </summary>
+  public ContentAlignment ImageAlign {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.Invalidate();
+    }
+  } = ContentAlignment.MiddleCenter;
+
+  /// <summary>
+  /// How the image sits relative to the text. Defaults to
+  /// <see cref="TextImageRelation.ImageBeforeText"/> — the icon leads, the caption follows.
+  /// </summary>
+  public TextImageRelation TextImageRelation {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.ApplyAutoSize();
+      this.Invalidate();
+    }
+  } = TextImageRelation.ImageBeforeText;
+
+  /// <summary>
+  /// When <see langword="true"/>, the label sizes itself to fit image and text in the ambient font.
+  /// Measured through the backend on realization and on every content change; before realization
+  /// the wish is simply buffered. Defaults to <see langword="false"/>, matching Windows Forms.
+  /// </summary>
+  public bool AutoSize {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.ApplyAutoSize();
+    }
+  }
+
+  /// <summary>Static text never takes keyboard focus (and so never joins the tab order).</summary>
+  protected override bool Focusable => false;
+
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var font = this.Font;
+    var client = this.DisplayRectangle;
+    g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
+
+    var text = this.Text;
+    var color = this.Enabled ? this.ForeColor : this.Theme.DisabledText;
+    var image = this.Image;
+    if (image is null) {
+      g.DrawText(text, font, color, client, this.EffectiveAlignment);
+      return;
     }
 
-    /// <inheritdoc/>
-    private protected override IImage? AnimatedImageSlot => this.Image;
+    // Right-to-left mirrors which side the icon leads on, exactly like the CheckBox face.
+    var relation = this.IsRightToLeft ? Mirror(this.TextImageRelation) : this.TextImageRelation;
+    ContentLayout.Arrange(
+        client,
+        new Size(image.Width, image.Height),
+        text.Length == 0 ? Size.Empty : g.MeasureText(text, font),
+        relation,
+        text.Length == 0 ? this.ImageAlign : this.EffectiveAlignment,
+        out var imageRect,
+        out var textRect);
 
-    /// <summary>
-    /// Where the whole image+text block anchors within the control's bounds. Defaults to
-    /// <see cref="ContentAlignment.MiddleLeft"/>, the reading position a captioned icon wants.
-    /// </summary>
-    public ContentAlignment TextAlign
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+    g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
+    if (text.Length > 0)
+      g.DrawText(text, font, color, textRect, ContentAlignment.MiddleCenter);
+  }
 
-            field = value;
-            this.Invalidate();
-        }
-    } = ContentAlignment.MiddleLeft;
+  /// <inheritdoc/>
+  protected override void OnTextChanged(EventArgs e) {
+    base.OnTextChanged(e);
+    this.ApplyAutoSize();
+  }
 
-    /// <summary>
-    /// Where the image anchors when it is the only content — a text-less <see cref="IconLabel"/>
-    /// places its image by this rather than by <see cref="TextAlign"/>, matching Windows Forms.
-    /// </summary>
-    public ContentAlignment ImageAlign
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>The block anchor, mirrored when the control reads right to left.</summary>
+  private ContentAlignment EffectiveAlignment
+      => this.IsRightToLeft ? RtlLayout.Mirror(this.TextAlign) : this.TextAlign;
 
-            field = value;
-            this.Invalidate();
-        }
-    } = ContentAlignment.MiddleCenter;
+  /// <summary>Resizes to the measured image+text block when <see cref="AutoSize"/> is on.</summary>
+  private void ApplyAutoSize() {
+    if (!this.AutoSize || this.Backend is not { } backend)
+      return;
 
-    /// <summary>
-    /// How the image sits relative to the text. Defaults to
-    /// <see cref="TextImageRelation.ImageBeforeText"/> — the icon leads, the caption follows.
-    /// </summary>
-    public TextImageRelation TextImageRelation
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.ApplyAutoSize();
-            this.Invalidate();
-        }
-    } = TextImageRelation.ImageBeforeText;
-
-    /// <summary>
-    /// When <see langword="true"/>, the label sizes itself to fit image and text in the ambient font.
-    /// Measured through the backend on realization and on every content change; before realization
-    /// the wish is simply buffered. Defaults to <see langword="false"/>, matching Windows Forms.
-    /// </summary>
-    public bool AutoSize
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.ApplyAutoSize();
-        }
+    var text = this.Text;
+    var textSize = text.Length == 0 ? Size.Empty : backend.MeasureText(text, this.Font);
+    if (this.Image is not { } image) {
+      this.Size = textSize;
+      return;
     }
 
-    /// <summary>Static text never takes keyboard focus (and so never joins the tab order).</summary>
-    protected override bool Focusable => false;
-
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var font = this.Font;
-        var client = this.DisplayRectangle;
-        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
-
-        var text = this.Text;
-        var color = this.Enabled ? this.ForeColor : this.Theme.DisabledText;
-        var image = this.Image;
-        if (image is null)
-        {
-            g.DrawText(text, font, color, client, this.EffectiveAlignment);
-            return;
-        }
-
-        // Right-to-left mirrors which side the icon leads on, exactly like the CheckBox face.
-        var relation = this.IsRightToLeft ? Mirror(this.TextImageRelation) : this.TextImageRelation;
-        ContentLayout.Arrange(
-            client,
-            new Size(image.Width, image.Height),
-            text.Length == 0 ? Size.Empty : g.MeasureText(text, font),
-            relation,
-            text.Length == 0 ? this.ImageAlign : this.EffectiveAlignment,
-            out var imageRect,
-            out var textRect);
-
-        g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
-        if (text.Length > 0)
-            g.DrawText(text, font, color, textRect, ContentAlignment.MiddleCenter);
+    var imageSize = new Size(image.Width, image.Height);
+    if (textSize.IsEmpty) {
+      this.Size = imageSize;
+      return;
     }
 
-    /// <inheritdoc/>
-    protected override void OnTextChanged(EventArgs e)
-    {
-        base.OnTextChanged(e);
-        this.ApplyAutoSize();
-    }
+    this.Size = this.TextImageRelation is TextImageRelation.ImageBeforeText or TextImageRelation.TextBeforeImage
+        ? new(imageSize.Width + ContentLayout.Gap + textSize.Width, Math.Max(imageSize.Height, textSize.Height))
+        : new(Math.Max(imageSize.Width, textSize.Width), imageSize.Height + ContentLayout.Gap + textSize.Height);
+  }
 
-    /// <summary>The block anchor, mirrored when the control reads right to left.</summary>
-    private ContentAlignment EffectiveAlignment
-        => this.IsRightToLeft ? RtlLayout.Mirror(this.TextAlign) : this.TextAlign;
+  /// <summary>Swaps the leading side of a horizontal relation; vertical ones are unaffected.</summary>
+  private static TextImageRelation Mirror(TextImageRelation relation) => relation switch {
+    TextImageRelation.ImageBeforeText => TextImageRelation.TextBeforeImage,
+    TextImageRelation.TextBeforeImage => TextImageRelation.ImageBeforeText,
+    _ => relation,
+  };
 
-    /// <summary>Resizes to the measured image+text block when <see cref="AutoSize"/> is on.</summary>
-    private void ApplyAutoSize()
-    {
-        if (!this.AutoSize || this.Backend is not { } backend)
-            return;
+  /// <inheritdoc/>
+  private protected override void OnRealized(Backends.IControlPeer peer) {
+    base.OnRealized(peer);
+    this.ApplyAutoSize();
+  }
 
-        var text = this.Text;
-        var textSize = text.Length == 0 ? Size.Empty : backend.MeasureText(text, this.Font);
-        if (this.Image is not { } image)
-        {
-            this.Size = textSize;
-            return;
-        }
+  /// <summary>Where the button went down, so a release can tell a click from the end of a drag.</summary>
+  private Point _pressedAt = new(-1, -1);
 
-        var imageSize = new Size(image.Width, image.Height);
-        if (textSize.IsEmpty)
-        {
-            this.Size = imageSize;
-            return;
-        }
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) {
+    base.OnMouseDown(e);
+    if (e.Button == MouseButtons.Left)
+      _pressedAt = e.Location;
+  }
 
-        this.Size = this.TextImageRelation is TextImageRelation.ImageBeforeText or TextImageRelation.TextBeforeImage
-            ? new(imageSize.Width + ContentLayout.Gap + textSize.Width, Math.Max(imageSize.Height, textSize.Height))
-            : new(Math.Max(imageSize.Width, textSize.Width), imageSize.Height + ContentLayout.Gap + textSize.Height);
-    }
+  /// <summary>
+  /// Raises <see cref="Control.Click"/> for a press and release inside the label.
+  /// </summary>
+  /// <remarks>
+  /// An owner-drawn control raises Click only if it says so, and this one never did — so a label
+  /// with a handler attached was inert, and an application using one as a row, a link or a
+  /// disclosure triangle got a picture of a control rather than a control. Every other toolkit's
+  /// label clicks; the ones here now do too.
+  /// </remarks>
+  protected override void OnMouseUp(MouseEventArgs e) {
+    var pressed = _pressedAt;
+    _pressedAt = new Point(-1, -1);
+    base.OnMouseUp(e);
 
-    /// <summary>Swaps the leading side of a horizontal relation; vertical ones are unaffected.</summary>
-    private static TextImageRelation Mirror(TextImageRelation relation) => relation switch
-    {
-        TextImageRelation.ImageBeforeText => TextImageRelation.TextBeforeImage,
-        TextImageRelation.TextBeforeImage => TextImageRelation.ImageBeforeText,
-        _ => relation,
-    };
+    if (e.Button != MouseButtons.Left || pressed.X < 0)
+      return;
 
-    /// <inheritdoc/>
-    private protected override void OnRealized(Backends.IControlPeer peer)
-    {
-        base.OnRealized(peer);
-        this.ApplyAutoSize();
-    }
-
-    /// <summary>Where the button went down, so a release can tell a click from the end of a drag.</summary>
-    private Point _pressedAt = new(-1, -1);
-
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        base.OnMouseDown(e);
-        if (e.Button == MouseButtons.Left)
-            _pressedAt = e.Location;
-    }
-
-    /// <summary>
-    /// Raises <see cref="Control.Click"/> for a press and release inside the label.
-    /// </summary>
-    /// <remarks>
-    /// An owner-drawn control raises Click only if it says so, and this one never did — so a label
-    /// with a handler attached was inert, and an application using one as a row, a link or a
-    /// disclosure triangle got a picture of a control rather than a control. Every other toolkit's
-    /// label clicks; the ones here now do too.
-    /// </remarks>
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        var pressed = _pressedAt;
-        _pressedAt = new Point(-1, -1);
-        base.OnMouseUp(e);
-
-        if (e.Button != MouseButtons.Left || pressed.X < 0)
-            return;
-
-        // Released where it went down, and still over the label: that is a click and not a drag that
-        // happened to end here.
-        if (new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
-            this.OnClick(EventArgs.Empty);
-    }
+    // Released where it went down, and still over the label: that is a click and not a drag that
+    // happened to end here.
+    if (new Rectangle(0, 0, this.Width, this.Height).Contains(e.Location))
+      this.OnClick(EventArgs.Empty);
+  }
 }

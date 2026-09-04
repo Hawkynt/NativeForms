@@ -4,261 +4,238 @@ using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Demo;
 
-internal sealed partial class MainForm
-{
-    /// <summary>A mutable work-item row for the data-grid demo; check and numeric cells write back.</summary>
-    private sealed class WorkItem
-    {
-        /// <summary>The section the item belongs to, shown in the merged section rows.</summary>
-        public required string Category { get; init; }
+internal sealed partial class MainForm {
+  /// <summary>A mutable work-item row for the data-grid demo; check and numeric cells write back.</summary>
+  private sealed class WorkItem {
+    /// <summary>The section the item belongs to, shown in the merged section rows.</summary>
+    public required string Category { get; init; }
 
-        /// <summary>The task name shown next to the category icon.</summary>
-        public string Name { get; init; } = string.Empty;
+    /// <summary>The task name shown next to the category icon.</summary>
+    public string Name { get; init; } = string.Empty;
 
-        /// <summary>The category icon painted into the first column.</summary>
-        public IImage? Icon { get; init; }
+    /// <summary>The category icon painted into the first column.</summary>
+    public IImage? Icon { get; init; }
 
-        /// <summary>Whether the task is done; toggled by the check column.</summary>
-        public bool Done { get; set; }
+    /// <summary>Whether the task is done; toggled by the check column.</summary>
+    public bool Done { get; set; }
 
-        /// <summary>The completion percentage painted by the progress column.</summary>
-        public int Percent { get; set; }
+    /// <summary>The completion percentage painted by the progress column.</summary>
+    public int Percent { get; set; }
 
-        /// <summary>The booked hours; edited through the numeric column.</summary>
-        public decimal Hours { get; set; }
+    /// <summary>The booked hours; edited through the numeric column.</summary>
+    public decimal Hours { get; set; }
 
-        /// <summary>When the task starts; edited through the time column.</summary>
-        public TimeSpan Start { get; set; }
+    /// <summary>When the task starts; edited through the time column.</summary>
+    public TimeSpan Start { get; set; }
 
-        /// <summary>The documentation link shown by the link column.</summary>
-        public string Docs { get; init; } = string.Empty;
+    /// <summary>The documentation link shown by the link column.</summary>
+    public string Docs { get; init; } = string.Empty;
 
-        /// <summary>The single person the task sits with; picked in the list column's popup.</summary>
-        public string Owner { get; set; } = string.Empty;
+    /// <summary>The single person the task sits with; picked in the list column's popup.</summary>
+    public string Owner { get; set; } = string.Empty;
 
-        /// <summary>The labels attached to the task; ticked as a whole set in the checked-list
-        /// column's popup, which is why the property takes a collection rather than a flag each.</summary>
-        public IReadOnlyList<object?> Labels { get; set; } = [];
+    /// <summary>The labels attached to the task; ticked as a whole set in the checked-list
+    /// column's popup, which is why the property takes a collection rather than a flag each.</summary>
+    public IReadOnlyList<object?> Labels { get; set; } = [];
 
-        /// <summary>Whether this row is a section marker rendered as one merged full-width cell.</summary>
-        public bool IsSection { get; init; }
+    /// <summary>Whether this row is a section marker rendered as one merged full-width cell.</summary>
+    public bool IsSection { get; init; }
+  }
+
+  /// <summary>
+  /// The Grid page: one large <see cref="DataGridView"/> exercising the column kinds (icon+text,
+  /// check with write-back, progress, numeric with write-back, button, link, single-pick popup
+  /// list, and a checked list whose ticks write back a whole set), alternating rows,
+  /// row headers, automatic sorting on the frozen first column, multi-select, merged section rows
+  /// and a few dozen rows in the grid's bound <see cref="DataGridView.Items"/> list. Selection and
+  /// content clicks report into the status strip.
+  /// </summary>
+  private TabPage BuildGridPage() {
+    var page = new TabPage("Grid") { ImageIndex = _IconRed };
+
+    var grid = new DataGridView {
+      Bounds = new(16, 36, 948, 500),
+      RowHeight = 24,
+      AlternatingRows = true,
+      ShowRowHeaders = true,
+      MultiSelect = true,
+      FullRowTextSelector = static o => ((WorkItem)o!).IsSection ? $"— {((WorkItem)o!).Category} —" : null,
+    };
+
+    grid.Columns.Add(new DataGridViewColumn("Task", static o => ((WorkItem)o!).Name) {
+      Width = 190,
+      Frozen = true,
+      SortMode = DataGridViewColumnSortMode.Automatic,
+      ImageSelector = static o => ((WorkItem)o!).Icon,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Done", static o => ((WorkItem)o!).Done) {
+      Kind = DataGridViewColumnKind.Check,
+      Width = 50,
+      CheckedSelector = static o => ((WorkItem)o!).Done,
+      CheckedSetter = static (o, value) => ((WorkItem)o!).Done = value,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Progress", static o => ((WorkItem)o!).Percent) {
+      Kind = DataGridViewColumnKind.Progress,
+      Width = 90,
+      ProgressSelector = static o => ((WorkItem)o!).Percent,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Hours", static o => ((WorkItem)o!).Hours) {
+      Kind = DataGridViewColumnKind.NumericUpDown,
+      Width = 70,
+      Alignment = ContentAlignment.MiddleRight,
+      DecimalPlaces = 1,
+      Maximum = 999m,
+      NumberSelector = static o => ((WorkItem)o!).Hours,
+      NumberSetter = static (o, value) => ((WorkItem)o!).Hours = value,
+      CellStyleSelector = static o => ((WorkItem)o!).Hours > 24m
+          ? new(foreColor: Color.Firebrick)
+          : default,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Start", static o => ((WorkItem)o!).Start) {
+      Kind = DataGridViewColumnKind.TimePicker,
+      Width = 90,
+      Alignment = ContentAlignment.MiddleRight,
+      ShowSeconds = false,
+      MinTime = new(6, 0, 0),
+      MaxTime = new(20, 0, 0),
+      FormatSelector = static v => ((TimeSpan)v!).ToString(@"hh\:mm", CultureInfo.InvariantCulture),
+      TimeSelector = static o => ((WorkItem)o!).Start,
+      TimeSetter = static (o, value) => ((WorkItem)o!).Start = value,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Open", static _ => "Open…") {
+      Kind = DataGridViewColumnKind.Button,
+      Width = 70,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Docs", static o => ((WorkItem)o!).Docs) {
+      Kind = DataGridViewColumnKind.Link,
+      Width = 90,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Owner", static o => ((WorkItem)o!).Owner) {
+      Kind = DataGridViewColumnKind.ListBox,
+      Width = 110,
+      ItemsSelector = static _ => _Owners,
+      ValueSetter = static (o, value) => ((WorkItem)o!).Owner = (string)value!,
+    });
+    grid.Columns.Add(new DataGridViewColumn("Labels", static o => ((WorkItem)o!).Labels) {
+      Kind = DataGridViewColumnKind.CheckedListBox,
+      Width = 120,
+      ItemsSelector = static _ => _Labels,
+      CheckedItemsSelector = static o => ((WorkItem)o!).Labels,
+      CheckedItemsSetter = static (o, items) => ((WorkItem)o!).Labels = items,
+    });
+
+    grid.Items.AddRange(BuildWorkItems(this.DiscImage(Color.RoyalBlue), this.DiscImage(Color.MediumSeaGreen), this.DiscImage(Color.Orange)));
+
+    grid.SelectionChanged += (_, _) => {
+      var count = 0;
+      WorkItem? first = null;
+      foreach (var item in grid.SelectedItems) {
+        first ??= item as WorkItem;
+        ++count;
+      }
+
+      this.SetStatus(count == 0
+          ? "Grid: nothing selected."
+          : $"Grid: {count} row(s) selected, first is \"{first?.Name}\".");
+    };
+    grid.CellContentClick += (_, e) => {
+      var row = grid.Items[e.RowIndex] as WorkItem;
+      this.SetStatus($"Grid: \"{grid.Columns[e.ColumnIndex].HeaderText}\" clicked on \"{row?.Name}\".");
+    };
+    grid.SelectedRowIndex = 1;
+
+    page.Controls.AddRange(
+        Caption("DataGridView — click the Task header to sort; the column stays frozen.", 16, 12, 540),
+        grid,
+        Caption("Check, Hours, Start, Owner and Labels cells write back into the bound items — Labels as a whole set.", 16, 544, 760));
+
+    // The walkthrough sorts the grid, widens a column, scrolls both ways and writes back into two
+    // bound cells. The column widths and the rows themselves are the authored state; the offsets
+    // are simply zero, which is where a grid nobody has touched sits.
+    var columnWidths = new int[grid.Columns.Count];
+    for (var i = 0; i < columnWidths.Length; ++i)
+      columnWidths[i] = grid.Columns[i].Width;
+
+    var authoredRows = new WorkItem[grid.Items.Count];
+    grid.Items.CopyTo(authoredRows, 0);
+    var doneFlags = new bool[authoredRows.Length];
+    var hourValues = new decimal[authoredRows.Length];
+    var owners = new string[authoredRows.Length];
+    var labels = new IReadOnlyList<object?>[authoredRows.Length];
+    var startValues = new TimeSpan[authoredRows.Length];
+    for (var i = 0; i < authoredRows.Length; ++i) {
+      doneFlags[i] = authoredRows[i].Done;
+      hourValues[i] = authoredRows[i].Hours;
+      owners[i] = authoredRows[i].Owner;
+      labels[i] = authoredRows[i].Labels;
+      startValues[i] = authoredRows[i].Start;
     }
 
-    /// <summary>
-    /// The Grid page: one large <see cref="DataGridView"/> exercising the column kinds (icon+text,
-    /// check with write-back, progress, numeric with write-back, button, link, single-pick popup
-    /// list, and a checked list whose ticks write back a whole set), alternating rows,
-    /// row headers, automatic sorting on the frozen first column, multi-select, merged section rows
-    /// and a few dozen rows in the grid's bound <see cref="DataGridView.Items"/> list. Selection and
-    /// content clicks report into the status strip.
-    /// </summary>
-    private TabPage BuildGridPage()
+    var selectedRow = grid.SelectedRowIndex;
+    this.OnReset(() => {
+      grid.Sort(null, SortOrder.None);
+      for (var i = 0; i < columnWidths.Length; ++i)
+        grid.Columns[i].Width = columnWidths[i];
+
+      for (var i = 0; i < authoredRows.Length; ++i) {
+        authoredRows[i].Done = doneFlags[i];
+        authoredRows[i].Hours = hourValues[i];
+        authoredRows[i].Owner = owners[i];
+        authoredRows[i].Labels = labels[i];
+        authoredRows[i].Start = startValues[i];
+      }
+
+      grid.HorizontalOffset = 0;
+      grid.TopRow = 0;
+      grid.SelectedRowIndex = selectedRow;
+      grid.Invalidate();
+    });
+
+    this.Publish("grid.page", page);
+    this.Publish("grid.grid", grid);
+
+    return page;
+  }
+
+  /// <summary>The people an "Owner" cell picks exactly one of.</summary>
+  private static readonly object?[] _Owners = ["Alice", "Bob", "Carol", "Dave"];
+
+  /// <summary>The labels a "Labels" cell ticks any number of.</summary>
+  private static readonly object?[] _Labels = ["Docs", "UX", "Perf", "Risk"];
+
+  /// <summary>Builds three sections of ten deterministic rows each, plus one marker row per section.</summary>
+  private static WorkItem[] BuildWorkItems(IImage coreIcon, IImage backendIcon, IImage demoIcon) {
+    var sections = new (string Category, IImage Icon)[]
     {
-        var page = new TabPage("Grid") { ImageIndex = _IconRed };
-
-        var grid = new DataGridView
-        {
-            Bounds = new(16, 36, 948, 500),
-            RowHeight = 24,
-            AlternatingRows = true,
-            ShowRowHeaders = true,
-            MultiSelect = true,
-            FullRowTextSelector = static o => ((WorkItem)o!).IsSection ? $"— {((WorkItem)o!).Category} —" : null,
-        };
-
-        grid.Columns.Add(new DataGridViewColumn("Task", static o => ((WorkItem)o!).Name)
-        {
-            Width = 190,
-            Frozen = true,
-            SortMode = DataGridViewColumnSortMode.Automatic,
-            ImageSelector = static o => ((WorkItem)o!).Icon,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Done", static o => ((WorkItem)o!).Done)
-        {
-            Kind = DataGridViewColumnKind.Check,
-            Width = 50,
-            CheckedSelector = static o => ((WorkItem)o!).Done,
-            CheckedSetter = static (o, value) => ((WorkItem)o!).Done = value,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Progress", static o => ((WorkItem)o!).Percent)
-        {
-            Kind = DataGridViewColumnKind.Progress,
-            Width = 90,
-            ProgressSelector = static o => ((WorkItem)o!).Percent,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Hours", static o => ((WorkItem)o!).Hours)
-        {
-            Kind = DataGridViewColumnKind.NumericUpDown,
-            Width = 70,
-            Alignment = ContentAlignment.MiddleRight,
-            DecimalPlaces = 1,
-            Maximum = 999m,
-            NumberSelector = static o => ((WorkItem)o!).Hours,
-            NumberSetter = static (o, value) => ((WorkItem)o!).Hours = value,
-            CellStyleSelector = static o => ((WorkItem)o!).Hours > 24m
-                ? new(foreColor: Color.Firebrick)
-                : default,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Start", static o => ((WorkItem)o!).Start)
-        {
-            Kind = DataGridViewColumnKind.TimePicker,
-            Width = 90,
-            Alignment = ContentAlignment.MiddleRight,
-            ShowSeconds = false,
-            MinTime = new(6, 0, 0),
-            MaxTime = new(20, 0, 0),
-            FormatSelector = static v => ((TimeSpan)v!).ToString(@"hh\:mm", CultureInfo.InvariantCulture),
-            TimeSelector = static o => ((WorkItem)o!).Start,
-            TimeSetter = static (o, value) => ((WorkItem)o!).Start = value,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Open", static _ => "Open…")
-        {
-            Kind = DataGridViewColumnKind.Button,
-            Width = 70,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Docs", static o => ((WorkItem)o!).Docs)
-        {
-            Kind = DataGridViewColumnKind.Link,
-            Width = 90,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Owner", static o => ((WorkItem)o!).Owner)
-        {
-            Kind = DataGridViewColumnKind.ListBox,
-            Width = 110,
-            ItemsSelector = static _ => _Owners,
-            ValueSetter = static (o, value) => ((WorkItem)o!).Owner = (string)value!,
-        });
-        grid.Columns.Add(new DataGridViewColumn("Labels", static o => ((WorkItem)o!).Labels)
-        {
-            Kind = DataGridViewColumnKind.CheckedListBox,
-            Width = 120,
-            ItemsSelector = static _ => _Labels,
-            CheckedItemsSelector = static o => ((WorkItem)o!).Labels,
-            CheckedItemsSetter = static (o, items) => ((WorkItem)o!).Labels = items,
-        });
-
-        grid.Items.AddRange(BuildWorkItems(this.DiscImage(Color.RoyalBlue), this.DiscImage(Color.MediumSeaGreen), this.DiscImage(Color.Orange)));
-
-        grid.SelectionChanged += (_, _) =>
-        {
-            var count = 0;
-            WorkItem? first = null;
-            foreach (var item in grid.SelectedItems)
-            {
-                first ??= item as WorkItem;
-                ++count;
-            }
-
-            this.SetStatus(count == 0
-                ? "Grid: nothing selected."
-                : $"Grid: {count} row(s) selected, first is \"{first?.Name}\".");
-        };
-        grid.CellContentClick += (_, e) =>
-        {
-            var row = grid.Items[e.RowIndex] as WorkItem;
-            this.SetStatus($"Grid: \"{grid.Columns[e.ColumnIndex].HeaderText}\" clicked on \"{row?.Name}\".");
-        };
-        grid.SelectedRowIndex = 1;
-
-        page.Controls.AddRange(
-            Caption("DataGridView — click the Task header to sort; the column stays frozen.", 16, 12, 540),
-            grid,
-            Caption("Check, Hours, Start, Owner and Labels cells write back into the bound items — Labels as a whole set.", 16, 544, 760));
-
-        // The walkthrough sorts the grid, widens a column, scrolls both ways and writes back into two
-        // bound cells. The column widths and the rows themselves are the authored state; the offsets
-        // are simply zero, which is where a grid nobody has touched sits.
-        var columnWidths = new int[grid.Columns.Count];
-        for (var i = 0; i < columnWidths.Length; ++i)
-            columnWidths[i] = grid.Columns[i].Width;
-
-        var authoredRows = new WorkItem[grid.Items.Count];
-        grid.Items.CopyTo(authoredRows, 0);
-        var doneFlags = new bool[authoredRows.Length];
-        var hourValues = new decimal[authoredRows.Length];
-        var owners = new string[authoredRows.Length];
-        var labels = new IReadOnlyList<object?>[authoredRows.Length];
-        var startValues = new TimeSpan[authoredRows.Length];
-        for (var i = 0; i < authoredRows.Length; ++i)
-        {
-            doneFlags[i] = authoredRows[i].Done;
-            hourValues[i] = authoredRows[i].Hours;
-            owners[i] = authoredRows[i].Owner;
-            labels[i] = authoredRows[i].Labels;
-            startValues[i] = authoredRows[i].Start;
-        }
-
-        var selectedRow = grid.SelectedRowIndex;
-        this.OnReset(() =>
-        {
-            grid.Sort(null, SortOrder.None);
-            for (var i = 0; i < columnWidths.Length; ++i)
-                grid.Columns[i].Width = columnWidths[i];
-
-            for (var i = 0; i < authoredRows.Length; ++i)
-            {
-                authoredRows[i].Done = doneFlags[i];
-                authoredRows[i].Hours = hourValues[i];
-                authoredRows[i].Owner = owners[i];
-                authoredRows[i].Labels = labels[i];
-                authoredRows[i].Start = startValues[i];
-            }
-
-            grid.HorizontalOffset = 0;
-            grid.TopRow = 0;
-            grid.SelectedRowIndex = selectedRow;
-            grid.Invalidate();
-        });
-
-        this.Publish("grid.page", page);
-        this.Publish("grid.grid", grid);
-
-        return page;
-    }
-
-    /// <summary>The people an "Owner" cell picks exactly one of.</summary>
-    private static readonly object?[] _Owners = ["Alice", "Bob", "Carol", "Dave"];
-
-    /// <summary>The labels a "Labels" cell ticks any number of.</summary>
-    private static readonly object?[] _Labels = ["Docs", "UX", "Perf", "Risk"];
-
-    /// <summary>Builds three sections of ten deterministic rows each, plus one marker row per section.</summary>
-    private static WorkItem[] BuildWorkItems(IImage coreIcon, IImage backendIcon, IImage demoIcon)
-    {
-        var sections = new (string Category, IImage Icon)[]
-        {
             ("Core", coreIcon),
             ("Backends", backendIcon),
             ("Demo", demoIcon),
-        };
-        var verbs = new[] { "Design", "Implement", "Test", "Document", "Polish" };
-        var nouns = new[] { "layout", "painting" };
+    };
+    var verbs = new[] { "Design", "Implement", "Test", "Document", "Polish" };
+    var nouns = new[] { "layout", "painting" };
 
-        var rows = new WorkItem[sections.Length * ((verbs.Length * nouns.Length) + 1)];
-        var index = 0;
-        foreach (var (category, icon) in sections)
-        {
-            rows[index++] = new() { Category = category, IsSection = true };
-            for (var v = 0; v < verbs.Length; ++v)
-            for (var n = 0; n < nouns.Length; ++n)
-            {
-                var ordinal = (v * nouns.Length) + n;
-                rows[index++] = new()
-                {
-                    Category = category,
-                    Name = $"{verbs[v]} {category.ToLowerInvariant()} {nouns[n]}",
-                    Icon = icon,
-                    Done = ordinal % 3 == 0,
-                    Percent = ordinal * 11 % 101,
-                    Hours = 2.5m * (ordinal + 1),
-                    Start = new(8 + (ordinal % 8), ordinal % 2 == 0 ? 0 : 30, 0),
-                    Docs = $"docs/{category.ToLowerInvariant()}.md",
-                    Owner = (string)_Owners[ordinal % _Owners.Length]!,
-                    Labels = ordinal % 2 == 0 ? [_Labels[0]] : [_Labels[1], _Labels[2]],
-                };
-            }
+    var rows = new WorkItem[sections.Length * ((verbs.Length * nouns.Length) + 1)];
+    var index = 0;
+    foreach (var (category, icon) in sections) {
+      rows[index++] = new() { Category = category, IsSection = true };
+      for (var v = 0; v < verbs.Length; ++v)
+        for (var n = 0; n < nouns.Length; ++n) {
+          var ordinal = (v * nouns.Length) + n;
+          rows[index++] = new() {
+            Category = category,
+            Name = $"{verbs[v]} {category.ToLowerInvariant()} {nouns[n]}",
+            Icon = icon,
+            Done = ordinal % 3 == 0,
+            Percent = ordinal * 11 % 101,
+            Hours = 2.5m * (ordinal + 1),
+            Start = new(8 + (ordinal % 8), ordinal % 2 == 0 ? 0 : 30, 0),
+            Docs = $"docs/{category.ToLowerInvariant()}.md",
+            Owner = (string)_Owners[ordinal % _Owners.Length]!,
+            Labels = ordinal % 2 == 0 ? [_Labels[0]] : [_Labels[1], _Labels[2]],
+          };
         }
-
-        return rows;
     }
+
+    return rows;
+  }
 }

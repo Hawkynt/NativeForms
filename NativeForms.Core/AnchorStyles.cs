@@ -8,20 +8,19 @@ namespace Hawkynt.NativeForms;
 /// resize model.
 /// </summary>
 [Flags]
-public enum AnchorStyles
-{
-    /// <summary>No edge is bound; the control keeps its position relative to the container's center.</summary>
-    None = 0,
+public enum AnchorStyles {
+  /// <summary>No edge is bound; the control keeps its position relative to the container's center.</summary>
+  None = 0,
 
-    /// <summary>The top edge keeps its distance to the container's top.</summary>
-    Top = 1,
+  /// <summary>The top edge keeps its distance to the container's top.</summary>
+  Top = 1,
 
-    /// <summary>The bottom edge keeps its distance to the container's bottom.</summary>
-    Bottom = 2,
+  /// <summary>The bottom edge keeps its distance to the container's bottom.</summary>
+  Bottom = 2,
 
-    /// <summary>The left edge keeps its distance to the container's left.</summary>
-    Left = 4,
+  /// <summary>The left edge keeps its distance to the container's left.</summary>
+  Left = 4,
 
-    /// <summary>The right edge keeps its distance to the container's right.</summary>
-    Right = 8,
+  /// <summary>The right edge keeps its distance to the container's right.</summary>
+  Right = 8,
 }

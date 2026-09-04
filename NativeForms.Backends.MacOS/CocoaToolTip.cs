@@ -11,25 +11,22 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// — the toolkit's own delay has already run — and right for every hover after it, which is worth
 /// more than a control that never shows a tip at all.
 /// </remarks>
-internal static class CocoaToolTip
-{
-    /// <summary>Puts a hover text on a view, or takes the one it has away.</summary>
-    internal static void Apply(nint view, string? text)
-    {
-        if (view == 0)
-            return;
+internal static class CocoaToolTip {
+  /// <summary>Puts a hover text on a view, or takes the one it has away.</summary>
+  internal static void Apply(nint view, string? text) {
+    if (view == 0)
+      return;
 
-        if (string.IsNullOrEmpty(text))
-        {
-            CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setToolTip:"), 0);
-            return;
-        }
-
-        var value = CocoaRuntime.NSString(text);
-        if (value == 0)
-            return;
-
-        CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setToolTip:"), value);
-        CocoaNative.CFRelease(value);
+    if (string.IsNullOrEmpty(text)) {
+      CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setToolTip:"), 0);
+      return;
     }
+
+    var value = CocoaRuntime.NSString(text);
+    if (value == 0)
+      return;
+
+    CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("setToolTip:"), value);
+    CocoaNative.CFRelease(value);
+  }
 }

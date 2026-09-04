@@ -19,202 +19,186 @@ namespace Hawkynt.NativeForms;
 /// and when the surface loses focus. Subclasses may add further commit points, as
 /// <see cref="NumericUpDown"/> does on <c>Value</c> reads.
 /// </remarks>
-public abstract class UpDownBase : OwnerDrawnControl
-{
-    private readonly TextBox _editor;
-    private AutoRepeat? _autoRepeat;
-    private bool _updatingEditor;
-    private int _pressedDirection; // +1 up button held, -1 down button held, 0 none
+public abstract class UpDownBase : OwnerDrawnControl {
+  private readonly TextBox _editor;
+  private AutoRepeat? _autoRepeat;
+  private bool _updatingEditor;
+  private int _pressedDirection; // +1 up button held, -1 down button held, 0 none
 
-    /// <summary>Creates the spinner shell and its hosted editor.</summary>
-    protected UpDownBase()
-    {
-        _editor = new() { TabStop = false };
-        _editor.TextChanged += this.OnEditorTextChanged;
-        _editor.KeyDown += this.OnEditorKeyDown; // Enter/Up/Down while the caret lives in the editor
-        this.Controls.Add(_editor);
-    }
+  /// <summary>Creates the spinner shell and its hosted editor.</summary>
+  protected UpDownBase() {
+    _editor = new() { TabStop = false };
+    _editor.TextChanged += this.OnEditorTextChanged;
+    _editor.KeyDown += this.OnEditorKeyDown; // Enter/Up/Down while the caret lives in the editor
+    this.Controls.Add(_editor);
+  }
 
-    /// <summary>The content of the hosted editor. Assigning counts as a pending user edit, committed
-    /// at the next commit point.</summary>
-    public override string Text
-    {
-        get => _editor.Text;
-        set => _editor.Text = value;
-    }
+  /// <summary>The content of the hosted editor. Assigning counts as a pending user edit, committed
+  /// at the next commit point.</summary>
+  public override string Text {
+    get => _editor.Text;
+    set => _editor.Text = value;
+  }
 
-    /// <summary>Whether the editor holds a user edit that has not been committed yet.</summary>
-    protected bool UserEdit { get; private set; }
+  /// <summary>Whether the editor holds a user edit that has not been committed yet.</summary>
+  protected bool UserEdit { get; private set; }
 
-    /// <inheritdoc/>
-    protected override bool Focusable => true;
+  /// <inheritdoc/>
+  protected override bool Focusable => true;
 
-    /// <summary>Steps the value one increment up.</summary>
-    public abstract void UpButton();
+  /// <summary>Steps the value one increment up.</summary>
+  public abstract void UpButton();
 
-    /// <summary>Steps the value one increment down.</summary>
-    public abstract void DownButton();
+  /// <summary>Steps the value one increment down.</summary>
+  public abstract void DownButton();
 
-    /// <summary>Rewrites the editor from the current value, clearing any pending edit.</summary>
-    protected abstract void UpdateEditText();
+  /// <summary>Rewrites the editor from the current value, clearing any pending edit.</summary>
+  protected abstract void UpdateEditText();
 
-    /// <summary>Commits the editor's text into the value: parse and clamp, or revert when invalid.</summary>
-    protected abstract void ValidateEditText();
+  /// <summary>Commits the editor's text into the value: parse and clamp, or revert when invalid.</summary>
+  protected abstract void ValidateEditText();
 
-    /// <summary>Commits a pending user edit, if any — the shared entry to every commit point.</summary>
-    private protected void CommitEdit()
-    {
-        if (this.UserEdit)
-            this.ValidateEditText();
-    }
+  /// <summary>Commits a pending user edit, if any — the shared entry to every commit point.</summary>
+  private protected void CommitEdit() {
+    if (this.UserEdit)
+      this.ValidateEditText();
+  }
 
-    /// <summary>Writes programmatic text into the editor without flagging a user edit.</summary>
-    protected void SetEditorText(string text)
-    {
-        _updatingEditor = true;
-        _editor.Text = text;
-        _updatingEditor = false;
-        this.UserEdit = false;
-    }
+  /// <summary>Writes programmatic text into the editor without flagging a user edit.</summary>
+  protected void SetEditorText(string text) {
+    _updatingEditor = true;
+    _editor.Text = text;
+    _updatingEditor = false;
+    this.UserEdit = false;
+  }
 
-    /// <summary>The width of the spinner-button column at the right edge of the field.</summary>
-    private int ButtonWidth => SpinnerRenderer.ColumnWidth(this.Theme);
+  /// <summary>The width of the spinner-button column at the right edge of the field.</summary>
+  private int ButtonWidth => SpinnerRenderer.ColumnWidth(this.Theme);
 
-    /// <summary>The upper (increment) spinner button.</summary>
-    private Rectangle UpButtonRect => SpinnerRenderer.UpButton(this.Theme, this.Width, this.Height);
+  /// <summary>The upper (increment) spinner button.</summary>
+  private Rectangle UpButtonRect => SpinnerRenderer.UpButton(this.Theme, this.Width, this.Height);
 
-    /// <summary>The lower (decrement) spinner button.</summary>
-    private Rectangle DownButtonRect => SpinnerRenderer.DownButton(this.Theme, this.Width, this.Height);
+  /// <summary>The lower (decrement) spinner button.</summary>
+  private Rectangle DownButtonRect => SpinnerRenderer.DownButton(this.Theme, this.Width, this.Height);
 
-    private protected override void OnRealized(IControlPeer peer)
-    {
-        base.OnRealized(peer);
-        _editor.Bounds = new(0, 0, Math.Max(0, this.Width - this.ButtonWidth), this.Height);
-    }
+  private protected override void OnRealized(IControlPeer peer) {
+    base.OnRealized(peer);
+    _editor.Bounds = new(0, 0, Math.Max(0, this.Width - this.ButtonWidth), this.Height);
+  }
 
-    /// <inheritdoc/>
-    private protected override void OnUnrealized()
-    {
-        base.OnUnrealized();
-        _pressedDirection = 0;
-        _autoRepeat?.Dispose();
-        _autoRepeat = null;
-    }
+  /// <inheritdoc/>
+  private protected override void OnUnrealized() {
+    base.OnUnrealized();
+    _pressedDirection = 0;
+    _autoRepeat?.Dispose();
+    _autoRepeat = null;
+  }
 
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        var width = this.Width;
-        var height = this.Height;
-        g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, height));
-        SpinnerRenderer.Paint(g, theme, width, height, _pressedDirection, this.Enabled);
-    }
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var theme = this.Theme;
+    var width = this.Width;
+    var height = this.Height;
+    g.FillRectangle(theme.FieldBackground, new Rectangle(0, 0, width, height));
+    SpinnerRenderer.Paint(g, theme, width, height, _pressedDirection, this.Enabled);
+  }
 
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        if (e.Button != MouseButtons.Left)
-            return;
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) {
+    if (e.Button != MouseButtons.Left)
+      return;
 
-        // The platform's summary of a double click, not a press of its own: a spinner steps once per
-        // press, so counting it made a double click on an arrow move the value by three and left fast
-        // clicking landing somewhere nobody could predict.
-        if (e.Clicks > 1)
-            return;
+    // The platform's summary of a double click, not a press of its own: a spinner steps once per
+    // press, so counting it made a double click on an arrow move the value by three and left fast
+    // clicking landing somewhere nobody could predict.
+    if (e.Clicks > 1)
+      return;
 
-        if (this.UpButtonRect.Contains(e.Location))
-            this.PressButton(+1);
-        else if (this.DownButtonRect.Contains(e.Location))
-            this.PressButton(-1);
-    }
+    if (this.UpButtonRect.Contains(e.Location))
+      this.PressButton(+1);
+    else if (this.DownButtonRect.Contains(e.Location))
+      this.PressButton(-1);
+  }
 
-    /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e) => this.ReleaseButton();
+  /// <inheritdoc/>
+  protected override void OnMouseUp(MouseEventArgs e) => this.ReleaseButton();
 
-    /// <inheritdoc/>
-    protected override void OnMouseLeave(EventArgs e) => this.ReleaseButton();
+  /// <inheritdoc/>
+  protected override void OnMouseLeave(EventArgs e) => this.ReleaseButton();
 
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        switch (e.KeyCode)
-        {
-            case Keys.Up:
-                this.UpButton();
-                e.Handled = true;
-                break;
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    switch (e.KeyCode) {
+      case Keys.Up:
+        this.UpButton();
+        e.Handled = true;
+        break;
 
-            case Keys.Down:
-                this.DownButton();
-                e.Handled = true;
-                break;
+      case Keys.Down:
+        this.DownButton();
+        e.Handled = true;
+        break;
 
-            case Keys.Enter:
-                this.CommitEdit();
-                e.Handled = true;
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Routes a key the hosted editor reported into the shared <see cref="OnKeyDown"/> handling, so
-    /// Enter commits and Up/Down step even though the caret — and thus the key — lives in the native
-    /// editor rather than on this owner-drawn surface. A handled key is consumed before the editor
-    /// acts on it.
-    /// </summary>
-    private void OnEditorKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
-
-    /// <inheritdoc/>
-    protected override void OnLostFocus(EventArgs e)
-    {
-        base.OnLostFocus(e);
+      case Keys.Enter:
         this.CommitEdit();
+        e.Handled = true;
+        break;
     }
+  }
 
-    /// <summary>Presses a spinner button: steps once and arms the autorepeat.</summary>
-    private void PressButton(int direction)
-    {
-        _pressedDirection = direction;
-        this.StepPressedButton();
-        this.Invalidate();
+  /// <summary>
+  /// Routes a key the hosted editor reported into the shared <see cref="OnKeyDown"/> handling, so
+  /// Enter commits and Up/Down step even though the caret — and thus the key — lives in the native
+  /// editor rather than on this owner-drawn surface. A handled key is consumed before the editor
+  /// acts on it.
+  /// </summary>
+  private void OnEditorKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
 
-        var backend = this.Backend;
-        if (backend is null)
-            return;
+  /// <inheritdoc/>
+  protected override void OnLostFocus(EventArgs e) {
+    base.OnLostFocus(e);
+    this.CommitEdit();
+  }
 
-        _autoRepeat ??= new(this.StepPressedButton);
-        _autoRepeat.Start(backend);
-    }
+  /// <summary>Presses a spinner button: steps once and arms the autorepeat.</summary>
+  private void PressButton(int direction) {
+    _pressedDirection = direction;
+    this.StepPressedButton();
+    this.Invalidate();
 
-    /// <summary>Releases a pressed spinner button and stops its autorepeat.</summary>
-    private void ReleaseButton()
-    {
-        if (_pressedDirection == 0)
-            return;
+    var backend = this.Backend;
+    if (backend is null)
+      return;
 
-        _pressedDirection = 0;
-        _autoRepeat?.Stop();
-        this.Invalidate();
-    }
+    _autoRepeat ??= new(this.StepPressedButton);
+    _autoRepeat.Start(backend);
+  }
 
-    /// <summary>Steps once in the pressed button's direction; the autorepeat tick action.</summary>
-    private void StepPressedButton()
-    {
-        if (_pressedDirection > 0)
-            this.UpButton();
-        else if (_pressedDirection < 0)
-            this.DownButton();
-    }
+  /// <summary>Releases a pressed spinner button and stops its autorepeat.</summary>
+  private void ReleaseButton() {
+    if (_pressedDirection == 0)
+      return;
 
-    /// <summary>Tracks editor changes: everything not written by <see cref="SetEditorText"/> becomes
-    /// a pending user edit awaiting the next commit point.</summary>
-    private void OnEditorTextChanged(object? sender, EventArgs e)
-    {
-        if (!_updatingEditor)
-            this.UserEdit = true;
+    _pressedDirection = 0;
+    _autoRepeat?.Stop();
+    this.Invalidate();
+  }
 
-        this.OnTextChanged(EventArgs.Empty);
-    }
+  /// <summary>Steps once in the pressed button's direction; the autorepeat tick action.</summary>
+  private void StepPressedButton() {
+    if (_pressedDirection > 0)
+      this.UpButton();
+    else if (_pressedDirection < 0)
+      this.DownButton();
+  }
+
+  /// <summary>Tracks editor changes: everything not written by <see cref="SetEditorText"/> becomes
+  /// a pending user edit awaiting the next commit point.</summary>
+  private void OnEditorTextChanged(object? sender, EventArgs e) {
+    if (!_updatingEditor)
+      this.UserEdit = true;
+
+    this.OnTextChanged(EventArgs.Empty);
+  }
 }

@@ -6,17 +6,16 @@ namespace Hawkynt.NativeForms;
 /// <see cref="Control.Bounds"/> in the core before the window is realized — the peers never see the
 /// policy, only the resulting rectangle.
 /// </summary>
-public enum FormStartPosition
-{
-    /// <summary>The form appears exactly at its <see cref="Control.Bounds"/>.</summary>
-    Manual,
+public enum FormStartPosition {
+  /// <summary>The form appears exactly at its <see cref="Control.Bounds"/>.</summary>
+  Manual,
 
-    /// <summary>The form is centered on the primary screen.</summary>
-    CenterScreen,
+  /// <summary>The form is centered on the primary screen.</summary>
+  CenterScreen,
 
-    /// <summary>
-    /// The form is centered within its owner's bounds; shown without an owner it falls back to
-    /// <see cref="CenterScreen"/>.
-    /// </summary>
-    CenterParent,
+  /// <summary>
+  /// The form is centered within its owner's bounds; shown without an owner it falls back to
+  /// <see cref="CenterScreen"/>.
+  /// </summary>
+  CenterParent,
 }

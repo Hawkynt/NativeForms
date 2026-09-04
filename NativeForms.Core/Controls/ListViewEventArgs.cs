@@ -1,33 +1,30 @@
 namespace Hawkynt.NativeForms;
 
 /// <summary>Carries the index of a clicked <see cref="ListView"/> column header.</summary>
-public sealed class ColumnClickEventArgs(int column) : EventArgs
-{
-    /// <summary>The index of the clicked column in <see cref="ListView.Columns"/>.</summary>
-    public int Column { get; } = column;
+public sealed class ColumnClickEventArgs(int column) : EventArgs {
+  /// <summary>The index of the clicked column in <see cref="ListView.Columns"/>.</summary>
+  public int Column { get; } = column;
 }
 
 /// <summary>Requests the row at <see cref="ItemIndex"/> while a <see cref="ListView"/> is in
 /// <see cref="ListView.VirtualMode"/>; the handler assigns <see cref="Item"/>.</summary>
-public sealed class RetrieveVirtualItemEventArgs(int itemIndex) : EventArgs
-{
-    /// <summary>The zero-based index of the row being fetched.</summary>
-    public int ItemIndex { get; } = itemIndex;
+public sealed class RetrieveVirtualItemEventArgs(int itemIndex) : EventArgs {
+  /// <summary>The zero-based index of the row being fetched.</summary>
+  public int ItemIndex { get; } = itemIndex;
 
-    /// <summary>Set by the handler to the item that represents the row.</summary>
-    public ListViewItem? Item { get; set; }
+  /// <summary>Set by the handler to the item that represents the row.</summary>
+  public ListViewItem? Item { get; set; }
 
-    /// <summary>Set by the handler (in the unknown-size virtual mode, <see cref="ListView.VirtualListSize"/>
-    /// = -1) when <see cref="ItemIndex"/> is past the end, so the list stops probing and fixes its extent.
-    /// Leaving <see cref="Item"/> null has the same effect.</summary>
-    public bool EndOfList { get; set; }
+  /// <summary>Set by the handler (in the unknown-size virtual mode, <see cref="ListView.VirtualListSize"/>
+  /// = -1) when <see cref="ItemIndex"/> is past the end, so the list stops probing and fixes its extent.
+  /// Leaving <see cref="Item"/> null has the same effect.</summary>
+  public bool EndOfList { get; set; }
 }
 
 /// <summary>Carries the item whose check state just flipped; see <see cref="ListView.ItemChecked"/>.</summary>
-public sealed class ItemCheckedEventArgs(ListViewItem item) : EventArgs
-{
-    /// <summary>The item that changed.</summary>
-    public ListViewItem Item { get; } = item;
+public sealed class ItemCheckedEventArgs(ListViewItem item) : EventArgs {
+  /// <summary>The item that changed.</summary>
+  public ListViewItem Item { get; } = item;
 }
 
 /// <summary>
@@ -36,15 +33,14 @@ public sealed class ItemCheckedEventArgs(ListViewItem item) : EventArgs
 /// for <see cref="ListView.AfterLabelEdit"/> it carries the entered text and <see cref="CancelEdit"/>
 /// discards it, leaving the item's original text in place.
 /// </summary>
-public sealed class LabelEditEventArgs(int item, string? label) : EventArgs
-{
-    /// <summary>The index of the edited item.</summary>
-    public int Item { get; } = item;
+public sealed class LabelEditEventArgs(int item, string? label) : EventArgs {
+  /// <summary>The index of the edited item.</summary>
+  public int Item { get; } = item;
 
-    /// <summary>The label text: the current text before an edit, the text the user entered after
-    /// one — or <see langword="null"/> when the edit was cancelled.</summary>
-    public string? Label { get; } = label;
+  /// <summary>The label text: the current text before an edit, the text the user entered after
+  /// one — or <see langword="null"/> when the edit was cancelled.</summary>
+  public string? Label { get; } = label;
 
-    /// <summary>Set by a handler to veto the pending edit (before) or discard the entered text (after).</summary>
-    public bool CancelEdit { get; set; }
+  /// <summary>Set by a handler to veto the pending edit (before) or discard the entered text (after).</summary>
+  public bool CancelEdit { get; set; }
 }

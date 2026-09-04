@@ -5,802 +5,733 @@ using Hawkynt.NativeForms.Tests.Fakes;
 namespace Hawkynt.NativeForms.Tests;
 
 [TestFixture]
-internal sealed class CalendarViewTests
-{
-    // The fixture calendar is 700x1100 so a full week fits without a vertical scrollbar (the content
-    // is 24 h × 22 px/30-min-slot ≈ 1056 px, below the ~1078 px body), which keeps the geometry the
-    // tests aim clicks at deterministic. It shows the week of Wednesday 2026-07-15 (Monday-first: Mon
-    // 2026-07-13 .. Sun 2026-07-19) with "now" pinned to 2026-07-15 10:30.
+internal sealed class CalendarViewTests {
+  // The fixture calendar is 700x1100 so a full week fits without a vertical scrollbar (the content
+  // is 24 h × 22 px/30-min-slot ≈ 1056 px, below the ~1078 px body), which keeps the geometry the
+  // tests aim clicks at deterministic. It shows the week of Wednesday 2026-07-15 (Monday-first: Mon
+  // 2026-07-13 .. Sun 2026-07-19) with "now" pinned to 2026-07-15 10:30.
 
-    private static readonly DateTime _Week = new(2026, 7, 15);
-    private static readonly DateTime _NowInstant = new(2026, 7, 15, 10, 30, 0);
+  private static readonly DateTime _Week = new(2026, 7, 15);
+  private static readonly DateTime _NowInstant = new(2026, 7, 15, 10, 30, 0);
 
-    private static readonly Color _Red = Color.FromArgb(0xFF, 0xD0, 0x30, 0x30);
-    private static readonly Color _Blue = Color.FromArgb(0xFF, 0x30, 0x60, 0xD0);
+  private static readonly Color _Red = Color.FromArgb(0xFF, 0xD0, 0x30, 0x30);
+  private static readonly Color _Blue = Color.FromArgb(0xFF, 0x30, 0x60, 0xD0);
 
-    private static Appointment[] SampleWeek() =>
-    [
-        new("Review", new(2026, 7, 13, 15, 0, 0), new(2026, 7, 13, 16, 0, 0)),
+  private static Appointment[] SampleWeek() =>
+  [
+      new("Review", new(2026, 7, 13, 15, 0, 0), new(2026, 7, 13, 16, 0, 0)),
         new("Conference", new(2026, 7, 14), new(2026, 7, 15), allDay: true),
         new("Standup", new(2026, 7, 15, 9, 0, 0), new(2026, 7, 15, 9, 30, 0), color: _Red, tag: "s"),
         new("Design", new(2026, 7, 15, 9, 15, 0), new(2026, 7, 15, 10, 0, 0), color: _Blue, location: "Room 2"),
         new("Lunch", new(2026, 7, 16, 12, 0, 0), new(2026, 7, 16, 13, 0, 0)),
     ];
 
-    private static CalendarView CreateCalendar(out HeadlessCanvasPeer canvas, Size? size = null)
-    {
-        var calendar = new CalendarView
-        {
-            Bounds = new(Point.Empty, size ?? new Size(700, 1100)),
-            SelectedDate = _Week,
-            Now = _NowInstant,
-        };
-        calendar.SetAppointments(SampleWeek());
+  private static CalendarView CreateCalendar(out HeadlessCanvasPeer canvas, Size? size = null) {
+    var calendar = new CalendarView {
+      Bounds = new(Point.Empty, size ?? new Size(700, 1100)),
+      SelectedDate = _Week,
+      Now = _NowInstant,
+    };
+    calendar.SetAppointments(SampleWeek());
 
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(calendar);
-        Application.Run(form, backend);
-        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
-        return calendar;
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(calendar);
+    Application.Run(form, backend);
+    canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+    return calendar;
+  }
+
+  private static void Click(HeadlessCanvasPeer canvas, int x, int y) {
+    canvas.RaiseMouseDown(x, y);
+    canvas.RaiseMouseUp(x, y);
+  }
+
+  private static int IndexOf(CalendarView calendar, string subject) {
+    for (var i = 0; i < calendar.AppointmentCount; ++i)
+      if (calendar.SnapshotAppointment(i).Subject == subject)
+        return i;
+
+    return -1;
+  }
+
+  [Test]
+  public void Defaults_are_a_monday_first_week_view_on_a_thirty_minute_scale() {
+    var calendar = new CalendarView();
+    Assert.Multiple(() => {
+      Assert.That(calendar.ViewMode, Is.EqualTo(CalendarViewMode.Week));
+      Assert.That(calendar.TimeScale, Is.EqualTo(30));
+      Assert.That(calendar.FirstDayOfWeek, Is.EqualTo(DayOfWeek.Monday));
+      Assert.That(calendar.WorkDayStart, Is.EqualTo(new TimeSpan(8, 0, 0)));
+      Assert.That(calendar.WorkDayEnd, Is.EqualTo(new TimeSpan(17, 0, 0)));
+      Assert.That(calendar.AppointmentCount, Is.Zero);
+      Assert.That(calendar.SelectedAppointment, Is.Null);
+    });
+  }
+
+  [Test]
+  public void SetAppointments_snapshots_and_sorts_by_start() {
+    var calendar = CreateCalendar(out _);
+    Assert.Multiple(() => {
+      Assert.That(calendar.AppointmentCount, Is.EqualTo(5));
+      Assert.That(calendar.SnapshotAppointment(0).Subject, Is.EqualTo("Review"), "the earliest start leads");
+      Assert.That(calendar.SnapshotAppointment(4).Subject, Is.EqualTo("Lunch"), "the latest start trails");
+      Assert.That(calendar.SelectedAppointment, Is.Null, "nothing is selected before a gesture");
+    });
+  }
+
+  [Test]
+  public void SetAppointments_with_a_selector_projects_the_source() {
+    var calendar = new CalendarView { Bounds = new(0, 0, 700, 600) };
+    var rows = new[] { ("A", new DateTime(2026, 7, 15, 9, 0, 0)), ("B", new DateTime(2026, 7, 15, 8, 0, 0)) };
+    calendar.SetAppointments(rows, r => new Appointment(r.Item1, r.Item2, r.Item2.AddHours(1)));
+
+    Assert.Multiple(() => {
+      Assert.That(calendar.AppointmentCount, Is.EqualTo(2));
+      Assert.That(calendar.SnapshotAppointment(0).Subject, Is.EqualTo("B"), "sorted by start, 08:00 first");
+    });
+  }
+
+  [TestCase(CalendarViewMode.Day, 1)]
+  [TestCase(CalendarViewMode.WorkWeek, 5)]
+  [TestCase(CalendarViewMode.Week, 7)]
+  [TestCase(CalendarViewMode.Month, 7)]
+  public void VisibleDayCount_follows_the_view_mode(CalendarViewMode mode, int expected) {
+    var calendar = CreateCalendar(out _);
+    calendar.ViewMode = mode;
+    Assert.That(calendar.VisibleDayCount, Is.EqualTo(expected));
+  }
+
+  [Test]
+  public void FirstVisibleDate_starts_the_week_on_the_first_day_of_week() {
+    var calendar = CreateCalendar(out _);
+    Assert.Multiple(() => {
+      Assert.That(calendar.FirstVisibleDate, Is.EqualTo(new DateTime(2026, 7, 13)), "Monday of the shown week");
+
+      calendar.ViewMode = CalendarViewMode.Day;
+      Assert.That(calendar.FirstVisibleDate, Is.EqualTo(_Week));
+
+      calendar.ViewMode = CalendarViewMode.WorkWeek;
+      Assert.That(calendar.FirstVisibleDate, Is.EqualTo(new DateTime(2026, 7, 13)), "WorkWeek starts Monday");
+    });
+  }
+
+  [Test]
+  public void Clicking_an_appointment_selects_it_and_raises_SelectionChanged() {
+    var calendar = CreateCalendar(out var canvas);
+    var changes = 0;
+    calendar.SelectionChanged += (_, _) => ++changes;
+
+    var index = IndexOf(calendar, "Lunch");
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True, "Lunch should be laid out this week");
+    Click(canvas, bounds.X + (bounds.Width / 2), bounds.Y + (bounds.Height / 2));
+
+    Assert.Multiple(() => {
+      Assert.That(calendar.SelectedAppointmentIndex, Is.EqualTo(index));
+      Assert.That(calendar.SelectedAppointment?.Subject, Is.EqualTo("Lunch"));
+      Assert.That(changes, Is.EqualTo(1));
+    });
+  }
+
+  [Test]
+  public void Clicking_empty_space_clears_the_selection() {
+    var calendar = CreateCalendar(out var canvas);
+    var index = IndexOf(calendar, "Lunch");
+    calendar.TryGetAppointmentBounds(index, out var bounds);
+    Click(canvas, bounds.X + (bounds.Width / 2), bounds.Y + (bounds.Height / 2));
+    Assert.That(calendar.SelectedAppointment, Is.Not.Null);
+
+    // The hour gutter is always empty space.
+    Click(canvas, 10, 400);
+    Assert.That(calendar.SelectedAppointment, Is.Null);
+  }
+
+  [Test]
+  public void A_double_click_on_an_appointment_raises_AppointmentActivate() {
+    var calendar = CreateCalendar(out var canvas);
+    Appointment? activated = null;
+    calendar.AppointmentActivate += (_, e) => activated = e.Appointment;
+
+    var index = IndexOf(calendar, "Lunch");
+    calendar.TryGetAppointmentBounds(index, out var bounds);
+    var x = bounds.X + (bounds.Width / 2);
+    var y = bounds.Y + (bounds.Height / 2);
+    Click(canvas, x, y);
+    Click(canvas, x, y); // the second press inside the double-click window opens it
+
+    Assert.That(activated?.Subject, Is.EqualTo("Lunch"));
+  }
+
+  [Test]
+  public void Enter_activates_the_selected_appointment() {
+    var calendar = CreateCalendar(out var canvas);
+    Appointment? activated = null;
+    calendar.AppointmentActivate += (_, e) => activated = e.Appointment;
+
+    var index = IndexOf(calendar, "Lunch");
+    calendar.TryGetAppointmentBounds(index, out var bounds);
+    Click(canvas, bounds.X + (bounds.Width / 2), bounds.Y + (bounds.Height / 2));
+    canvas.RaiseKeyDown(Keys.Enter);
+
+    Assert.That(activated?.Subject, Is.EqualTo("Lunch"));
+  }
+
+  [Test]
+  public void Overlapping_appointments_pack_side_by_side() {
+    var calendar = CreateCalendar(out _);
+    var standup = IndexOf(calendar, "Standup");
+    var design = IndexOf(calendar, "Design");
+    Assert.That(calendar.TryGetAppointmentBounds(standup, out var a), Is.True);
+    Assert.That(calendar.TryGetAppointmentBounds(design, out var b), Is.True);
+
+    Assert.Multiple(() => {
+      // Two overlapping appointments each take roughly half the day column and sit next to each
+      // other, not stacked on the same x.
+      Assert.That(a.X, Is.Not.EqualTo(b.X), "packed columns must differ in x");
+      Assert.That(a.Right, Is.LessThanOrEqualTo(b.X + 4).Or.GreaterThanOrEqualTo(b.Right - 4), "the two columns do not overlap");
+    });
+  }
+
+  [Test]
+  public void An_empty_time_drag_raises_TimeRangeSelected() {
+    var calendar = CreateCalendar(out var canvas, new Size(700, 1100));
+    calendar.ViewMode = CalendarViewMode.Day;
+    calendar.SetAppointments(Array.Empty<Appointment>());
+    DateRangeEventArgs? range = null;
+    calendar.TimeRangeSelected += (_, e) => range = e;
+
+    // A drag down an empty day column.
+    canvas.RaiseMouseDown(200, 300);
+    canvas.RaiseMouseMove(200, 420);
+    canvas.RaiseMouseUp(200, 420);
+
+    Assert.That(range, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(range!.Start.Date, Is.EqualTo(_Week), "the range lands on the shown day");
+      Assert.That(range.End, Is.GreaterThan(range.Start), "the range spans forward in time");
+    });
+  }
+
+  // The fixture runs on RowHeight 22, so a 30-minute slot is 22 px tall: a 22 px vertical drag is
+  // exactly one TimeScale slot, and a 100 px horizontal drag in month view is one day cell (700/7).
+  private const int _SlotPx = 22;
+
+  private static CalendarView CreateMovableDay(out HeadlessCanvasPeer canvas, params Appointment[] appointments) {
+    var calendar = new CalendarView {
+      Bounds = new(0, 0, 700, 1100),
+      ViewMode = CalendarViewMode.Day,
+      SelectedDate = _Week,
+      Now = _NowInstant,
+    };
+    calendar.SetAppointments(appointments);
+
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(calendar);
+    Application.Run(form, backend);
+    canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+    return calendar;
+  }
+
+  [Test]
+  public void Dragging_a_movable_appointment_raises_Moving_then_Moved_with_snapped_times() {
+    var calendar = CreateCalendar(out var canvas);
+    AppointmentMoveEventArgs? moving = null, moved = null;
+    calendar.AppointmentMoving += (_, e) => moving = e;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    var index = IndexOf(calendar, "Lunch"); // 2026-07-16 12:00–13:00, one hour
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(cx, cy);
+    canvas.RaiseMouseMove(cx, cy + (2 * _SlotPx)); // two slots down = +1h
+    canvas.RaiseMouseUp(cx, cy + (2 * _SlotPx));
+
+    Assert.Multiple(() => {
+      Assert.That(moving, Is.Not.Null, "the cancelable proposal fires first");
+      Assert.That(moved, Is.Not.Null, "then the applied move");
+      Assert.That(moving!.OriginalStart, Is.EqualTo(new DateTime(2026, 7, 16, 12, 0, 0)));
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 16, 13, 0, 0)), "start snapped +1h");
+      Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 16, 14, 0, 0)), "duration preserved");
+      Assert.That((moved.Start - moved.Start.Date).TotalMinutes % calendar.TimeScale, Is.Zero, "snapped to the slot");
+    });
+  }
+
+  [Test]
+  public void A_non_movable_appointment_does_not_drag_but_still_selects() {
+    var locked = new Appointment("Holiday", new(2026, 7, 15, 9, 0, 0), new(2026, 7, 15, 10, 0, 0), movable: false);
+    var calendar = CreateMovableDay(out var canvas, locked);
+    var moves = 0;
+    calendar.AppointmentMoving += (_, _) => ++moves;
+    calendar.AppointmentMoved += (_, _) => ++moves;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(cx, cy);
+    canvas.RaiseMouseMove(cx, cy + (3 * _SlotPx));
+    canvas.RaiseMouseUp(cx, cy + (3 * _SlotPx));
+
+    Assert.Multiple(() => {
+      Assert.That(moves, Is.Zero, "a locked appointment proposes no move");
+      Assert.That(calendar.SelectedAppointment?.Subject, Is.EqualTo("Holiday"), "but the press still selects it");
+    });
+  }
+
+  [Test]
+  public void Cancelling_AppointmentMoving_leaves_the_snapshot_unchanged() {
+    var calendar = CreateCalendar(out var canvas);
+    var moved = 0;
+    calendar.AppointmentMoving += (_, e) => e.Cancel = true;
+    calendar.AppointmentMoved += (_, _) => ++moved;
+
+    var index = IndexOf(calendar, "Lunch");
+    var before = calendar.SnapshotAppointment(index).Start;
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(cx, cy);
+    canvas.RaiseMouseMove(cx, cy + (2 * _SlotPx));
+    canvas.RaiseMouseUp(cx, cy + (2 * _SlotPx));
+
+    Assert.Multiple(() => {
+      Assert.That(moved, Is.Zero, "a cancelled proposal never becomes an applied move");
+      Assert.That(calendar.SnapshotAppointment(index).Start, Is.EqualTo(before), "the control mutates no snapshot");
+    });
+  }
+
+  [Test]
+  public void A_sub_threshold_press_selects_without_proposing_a_move() {
+    var calendar = CreateCalendar(out var canvas);
+    var moves = 0;
+    calendar.AppointmentMoving += (_, _) => ++moves;
+    calendar.AppointmentMoved += (_, _) => ++moves;
+
+    var index = IndexOf(calendar, "Lunch");
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(cx, cy);
+    canvas.RaiseMouseMove(cx + 2, cy + 2); // within the threshold — a click, not a drag
+    canvas.RaiseMouseUp(cx + 2, cy + 2);
+
+    Assert.Multiple(() => {
+      Assert.That(moves, Is.Zero, "a click below the threshold proposes nothing");
+      Assert.That(calendar.SelectedAppointment?.Subject, Is.EqualTo("Lunch"), "it still selects");
+    });
+  }
+
+  [Test]
+  public void A_move_works_in_day_view() {
+    var appt = new Appointment("Sync", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 15, 10, 30, 0));
+    var calendar = CreateMovableDay(out var canvas, appt);
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(cx, cy);
+    canvas.RaiseMouseMove(cx, cy + _SlotPx); // one slot down = +30 min
+    canvas.RaiseMouseUp(cx, cy + _SlotPx);
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 30, 0)));
+      Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 11, 0, 0)));
+    });
+  }
+
+  [Test]
+  public void A_move_in_month_view_shifts_by_whole_days() {
+    var calendar = CreateCalendar(out var canvas);
+    calendar.ViewMode = CalendarViewMode.Month;
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(cx, cy);
+    canvas.RaiseMouseMove(cx + 100, cy); // one day cell to the right (700/7)
+    canvas.RaiseMouseUp(cx + 100, cy);
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start.Date, Is.EqualTo(new DateTime(2026, 7, 16)), "shifted one day");
+      Assert.That(moved.Start.TimeOfDay, Is.EqualTo(new TimeSpan(9, 0, 0)), "time of day preserved at day granularity");
+      Assert.That(moved.End - moved.Start, Is.EqualTo(new TimeSpan(0, 30, 0)), "duration preserved");
+    });
+  }
+
+  [Test]
+  public void Dragging_a_month_chips_right_edge_resizes_the_end_day() {
+    var calendar = CreateCalendar(out var canvas);
+    calendar.ViewMode = CalendarViewMode.Month;
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var edge = bounds.Right - 3; // grab the right edge
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(edge, cy);
+    canvas.RaiseMouseMove(edge + 100, cy); // one day cell to the right
+    canvas.RaiseMouseUp(edge + 100, cy);
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 9, 0, 0)), "the start day stays put");
+      Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 16)), "the end day extends by one day");
+      Assert.That(moved.End.TimeOfDay, Is.EqualTo(new TimeSpan(9, 30, 0)), "the end time of day is preserved");
+    });
+  }
+
+  [Test]
+  public void Resizing_in_month_view_reflows_the_chip_across_every_covered_day() {
+    var calendar = CreateCalendar(out var canvas);
+    calendar.ViewMode = CalendarViewMode.Month;
+    var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var edge = bounds.Right - 3;
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(edge, cy);
+    canvas.RaiseMouseMove(edge + 100, cy); // extend the end one day right — the drag is live now
+
+    var g = canvas.RaisePaint();
+    var chips = g.Operations.FindAll(o => o.StartsWith("text ") && o.Contains("Standup")).Count;
+    canvas.RaiseMouseUp(edge + 100, cy);
+
+    Assert.That(chips, Is.EqualTo(2), "the appointment reflows as a chip in both the original and the new day cell");
+  }
+
+  [Test]
+  public void Dragging_a_month_chips_left_edge_resizes_the_start_day() {
+    var calendar = CreateCalendar(out var canvas);
+    calendar.ViewMode = CalendarViewMode.Month;
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var edge = bounds.X + 3; // grab the left edge
+    var cy = bounds.Y + (bounds.Height / 2);
+
+    canvas.RaiseMouseDown(edge, cy);
+    canvas.RaiseMouseMove(edge - 100, cy); // one day cell to the left
+    canvas.RaiseMouseUp(edge - 100, cy);
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start.Date, Is.EqualTo(new DateTime(2026, 7, 14)), "the start day moves one day earlier");
+      Assert.That(moved.Start.TimeOfDay, Is.EqualTo(new TimeSpan(9, 0, 0)), "the start time of day is preserved");
+      Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 9, 30, 0)), "the end stays put");
+    });
+  }
+
+  [Test]
+  public void Dragging_an_appointments_bottom_edge_resizes_its_end() {
+    var appt = new Appointment("Review", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 15, 11, 0, 0));
+    var calendar = CreateMovableDay(out var canvas, appt);
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var edge = bounds.Bottom - 3; // grab the bottom edge
+
+    canvas.RaiseMouseDown(cx, edge);
+    canvas.RaiseMouseMove(cx, edge + (2 * _SlotPx)); // pull the end down past the next slot boundary
+    canvas.RaiseMouseUp(cx, edge + (2 * _SlotPx));
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 0, 0)), "the start is unchanged by a bottom-edge resize");
+      Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 11, 30, 0)), "the end grew to the next half hour");
+    });
+  }
+
+  [Test]
+  public void Next_and_Previous_page_by_the_view_unit() {
+    var calendar = CreateCalendar(out _);
+
+    calendar.ViewMode = CalendarViewMode.Day;
+    calendar.Next();
+    Assert.That(calendar.SelectedDate, Is.EqualTo(_Week.AddDays(1)), "Day pages one day");
+
+    calendar.ViewMode = CalendarViewMode.Week;
+    var before = calendar.SelectedDate;
+    calendar.Next();
+    Assert.That(calendar.SelectedDate, Is.EqualTo(before.AddDays(7)), "Week pages seven days");
+
+    calendar.ViewMode = CalendarViewMode.Month;
+    before = calendar.SelectedDate;
+    calendar.Previous();
+    Assert.That(calendar.SelectedDate, Is.EqualTo(before.AddMonths(-1)), "Month pages one month");
+  }
+
+  [Test]
+  public void GoToToday_returns_to_the_now_date() {
+    var calendar = CreateCalendar(out _);
+    calendar.ViewMode = CalendarViewMode.Day;
+    calendar.Next();
+    calendar.Next();
+    calendar.GoToToday();
+    Assert.That(calendar.SelectedDate, Is.EqualTo(_NowInstant.Date));
+  }
+
+  [Test]
+  public void The_wheel_scrolls_the_time_grid_in_week_view() {
+    // A short calendar so the day content overflows and the grid scrolls.
+    var calendar = CreateCalendar(out var canvas, new Size(700, 320));
+    var before = calendar.ScrollOffset;
+    canvas.RaiseMouseWheel(-120, 300, 200); // down
+    Assert.That(calendar.ScrollOffset, Is.GreaterThan(before), "a downward notch scrolls the grid down");
+
+    var mid = calendar.ScrollOffset;
+    canvas.RaiseMouseWheel(120, 300, 200); // up
+    Assert.That(calendar.ScrollOffset, Is.LessThan(mid), "an upward notch scrolls back up");
+  }
+
+  [Test]
+  public void The_wheel_pages_the_month_view() {
+    var calendar = CreateCalendar(out var canvas);
+    calendar.ViewMode = CalendarViewMode.Month;
+    var before = calendar.SelectedDate;
+    canvas.RaiseMouseWheel(-120, 300, 200);
+    Assert.That(calendar.SelectedDate, Is.EqualTo(before.AddMonths(1)));
+  }
+
+  [Test]
+  public void The_time_grid_paints_headers_appointments_and_the_now_line() {
+    var calendar = CreateCalendar(out var canvas);
+
+    var g = canvas.RaisePaint();
+
+    Assert.Multiple(() => {
+      Assert.That(g.DrewText("Standup"), Is.True, "a timed appointment is painted");
+      Assert.That(g.DrewText("Conference"), Is.True, "an all-day appointment shows in the band");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("fillellipse")), Is.True, "the now line's marker dot is painted");
+    });
+  }
+
+  [Test]
+  public void The_month_view_paints_day_numbers_and_chips() {
+    var calendar = CreateCalendar(out var canvas);
+    calendar.ViewMode = CalendarViewMode.Month;
+
+    var g = canvas.RaisePaint();
+
+    Assert.Multiple(() => {
+      Assert.That(g.DrewText("15"), Is.True, "the day-of-month number is painted");
+      Assert.That(g.DrewText("Standup"), Is.True, "an appointment chip is painted in its day cell");
+    });
+  }
+
+  [Test]
+  public void The_layout_stays_bounded_for_a_hundred_thousand_appointments() {
+    var calendar = new CalendarView { Bounds = new(0, 0, 700, 1100), SelectedDate = _Week, Now = _NowInstant };
+    var many = new Appointment[100_000];
+    var start = new DateTime(2020, 1, 1, 9, 0, 0);
+    for (var i = 0; i < many.Length; ++i) {
+      var when = start.AddMinutes(i * 137);
+      many[i] = new Appointment("Item " + i, when, when.AddMinutes(30));
     }
 
-    private static void Click(HeadlessCanvasPeer canvas, int x, int y)
-    {
-        canvas.RaiseMouseDown(x, y);
-        canvas.RaiseMouseUp(x, y);
-    }
-
-    private static int IndexOf(CalendarView calendar, string subject)
-    {
-        for (var i = 0; i < calendar.AppointmentCount; ++i)
-            if (calendar.SnapshotAppointment(i).Subject == subject)
-                return i;
-
-        return -1;
-    }
-
-    [Test]
-    public void Defaults_are_a_monday_first_week_view_on_a_thirty_minute_scale()
-    {
-        var calendar = new CalendarView();
-        Assert.Multiple(() =>
-        {
-            Assert.That(calendar.ViewMode, Is.EqualTo(CalendarViewMode.Week));
-            Assert.That(calendar.TimeScale, Is.EqualTo(30));
-            Assert.That(calendar.FirstDayOfWeek, Is.EqualTo(DayOfWeek.Monday));
-            Assert.That(calendar.WorkDayStart, Is.EqualTo(new TimeSpan(8, 0, 0)));
-            Assert.That(calendar.WorkDayEnd, Is.EqualTo(new TimeSpan(17, 0, 0)));
-            Assert.That(calendar.AppointmentCount, Is.Zero);
-            Assert.That(calendar.SelectedAppointment, Is.Null);
-        });
-    }
-
-    [Test]
-    public void SetAppointments_snapshots_and_sorts_by_start()
-    {
-        var calendar = CreateCalendar(out _);
-        Assert.Multiple(() =>
-        {
-            Assert.That(calendar.AppointmentCount, Is.EqualTo(5));
-            Assert.That(calendar.SnapshotAppointment(0).Subject, Is.EqualTo("Review"), "the earliest start leads");
-            Assert.That(calendar.SnapshotAppointment(4).Subject, Is.EqualTo("Lunch"), "the latest start trails");
-            Assert.That(calendar.SelectedAppointment, Is.Null, "nothing is selected before a gesture");
-        });
-    }
-
-    [Test]
-    public void SetAppointments_with_a_selector_projects_the_source()
-    {
-        var calendar = new CalendarView { Bounds = new(0, 0, 700, 600) };
-        var rows = new[] { ("A", new DateTime(2026, 7, 15, 9, 0, 0)), ("B", new DateTime(2026, 7, 15, 8, 0, 0)) };
-        calendar.SetAppointments(rows, r => new Appointment(r.Item1, r.Item2, r.Item2.AddHours(1)));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(calendar.AppointmentCount, Is.EqualTo(2));
-            Assert.That(calendar.SnapshotAppointment(0).Subject, Is.EqualTo("B"), "sorted by start, 08:00 first");
-        });
-    }
-
-    [TestCase(CalendarViewMode.Day, 1)]
-    [TestCase(CalendarViewMode.WorkWeek, 5)]
-    [TestCase(CalendarViewMode.Week, 7)]
-    [TestCase(CalendarViewMode.Month, 7)]
-    public void VisibleDayCount_follows_the_view_mode(CalendarViewMode mode, int expected)
-    {
-        var calendar = CreateCalendar(out _);
-        calendar.ViewMode = mode;
-        Assert.That(calendar.VisibleDayCount, Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void FirstVisibleDate_starts_the_week_on_the_first_day_of_week()
-    {
-        var calendar = CreateCalendar(out _);
-        Assert.Multiple(() =>
-        {
-            Assert.That(calendar.FirstVisibleDate, Is.EqualTo(new DateTime(2026, 7, 13)), "Monday of the shown week");
-
-            calendar.ViewMode = CalendarViewMode.Day;
-            Assert.That(calendar.FirstVisibleDate, Is.EqualTo(_Week));
-
-            calendar.ViewMode = CalendarViewMode.WorkWeek;
-            Assert.That(calendar.FirstVisibleDate, Is.EqualTo(new DateTime(2026, 7, 13)), "WorkWeek starts Monday");
-        });
-    }
-
-    [Test]
-    public void Clicking_an_appointment_selects_it_and_raises_SelectionChanged()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        var changes = 0;
-        calendar.SelectionChanged += (_, _) => ++changes;
-
-        var index = IndexOf(calendar, "Lunch");
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True, "Lunch should be laid out this week");
-        Click(canvas, bounds.X + (bounds.Width / 2), bounds.Y + (bounds.Height / 2));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(calendar.SelectedAppointmentIndex, Is.EqualTo(index));
-            Assert.That(calendar.SelectedAppointment?.Subject, Is.EqualTo("Lunch"));
-            Assert.That(changes, Is.EqualTo(1));
-        });
-    }
-
-    [Test]
-    public void Clicking_empty_space_clears_the_selection()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        var index = IndexOf(calendar, "Lunch");
-        calendar.TryGetAppointmentBounds(index, out var bounds);
-        Click(canvas, bounds.X + (bounds.Width / 2), bounds.Y + (bounds.Height / 2));
-        Assert.That(calendar.SelectedAppointment, Is.Not.Null);
-
-        // The hour gutter is always empty space.
-        Click(canvas, 10, 400);
-        Assert.That(calendar.SelectedAppointment, Is.Null);
-    }
-
-    [Test]
-    public void A_double_click_on_an_appointment_raises_AppointmentActivate()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        Appointment? activated = null;
-        calendar.AppointmentActivate += (_, e) => activated = e.Appointment;
-
-        var index = IndexOf(calendar, "Lunch");
-        calendar.TryGetAppointmentBounds(index, out var bounds);
-        var x = bounds.X + (bounds.Width / 2);
-        var y = bounds.Y + (bounds.Height / 2);
-        Click(canvas, x, y);
-        Click(canvas, x, y); // the second press inside the double-click window opens it
-
-        Assert.That(activated?.Subject, Is.EqualTo("Lunch"));
-    }
-
-    [Test]
-    public void Enter_activates_the_selected_appointment()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        Appointment? activated = null;
-        calendar.AppointmentActivate += (_, e) => activated = e.Appointment;
-
-        var index = IndexOf(calendar, "Lunch");
-        calendar.TryGetAppointmentBounds(index, out var bounds);
-        Click(canvas, bounds.X + (bounds.Width / 2), bounds.Y + (bounds.Height / 2));
-        canvas.RaiseKeyDown(Keys.Enter);
-
-        Assert.That(activated?.Subject, Is.EqualTo("Lunch"));
-    }
-
-    [Test]
-    public void Overlapping_appointments_pack_side_by_side()
-    {
-        var calendar = CreateCalendar(out _);
-        var standup = IndexOf(calendar, "Standup");
-        var design = IndexOf(calendar, "Design");
-        Assert.That(calendar.TryGetAppointmentBounds(standup, out var a), Is.True);
-        Assert.That(calendar.TryGetAppointmentBounds(design, out var b), Is.True);
-
-        Assert.Multiple(() =>
-        {
-            // Two overlapping appointments each take roughly half the day column and sit next to each
-            // other, not stacked on the same x.
-            Assert.That(a.X, Is.Not.EqualTo(b.X), "packed columns must differ in x");
-            Assert.That(a.Right, Is.LessThanOrEqualTo(b.X + 4).Or.GreaterThanOrEqualTo(b.Right - 4), "the two columns do not overlap");
-        });
-    }
-
-    [Test]
-    public void An_empty_time_drag_raises_TimeRangeSelected()
-    {
-        var calendar = CreateCalendar(out var canvas, new Size(700, 1100));
-        calendar.ViewMode = CalendarViewMode.Day;
-        calendar.SetAppointments(Array.Empty<Appointment>());
-        DateRangeEventArgs? range = null;
-        calendar.TimeRangeSelected += (_, e) => range = e;
-
-        // A drag down an empty day column.
-        canvas.RaiseMouseDown(200, 300);
-        canvas.RaiseMouseMove(200, 420);
-        canvas.RaiseMouseUp(200, 420);
-
-        Assert.That(range, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(range!.Start.Date, Is.EqualTo(_Week), "the range lands on the shown day");
-            Assert.That(range.End, Is.GreaterThan(range.Start), "the range spans forward in time");
-        });
-    }
-
-    // The fixture runs on RowHeight 22, so a 30-minute slot is 22 px tall: a 22 px vertical drag is
-    // exactly one TimeScale slot, and a 100 px horizontal drag in month view is one day cell (700/7).
-    private const int _SlotPx = 22;
-
-    private static CalendarView CreateMovableDay(out HeadlessCanvasPeer canvas, params Appointment[] appointments)
-    {
-        var calendar = new CalendarView
-        {
-            Bounds = new(0, 0, 700, 1100),
-            ViewMode = CalendarViewMode.Day,
-            SelectedDate = _Week,
-            Now = _NowInstant,
-        };
-        calendar.SetAppointments(appointments);
-
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(calendar);
-        Application.Run(form, backend);
-        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
-        return calendar;
-    }
-
-    [Test]
-    public void Dragging_a_movable_appointment_raises_Moving_then_Moved_with_snapped_times()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        AppointmentMoveEventArgs? moving = null, moved = null;
-        calendar.AppointmentMoving += (_, e) => moving = e;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        var index = IndexOf(calendar, "Lunch"); // 2026-07-16 12:00–13:00, one hour
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(cx, cy);
-        canvas.RaiseMouseMove(cx, cy + (2 * _SlotPx)); // two slots down = +1h
-        canvas.RaiseMouseUp(cx, cy + (2 * _SlotPx));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(moving, Is.Not.Null, "the cancelable proposal fires first");
-            Assert.That(moved, Is.Not.Null, "then the applied move");
-            Assert.That(moving!.OriginalStart, Is.EqualTo(new DateTime(2026, 7, 16, 12, 0, 0)));
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 16, 13, 0, 0)), "start snapped +1h");
-            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 16, 14, 0, 0)), "duration preserved");
-            Assert.That((moved.Start - moved.Start.Date).TotalMinutes % calendar.TimeScale, Is.Zero, "snapped to the slot");
-        });
-    }
-
-    [Test]
-    public void A_non_movable_appointment_does_not_drag_but_still_selects()
-    {
-        var locked = new Appointment("Holiday", new(2026, 7, 15, 9, 0, 0), new(2026, 7, 15, 10, 0, 0), movable: false);
-        var calendar = CreateMovableDay(out var canvas, locked);
-        var moves = 0;
-        calendar.AppointmentMoving += (_, _) => ++moves;
-        calendar.AppointmentMoved += (_, _) => ++moves;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(cx, cy);
-        canvas.RaiseMouseMove(cx, cy + (3 * _SlotPx));
-        canvas.RaiseMouseUp(cx, cy + (3 * _SlotPx));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(moves, Is.Zero, "a locked appointment proposes no move");
-            Assert.That(calendar.SelectedAppointment?.Subject, Is.EqualTo("Holiday"), "but the press still selects it");
-        });
-    }
-
-    [Test]
-    public void Cancelling_AppointmentMoving_leaves_the_snapshot_unchanged()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        var moved = 0;
-        calendar.AppointmentMoving += (_, e) => e.Cancel = true;
-        calendar.AppointmentMoved += (_, _) => ++moved;
-
-        var index = IndexOf(calendar, "Lunch");
-        var before = calendar.SnapshotAppointment(index).Start;
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(cx, cy);
-        canvas.RaiseMouseMove(cx, cy + (2 * _SlotPx));
-        canvas.RaiseMouseUp(cx, cy + (2 * _SlotPx));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved, Is.Zero, "a cancelled proposal never becomes an applied move");
-            Assert.That(calendar.SnapshotAppointment(index).Start, Is.EqualTo(before), "the control mutates no snapshot");
-        });
-    }
-
-    [Test]
-    public void A_sub_threshold_press_selects_without_proposing_a_move()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        var moves = 0;
-        calendar.AppointmentMoving += (_, _) => ++moves;
-        calendar.AppointmentMoved += (_, _) => ++moves;
-
-        var index = IndexOf(calendar, "Lunch");
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(cx, cy);
-        canvas.RaiseMouseMove(cx + 2, cy + 2); // within the threshold — a click, not a drag
-        canvas.RaiseMouseUp(cx + 2, cy + 2);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(moves, Is.Zero, "a click below the threshold proposes nothing");
-            Assert.That(calendar.SelectedAppointment?.Subject, Is.EqualTo("Lunch"), "it still selects");
-        });
-    }
-
-    [Test]
-    public void A_move_works_in_day_view()
-    {
-        var appt = new Appointment("Sync", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 15, 10, 30, 0));
-        var calendar = CreateMovableDay(out var canvas, appt);
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(cx, cy);
-        canvas.RaiseMouseMove(cx, cy + _SlotPx); // one slot down = +30 min
-        canvas.RaiseMouseUp(cx, cy + _SlotPx);
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 30, 0)));
-            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 11, 0, 0)));
-        });
-    }
-
-    [Test]
-    public void A_move_in_month_view_shifts_by_whole_days()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        calendar.ViewMode = CalendarViewMode.Month;
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(cx, cy);
-        canvas.RaiseMouseMove(cx + 100, cy); // one day cell to the right (700/7)
-        canvas.RaiseMouseUp(cx + 100, cy);
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start.Date, Is.EqualTo(new DateTime(2026, 7, 16)), "shifted one day");
-            Assert.That(moved.Start.TimeOfDay, Is.EqualTo(new TimeSpan(9, 0, 0)), "time of day preserved at day granularity");
-            Assert.That(moved.End - moved.Start, Is.EqualTo(new TimeSpan(0, 30, 0)), "duration preserved");
-        });
-    }
-
-    [Test]
-    public void Dragging_a_month_chips_right_edge_resizes_the_end_day()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        calendar.ViewMode = CalendarViewMode.Month;
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var edge = bounds.Right - 3; // grab the right edge
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(edge, cy);
-        canvas.RaiseMouseMove(edge + 100, cy); // one day cell to the right
-        canvas.RaiseMouseUp(edge + 100, cy);
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 9, 0, 0)), "the start day stays put");
-            Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 16)), "the end day extends by one day");
-            Assert.That(moved.End.TimeOfDay, Is.EqualTo(new TimeSpan(9, 30, 0)), "the end time of day is preserved");
-        });
-    }
-
-    [Test]
-    public void Resizing_in_month_view_reflows_the_chip_across_every_covered_day()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        calendar.ViewMode = CalendarViewMode.Month;
-        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var edge = bounds.Right - 3;
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(edge, cy);
-        canvas.RaiseMouseMove(edge + 100, cy); // extend the end one day right — the drag is live now
-
-        var g = canvas.RaisePaint();
-        var chips = g.Operations.FindAll(o => o.StartsWith("text ") && o.Contains("Standup")).Count;
-        canvas.RaiseMouseUp(edge + 100, cy);
-
-        Assert.That(chips, Is.EqualTo(2), "the appointment reflows as a chip in both the original and the new day cell");
-    }
-
-    [Test]
-    public void Dragging_a_month_chips_left_edge_resizes_the_start_day()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        calendar.ViewMode = CalendarViewMode.Month;
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        var index = IndexOf(calendar, "Standup"); // 2026-07-15 09:00–09:30
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var edge = bounds.X + 3; // grab the left edge
-        var cy = bounds.Y + (bounds.Height / 2);
-
-        canvas.RaiseMouseDown(edge, cy);
-        canvas.RaiseMouseMove(edge - 100, cy); // one day cell to the left
-        canvas.RaiseMouseUp(edge - 100, cy);
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start.Date, Is.EqualTo(new DateTime(2026, 7, 14)), "the start day moves one day earlier");
-            Assert.That(moved.Start.TimeOfDay, Is.EqualTo(new TimeSpan(9, 0, 0)), "the start time of day is preserved");
-            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 9, 30, 0)), "the end stays put");
-        });
-    }
-
-    [Test]
-    public void Dragging_an_appointments_bottom_edge_resizes_its_end()
-    {
-        var appt = new Appointment("Review", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 15, 11, 0, 0));
-        var calendar = CreateMovableDay(out var canvas, appt);
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var edge = bounds.Bottom - 3; // grab the bottom edge
-
-        canvas.RaiseMouseDown(cx, edge);
-        canvas.RaiseMouseMove(cx, edge + (2 * _SlotPx)); // pull the end down past the next slot boundary
-        canvas.RaiseMouseUp(cx, edge + (2 * _SlotPx));
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 0, 0)), "the start is unchanged by a bottom-edge resize");
-            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 15, 11, 30, 0)), "the end grew to the next half hour");
-        });
-    }
-
-    [Test]
-    public void Next_and_Previous_page_by_the_view_unit()
-    {
-        var calendar = CreateCalendar(out _);
-
-        calendar.ViewMode = CalendarViewMode.Day;
-        calendar.Next();
-        Assert.That(calendar.SelectedDate, Is.EqualTo(_Week.AddDays(1)), "Day pages one day");
-
-        calendar.ViewMode = CalendarViewMode.Week;
-        var before = calendar.SelectedDate;
-        calendar.Next();
-        Assert.That(calendar.SelectedDate, Is.EqualTo(before.AddDays(7)), "Week pages seven days");
-
-        calendar.ViewMode = CalendarViewMode.Month;
-        before = calendar.SelectedDate;
-        calendar.Previous();
-        Assert.That(calendar.SelectedDate, Is.EqualTo(before.AddMonths(-1)), "Month pages one month");
-    }
-
-    [Test]
-    public void GoToToday_returns_to_the_now_date()
-    {
-        var calendar = CreateCalendar(out _);
-        calendar.ViewMode = CalendarViewMode.Day;
-        calendar.Next();
-        calendar.Next();
-        calendar.GoToToday();
-        Assert.That(calendar.SelectedDate, Is.EqualTo(_NowInstant.Date));
-    }
-
-    [Test]
-    public void The_wheel_scrolls_the_time_grid_in_week_view()
-    {
-        // A short calendar so the day content overflows and the grid scrolls.
-        var calendar = CreateCalendar(out var canvas, new Size(700, 320));
-        var before = calendar.ScrollOffset;
-        canvas.RaiseMouseWheel(-120, 300, 200); // down
-        Assert.That(calendar.ScrollOffset, Is.GreaterThan(before), "a downward notch scrolls the grid down");
-
-        var mid = calendar.ScrollOffset;
-        canvas.RaiseMouseWheel(120, 300, 200); // up
-        Assert.That(calendar.ScrollOffset, Is.LessThan(mid), "an upward notch scrolls back up");
-    }
-
-    [Test]
-    public void The_wheel_pages_the_month_view()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        calendar.ViewMode = CalendarViewMode.Month;
-        var before = calendar.SelectedDate;
-        canvas.RaiseMouseWheel(-120, 300, 200);
-        Assert.That(calendar.SelectedDate, Is.EqualTo(before.AddMonths(1)));
-    }
-
-    [Test]
-    public void The_time_grid_paints_headers_appointments_and_the_now_line()
-    {
-        var calendar = CreateCalendar(out var canvas);
-
-        var g = canvas.RaisePaint();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.DrewText("Standup"), Is.True, "a timed appointment is painted");
-            Assert.That(g.DrewText("Conference"), Is.True, "an all-day appointment shows in the band");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("fillellipse")), Is.True, "the now line's marker dot is painted");
-        });
-    }
-
-    [Test]
-    public void The_month_view_paints_day_numbers_and_chips()
-    {
-        var calendar = CreateCalendar(out var canvas);
-        calendar.ViewMode = CalendarViewMode.Month;
-
-        var g = canvas.RaisePaint();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.DrewText("15"), Is.True, "the day-of-month number is painted");
-            Assert.That(g.DrewText("Standup"), Is.True, "an appointment chip is painted in its day cell");
-        });
-    }
-
-    [Test]
-    public void The_layout_stays_bounded_for_a_hundred_thousand_appointments()
-    {
-        var calendar = new CalendarView { Bounds = new(0, 0, 700, 1100), SelectedDate = _Week, Now = _NowInstant };
-        var many = new Appointment[100_000];
-        var start = new DateTime(2020, 1, 1, 9, 0, 0);
-        for (var i = 0; i < many.Length; ++i)
-        {
-            var when = start.AddMinutes(i * 137);
-            many[i] = new Appointment("Item " + i, when, when.AddMinutes(30));
-        }
-
-        calendar.SetAppointments(many);
-
-        // Only the shown week's appointments are ever laid out, so the box count is tiny however large
-        // the bound set is — the virtualization guarantee.
-        Assert.That(calendar.LaidOutBoxCount, Is.LessThan(200), $"{calendar.LaidOutBoxCount} boxes for a week out of 100k appointments");
-    }
-
-    // --- Multi-day / out-of-view resize -------------------------------------------------------------
-
-    // A 2026-07-15 10:00 → 2026-07-17 14:00 appointment: three days, its start and end on different days.
-    private static Appointment Trip() => new("Trip", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 17, 14, 0, 0));
-
-    private static CalendarView CreateDay(DateTime day, out HeadlessCanvasPeer canvas, params Appointment[] appts)
-    {
-        var calendar = new CalendarView
-        {
-            Bounds = new(0, 0, 700, 1100),
-            ViewMode = CalendarViewMode.Day,
-            SelectedDate = day,
-            Now = _NowInstant,
-        };
-        calendar.SetAppointments(appts);
-
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(calendar);
-        Application.Run(form, backend);
-        canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
-        return calendar;
-    }
-
-    [Test]
-    public void A_multi_day_box_is_clamped_and_flags_its_off_view_edges()
-    {
-        var start = CreateDay(new DateTime(2026, 7, 15), out _, Trip());
-        var middle = CreateDay(new DateTime(2026, 7, 16), out _, Trip());
-        var end = CreateDay(new DateTime(2026, 7, 17), out _, Trip());
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(start.BoxClipFlags(0), Is.EqualTo((false, true)), "the start day owns the real start, continues below");
-            Assert.That(middle.BoxClipFlags(0), Is.EqualTo((true, true)), "a spanned middle day is a continuation both ways");
-            Assert.That(end.BoxClipFlags(0), Is.EqualTo((true, false)), "the end day owns the real end, continues above");
-        });
-    }
-
-    [Test]
-    public void Resizing_the_start_on_the_first_day_leaves_the_off_view_end_untouched()
-    {
-        var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var top = bounds.Y + 2; // the real start edge at 10:00
-
-        canvas.RaiseMouseDown(cx, top);
-        canvas.RaiseMouseMove(cx, top - (2 * _SlotPx)); // pull the start up one hour → 09:00
-        canvas.RaiseMouseUp(cx, top - (2 * _SlotPx));
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 9, 0, 0)), "the start moved earlier");
-            Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 17, 14, 0, 0)), "the out-of-view end held");
-        });
-    }
-
-    [Test]
-    public void Resizing_the_end_on_the_last_day_leaves_the_off_view_start_untouched()
-    {
-        var calendar = CreateDay(new DateTime(2026, 7, 17), out var canvas, Trip());
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var bottom = bounds.Bottom - 3; // the real end edge at 14:00
-
-        canvas.RaiseMouseDown(cx, bottom);
-        canvas.RaiseMouseMove(cx, bottom - (2 * _SlotPx)); // pull the end up one hour → 13:00
-        canvas.RaiseMouseUp(cx, bottom - (2 * _SlotPx));
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 0, 0)), "the out-of-view start held");
-            Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 17)), "the end stayed on the last day");
-            Assert.That(moved.End, Is.LessThan(new DateTime(2026, 7, 17, 14, 0, 0)), "and moved earlier");
-            Assert.That(moved.End, Is.GreaterThan(moved.Start), "still a valid span");
-            Assert.That((moved.End - moved.End.Date).TotalMinutes % calendar.TimeScale, Is.Zero, "snapped to a slot");
-        });
-    }
-
-    [Test]
-    public void A_continuation_edge_moves_the_appointment_rather_than_resizing_it()
-    {
-        // On the end day the top edge is a continuation from the previous day: grabbing it must not be
-        // read as a start-resize (which would keep the end and shrink the span), but as a whole move.
-        var calendar = CreateDay(new DateTime(2026, 7, 17), out var canvas, Trip());
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-        var originalSpan = Trip().End - Trip().Start;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var top = bounds.Y + 2; // the clamped continuation edge
-
-        canvas.RaiseMouseDown(cx, top);
-        canvas.RaiseMouseMove(cx, top + (4 * _SlotPx));
-        canvas.RaiseMouseUp(cx, top + (4 * _SlotPx));
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.That(moved!.End - moved.Start, Is.EqualTo(originalSpan), "the span is preserved — a move, not an edge resize");
-    }
-
-    [Test]
-    public void A_spanned_middle_day_paints_without_error_and_moves_from_either_edge()
-    {
-        var calendar = CreateDay(new DateTime(2026, 7, 16), out var canvas, Trip());
-        Assert.DoesNotThrow(() => canvas.RaisePaint(), "the both-way continuation chevrons paint");
-
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-        var span = Trip().End - Trip().Start;
-
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-
-        canvas.RaiseMouseDown(cx, bounds.Y + 2);
-        canvas.RaiseMouseMove(cx, bounds.Y + 2 + (3 * _SlotPx));
-        canvas.RaiseMouseUp(cx, bounds.Y + 2 + (3 * _SlotPx));
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.That(moved!.End - moved.Start, Is.EqualTo(span), "neither continuation edge resizes; it moves");
-    }
-
-    [Test]
-    public void An_appointment_starting_before_the_visible_range_is_clamped_on_the_first_day()
-    {
-        // Starts five days before the shown week and ends inside it — the classic "starts out of view".
-        var early = new Appointment("Away", new(2026, 7, 10, 8, 0, 0), new(2026, 7, 14, 12, 0, 0));
-        var calendar = new CalendarView { Bounds = new(0, 0, 900, 1100), SelectedDate = _Week, Now = _NowInstant };
-        calendar.SetAppointments(new[] { early });
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(calendar);
-        Application.Run(form, backend);
-
-        var flags = calendar.BoxClipFlags(0); // first visible day is Monday 2026-07-13
-        Assert.That(flags.ClipStart, Is.True, "the real start is before the week, so the first day's box is a continuation");
-    }
-
-    [Test]
-    public void Dragging_the_end_edge_into_the_next_day_column_moves_the_end_to_that_day()
-    {
-        var calendar = CreateCalendar(out var canvas); // Week view, Mon 2026-07-13 .. Sun 2026-07-19
-        AppointmentMoveEventArgs? moved = null;
-        calendar.AppointmentMoved += (_, e) => moved = e;
-
-        var index = IndexOf(calendar, "Lunch"); // 2026-07-16 12:00–13:00
-        Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-        var bottom = bounds.Bottom - 3; // the real end edge
-
-        var nextDayX = calendar.DayColumnCenterX(new DateTime(2026, 7, 17));
-        Assert.That(nextDayX, Is.GreaterThan(0), "the next day is on screen");
-
-        canvas.RaiseMouseDown(cx, bottom);
-        canvas.RaiseMouseMove(nextDayX, bottom); // drag the end horizontally into the next day's column
-        canvas.RaiseMouseUp(nextDayX, bottom);
-
-        Assert.That(moved, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 16, 12, 0, 0)), "the start held");
-            Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 17)), "the end crossed into the next day");
-            Assert.That(moved.End, Is.GreaterThan(moved.Start), "still a valid span");
-        });
-    }
-
-    [Test]
-    public void Hovering_a_real_edge_shows_the_resize_cursor()
-    {
-        var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());
-        Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
-        var cx = bounds.X + (bounds.Width / 2);
-
-        canvas.RaiseMouseMove(cx, bounds.Y + 2); // over the real start edge
-        var onEdge = ((HeadlessCanvasPeer)calendar.Peer!).Cursor;
-
-        canvas.RaiseMouseMove(cx, bounds.Y + (bounds.Height / 2)); // over the body
-        var onBody = ((HeadlessCanvasPeer)calendar.Peer!).Cursor;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(onEdge, Is.SameAs(Cursors.SizeNS), "the real edge offers a north-south resize cursor");
-            Assert.That(onBody, Is.Not.SameAs(Cursors.SizeNS), "the body does not");
-        });
-    }
+    calendar.SetAppointments(many);
+
+    // Only the shown week's appointments are ever laid out, so the box count is tiny however large
+    // the bound set is — the virtualization guarantee.
+    Assert.That(calendar.LaidOutBoxCount, Is.LessThan(200), $"{calendar.LaidOutBoxCount} boxes for a week out of 100k appointments");
+  }
+
+  // --- Multi-day / out-of-view resize -------------------------------------------------------------
+
+  // A 2026-07-15 10:00 → 2026-07-17 14:00 appointment: three days, its start and end on different days.
+  private static Appointment Trip() => new("Trip", new(2026, 7, 15, 10, 0, 0), new(2026, 7, 17, 14, 0, 0));
+
+  private static CalendarView CreateDay(DateTime day, out HeadlessCanvasPeer canvas, params Appointment[] appts) {
+    var calendar = new CalendarView {
+      Bounds = new(0, 0, 700, 1100),
+      ViewMode = CalendarViewMode.Day,
+      SelectedDate = day,
+      Now = _NowInstant,
+    };
+    calendar.SetAppointments(appts);
+
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(calendar);
+    Application.Run(form, backend);
+    canvas = backend.Created.OfType<HeadlessCanvasPeer>().Single();
+    return calendar;
+  }
+
+  [Test]
+  public void A_multi_day_box_is_clamped_and_flags_its_off_view_edges() {
+    var start = CreateDay(new DateTime(2026, 7, 15), out _, Trip());
+    var middle = CreateDay(new DateTime(2026, 7, 16), out _, Trip());
+    var end = CreateDay(new DateTime(2026, 7, 17), out _, Trip());
+
+    Assert.Multiple(() => {
+      Assert.That(start.BoxClipFlags(0), Is.EqualTo((false, true)), "the start day owns the real start, continues below");
+      Assert.That(middle.BoxClipFlags(0), Is.EqualTo((true, true)), "a spanned middle day is a continuation both ways");
+      Assert.That(end.BoxClipFlags(0), Is.EqualTo((true, false)), "the end day owns the real end, continues above");
+    });
+  }
+
+  [Test]
+  public void Resizing_the_start_on_the_first_day_leaves_the_off_view_end_untouched() {
+    var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var top = bounds.Y + 2; // the real start edge at 10:00
+
+    canvas.RaiseMouseDown(cx, top);
+    canvas.RaiseMouseMove(cx, top - (2 * _SlotPx)); // pull the start up one hour → 09:00
+    canvas.RaiseMouseUp(cx, top - (2 * _SlotPx));
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 9, 0, 0)), "the start moved earlier");
+      Assert.That(moved.End, Is.EqualTo(new DateTime(2026, 7, 17, 14, 0, 0)), "the out-of-view end held");
+    });
+  }
+
+  [Test]
+  public void Resizing_the_end_on_the_last_day_leaves_the_off_view_start_untouched() {
+    var calendar = CreateDay(new DateTime(2026, 7, 17), out var canvas, Trip());
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var bottom = bounds.Bottom - 3; // the real end edge at 14:00
+
+    canvas.RaiseMouseDown(cx, bottom);
+    canvas.RaiseMouseMove(cx, bottom - (2 * _SlotPx)); // pull the end up one hour → 13:00
+    canvas.RaiseMouseUp(cx, bottom - (2 * _SlotPx));
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 15, 10, 0, 0)), "the out-of-view start held");
+      Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 17)), "the end stayed on the last day");
+      Assert.That(moved.End, Is.LessThan(new DateTime(2026, 7, 17, 14, 0, 0)), "and moved earlier");
+      Assert.That(moved.End, Is.GreaterThan(moved.Start), "still a valid span");
+      Assert.That((moved.End - moved.End.Date).TotalMinutes % calendar.TimeScale, Is.Zero, "snapped to a slot");
+    });
+  }
+
+  [Test]
+  public void A_continuation_edge_moves_the_appointment_rather_than_resizing_it() {
+    // On the end day the top edge is a continuation from the previous day: grabbing it must not be
+    // read as a start-resize (which would keep the end and shrink the span), but as a whole move.
+    var calendar = CreateDay(new DateTime(2026, 7, 17), out var canvas, Trip());
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+    var originalSpan = Trip().End - Trip().Start;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var top = bounds.Y + 2; // the clamped continuation edge
+
+    canvas.RaiseMouseDown(cx, top);
+    canvas.RaiseMouseMove(cx, top + (4 * _SlotPx));
+    canvas.RaiseMouseUp(cx, top + (4 * _SlotPx));
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.That(moved!.End - moved.Start, Is.EqualTo(originalSpan), "the span is preserved — a move, not an edge resize");
+  }
+
+  [Test]
+  public void A_spanned_middle_day_paints_without_error_and_moves_from_either_edge() {
+    var calendar = CreateDay(new DateTime(2026, 7, 16), out var canvas, Trip());
+    Assert.DoesNotThrow(() => canvas.RaisePaint(), "the both-way continuation chevrons paint");
+
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+    var span = Trip().End - Trip().Start;
+
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+
+    canvas.RaiseMouseDown(cx, bounds.Y + 2);
+    canvas.RaiseMouseMove(cx, bounds.Y + 2 + (3 * _SlotPx));
+    canvas.RaiseMouseUp(cx, bounds.Y + 2 + (3 * _SlotPx));
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.That(moved!.End - moved.Start, Is.EqualTo(span), "neither continuation edge resizes; it moves");
+  }
+
+  [Test]
+  public void An_appointment_starting_before_the_visible_range_is_clamped_on_the_first_day() {
+    // Starts five days before the shown week and ends inside it — the classic "starts out of view".
+    var early = new Appointment("Away", new(2026, 7, 10, 8, 0, 0), new(2026, 7, 14, 12, 0, 0));
+    var calendar = new CalendarView { Bounds = new(0, 0, 900, 1100), SelectedDate = _Week, Now = _NowInstant };
+    calendar.SetAppointments(new[] { early });
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(calendar);
+    Application.Run(form, backend);
+
+    var flags = calendar.BoxClipFlags(0); // first visible day is Monday 2026-07-13
+    Assert.That(flags.ClipStart, Is.True, "the real start is before the week, so the first day's box is a continuation");
+  }
+
+  [Test]
+  public void Dragging_the_end_edge_into_the_next_day_column_moves_the_end_to_that_day() {
+    var calendar = CreateCalendar(out var canvas); // Week view, Mon 2026-07-13 .. Sun 2026-07-19
+    AppointmentMoveEventArgs? moved = null;
+    calendar.AppointmentMoved += (_, e) => moved = e;
+
+    var index = IndexOf(calendar, "Lunch"); // 2026-07-16 12:00–13:00
+    Assert.That(calendar.TryGetAppointmentBounds(index, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+    var bottom = bounds.Bottom - 3; // the real end edge
+
+    var nextDayX = calendar.DayColumnCenterX(new DateTime(2026, 7, 17));
+    Assert.That(nextDayX, Is.GreaterThan(0), "the next day is on screen");
+
+    canvas.RaiseMouseDown(cx, bottom);
+    canvas.RaiseMouseMove(nextDayX, bottom); // drag the end horizontally into the next day's column
+    canvas.RaiseMouseUp(nextDayX, bottom);
+
+    Assert.That(moved, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(moved!.Start, Is.EqualTo(new DateTime(2026, 7, 16, 12, 0, 0)), "the start held");
+      Assert.That(moved.End.Date, Is.EqualTo(new DateTime(2026, 7, 17)), "the end crossed into the next day");
+      Assert.That(moved.End, Is.GreaterThan(moved.Start), "still a valid span");
+    });
+  }
+
+  [Test]
+  public void Hovering_a_real_edge_shows_the_resize_cursor() {
+    var calendar = CreateDay(new DateTime(2026, 7, 15), out var canvas, Trip());
+    Assert.That(calendar.TryGetAppointmentBounds(0, out var bounds), Is.True);
+    var cx = bounds.X + (bounds.Width / 2);
+
+    canvas.RaiseMouseMove(cx, bounds.Y + 2); // over the real start edge
+    var onEdge = ((HeadlessCanvasPeer)calendar.Peer!).Cursor;
+
+    canvas.RaiseMouseMove(cx, bounds.Y + (bounds.Height / 2)); // over the body
+    var onBody = ((HeadlessCanvasPeer)calendar.Peer!).Cursor;
+
+    Assert.Multiple(() => {
+      Assert.That(onEdge, Is.SameAs(Cursors.SizeNS), "the real edge offers a north-south resize cursor");
+      Assert.That(onBody, Is.Not.SameAs(Cursors.SizeNS), "the body does not");
+    });
+  }
 }

@@ -11,451 +11,408 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// GTK main loop. Reflection-free and AOT-safe: every native call is a source-generated P/Invoke and
 /// every signal callback is an unmanaged function pointer.
 /// </summary>
-public sealed partial class GtkBackend : IPlatformBackend
-{
-    private static readonly object _initGate = new();
-    private static bool _initialized;
+public sealed partial class GtkBackend : IPlatformBackend {
+  private static readonly object _initGate = new();
+  private static bool _initialized;
 
-    /// <summary>The most recently constructed backend — the instance the static settings callback
-    /// notifies when the desktop theme changes (an app runs exactly one backend).</summary>
-    private static GtkBackend? _current;
+  /// <summary>The most recently constructed backend — the instance the static settings callback
+  /// notifies when the desktop theme changes (an app runs exactly one backend).</summary>
+  private static GtkBackend? _current;
 
-    private GtkTheme? _theme;
+  private GtkTheme? _theme;
 
-    /// <summary>Registers this instance as the receiver of desktop theme-change notifications.</summary>
-    public GtkBackend() => _current = this;
+  /// <summary>Registers this instance as the receiver of desktop theme-change notifications.</summary>
+  public GtkBackend() => _current = this;
 
-    /// <summary>Calls <c>gtk_init</c> exactly once, before any widget is created or the loop runs,
-    /// and hooks the <c>GtkSettings</c> notifications that announce a desktop theme change.</summary>
-    private static void EnsureInitialized()
-    {
-        if (_initialized)
-            return;
+  /// <summary>Calls <c>gtk_init</c> exactly once, before any widget is created or the loop runs,
+  /// and hooks the <c>GtkSettings</c> notifications that announce a desktop theme change.</summary>
+  private static void EnsureInitialized() {
+    if (_initialized)
+      return;
 
-        lock (_initGate)
-        {
-            if (_initialized)
-                return;
+    lock (_initGate) {
+      if (_initialized)
+        return;
 
-            NativeMethods.gtk_init(0, 0);
-            NormalizeFontDpi();
-            HookThemeNotifications();
-            _initialized = true;
-        }
+      NativeMethods.gtk_init(0, 0);
+      NormalizeFontDpi();
+      HookThemeNotifications();
+      _initialized = true;
     }
+  }
 
-    private static nint _measureContext;
+  private static nint _measureContext;
 
-    /// <summary>
-    /// The reused Pango context for text measurement, built once from the default Cairo font map.
-    /// Kept for the process lifetime (the default font map is stable across theme changes, which alter
-    /// resolved colours and fonts, not the map itself), so measurement never rebuilds a font-map
-    /// context. Created lazily on the UI thread the first time text is measured.
-    /// </summary>
-    private static nint MeasureContext()
-        => _measureContext != 0
-            ? _measureContext
-            : _measureContext = NativeMethods.pango_font_map_create_context(NativeMethods.pango_cairo_font_map_get_default());
+  /// <summary>
+  /// The reused Pango context for text measurement, built once from the default Cairo font map.
+  /// Kept for the process lifetime (the default font map is stable across theme changes, which alter
+  /// resolved colours and fonts, not the map itself), so measurement never rebuilds a font-map
+  /// context. Created lazily on the UI thread the first time text is measured.
+  /// </summary>
+  private static nint MeasureContext()
+      => _measureContext != 0
+          ? _measureContext
+          : _measureContext = NativeMethods.pango_font_map_create_context(NativeMethods.pango_cairo_font_map_get_default());
 
-    /// <summary><c>gtk-xft-dpi</c> value that renders native text at 96 DPI (in 1/1024 point units).</summary>
-    private const int _baselineFontDpi = 96 * 1024;
+  /// <summary><c>gtk-xft-dpi</c> value that renders native text at 96 DPI (in 1/1024 point units).</summary>
+  private const int _baselineFontDpi = 96 * 1024;
 
-    /// <summary>
-    /// Pins native widgets to 96-DPI text so they match the owner-drawn controls. Owner-drawn text is
-    /// laid out through the default PangoCairo font map, whose resolution is a fixed 96 DPI, while
-    /// native GTK widgets follow the desktop's <c>gtk-xft-dpi</c> — which on a HiDPI display is far
-    /// higher (163 DPI on a 4K screen), so a native control's caption comes out visibly larger than the
-    /// label beside it. The toolkit lays out in device pixels at 96 DPI (100% scaling; DPI-aware
-    /// coordinate scaling is tracked in <c>docs/PRD.md</c> §4), so the honest, consistent baseline is to
-    /// render every widget at that same resolution rather than let the two surfaces diverge.
-    /// </summary>
-    private static void NormalizeFontDpi()
-    {
-        var settings = NativeMethods.gtk_settings_get_default();
-        if (settings != 0)
-            NativeMethods.g_object_set_int(settings, "gtk-xft-dpi", _baselineFontDpi, 0);
+  /// <summary>
+  /// Pins native widgets to 96-DPI text so they match the owner-drawn controls. Owner-drawn text is
+  /// laid out through the default PangoCairo font map, whose resolution is a fixed 96 DPI, while
+  /// native GTK widgets follow the desktop's <c>gtk-xft-dpi</c> — which on a HiDPI display is far
+  /// higher (163 DPI on a 4K screen), so a native control's caption comes out visibly larger than the
+  /// label beside it. The toolkit lays out in device pixels at 96 DPI (100% scaling; DPI-aware
+  /// coordinate scaling is tracked in <c>docs/PRD.md</c> §4), so the honest, consistent baseline is to
+  /// render every widget at that same resolution rather than let the two surfaces diverge.
+  /// </summary>
+  private static void NormalizeFontDpi() {
+    var settings = NativeMethods.gtk_settings_get_default();
+    if (settings != 0)
+      NativeMethods.g_object_set_int(settings, "gtk-xft-dpi", _baselineFontDpi, 0);
+  }
+
+  /// <summary>
+  /// Subscribes to <c>notify::gtk-theme-name</c> and <c>notify::gtk-application-prefer-dark-theme</c>
+  /// on the default <c>GtkSettings</c>, so a theme or dark-mode switch invalidates the cached theme
+  /// and repaints every owner-drawn control.
+  /// </summary>
+  private static void HookThemeNotifications() {
+    var settings = NativeMethods.gtk_settings_get_default();
+    if (settings == 0)
+      return;
+
+    unsafe {
+      var handler = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSettingsChanged;
+      NativeMethods.g_signal_connect_data(settings, "notify::gtk-theme-name", handler, 0, 0, 0);
+      NativeMethods.g_signal_connect_data(settings, "notify::gtk-application-prefer-dark-theme", handler, 0, 0, 0);
+
+      // A scaling change is the same kind of event: every metric the toolkit measures in pixels
+      // comes from the theme and is derived from the DPI, so the cached snapshot goes stale exactly
+      // as it does for a colour change. gtk-xft-dpi covers a fractional text-scale change, and the
+      // monitor's scale-factor covers the integer one GTK applies to whole widgets.
+      NativeMethods.g_signal_connect_data(settings, "notify::gtk-xft-dpi", handler, 0, 0, 0);
+
+      if (NativeMethods.gdk_display_get_default() is var display && display != 0
+          && NativeMethods.gdk_display_get_primary_monitor(display) is var monitor && monitor != 0)
+        NativeMethods.g_signal_connect_data(monitor, "notify::scale-factor", handler, 0, 0, 0);
     }
+  }
 
-    /// <summary>
-    /// Subscribes to <c>notify::gtk-theme-name</c> and <c>notify::gtk-application-prefer-dark-theme</c>
-    /// on the default <c>GtkSettings</c>, so a theme or dark-mode switch invalidates the cached theme
-    /// and repaints every owner-drawn control.
-    /// </summary>
-    private static void HookThemeNotifications()
-    {
-        var settings = NativeMethods.gtk_settings_get_default();
-        if (settings == 0)
-            return;
+  /// <summary>Native <c>notify::…</c> handler: <c>void (GObject*, GParamSpec*, gpointer)</c>.</summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static void OnSettingsChanged(nint settings, nint pspec, nint userData) {
+    var backend = _current;
+    if (backend is null)
+      return;
 
-        unsafe
-        {
-            var handler = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnSettingsChanged;
-            NativeMethods.g_signal_connect_data(settings, "notify::gtk-theme-name", handler, 0, 0, 0);
-            NativeMethods.g_signal_connect_data(settings, "notify::gtk-application-prefer-dark-theme", handler, 0, 0, 0);
+    backend._theme = null;
+    backend.ThemeChanged?.Invoke(backend, EventArgs.Empty);
+  }
 
-            // A scaling change is the same kind of event: every metric the toolkit measures in pixels
-            // comes from the theme and is derived from the DPI, so the cached snapshot goes stale exactly
-            // as it does for a colour change. gtk-xft-dpi covers a fractional text-scale change, and the
-            // monitor's scale-factor covers the integer one GTK applies to whole widgets.
-            NativeMethods.g_signal_connect_data(settings, "notify::gtk-xft-dpi", handler, 0, 0, 0);
+  /// <inheritdoc />
+  public string Name => "Gtk";
 
-            if (NativeMethods.gdk_display_get_default() is var display && display != 0
-                && NativeMethods.gdk_display_get_primary_monitor(display) is var monitor && monitor != 0)
-                NativeMethods.g_signal_connect_data(monitor, "notify::scale-factor", handler, 0, 0, 0);
-        }
+  /// <inheritdoc />
+  public bool IsSupported => OperatingSystem.IsLinux();
+
+  /// <inheritdoc />
+  // The cache is dropped when GtkSettings announces a theme change, so the next read snapshots
+  // fresh style-context values.
+  public ITheme Theme {
+    get {
+      EnsureInitialized();
+      return _theme ??= new GtkTheme();
     }
+  }
 
-    /// <summary>Native <c>notify::…</c> handler: <c>void (GObject*, GParamSpec*, gpointer)</c>.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static void OnSettingsChanged(nint settings, nint pspec, nint userData)
-    {
-        var backend = _current;
-        if (backend is null)
-            return;
+  /// <inheritdoc />
+  public event EventHandler? ThemeChanged;
 
-        backend._theme = null;
-        backend.ThemeChanged?.Invoke(backend, EventArgs.Empty);
+  /// <inheritdoc />
+  public double GetDpiScale() {
+    EnsureInitialized();
+    var display = NativeMethods.gdk_display_get_default();
+    if (display == 0)
+      return 1.0;
+
+    var monitor = NativeMethods.gdk_display_get_primary_monitor(display);
+    if (monitor == 0)
+      monitor = NativeMethods.gdk_display_get_monitor(display, 0);
+
+    if (monitor == 0)
+      return 1.0;
+
+    var scale = NativeMethods.gdk_monitor_get_scale_factor(monitor);
+    return scale > 0 ? scale : 1.0;
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real check button, so this backend accepts the promotion (PRD §12).</remarks>
+  /// <inheritdoc />
+  /// <remarks>
+  /// <c>gtk_button_set_image</c> puts the image beside the label and honours the position, so the
+  /// widget renders the whole face and there is nothing for the owner-drawn half to add.
+  /// </remarks>
+  public bool ButtonRendersImageWithText => true;
+
+  public ICheckBoxPeer? CreateCheckBox() {
+    EnsureInitialized();
+    return new GtkCheckBoxPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real radio button, so this backend accepts the promotion (PRD §12).</remarks>
+  public IRadioButtonPeer? CreateRadioButton() {
+    EnsureInitialized();
+    return new GtkRadioButtonPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real link button, so this backend accepts the promotion (PRD §12).</remarks>
+  public ILinkLabelPeer? CreateLinkLabel() {
+    EnsureInitialized();
+    return new GtkLinkLabelPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real scrollbar, so this backend accepts the promotion (PRD §12).</remarks>
+  public IScrollBarPeer? CreateScrollBar(bool vertical) {
+    EnsureInitialized();
+    return new GtkScrollBarPeer(vertical);
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real drop-down list, so this backend accepts the promotion (PRD §12).</remarks>
+  public IComboBoxPeer? CreateComboBox() {
+    EnsureInitialized();
+    return new GtkComboBoxPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real tree view, so this backend accepts the promotion (PRD §12).</remarks>
+  public IListBoxPeer? CreateListBox() {
+    EnsureInitialized();
+    return new GtkListBoxPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real frame, so this backend accepts the promotion (PRD §12).</remarks>
+  public IGroupBoxPeer? CreateGroupBox() {
+    EnsureInitialized();
+    return new GtkGroupBoxPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
+  public IProgressBarPeer? CreateProgressBar() {
+    EnsureInitialized();
+    return new GtkProgressBarPeer();
+  }
+
+  /// <inheritdoc />
+  /// <remarks>GTK has a real scale, so this backend accepts the promotion (PRD §12).</remarks>
+  public ITrackBarPeer? CreateTrackBar(bool vertical) {
+    EnsureInitialized();
+    return new GtkTrackBarPeer(vertical);
+  }
+
+  /// <inheritdoc />
+  public ICanvasPeer CreateCanvas() {
+    EnsureInitialized();
+    return new GtkCanvasPeer();
+  }
+
+  /// <inheritdoc />
+  public IPopupPeer CreatePopup(IWindowPeer? owner) {
+    EnsureInitialized();
+    return new GtkPopupPeer(owner is GtkWindowPeer window ? window.WidgetHandle : 0);
+  }
+
+  /// <inheritdoc />
+  public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) {
+    EnsureInitialized();
+    return new GtkImage(width, height, argb);
+  }
+
+  /// <inheritdoc />
+  public Color SampleScreenPixel(Point screen) {
+    EnsureInitialized();
+    var root = NativeMethods.gdk_get_default_root_window();
+    if (root == 0)
+      return Color.Empty;
+
+    // Grabbing a 1×1 rectangle of the root window reads the desktop pixel under the point. A
+    // compositor that forbids reading other surfaces (Wayland) returns 0, so the eyedropper is a
+    // no-op there — screen sampling is an X11/Win32 capability.
+    var pixbuf = NativeMethods.gdk_pixbuf_get_from_window(root, screen.X, screen.Y, 1, 1);
+    if (pixbuf == 0)
+      return Color.Empty;
+
+    try {
+      var pixels = NativeMethods.gdk_pixbuf_get_pixels(pixbuf);
+      if (pixels == 0)
+        return Color.Empty;
+
+      var r = Marshal.ReadByte(pixels, 0);
+      var g = Marshal.ReadByte(pixels, 1);
+      var b = Marshal.ReadByte(pixels, 2);
+      return Color.FromArgb(255, r, g, b);
+    } finally {
+      NativeMethods.g_object_unref(pixbuf);
     }
+  }
 
-    /// <inheritdoc />
-    public string Name => "Gtk";
+  /// <inheritdoc />
+  public ITimerPeer CreateTimer() {
+    EnsureInitialized();
+    return new GtkTimerPeer();
+  }
 
-    /// <inheritdoc />
-    public bool IsSupported => OperatingSystem.IsLinux();
+  /// <inheritdoc />
+  /// <remarks>
+  /// Not implemented: <c>GtkStatusIcon</c> has been deprecated since GTK 3.14 and is absent from
+  /// many desktops, and the replacement (the StatusNotifier D-Bus protocol) is a separate
+  /// integration tracked in <c>docs/PRD.md</c> §7.7. Failing here is more honest than adding an
+  /// icon no shell will show.
+  /// </remarks>
+  public INotifyIconPeer CreateNotifyIcon()
+      => throw new NotSupportedException(
+          "Tray icons are not supported by the GTK backend yet: GtkStatusIcon is deprecated and the "
+          + "StatusNotifier (D-Bus) integration is tracked in docs/PRD.md §7.7.");
 
-    /// <inheritdoc />
-    // The cache is dropped when GtkSettings announces a theme change, so the next read snapshots
-    // fresh style-context values.
-    public ITheme Theme
-    {
-        get
-        {
-            EnsureInitialized();
-            return _theme ??= new GtkTheme();
-        }
+  /// <inheritdoc />
+  public Size GetScreenSize() {
+    EnsureInitialized();
+    var display = NativeMethods.gdk_display_get_default();
+    if (display == 0)
+      return Size.Empty;
+
+    // The primary monitor when the desktop marks one, otherwise the first.
+    var monitor = NativeMethods.gdk_display_get_primary_monitor(display);
+    if (monitor == 0)
+      monitor = NativeMethods.gdk_display_get_monitor(display, 0);
+
+    if (monitor == 0)
+      return Size.Empty;
+
+    NativeMethods.gdk_monitor_get_geometry(monitor, out var geometry);
+    return new(geometry.Width, geometry.Height);
+  }
+
+  /// <inheritdoc />
+  public Size MeasureText(string text, Font font) {
+    if (string.IsNullOrEmpty(text))
+      return Size.Empty;
+
+    EnsureInitialized();
+
+    // A layout on a context from the default font map measures identically to the per-paint
+    // PangoCairo layout, but needs no Cairo surface — so it works before anything is realized.
+    // The context is created once and reused: it is stateless for measuring (text and font live on
+    // the layout), and building a fresh font-map context per call dominated cold-start text
+    // measurement (autosize labels, tab widths) — all on the single UI thread, so no lock is due.
+    var layout = NativeMethods.pango_layout_new(MeasureContext());
+    try {
+      GtkGraphics.ConfigureLayout(layout, text, font);
+      NativeMethods.pango_layout_get_pixel_size(layout, out var width, out var height);
+      return new Size(width, height);
+    } finally {
+      NativeMethods.g_object_unref(layout);
     }
+  }
 
-    /// <inheritdoc />
-    public event EventHandler? ThemeChanged;
+  /// <inheritdoc />
+  public IWindowPeer CreateWindow() {
+    EnsureInitialized();
+    return new GtkWindowPeer();
+  }
 
-    /// <inheritdoc />
-    public double GetDpiScale()
-    {
-        EnsureInitialized();
-        var display = NativeMethods.gdk_display_get_default();
-        if (display == 0)
-            return 1.0;
+  /// <inheritdoc />
+  public IButtonPeer CreateButton() {
+    EnsureInitialized();
+    return new GtkButtonPeer();
+  }
 
-        var monitor = NativeMethods.gdk_display_get_primary_monitor(display);
-        if (monitor == 0)
-            monitor = NativeMethods.gdk_display_get_monitor(display, 0);
+  /// <inheritdoc />
+  public ILabelPeer CreateLabel() {
+    EnsureInitialized();
+    return new GtkLabelPeer();
+  }
 
-        if (monitor == 0)
-            return 1.0;
+  /// <inheritdoc />
+  public ITextBoxPeer CreateTextBox() {
+    EnsureInitialized();
+    return new GtkTextBoxPeer();
+  }
 
-        var scale = NativeMethods.gdk_monitor_get_scale_factor(monitor);
-        return scale > 0 ? scale : 1.0;
+  /// <inheritdoc />
+  public IRichTextBoxPeer CreateRichTextBox() {
+    EnsureInitialized();
+    return new GtkRichTextBoxPeer();
+  }
+
+  /// <inheritdoc />
+  public void SetClipboardText(string text) {
+    ArgumentNullException.ThrowIfNull(text);
+    EnsureInitialized();
+    var clipboard = NativeMethods.gtk_clipboard_get(NativeMethods.gdk_atom_intern("CLIPBOARD", 0));
+    NativeMethods.gtk_clipboard_set_text(clipboard, text, -1);
+  }
+
+  /// <inheritdoc />
+  public string? GetClipboardText() {
+    EnsureInitialized();
+    var clipboard = NativeMethods.gtk_clipboard_get(NativeMethods.gdk_atom_intern("CLIPBOARD", 0));
+    var ptr = NativeMethods.gtk_clipboard_wait_for_text(clipboard);
+    if (ptr == 0)
+      return null;
+
+    var text = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr);
+    NativeMethods.g_free(ptr);
+    return text;
+  }
+
+  /// <inheritdoc />
+  /// <remarks>
+  /// Queues through <c>g_idle_add_full</c>, which is thread-safe by GLib contract, so posting works
+  /// from any thread. The action travels as a normal <see cref="GCHandle"/> threaded through
+  /// <c>user_data</c> — the same state-recovery pattern every signal handler uses — and the
+  /// <see cref="UnmanagedCallersOnlyAttribute"/> callback frees it after the single invocation.
+  /// </remarks>
+  public void Post(Action action) {
+    ArgumentNullException.ThrowIfNull(action);
+    EnsureInitialized();
+    var handle = GCHandle.Alloc(action);
+    unsafe {
+      var callback = (nint)(delegate* unmanaged[Cdecl]<nint, int>)&OnIdle;
+      NativeMethods.g_idle_add_full(NativeMethods.G_PRIORITY_DEFAULT, callback, GCHandle.ToIntPtr(handle), 0);
     }
+  }
 
-    /// <inheritdoc />
-    /// <remarks>GTK has a real check button, so this backend accepts the promotion (PRD §12).</remarks>
-    /// <inheritdoc />
-    /// <remarks>
-    /// <c>gtk_button_set_image</c> puts the image beside the label and honours the position, so the
-    /// widget renders the whole face and there is nothing for the owner-drawn half to add.
-    /// </remarks>
-    public bool ButtonRendersImageWithText => true;
+  /// <summary>
+  /// Native <c>GSourceFunc</c> handler shaped as <c>gboolean (gpointer user_data)</c>; recovers the
+  /// posted action from <paramref name="userData"/>, frees the handle, runs the action once and
+  /// returns 0 (<c>G_SOURCE_REMOVE</c>) so the idle source retires.
+  /// </summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static int OnIdle(nint userData) {
+    if (userData == 0)
+      return 0;
 
-    public ICheckBoxPeer? CreateCheckBox()
-    {
-        EnsureInitialized();
-        return new GtkCheckBoxPeer();
-    }
+    var handle = GCHandle.FromIntPtr(userData);
+    var action = handle.Target as Action;
+    handle.Free();
+    action?.Invoke();
+    return 0;
+  }
 
-    /// <inheritdoc />
-    /// <remarks>GTK has a real radio button, so this backend accepts the promotion (PRD §12).</remarks>
-    public IRadioButtonPeer? CreateRadioButton()
-    {
-        EnsureInitialized();
-        return new GtkRadioButtonPeer();
-    }
+  /// <inheritdoc />
+  public void Run(IWindowPeer mainWindow) {
+    EnsureInitialized();
+    NativeMethods.gtk_main();
+  }
 
-    /// <inheritdoc />
-    /// <remarks>GTK has a real link button, so this backend accepts the promotion (PRD §12).</remarks>
-    public ILinkLabelPeer? CreateLinkLabel()
-    {
-        EnsureInitialized();
-        return new GtkLinkLabelPeer();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>GTK has a real scrollbar, so this backend accepts the promotion (PRD §12).</remarks>
-    public IScrollBarPeer? CreateScrollBar(bool vertical)
-    {
-        EnsureInitialized();
-        return new GtkScrollBarPeer(vertical);
-    }
-
-    /// <inheritdoc />
-    /// <remarks>GTK has a real drop-down list, so this backend accepts the promotion (PRD §12).</remarks>
-    public IComboBoxPeer? CreateComboBox()
-    {
-        EnsureInitialized();
-        return new GtkComboBoxPeer();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>GTK has a real tree view, so this backend accepts the promotion (PRD §12).</remarks>
-    public IListBoxPeer? CreateListBox()
-    {
-        EnsureInitialized();
-        return new GtkListBoxPeer();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>GTK has a real frame, so this backend accepts the promotion (PRD §12).</remarks>
-    public IGroupBoxPeer? CreateGroupBox()
-    {
-        EnsureInitialized();
-        return new GtkGroupBoxPeer();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>GTK has a real progress bar, so this backend accepts the promotion (PRD §12).</remarks>
-    public IProgressBarPeer? CreateProgressBar()
-    {
-        EnsureInitialized();
-        return new GtkProgressBarPeer();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>GTK has a real scale, so this backend accepts the promotion (PRD §12).</remarks>
-    public ITrackBarPeer? CreateTrackBar(bool vertical)
-    {
-        EnsureInitialized();
-        return new GtkTrackBarPeer(vertical);
-    }
-
-    /// <inheritdoc />
-    public ICanvasPeer CreateCanvas()
-    {
-        EnsureInitialized();
-        return new GtkCanvasPeer();
-    }
-
-    /// <inheritdoc />
-    public IPopupPeer CreatePopup(IWindowPeer? owner)
-    {
-        EnsureInitialized();
-        return new GtkPopupPeer(owner is GtkWindowPeer window ? window.WidgetHandle : 0);
-    }
-
-    /// <inheritdoc />
-    public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb)
-    {
-        EnsureInitialized();
-        return new GtkImage(width, height, argb);
-    }
-
-    /// <inheritdoc />
-    public Color SampleScreenPixel(Point screen)
-    {
-        EnsureInitialized();
-        var root = NativeMethods.gdk_get_default_root_window();
-        if (root == 0)
-            return Color.Empty;
-
-        // Grabbing a 1×1 rectangle of the root window reads the desktop pixel under the point. A
-        // compositor that forbids reading other surfaces (Wayland) returns 0, so the eyedropper is a
-        // no-op there — screen sampling is an X11/Win32 capability.
-        var pixbuf = NativeMethods.gdk_pixbuf_get_from_window(root, screen.X, screen.Y, 1, 1);
-        if (pixbuf == 0)
-            return Color.Empty;
-
-        try
-        {
-            var pixels = NativeMethods.gdk_pixbuf_get_pixels(pixbuf);
-            if (pixels == 0)
-                return Color.Empty;
-
-            var r = Marshal.ReadByte(pixels, 0);
-            var g = Marshal.ReadByte(pixels, 1);
-            var b = Marshal.ReadByte(pixels, 2);
-            return Color.FromArgb(255, r, g, b);
-        }
-        finally
-        {
-            NativeMethods.g_object_unref(pixbuf);
-        }
-    }
-
-    /// <inheritdoc />
-    public ITimerPeer CreateTimer()
-    {
-        EnsureInitialized();
-        return new GtkTimerPeer();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>
-    /// Not implemented: <c>GtkStatusIcon</c> has been deprecated since GTK 3.14 and is absent from
-    /// many desktops, and the replacement (the StatusNotifier D-Bus protocol) is a separate
-    /// integration tracked in <c>docs/PRD.md</c> §7.7. Failing here is more honest than adding an
-    /// icon no shell will show.
-    /// </remarks>
-    public INotifyIconPeer CreateNotifyIcon()
-        => throw new NotSupportedException(
-            "Tray icons are not supported by the GTK backend yet: GtkStatusIcon is deprecated and the "
-            + "StatusNotifier (D-Bus) integration is tracked in docs/PRD.md §7.7.");
-
-    /// <inheritdoc />
-    public Size GetScreenSize()
-    {
-        EnsureInitialized();
-        var display = NativeMethods.gdk_display_get_default();
-        if (display == 0)
-            return Size.Empty;
-
-        // The primary monitor when the desktop marks one, otherwise the first.
-        var monitor = NativeMethods.gdk_display_get_primary_monitor(display);
-        if (monitor == 0)
-            monitor = NativeMethods.gdk_display_get_monitor(display, 0);
-
-        if (monitor == 0)
-            return Size.Empty;
-
-        NativeMethods.gdk_monitor_get_geometry(monitor, out var geometry);
-        return new(geometry.Width, geometry.Height);
-    }
-
-    /// <inheritdoc />
-    public Size MeasureText(string text, Font font)
-    {
-        if (string.IsNullOrEmpty(text))
-            return Size.Empty;
-
-        EnsureInitialized();
-
-        // A layout on a context from the default font map measures identically to the per-paint
-        // PangoCairo layout, but needs no Cairo surface — so it works before anything is realized.
-        // The context is created once and reused: it is stateless for measuring (text and font live on
-        // the layout), and building a fresh font-map context per call dominated cold-start text
-        // measurement (autosize labels, tab widths) — all on the single UI thread, so no lock is due.
-        var layout = NativeMethods.pango_layout_new(MeasureContext());
-        try
-        {
-            GtkGraphics.ConfigureLayout(layout, text, font);
-            NativeMethods.pango_layout_get_pixel_size(layout, out var width, out var height);
-            return new Size(width, height);
-        }
-        finally
-        {
-            NativeMethods.g_object_unref(layout);
-        }
-    }
-
-    /// <inheritdoc />
-    public IWindowPeer CreateWindow()
-    {
-        EnsureInitialized();
-        return new GtkWindowPeer();
-    }
-
-    /// <inheritdoc />
-    public IButtonPeer CreateButton()
-    {
-        EnsureInitialized();
-        return new GtkButtonPeer();
-    }
-
-    /// <inheritdoc />
-    public ILabelPeer CreateLabel()
-    {
-        EnsureInitialized();
-        return new GtkLabelPeer();
-    }
-
-    /// <inheritdoc />
-    public ITextBoxPeer CreateTextBox()
-    {
-        EnsureInitialized();
-        return new GtkTextBoxPeer();
-    }
-
-    /// <inheritdoc />
-    public IRichTextBoxPeer CreateRichTextBox()
-    {
-        EnsureInitialized();
-        return new GtkRichTextBoxPeer();
-    }
-
-    /// <inheritdoc />
-    public void SetClipboardText(string text)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        EnsureInitialized();
-        var clipboard = NativeMethods.gtk_clipboard_get(NativeMethods.gdk_atom_intern("CLIPBOARD", 0));
-        NativeMethods.gtk_clipboard_set_text(clipboard, text, -1);
-    }
-
-    /// <inheritdoc />
-    public string? GetClipboardText()
-    {
-        EnsureInitialized();
-        var clipboard = NativeMethods.gtk_clipboard_get(NativeMethods.gdk_atom_intern("CLIPBOARD", 0));
-        var ptr = NativeMethods.gtk_clipboard_wait_for_text(clipboard);
-        if (ptr == 0)
-            return null;
-
-        var text = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr);
-        NativeMethods.g_free(ptr);
-        return text;
-    }
-
-    /// <inheritdoc />
-    /// <remarks>
-    /// Queues through <c>g_idle_add_full</c>, which is thread-safe by GLib contract, so posting works
-    /// from any thread. The action travels as a normal <see cref="GCHandle"/> threaded through
-    /// <c>user_data</c> — the same state-recovery pattern every signal handler uses — and the
-    /// <see cref="UnmanagedCallersOnlyAttribute"/> callback frees it after the single invocation.
-    /// </remarks>
-    public void Post(Action action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        EnsureInitialized();
-        var handle = GCHandle.Alloc(action);
-        unsafe
-        {
-            var callback = (nint)(delegate* unmanaged[Cdecl]<nint, int>)&OnIdle;
-            NativeMethods.g_idle_add_full(NativeMethods.G_PRIORITY_DEFAULT, callback, GCHandle.ToIntPtr(handle), 0);
-        }
-    }
-
-    /// <summary>
-    /// Native <c>GSourceFunc</c> handler shaped as <c>gboolean (gpointer user_data)</c>; recovers the
-    /// posted action from <paramref name="userData"/>, frees the handle, runs the action once and
-    /// returns 0 (<c>G_SOURCE_REMOVE</c>) so the idle source retires.
-    /// </summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnIdle(nint userData)
-    {
-        if (userData == 0)
-            return 0;
-
-        var handle = GCHandle.FromIntPtr(userData);
-        var action = handle.Target as Action;
-        handle.Free();
-        action?.Invoke();
-        return 0;
-    }
-
-    /// <inheritdoc />
-    public void Run(IWindowPeer mainWindow)
-    {
-        EnsureInitialized();
-        NativeMethods.gtk_main();
-    }
-
-    /// <inheritdoc />
-    public void Quit() => NativeMethods.gtk_main_quit();
+  /// <inheritdoc />
+  public void Quit() => NativeMethods.gtk_main_quit();
 }

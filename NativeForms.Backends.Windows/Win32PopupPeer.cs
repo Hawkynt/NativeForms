@@ -14,171 +14,162 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// Because the surface never activates, keyboard messages only arrive while it is explicitly focused;
 /// forwarding richer keyboard input into an unfocused popup is left to the owning control.
 /// </summary>
-internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer
-{
-    private bool _shown;
+internal sealed class Win32PopupPeer : Win32CanvasPeer, IPopupPeer {
+  private bool _shown;
 
-    /// <summary>The window that owns the surface, or zero. An owned <c>WS_POPUP</c> stays above its
-    /// owner, is destroyed with it and keeps off the taskbar; an unowned one is a stray window.</summary>
-    private readonly nint _owner;
+  /// <summary>The window that owns the surface, or zero. An owned <c>WS_POPUP</c> stays above its
+  /// owner, is destroyed with it and keeps off the taskbar; an unowned one is a stray window.</summary>
+  private readonly nint _owner;
 
-    /// <summary>Creates the hidden surface, owned by <paramref name="owner"/> when one is known.</summary>
-    internal Win32PopupPeer(nint owner) => _owner = owner;
+  /// <summary>Creates the hidden surface, owned by <paramref name="owner"/> when one is known.</summary>
+  internal Win32PopupPeer(nint owner) => _owner = owner;
 
-    /// <inheritdoc/>
-    public event EventHandler? Dismissed;
+  /// <inheritdoc/>
+  public event EventHandler? Dismissed;
 
-    /// <inheritdoc/>
-    public bool LightDismiss { get; set; } = true;
+  /// <inheritdoc/>
+  public bool LightDismiss { get; set; } = true;
 
-    /// <inheritdoc/>
-    public Func<Point, bool>? OutsidePress { get; set; }
+  /// <inheritdoc/>
+  public Func<Point, bool>? OutsidePress { get; set; }
 
-    /// <inheritdoc/>
-    public Action<Point>? OutsidePointerMove { get; set; }
+  /// <inheritdoc/>
+  public Action<Point>? OutsidePointerMove { get; set; }
 
-    /// <inheritdoc/>
-    /// <inheritdoc/>
-    public void Resize(Size size)
-    {
-        if (!this._shown || this.Handle == 0)
-            return;
+  /// <inheritdoc/>
+  /// <inheritdoc/>
+  public void Resize(Size size) {
+    if (!this._shown || this.Handle == 0)
+      return;
 
-        // Size only: no move, no activation and no z-order change, so the capture this surface already
-        // holds for light dismiss is untouched.
-        NativeMethods.SetWindowPos(
-            this.Handle,
-            0,
-            0,
-            0,
-            size.Width,
-            size.Height,
-            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOZORDER);
-        this.InvalidateAll();
-    }
+    // Size only: no move, no activation and no z-order change, so the capture this surface already
+    // holds for light dismiss is untouched.
+    NativeMethods.SetWindowPos(
+        this.Handle,
+        0,
+        0,
+        0,
+        size.Width,
+        size.Height,
+        NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOZORDER);
+    this.InvalidateAll();
+  }
 
-    public void ShowAt(Point screenLocation, Size size)
-    {
-        this.EnsureHandle();
-        if (this.Handle == 0)
-            return;
+  public void ShowAt(Point screenLocation, Size size) {
+    this.EnsureHandle();
+    if (this.Handle == 0)
+      return;
 
-        NativeMethods.SetWindowPos(
-            this.Handle,
-            NativeMethods.HWND_TOPMOST,
-            screenLocation.X,
-            screenLocation.Y,
-            size.Width,
-            size.Height,
-            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
-        this._shown = true;
+    NativeMethods.SetWindowPos(
+        this.Handle,
+        NativeMethods.HWND_TOPMOST,
+        screenLocation.X,
+        screenLocation.Y,
+        size.Width,
+        size.Height,
+        NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+    this._shown = true;
 
-        // A passive surface — a tooltip — takes no capture at all, so the next click keeps its normal
-        // delivery path and reaches the window the user aimed at.
-        if (!this.LightDismiss)
-            return;
+    // A passive surface — a tooltip — takes no capture at all, so the next click keeps its normal
+    // delivery path and reaches the window the user aimed at.
+    if (!this.LightDismiss)
+      return;
 
-        // Capture routes every mouse message here — including clicks outside the surface — without
-        // stealing activation from the owner window.
-        NativeMethods.SetCapture(this.Handle);
-    }
+    // Capture routes every mouse message here — including clicks outside the surface — without
+    // stealing activation from the owner window.
+    NativeMethods.SetCapture(this.Handle);
+  }
 
-    /// <inheritdoc/>
-    public void Hide()
-    {
-        // Drop the shown flag first: releasing capture posts WM_CAPTURECHANGED, which must not
-        // re-enter dismissal for a surface that is already going away.
-        this._shown = false;
-        if (this.Handle == 0)
-            return;
+  /// <inheritdoc/>
+  public void Hide() {
+    // Drop the shown flag first: releasing capture posts WM_CAPTURECHANGED, which must not
+    // re-enter dismissal for a surface that is already going away.
+    this._shown = false;
+    if (this.Handle == 0)
+      return;
 
-        if (NativeMethods.GetCapture() == this.Handle)
-            NativeMethods.ReleaseCapture();
+    if (NativeMethods.GetCapture() == this.Handle)
+      NativeMethods.ReleaseCapture();
 
-        NativeMethods.ShowWindow(this.Handle, NativeMethods.SW_HIDE);
-    }
+    NativeMethods.ShowWindow(this.Handle, NativeMethods.SW_HIDE);
+  }
 
-    /// <inheritdoc/>
-    public override void Dispose()
-    {
-        this.Hide();
-        base.Dispose();
-    }
+  /// <inheritdoc/>
+  public override void Dispose() {
+    this.Hide();
+    base.Dispose();
+  }
 
-    /// <inheritdoc/>
-    private protected override bool PreProcessMessage(uint msg, nint wParam, nint lParam)
-    {
-        switch (msg)
-        {
-            case NativeMethods.WM_LBUTTONDOWN:
-                // Captured clicks arrive in this window's client space even when they land outside it.
-                NativeMethods.GetClientRect(this.Handle, out var client);
-                var x = LoWord(lParam);
-                var y = HiWord(lParam);
-                if (x >= client.left && x < client.right && y >= client.top && y < client.bottom)
-                    return false;
+  /// <inheritdoc/>
+  private protected override bool PreProcessMessage(uint msg, nint wParam, nint lParam) {
+    switch (msg) {
+      case NativeMethods.WM_LBUTTONDOWN:
+        // Captured clicks arrive in this window's client space even when they land outside it.
+        NativeMethods.GetClientRect(this.Handle, out var client);
+        var x = LoWord(lParam);
+        var y = HiWord(lParam);
+        if (x >= client.left && x < client.right && y >= client.top && y < client.bottom)
+          return false;
 
-                // Outside this surface. Offer it to the owner first (in screen space): a menu routes a
-                // click on a shallower level of the same cascade there rather than tearing the menu down.
-                var point = new NativeMethods.POINT { x = x, y = y };
-                NativeMethods.ClientToScreen(this.Handle, ref point);
-                if (this.OutsidePress?.Invoke(new Point(point.x, point.y)) == true)
-                    return true;
+        // Outside this surface. Offer it to the owner first (in screen space): a menu routes a
+        // click on a shallower level of the same cascade there rather than tearing the menu down.
+        var point = new NativeMethods.POINT { x = x, y = y };
+        NativeMethods.ClientToScreen(this.Handle, ref point);
+        if (this.OutsidePress?.Invoke(new Point(point.x, point.y)) == true)
+          return true;
 
-                this.Dismiss();
-                return true;
+        this.Dismiss();
+        return true;
 
-            case NativeMethods.WM_CAPTURECHANGED:
-                // Another window took the mouse capture that keeps light dismiss armed.
-                if (lParam != this.Handle)
-                    this.Dismiss();
-                return false;
-
-            case NativeMethods.WM_KILLFOCUS:
-                // Dismiss, but let the canvas raise LostFocus as usual.
-                this.Dismiss();
-                return false;
-
-            case NativeMethods.WM_KEYDOWN when wParam == NativeMethods.VK_ESCAPE:
-                this.Dismiss();
-                return true;
-        }
-
+      case NativeMethods.WM_CAPTURECHANGED:
+        // Another window took the mouse capture that keeps light dismiss armed.
+        if (lParam != this.Handle)
+          this.Dismiss();
         return false;
+
+      case NativeMethods.WM_KILLFOCUS:
+        // Dismiss, but let the canvas raise LostFocus as usual.
+        this.Dismiss();
+        return false;
+
+      case NativeMethods.WM_KEYDOWN when wParam == NativeMethods.VK_ESCAPE:
+        this.Dismiss();
+        return true;
     }
 
-    /// <summary>Hides the surface, then raises <see cref="Dismissed"/>. A no-op while hidden.</summary>
-    private void Dismiss()
-    {
-        if (!this._shown)
-            return;
+    return false;
+  }
 
-        this.Hide();
-        this.Dismissed?.Invoke(this, EventArgs.Empty);
-    }
+  /// <summary>Hides the surface, then raises <see cref="Dismissed"/>. A no-op while hidden.</summary>
+  private void Dismiss() {
+    if (!this._shown)
+      return;
 
-    /// <summary>Creates the (hidden) topmost popup tool window of the shared canvas class on first show.</summary>
-    private void EnsureHandle()
-    {
-        if (this.Handle != 0)
-            return;
+    this.Hide();
+    this.Dismissed?.Invoke(this, EventArgs.Empty);
+  }
 
-        EnsureClassRegistered();
-        this.Handle = NativeMethods.CreateWindowExW(
-            NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE,
-            ClassName,
-            string.Empty,
-            NativeMethods.WS_POPUP,
-            0,
-            0,
-            0,
-            0,
-            _owner,
-            0,
-            NativeMethods.GetModuleHandleW(null),
-            0);
+  /// <summary>Creates the (hidden) topmost popup tool window of the shared canvas class on first show.</summary>
+  private void EnsureHandle() {
+    if (this.Handle != 0)
+      return;
 
-        if (this.Handle != 0)
-            this.OnHandleCreated();
-    }
+    EnsureClassRegistered();
+    this.Handle = NativeMethods.CreateWindowExW(
+        NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE,
+        ClassName,
+        string.Empty,
+        NativeMethods.WS_POPUP,
+        0,
+        0,
+        0,
+        0,
+        _owner,
+        0,
+        NativeMethods.GetModuleHandleW(null),
+        0);
+
+    if (this.Handle != 0)
+      this.OnHandleCreated();
+  }
 }

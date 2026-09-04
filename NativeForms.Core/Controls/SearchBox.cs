@@ -18,99 +18,92 @@ namespace Hawkynt.NativeForms;
 /// <see cref="SearchCommitted"/> fires whether the key was typed inside the editor or on the surface
 /// around it.
 /// </remarks>
-public class SearchBox : OwnerDrawnControl
-{
-    /// <summary>The width of the leading zone carrying the magnifier glyph.</summary>
-    internal const int GlyphZoneWidth = GlyphRenderer.SearchGlyphZoneWidth;
+public class SearchBox : OwnerDrawnControl {
+  /// <summary>The width of the leading zone carrying the magnifier glyph.</summary>
+  internal const int GlyphZoneWidth = GlyphRenderer.SearchGlyphZoneWidth;
 
-    /// <summary>The width of the trailing zone carrying the clear (×) glyph.</summary>
-    internal const int ClearZoneWidth = GlyphRenderer.SearchClearZoneWidth;
+  /// <summary>The width of the trailing zone carrying the clear (×) glyph.</summary>
+  internal const int ClearZoneWidth = GlyphRenderer.SearchClearZoneWidth;
 
-    private readonly TextBox _editor;
+  private readonly TextBox _editor;
 
-    /// <summary>Creates the search field and its hosted editor.</summary>
-    public SearchBox()
-    {
-        _editor = new FramelessTextBox { PlaceholderText = Strings.SearchPlaceholder, TabStop = false };
-        _editor.TextChanged += (_, _) => this.OnTextChanged(EventArgs.Empty);
-        _editor.KeyDown += this.OnEditorKeyDown;
-        this.Controls.Add(_editor);
-    }
+  /// <summary>Creates the search field and its hosted editor.</summary>
+  public SearchBox() {
+    _editor = new FramelessTextBox { PlaceholderText = Strings.SearchPlaceholder, TabStop = false };
+    _editor.TextChanged += (_, _) => this.OnTextChanged(EventArgs.Empty);
+    _editor.KeyDown += this.OnEditorKeyDown;
+    this.Controls.Add(_editor);
+  }
 
-    /// <summary>The search text, forwarded to the hosted editor.</summary>
-    public override string Text
-    {
-        get => _editor.Text;
-        set => _editor.Text = value;
-    }
+  /// <summary>The search text, forwarded to the hosted editor.</summary>
+  public override string Text {
+    get => _editor.Text;
+    set => _editor.Text = value;
+  }
 
-    /// <summary>The greyed hint shown while the box is empty. Defaults to "Search".</summary>
-    public string PlaceholderText
-    {
-        get => _editor.PlaceholderText;
-        set => _editor.PlaceholderText = value;
-    }
+  /// <summary>The greyed hint shown while the box is empty. Defaults to "Search".</summary>
+  public string PlaceholderText {
+    get => _editor.PlaceholderText;
+    set => _editor.PlaceholderText = value;
+  }
 
-    /// <summary>Raised after the clear (×) zone emptied the box.</summary>
-    public event EventHandler? SearchCleared;
+  /// <summary>Raised after the clear (×) zone emptied the box.</summary>
+  public event EventHandler? SearchCleared;
 
-    /// <summary>Raised when Enter commits the search (see the class remarks for the reach).</summary>
-    public event EventHandler? SearchCommitted;
+  /// <summary>Raised when Enter commits the search (see the class remarks for the reach).</summary>
+  public event EventHandler? SearchCommitted;
 
-    /// <inheritdoc/>
-    protected override bool Focusable => true;
+  /// <inheritdoc/>
+  protected override bool Focusable => true;
 
-    /// <summary>The keyboard belongs to the hosted editor, not to the painted shell around it.</summary>
-    private protected override Control FocusTarget => _editor;
+  /// <summary>The keyboard belongs to the hosted editor, not to the painted shell around it.</summary>
+  private protected override Control FocusTarget => _editor;
 
-    /// <summary>Enter commits the search, so it stays out of the form's AcceptButton routing.</summary>
-    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
+  /// <summary>Enter commits the search, so it stays out of the form's AcceptButton routing.</summary>
+  protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
 
-    /// <summary>Raises <see cref="SearchCleared"/>.</summary>
-    protected virtual void OnSearchCleared(EventArgs e) => this.SearchCleared?.Invoke(this, e);
+  /// <summary>Raises <see cref="SearchCleared"/>.</summary>
+  protected virtual void OnSearchCleared(EventArgs e) => this.SearchCleared?.Invoke(this, e);
 
-    /// <summary>Raises <see cref="SearchCommitted"/>.</summary>
-    protected virtual void OnSearchCommitted(EventArgs e) => this.SearchCommitted?.Invoke(this, e);
+  /// <summary>Raises <see cref="SearchCommitted"/>.</summary>
+  protected virtual void OnSearchCommitted(EventArgs e) => this.SearchCommitted?.Invoke(this, e);
 
-    /// <inheritdoc/>
-    private protected override void OnRealized(IControlPeer peer)
-    {
-        base.OnRealized(peer);
-        _editor.Bounds = new(GlyphZoneWidth, 0, Math.Max(0, this.Width - GlyphZoneWidth - ClearZoneWidth), this.Height);
-    }
+  /// <inheritdoc/>
+  private protected override void OnRealized(IControlPeer peer) {
+    base.OnRealized(peer);
+    _editor.Bounds = new(GlyphZoneWidth, 0, Math.Max(0, this.Width - GlyphZoneWidth - ClearZoneWidth), this.Height);
+  }
 
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-        => GlyphRenderer.DrawSearchField(
-            e.Graphics,
-            this.Theme,
-            new(0, 0, this.Width, this.Height),
-            this.Enabled,
-            showClear: this.Text.Length > 0);
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e)
+      => GlyphRenderer.DrawSearchField(
+          e.Graphics,
+          this.Theme,
+          new(0, 0, this.Width, this.Height),
+          this.Enabled,
+          showClear: this.Text.Length > 0);
 
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        if (e.Button != MouseButtons.Left)
-            return;
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) {
+    if (e.Button != MouseButtons.Left)
+      return;
 
-        if (e.X < this.Width - ClearZoneWidth || this.Text.Length == 0)
-            return;
+    if (e.X < this.Width - ClearZoneWidth || this.Text.Length == 0)
+      return;
 
-        this.Text = string.Empty;
-        this.OnSearchCleared(EventArgs.Empty);
-    }
+    this.Text = string.Empty;
+    this.OnSearchCleared(EventArgs.Empty);
+  }
 
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.KeyCode is not Keys.Enter)
-            return;
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    if (e.KeyCode is not Keys.Enter)
+      return;
 
-        this.OnSearchCommitted(EventArgs.Empty);
-        e.Handled = true;
-    }
+    this.OnSearchCommitted(EventArgs.Empty);
+    e.Handled = true;
+  }
 
-    /// <summary>Claims Enter back from the hosted editor, so a search typed into it still commits.</summary>
-    private void OnEditorKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
+  /// <summary>Claims Enter back from the hosted editor, so a search typed into it still commits.</summary>
+  private void OnEditorKeyDown(object? sender, KeyEventArgs e) => this.OnKeyDown(e);
 }

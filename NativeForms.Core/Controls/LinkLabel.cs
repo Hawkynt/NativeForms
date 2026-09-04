@@ -11,224 +11,207 @@ namespace Hawkynt.NativeForms;
 /// theme's grey. Per-character link ranges (WinForms <c>LinkArea</c>) are not modeled yet — the
 /// entire text is the link.
 /// </summary>
-public class LinkLabel : OwnerDrawnControl
-{
-    /// <inheritdoc/>
-    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Link;
+public class LinkLabel : OwnerDrawnControl {
+  /// <inheritdoc/>
+  private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Link;
 
-    private bool _hovered;
-    private bool _focused;
+  private bool _hovered;
+  private bool _focused;
 
-    /// <summary>Whether the link has been followed; shifts the paint color toward the theme's grey.</summary>
-    public bool LinkVisited
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>Whether the link has been followed; shifts the paint color toward the theme's grey.</summary>
+  public bool LinkVisited {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            _native?.SetVisited(value);
-            this.Invalidate();
-        }
+      field = value;
+      _native?.SetVisited(value);
+      this.Invalidate();
+    }
+  }
+
+  /// <summary>The pre-rename spelling of <see cref="LinkVisited"/>, kept until every caller has
+  /// moved to the Windows Forms name.</summary>
+  public bool Visited {
+    get => this.LinkVisited;
+    set => this.LinkVisited = value;
+  }
+
+  /// <summary>Raised when the link is activated (click inside the text, or Space/Enter while focused).</summary>
+  public event EventHandler? LinkClicked;
+
+  /// <inheritdoc/>
+  protected override bool Focusable => true;
+
+  private ILinkLabelPeer? _native;
+  private bool? _nativeOffered;
+
+
+  /// <summary>Whether this link is currently rendered by a real platform widget.</summary>
+  public override bool IsNativeWidget => _native is not null;
+
+  /// <summary>
+  /// Whether the current property values are all expressible by a platform hyperlink. Everything this
+  /// control models — one link spanning the whole caption, a visited flag, activation by click or
+  /// Enter — is, so nothing gates it; the per-character link ranges that would not be expressible are
+  /// a documented non-goal.
+  /// </summary>
+  private static bool IsNativeEligible => true;
+
+  /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+  private bool WouldBeNative
+      => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible && (_nativeOffered ?? true);
+
+  /// <inheritdoc/>
+  private protected override IControlPeer CreatePeer(IPlatformBackend backend) {
+    if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible) {
+      var offered = backend.CreateLinkLabel();
+      _nativeOffered = offered is not null;
+      if (offered is { } peer) {
+        _native = peer;
+        peer.SetVisited(this.LinkVisited);
+        peer.LinkActivated += this.OnNativeLinkActivated;
+        return peer;
+      }
     }
 
-    /// <summary>The pre-rename spelling of <see cref="LinkVisited"/>, kept until every caller has
-    /// moved to the Windows Forms name.</summary>
-    public bool Visited
-    {
-        get => this.LinkVisited;
-        set => this.LinkVisited = value;
+    return base.CreatePeer(backend);
+  }
+
+  /// <inheritdoc/>
+  private protected override void OnUnrealized() {
+    if (_native is { } peer) {
+      peer.LinkActivated -= this.OnNativeLinkActivated;
+      _native = null;
     }
 
-    /// <summary>Raised when the link is activated (click inside the text, or Space/Enter while focused).</summary>
-    public event EventHandler? LinkClicked;
+    base.OnUnrealized();
+  }
 
-    /// <inheritdoc/>
-    protected override bool Focusable => true;
+  /// <summary>
+  /// The widget reported an activation. Raises the same pair the owner-drawn mouse path does — the
+  /// generic <see cref="Control.Click"/> and then <see cref="LinkClicked"/> — because neither platform
+  /// distinguishes a clicked link from one opened with Enter.
+  /// </summary>
+  private void OnNativeLinkActivated(object? sender, EventArgs e) {
+    this.OnClick(EventArgs.Empty);
+    this.OnLinkClicked(EventArgs.Empty);
+  }
 
-    private ILinkLabelPeer? _native;
-    private bool? _nativeOffered;
+  /// <summary>Enter activates the link, so it stays out of the form's AcceptButton routing.</summary>
+  protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
 
+  /// <summary>Raises <see cref="LinkClicked"/>.</summary>
+  protected virtual void OnLinkClicked(EventArgs e) => this.LinkClicked?.Invoke(this, e);
 
-    /// <summary>Whether this link is currently rendered by a real platform widget.</summary>
-    public override bool IsNativeWidget => _native is not null;
+  /// <inheritdoc/>
+  protected override void OnMouseUp(MouseEventArgs e) {
+    if (e.Button != MouseButtons.Left || !this.TextExtentRectangle().Contains(e.Location))
+      return;
 
-    /// <summary>
-    /// Whether the current property values are all expressible by a platform hyperlink. Everything this
-    /// control models — one link spanning the whole caption, a visited flag, activation by click or
-    /// Enter — is, so nothing gates it; the per-character link ranges that would not be expressible are
-    /// a documented non-goal.
-    /// </summary>
-    private static bool IsNativeEligible => true;
+    // Windows Forms raises both: the generic Click and the link-specific LinkClicked.
+    this.OnClick(EventArgs.Empty);
+    this.OnLinkClicked(EventArgs.Empty);
+  }
 
-    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
-    private bool WouldBeNative
-        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible && (_nativeOffered ?? true);
+  /// <inheritdoc/>
+  protected override void OnMouseMove(MouseEventArgs e)
+      => this.SetHovered(this.TextExtentRectangle().Contains(e.Location));
 
-    /// <inheritdoc/>
-    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
-    {
-        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && IsNativeEligible)
-        {
-            var offered = backend.CreateLinkLabel();
-            _nativeOffered = offered is not null;
-            if (offered is { } peer)
-            {
-                _native = peer;
-                peer.SetVisited(this.LinkVisited);
-                peer.LinkActivated += this.OnNativeLinkActivated;
-                return peer;
-            }
-        }
+  /// <inheritdoc/>
+  protected override void OnMouseLeave(EventArgs e) => this.SetHovered(false);
 
-        return base.CreatePeer(backend);
-    }
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    if (e.KeyCode is not Keys.Space and not Keys.Enter)
+      return;
 
-    /// <inheritdoc/>
-    private protected override void OnUnrealized()
-    {
-        if (_native is { } peer)
-        {
-            peer.LinkActivated -= this.OnNativeLinkActivated;
-            _native = null;
-        }
+    this.OnLinkClicked(EventArgs.Empty);
+    e.Handled = true;
+  }
 
-        base.OnUnrealized();
-    }
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var theme = this.Theme;
+    g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
 
-    /// <summary>
-    /// The widget reported an activation. Raises the same pair the owner-drawn mouse path does — the
-    /// generic <see cref="Control.Click"/> and then <see cref="LinkClicked"/> — because neither platform
-    /// distinguishes a clicked link from one opened with Enter.
-    /// </summary>
-    private void OnNativeLinkActivated(object? sender, EventArgs e)
-    {
-        this.OnClick(EventArgs.Empty);
-        this.OnLinkClicked(EventArgs.Empty);
-    }
+    if (this.Text.Length == 0)
+      return;
 
-    /// <summary>Enter activates the link, so it stays out of the form's AcceptButton routing.</summary>
-    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter;
+    // Right-to-left anchors the text (and its underline) at the right edge instead.
+    var rtl = this.IsRightToLeft;
+    var client = this.DisplayRectangle;
+    var font = this.Font;
+    var color = this.LinkColor(theme);
+    g.DrawText(this.Text, font, color, client, rtl ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft);
 
-    /// <summary>Raises <see cref="LinkClicked"/>.</summary>
-    protected virtual void OnLinkClicked(EventArgs e) => this.LinkClicked?.Invoke(this, e);
+    var extent = g.MeasureText(this.Text, font);
+    var underlineX = rtl ? client.Right - extent.Width : client.X;
+    var underlineY = client.Y + (client.Height - extent.Height) / 2 + extent.Height - 1;
+    g.DrawLine(color, underlineX, underlineY, underlineX + extent.Width, underlineY);
 
-    /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        if (e.Button != MouseButtons.Left || !this.TextExtentRectangle().Contains(e.Location))
-            return;
+    if (_focused)
+      GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(underlineX, client.Y + (client.Height - extent.Height) / 2, extent.Width, extent.Height));
+  }
 
-        // Windows Forms raises both: the generic Click and the link-specific LinkClicked.
-        this.OnClick(EventArgs.Empty);
-        this.OnLinkClicked(EventArgs.Empty);
-    }
+  /// <inheritdoc/>
+  protected override void OnGotFocus(EventArgs e) => this.SetFocused(true);
 
-    /// <inheritdoc/>
-    protected override void OnMouseMove(MouseEventArgs e)
-        => this.SetHovered(this.TextExtentRectangle().Contains(e.Location));
+  /// <inheritdoc/>
+  protected override void OnLostFocus(EventArgs e) => this.SetFocused(false);
 
-    /// <inheritdoc/>
-    protected override void OnMouseLeave(EventArgs e) => this.SetHovered(false);
+  /// <summary>Updates the focus state, repainting only on an actual change.</summary>
+  private void SetFocused(bool focused) {
+    if (_focused == focused)
+      return;
 
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.KeyCode is not Keys.Space and not Keys.Enter)
-            return;
+    _focused = focused;
+    this.Invalidate();
+  }
 
-        this.OnLinkClicked(EventArgs.Empty);
-        e.Handled = true;
-    }
+  /// <summary>The client-space rectangle the text occupies (anchored middle-left, or middle-right
+  /// under right-to-left), for hit testing.</summary>
+  private Rectangle TextExtentRectangle() {
+    var backend = this.Backend;
+    if (backend is null || this.Text.Length == 0)
+      return Rectangle.Empty;
 
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        g.FillRectangle(this.BackColor, new Rectangle(0, 0, this.Width, this.Height));
+    var client = this.DisplayRectangle;
+    var extent = backend.MeasureText(this.Text, this.Font);
+    var x = this.IsRightToLeft ? client.Right - extent.Width : client.X;
+    return new(new Point(x, client.Y + (client.Height - extent.Height) / 2), extent);
+  }
 
-        if (this.Text.Length == 0)
-            return;
+  /// <summary>
+  /// Updates the hover state, repainting only on an actual change and switching the pointer to
+  /// the hand cursor while it rests on the link text (back to the ambient cursor off it).
+  /// </summary>
+  private void SetHovered(bool hovered) {
+    if (_hovered == hovered)
+      return;
 
-        // Right-to-left anchors the text (and its underline) at the right edge instead.
-        var rtl = this.IsRightToLeft;
-        var client = this.DisplayRectangle;
-        var font = this.Font;
-        var color = this.LinkColor(theme);
-        g.DrawText(this.Text, font, color, client, rtl ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft);
+    _hovered = hovered;
+    if (hovered)
+      this.Cursor = Cursors.Hand;
+    else
+      this.ResetCursor();
 
-        var extent = g.MeasureText(this.Text, font);
-        var underlineX = rtl ? client.Right - extent.Width : client.X;
-        var underlineY = client.Y + (client.Height - extent.Height) / 2 + extent.Height - 1;
-        g.DrawLine(color, underlineX, underlineY, underlineX + extent.Width, underlineY);
+    this.Invalidate();
+  }
 
-        if (_focused)
-            GlyphRenderer.DrawFocusRing(g, theme, new Rectangle(underlineX, client.Y + (client.Height - extent.Height) / 2, extent.Width, extent.Height));
-    }
+  /// <summary>The current link color: theme accent, greyed when visited, shifted while hovered.</summary>
+  private Color LinkColor(ITheme theme) {
+    var color = this.LinkVisited ? Blend(theme.Accent, theme.DisabledText, 50) : theme.Accent;
+    return _hovered ? Blend(color, theme.ControlText, 30) : color;
+  }
 
-    /// <inheritdoc/>
-    protected override void OnGotFocus(EventArgs e) => this.SetFocused(true);
-
-    /// <inheritdoc/>
-    protected override void OnLostFocus(EventArgs e) => this.SetFocused(false);
-
-    /// <summary>Updates the focus state, repainting only on an actual change.</summary>
-    private void SetFocused(bool focused)
-    {
-        if (_focused == focused)
-            return;
-
-        _focused = focused;
-        this.Invalidate();
-    }
-
-    /// <summary>The client-space rectangle the text occupies (anchored middle-left, or middle-right
-    /// under right-to-left), for hit testing.</summary>
-    private Rectangle TextExtentRectangle()
-    {
-        var backend = this.Backend;
-        if (backend is null || this.Text.Length == 0)
-            return Rectangle.Empty;
-
-        var client = this.DisplayRectangle;
-        var extent = backend.MeasureText(this.Text, this.Font);
-        var x = this.IsRightToLeft ? client.Right - extent.Width : client.X;
-        return new(new Point(x, client.Y + (client.Height - extent.Height) / 2), extent);
-    }
-
-    /// <summary>
-    /// Updates the hover state, repainting only on an actual change and switching the pointer to
-    /// the hand cursor while it rests on the link text (back to the ambient cursor off it).
-    /// </summary>
-    private void SetHovered(bool hovered)
-    {
-        if (_hovered == hovered)
-            return;
-
-        _hovered = hovered;
-        if (hovered)
-            this.Cursor = Cursors.Hand;
-        else
-            this.ResetCursor();
-
-        this.Invalidate();
-    }
-
-    /// <summary>The current link color: theme accent, greyed when visited, shifted while hovered.</summary>
-    private Color LinkColor(ITheme theme)
-    {
-        var color = this.LinkVisited ? Blend(theme.Accent, theme.DisabledText, 50) : theme.Accent;
-        return _hovered ? Blend(color, theme.ControlText, 30) : color;
-    }
-
-    /// <summary>Linearly blends <paramref name="from"/> toward <paramref name="to"/> by <paramref name="percent"/>.</summary>
-    private static Color Blend(Color from, Color to, int percent)
-        => Color.FromArgb(
-            0xFF,
-            from.R + (to.R - from.R) * percent / 100,
-            from.G + (to.G - from.G) * percent / 100,
-            from.B + (to.B - from.B) * percent / 100);
+  /// <summary>Linearly blends <paramref name="from"/> toward <paramref name="to"/> by <paramref name="percent"/>.</summary>
+  private static Color Blend(Color from, Color to, int percent)
+      => Color.FromArgb(
+          0xFF,
+          from.R + (to.R - from.R) * percent / 100,
+          from.G + (to.G - from.G) * percent / 100,
+          from.B + (to.B - from.B) * percent / 100);
 }

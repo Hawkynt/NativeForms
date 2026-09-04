@@ -6,14 +6,13 @@ namespace Hawkynt.NativeForms;
 /// Row indices refer to <see cref="DataGridView.Items"/> (the model order), so they stay stable while
 /// the grid is sorted.
 /// </summary>
-public sealed class DataGridViewCellCancelEventArgs(int rowIndex, int columnIndex) : EventArgs
-{
-    /// <summary>The row's index into <see cref="DataGridView.Items"/>.</summary>
-    public int RowIndex { get; } = rowIndex;
+public sealed class DataGridViewCellCancelEventArgs(int rowIndex, int columnIndex) : EventArgs {
+  /// <summary>The row's index into <see cref="DataGridView.Items"/>.</summary>
+  public int RowIndex { get; } = rowIndex;
 
-    /// <summary>The column's index into <see cref="DataGridView.Columns"/>.</summary>
-    public int ColumnIndex { get; } = columnIndex;
+  /// <summary>The column's index into <see cref="DataGridView.Columns"/>.</summary>
+  public int ColumnIndex { get; } = columnIndex;
 
-    /// <summary>Set by a handler to veto the operation.</summary>
-    public bool Cancel { get; set; }
+  /// <summary>Set by a handler to veto the operation.</summary>
+  public bool Cancel { get; set; }
 }
