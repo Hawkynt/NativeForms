@@ -13,144 +13,130 @@ namespace Hawkynt.NativeForms.Tests;
 /// themselves.
 /// </summary>
 [TestFixture]
-internal sealed class LocalizationTests
-{
-    [TearDown]
-    public void RestoreDefaults() => Strings.Reset();
+internal sealed class LocalizationTests {
+  [TearDown]
+  public void RestoreDefaults() => Strings.Reset();
 
-    [Test]
-    public void SearchBox_uses_the_placeholder_provider()
-    {
-        Strings.SearchPlaceholder = "Suchen";
+  [Test]
+  public void SearchBox_uses_the_placeholder_provider() {
+    Strings.SearchPlaceholder = "Suchen";
 
-        Assert.That(new SearchBox().PlaceholderText, Is.EqualTo("Suchen"));
-    }
+    Assert.That(new SearchBox().PlaceholderText, Is.EqualTo("Suchen"));
+  }
 
-    [Test]
-    public void MonthCalendar_paints_the_provided_day_names()
-    {
-        Strings.AbbreviatedDayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-        var backend = new HeadlessBackend();
-        var form = new Form { Bounds = new(0, 0, 400, 300) };
-        var calendar = new MonthCalendar { Bounds = new(0, 0, 210, 180) };
-        form.Controls.Add(calendar);
-        form.RealizeWindow(backend);
+  [Test]
+  public void MonthCalendar_paints_the_provided_day_names() {
+    Strings.AbbreviatedDayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+    var backend = new HeadlessBackend();
+    var form = new Form { Bounds = new(0, 0, 400, 300) };
+    var calendar = new MonthCalendar { Bounds = new(0, 0, 210, 180) };
+    form.Controls.Add(calendar);
+    form.RealizeWindow(backend);
 
-        var g = ((HeadlessCanvasPeer)calendar.Peer!).RaisePaint();
+    var g = ((HeadlessCanvasPeer)calendar.Peer!).RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.DrewText("Di"), Is.True);
-            Assert.That(g.DrewText("Mi"), Is.True);
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.DrewText("Di"), Is.True);
+      Assert.That(g.DrewText("Mi"), Is.True);
+    });
+  }
 
-    [Test]
-    public void DateTimePicker_formats_through_the_provider()
-    {
-        // "MMMM" next to a day number reads the genitive month names, so a localizing app sets both.
-        string[] months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember", ""];
-        var german = new DateTimeFormatInfo
-        {
-            DayNames = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
-            MonthNames = months,
-            MonthGenitiveNames = months,
-        };
-        Strings.DateTimeFormat = german;
-        var backend = new HeadlessBackend();
-        var form = new Form { Bounds = new(0, 0, 400, 300) };
-        var picker = new DateTimePicker
-        {
-            Bounds = new(0, 0, 220, 24),
-            Format = DateTimePickerFormat.Long,
-            Value = new DateTime(2026, 3, 4),
-        };
-        form.Controls.Add(picker);
-        form.RealizeWindow(backend);
+  [Test]
+  public void DateTimePicker_formats_through_the_provider() {
+    // "MMMM" next to a day number reads the genitive month names, so a localizing app sets both.
+    string[] months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember", ""];
+    var german = new DateTimeFormatInfo {
+      DayNames = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
+      MonthNames = months,
+      MonthGenitiveNames = months,
+    };
+    Strings.DateTimeFormat = german;
+    var backend = new HeadlessBackend();
+    var form = new Form { Bounds = new(0, 0, 400, 300) };
+    var picker = new DateTimePicker {
+      Bounds = new(0, 0, 220, 24),
+      Format = DateTimePickerFormat.Long,
+      Value = new DateTime(2026, 3, 4),
+    };
+    form.Controls.Add(picker);
+    form.RealizeWindow(backend);
 
-        var g = ((HeadlessCanvasPeer)picker.Peer!).RaisePaint();
+    var g = ((HeadlessCanvasPeer)picker.Peer!).RaisePaint();
 
-        Assert.That(g.DrewText("Mittwoch, 04 März 2026"), Is.True);
-    }
+    Assert.That(g.DrewText("Mittwoch, 04 März 2026"), Is.True);
+  }
 
-    [Test]
-    public void Menu_shortcut_prefixes_come_from_the_providers()
-    {
-        Strings.ShortcutControlPrefix = "Strg+";
+  [Test]
+  public void Menu_shortcut_prefixes_come_from_the_providers() {
+    Strings.ShortcutControlPrefix = "Strg+";
 
-        Assert.That(ToolStripMenuItem.FormatShortcut(Keys.Control | Keys.S), Is.EqualTo("Strg+S"));
-    }
+    Assert.That(ToolStripMenuItem.FormatShortcut(Keys.Control | Keys.S), Is.EqualTo("Strg+S"));
+  }
 
-    [Test]
-    public void A_drilled_out_MonthCalendar_paints_the_provided_month_names()
-    {
-        Strings.AbbreviatedMonthNames = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-        var backend = new HeadlessBackend();
-        var form = new Form { Bounds = new(0, 0, 400, 300) };
-        var calendar = new MonthCalendar { Bounds = new(0, 0, 210, 180) };
-        form.Controls.Add(calendar);
-        form.RealizeWindow(backend);
-        var canvas = (HeadlessCanvasPeer)calendar.Peer!;
+  [Test]
+  public void A_drilled_out_MonthCalendar_paints_the_provided_month_names() {
+    Strings.AbbreviatedMonthNames = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+    var backend = new HeadlessBackend();
+    var form = new Form { Bounds = new(0, 0, 400, 300) };
+    var calendar = new MonthCalendar { Bounds = new(0, 0, 210, 180) };
+    form.Controls.Add(calendar);
+    form.RealizeWindow(backend);
+    var canvas = (HeadlessCanvasPeer)calendar.Peer!;
 
-        canvas.RaiseMouseDown(105, 10); // the title: drill out to the month grid
-        canvas.RaiseMouseUp(105, 10);
-        var g = canvas.RaisePaint();
+    canvas.RaiseMouseDown(105, 10); // the title: drill out to the month grid
+    canvas.RaiseMouseUp(105, 10);
+    var g = canvas.RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.DrewText("Jän"), Is.True);
-            Assert.That(g.DrewText("Dez"), Is.True);
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.DrewText("Jän"), Is.True);
+      Assert.That(g.DrewText("Dez"), Is.True);
+    });
+  }
 
-    [Test]
-    public void AbbreviatedMonthNames_rejects_wrong_counts_and_copies_on_assignment()
-    {
-        Assert.Throws<ArgumentException>(() => Strings.AbbreviatedMonthNames = ["Jan", "Feb"]);
+  [Test]
+  public void AbbreviatedMonthNames_rejects_wrong_counts_and_copies_on_assignment() {
+    Assert.Throws<ArgumentException>(() => Strings.AbbreviatedMonthNames = ["Jan", "Feb"]);
 
-        var names = new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l" };
-        Strings.AbbreviatedMonthNames = names;
-        names[0] = "mutated";
+    var names = new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l" };
+    Strings.AbbreviatedMonthNames = names;
+    names[0] = "mutated";
 
-        Assert.That(Strings.AbbreviatedMonthNames[0], Is.EqualTo("a"), "assignment took a defensive copy");
-    }
+    Assert.That(Strings.AbbreviatedMonthNames[0], Is.EqualTo("a"), "assignment took a defensive copy");
+  }
 
-    [Test]
-    public void AbbreviatedDayNames_rejects_wrong_counts_and_copies_on_assignment()
-    {
-        Assert.Throws<ArgumentException>(() => Strings.AbbreviatedDayNames = ["Mo", "Di"]);
+  [Test]
+  public void AbbreviatedDayNames_rejects_wrong_counts_and_copies_on_assignment() {
+    Assert.Throws<ArgumentException>(() => Strings.AbbreviatedDayNames = ["Mo", "Di"]);
 
-        var names = new[] { "a", "b", "c", "d", "e", "f", "g" };
-        Strings.AbbreviatedDayNames = names;
-        names[0] = "mutated";
+    var names = new[] { "a", "b", "c", "d", "e", "f", "g" };
+    Strings.AbbreviatedDayNames = names;
+    names[0] = "mutated";
 
-        Assert.That(Strings.AbbreviatedDayNames[0], Is.EqualTo("a"), "assignment took a defensive copy");
-    }
+    Assert.That(Strings.AbbreviatedDayNames[0], Is.EqualTo("a"), "assignment took a defensive copy");
+  }
 
-    [Test]
-    public void Reset_restores_every_default()
-    {
-        Strings.SearchPlaceholder = "x";
-        Strings.DefaultListViewGroupHeader = "x";
-        Strings.ShortcutControlPrefix = "x";
-        Strings.ShortcutShiftPrefix = "x";
-        Strings.ShortcutAltPrefix = "x";
-        Strings.AbbreviatedDayNames = ["1", "2", "3", "4", "5", "6", "7"];
-        Strings.AbbreviatedMonthNames = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-        Strings.DateTimeFormat = new DateTimeFormatInfo();
+  [Test]
+  public void Reset_restores_every_default() {
+    Strings.SearchPlaceholder = "x";
+    Strings.DefaultListViewGroupHeader = "x";
+    Strings.ShortcutControlPrefix = "x";
+    Strings.ShortcutShiftPrefix = "x";
+    Strings.ShortcutAltPrefix = "x";
+    Strings.AbbreviatedDayNames = ["1", "2", "3", "4", "5", "6", "7"];
+    Strings.AbbreviatedMonthNames = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+    Strings.DateTimeFormat = new DateTimeFormatInfo();
 
-        Strings.Reset();
+    Strings.Reset();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(Strings.SearchPlaceholder, Is.EqualTo("Search"));
-            Assert.That(Strings.DefaultListViewGroupHeader, Is.EqualTo("Default"));
-            Assert.That(Strings.ShortcutControlPrefix, Is.EqualTo("Ctrl+"));
-            Assert.That(Strings.ShortcutShiftPrefix, Is.EqualTo("Shift+"));
-            Assert.That(Strings.ShortcutAltPrefix, Is.EqualTo("Alt+"));
-            Assert.That(Strings.AbbreviatedDayNames, Is.EqualTo(new[] { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" }));
-            Assert.That(Strings.AbbreviatedMonthNames, Is.EqualTo(new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }));
-            Assert.That(Strings.DateTimeFormat, Is.EqualTo(CultureInfo.InvariantCulture));
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(Strings.SearchPlaceholder, Is.EqualTo("Search"));
+      Assert.That(Strings.DefaultListViewGroupHeader, Is.EqualTo("Default"));
+      Assert.That(Strings.ShortcutControlPrefix, Is.EqualTo("Ctrl+"));
+      Assert.That(Strings.ShortcutShiftPrefix, Is.EqualTo("Shift+"));
+      Assert.That(Strings.ShortcutAltPrefix, Is.EqualTo("Alt+"));
+      Assert.That(Strings.AbbreviatedDayNames, Is.EqualTo(new[] { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" }));
+      Assert.That(Strings.AbbreviatedMonthNames, Is.EqualTo(new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }));
+      Assert.That(Strings.DateTimeFormat, Is.EqualTo(CultureInfo.InvariantCulture));
+    });
+  }
 }

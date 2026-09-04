@@ -10,79 +10,71 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// BUTTON cannot render image and text together — themed common controls draw both, classic rendering
 /// keeps the text — and it offers no image placement, so alignment and relation are not rendered.
 /// </summary>
-internal sealed class ButtonPeer : Win32ChildPeer, IButtonPeer
-{
-    private Win32Image? _image;
+internal sealed class ButtonPeer : Win32ChildPeer, IButtonPeer {
+  private Win32Image? _image;
 
-    /// <inheritdoc/>
-    protected override string WindowClass => "BUTTON";
+  /// <inheritdoc/>
+  protected override string WindowClass => "BUTTON";
 
-    /// <inheritdoc/>
-    protected override uint ExtraStyle
-    {
-        get
-        {
-            var style = NativeMethods.BS_PUSHBUTTON | NativeMethods.WS_TABSTOP;
-            if (_image is not null && _text.Length == 0)
-                style |= NativeMethods.BS_BITMAP;
-            if (_isDefault)
-                style |= NativeMethods.BS_DEFPUSHBUTTON;
+  /// <inheritdoc/>
+  protected override uint ExtraStyle {
+    get {
+      var style = NativeMethods.BS_PUSHBUTTON | NativeMethods.WS_TABSTOP;
+      if (_image is not null && _text.Length == 0)
+        style |= NativeMethods.BS_BITMAP;
+      if (_isDefault)
+        style |= NativeMethods.BS_DEFPUSHBUTTON;
 
-            return style;
-        }
+      return style;
     }
+  }
 
-    private bool _isDefault;
+  private bool _isDefault;
 
-    /// <inheritdoc/>
-    public event EventHandler? Clicked;
+  /// <inheritdoc/>
+  public event EventHandler? Clicked;
 
-    /// <inheritdoc/>
-    public void SetDefault(bool isDefault)
-    {
-        if (_isDefault == isDefault)
-            return;
+  /// <inheritdoc/>
+  public void SetDefault(bool isDefault) {
+    if (_isDefault == isDefault)
+      return;
 
-        _isDefault = isDefault;
-        this.RecreateHandle(); // BS_DEFPUSHBUTTON is a creation-time style, like BS_BITMAP above
+    _isDefault = isDefault;
+    this.RecreateHandle(); // BS_DEFPUSHBUTTON is a creation-time style, like BS_BITMAP above
+  }
+
+  /// <inheritdoc/>
+  internal override void CreateChildHandle(nint parent, int controlId) {
+    base.CreateChildHandle(parent, controlId);
+
+    if (_image is { Handle: not 0 } image)
+      NativeMethods.SendMessageW(Handle, NativeMethods.BM_SETIMAGE, NativeMethods.IMAGE_BITMAP, image.Handle);
+  }
+
+  /// <inheritdoc/>
+  public void SetImage(IImage? image, ContentAlignment imageAlign, TextImageRelation relation) {
+    var native = image as Win32Image;
+    if (ReferenceEquals(_image, native))
+      return;
+
+    _image = native;
+    this.RecreateHandle();
+  }
+
+  /// <inheritdoc/>
+  internal override void OnCommand(int notifyCode) {
+    switch (notifyCode) {
+      case NativeMethods.BN_CLICKED:
+        Clicked?.Invoke(this, EventArgs.Empty);
+        break;
+
+      case NativeMethods.BN_SETFOCUS:
+        RaiseGotFocus();
+        break;
+
+      case NativeMethods.BN_KILLFOCUS:
+        RaiseLostFocus();
+        break;
     }
-
-    /// <inheritdoc/>
-    internal override void CreateChildHandle(nint parent, int controlId)
-    {
-        base.CreateChildHandle(parent, controlId);
-
-        if (_image is { Handle: not 0 } image)
-            NativeMethods.SendMessageW(Handle, NativeMethods.BM_SETIMAGE, NativeMethods.IMAGE_BITMAP, image.Handle);
-    }
-
-    /// <inheritdoc/>
-    public void SetImage(IImage? image, ContentAlignment imageAlign, TextImageRelation relation)
-    {
-        var native = image as Win32Image;
-        if (ReferenceEquals(_image, native))
-            return;
-
-        _image = native;
-        this.RecreateHandle();
-    }
-
-    /// <inheritdoc/>
-    internal override void OnCommand(int notifyCode)
-    {
-        switch (notifyCode)
-        {
-            case NativeMethods.BN_CLICKED:
-                Clicked?.Invoke(this, EventArgs.Empty);
-                break;
-
-            case NativeMethods.BN_SETFOCUS:
-                RaiseGotFocus();
-                break;
-
-            case NativeMethods.BN_KILLFOCUS:
-                RaiseLostFocus();
-                break;
-        }
-    }
+  }
 }

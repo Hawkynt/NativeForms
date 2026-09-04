@@ -12,53 +12,48 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// style, so switching modes recreates the window, and the marquee animates itself once started rather
 /// than needing per-tick pulses.
 /// </remarks>
-internal sealed class ProgressBarPeer : Win32ChildPeer, IProgressBarPeer
-{
-    private const int _Scale = 10000;
+internal sealed class ProgressBarPeer : Win32ChildPeer, IProgressBarPeer {
+  private const int _Scale = 10000;
 
-    private double _fraction;
-    private bool _marquee;
+  private double _fraction;
+  private bool _marquee;
 
-    /// <inheritdoc/>
-    protected override string WindowClass => NativeMethods.PROGRESS_CLASS;
+  /// <inheritdoc/>
+  protected override string WindowClass => NativeMethods.PROGRESS_CLASS;
 
-    /// <inheritdoc/>
-    protected override uint ExtraStyle => _marquee ? NativeMethods.PBS_MARQUEE : 0;
+  /// <inheritdoc/>
+  protected override uint ExtraStyle => _marquee ? NativeMethods.PBS_MARQUEE : 0;
 
-    /// <inheritdoc/>
-    public void SetFraction(double fraction)
-    {
-        _fraction = fraction;
-        if (Handle != 0 && !_marquee)
-            NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETPOS, (nint)(fraction * _Scale), 0);
+  /// <inheritdoc/>
+  public void SetFraction(double fraction) {
+    _fraction = fraction;
+    if (Handle != 0 && !_marquee)
+      NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETPOS, (nint)(fraction * _Scale), 0);
+  }
+
+  /// <inheritdoc/>
+  public void SetMarquee(bool marquee) {
+    if (_marquee == marquee)
+      return;
+
+    _marquee = marquee;
+    this.RecreateHandle(); // PBS_MARQUEE is a creation-time style
+  }
+
+  /// <inheritdoc/>
+  /// <remarks>A Win32 marquee animates on its own timer once started, so a pulse is a no-op here.</remarks>
+  public void Pulse() { }
+
+  /// <inheritdoc/>
+  internal override void CreateChildHandle(nint parent, int controlId) {
+    base.CreateChildHandle(parent, controlId);
+
+    if (_marquee) {
+      NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETMARQUEE, 1, 30);
+      return;
     }
 
-    /// <inheritdoc/>
-    public void SetMarquee(bool marquee)
-    {
-        if (_marquee == marquee)
-            return;
-
-        _marquee = marquee;
-        this.RecreateHandle(); // PBS_MARQUEE is a creation-time style
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>A Win32 marquee animates on its own timer once started, so a pulse is a no-op here.</remarks>
-    public void Pulse() { }
-
-    /// <inheritdoc/>
-    internal override void CreateChildHandle(nint parent, int controlId)
-    {
-        base.CreateChildHandle(parent, controlId);
-
-        if (_marquee)
-        {
-            NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETMARQUEE, 1, 30);
-            return;
-        }
-
-        NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETRANGE32, 0, _Scale);
-        NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETPOS, (nint)(_fraction * _Scale), 0);
-    }
+    NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETRANGE32, 0, _Scale);
+    NativeMethods.SendMessageW(Handle, NativeMethods.PBM_SETPOS, (nint)(_fraction * _Scale), 0);
+  }
 }

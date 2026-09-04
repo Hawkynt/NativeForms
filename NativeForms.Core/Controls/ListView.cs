@@ -39,2042 +39,1853 @@ namespace Hawkynt.NativeForms;
 /// </para>
 /// <para>TODO: a virtual-mode item API.</para>
 /// </remarks>
-public class ListView : OwnerDrawnControl
-{
-    /// <inheritdoc/>
-    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.List;
+public class ListView : OwnerDrawnControl {
+  /// <inheritdoc/>
+  private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.List;
 
-    private const int _IconGap = 4;
-    private const int _CellPad = 2;
-    private const int _CheckGap = 4;
-    private const int _SmallIconLabelWidth = 100;
-    private const int _TileLabelWidth = 120;
-    private const int _LargeIconCellPad = 16;
-    private const int _LargeIconLabelGap = 4;
-    private const int _MinLargeIconCellWidth = 64;
-    private const int _SortArrowWidth = 10;
-    private const int _DoubleClickMs = 500;
+  private const int _IconGap = 4;
+  private const int _CellPad = 2;
+  private const int _CheckGap = 4;
+  private const int _SmallIconLabelWidth = 100;
+  private const int _TileLabelWidth = 120;
+  private const int _LargeIconCellPad = 16;
+  private const int _LargeIconLabelGap = 4;
+  private const int _MinLargeIconCellWidth = 64;
+  private const int _SortArrowWidth = 10;
+  private const int _DoubleClickMs = 500;
 
-    /// <summary>The selected row indices, always kept sorted ascending.</summary>
-    private readonly List<int> _selectedIndices = [];
+  /// <summary>The selected row indices, always kept sorted ascending.</summary>
+  private readonly List<int> _selectedIndices = [];
 
-    /// <summary>An index-aligned mirror of <see cref="Items"/>, so removals can detach the item.</summary>
-    private readonly List<ListViewItem> _attachedItems = [];
+  /// <summary>An index-aligned mirror of <see cref="Items"/>, so removals can detach the item.</summary>
+  private readonly List<ListViewItem> _attachedItems = [];
 
-    private int _focusedIndex = -1;
-    private int _anchorIndex = -1;
-    private int _topIndex;
-    private int? _itemHeight;
+  private int _focusedIndex = -1;
+  private int _anchorIndex = -1;
+  private int _topIndex;
+  private int? _itemHeight;
 
-    /// <summary>Model item indices in display (group) order; <see langword="null"/> while no grouping is active.</summary>
-    private List<int>? _displayItems;
+  /// <summary>Model item indices in display (group) order; <see langword="null"/> while no grouping is active.</summary>
+  private List<int>? _displayItems;
 
-    /// <summary>The flattened visual rows (headers + item runs); <see langword="null"/> while no grouping is active.</summary>
-    private List<FlatRow>? _flatRows;
+  /// <summary>The flattened visual rows (headers + item runs); <see langword="null"/> while no grouping is active.</summary>
+  private List<FlatRow>? _flatRows;
 
-    private bool _flatDirty = true;
+  private bool _flatDirty = true;
 
-    private int _sortColumn = -1;
+  private int _sortColumn = -1;
 
-    private TextBox? _labelEditor;
-    private int _editIndex = -1;
+  private TextBox? _labelEditor;
+  private int _editIndex = -1;
 
-    private int _lastClickIndex = -1;
-    private long _lastClickTicks;
+  private int _lastClickIndex = -1;
+  private long _lastClickTicks;
 
-    private ListViewItem? _virtualPlaceholder;
+  private ListViewItem? _virtualPlaceholder;
 
-    /// <summary>Creates a list view.</summary>
-    public ListView()
-    {
-        this.Columns = new();
-        this.Items = new();
-        this.Groups = new();
-        this.Columns.ListChanged += this.OnColumnsChanged;
-        this.Items.ListChanged += this.OnItemsChanged;
-        this.Groups.ListChanged += this.OnGroupsChanged;
+  /// <summary>Creates a list view.</summary>
+  public ListView() {
+    this.Columns = new();
+    this.Items = new();
+    this.Groups = new();
+    this.Columns.ListChanged += this.OnColumnsChanged;
+    this.Items.ListChanged += this.OnItemsChanged;
+    this.Groups.ListChanged += this.OnGroupsChanged;
+  }
+
+  /// <summary>An unset <see cref="Control.BackColor"/> resolves to the theme's field background, so the
+  /// list looks like a native list box until an app recolours it.</summary>
+  private protected override Color FallbackBackColor => this.Theme.FieldBackground;
+
+  /// <summary>The columns shown in Details view. Mutating this collection repaints the control.</summary>
+  public ObservableList<ColumnHeader> Columns { get; }
+
+  /// <summary>The rows shown. Mutating this collection repaints the control.</summary>
+  public ObservableList<ListViewItem> Items { get; }
+
+  /// <summary>The groups items can join via <see cref="ListViewItem.Group"/>, rendered in this order.</summary>
+  public ObservableList<ListViewGroup> Groups { get; }
+
+  /// <summary>
+  /// Whether rows are served on demand by <see cref="RetrieveVirtualItem"/> over a
+  /// <see cref="VirtualListSize"/> instead of from <see cref="Items"/>, so a huge folder or search
+  /// result never materialises every row. Selection and keyboard navigation stay index-based; grouping,
+  /// sorting, check boxes and label editing are inert while virtual. Defaults to <see langword="false"/>.
+  /// </summary>
+  public bool VirtualMode {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.FinishSelectionGesture(this.ClearSelectionCore());
+      _focusedIndex = _anchorIndex = -1;
+      _flatDirty = true;
+      this.Invalidate();
     }
-
-    /// <summary>An unset <see cref="Control.BackColor"/> resolves to the theme's field background, so the
-    /// list looks like a native list box until an app recolours it.</summary>
-    private protected override Color FallbackBackColor => this.Theme.FieldBackground;
-
-    /// <summary>The columns shown in Details view. Mutating this collection repaints the control.</summary>
-    public ObservableList<ColumnHeader> Columns { get; }
-
-    /// <summary>The rows shown. Mutating this collection repaints the control.</summary>
-    public ObservableList<ListViewItem> Items { get; }
-
-    /// <summary>The groups items can join via <see cref="ListViewItem.Group"/>, rendered in this order.</summary>
-    public ObservableList<ListViewGroup> Groups { get; }
-
-    /// <summary>
-    /// Whether rows are served on demand by <see cref="RetrieveVirtualItem"/> over a
-    /// <see cref="VirtualListSize"/> instead of from <see cref="Items"/>, so a huge folder or search
-    /// result never materialises every row. Selection and keyboard navigation stay index-based; grouping,
-    /// sorting, check boxes and label editing are inert while virtual. Defaults to <see langword="false"/>.
-    /// </summary>
-    public bool VirtualMode
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.FinishSelectionGesture(this.ClearSelectionCore());
-            _focusedIndex = _anchorIndex = -1;
-            _flatDirty = true;
-            this.Invalidate();
-        }
-    }
-
-    /// <summary>The row count exposed while <see cref="VirtualMode"/> is on, or <c>-1</c> for an unknown
-    /// size: the list then probes a window past what it has confirmed, growing as you scroll until
-    /// <see cref="RetrieveVirtualItem"/> reports the end, at which point the scroll extent is fixed. Setting
-    /// it repaints.</summary>
-    public int VirtualListSize
-    {
-        get => field;
-        set
-        {
-            value = value < 0 ? -1 : value;
-            if (field == value)
-                return;
-
-            field = value;
-            _discoveredCount = 0;
-            _countFinal = false;
-            if (this.VirtualMode)
-            {
-                _flatDirty = true;
-                this.Invalidate();
-            }
-        }
-    }
-
-    private int _discoveredCount;   // confirmed rows in the unknown-size mode
-    private bool _countFinal;       // set once the provider reported the end
-
-    /// <summary>Raised while <see cref="VirtualMode"/> is on to fetch the row at
-    /// <see cref="RetrieveVirtualItemEventArgs.ItemIndex"/>; the handler sets
-    /// <see cref="RetrieveVirtualItemEventArgs.Item"/>. Called once per visible row per paint — keep it cheap.</summary>
-    public event EventHandler<RetrieveVirtualItemEventArgs>? RetrieveVirtualItem;
-
-    /// <summary>Whether the list is in the unknown-size virtual mode.</summary>
-    private bool UnknownVirtualSize => this.VirtualMode && this.VirtualListSize < 0;
-
-    /// <summary>The number of rows the presentation draws from: the model count normally, the fixed
-    /// <see cref="VirtualListSize"/> in known virtual mode, or a probe window past the confirmed rows in the
-    /// unknown-size mode (so the user can scroll a little further to discover more, until the end is found).</summary>
-    private int RowSourceCount
-    {
-        get
-        {
-            if (!this.VirtualMode)
-                return this.Items.Count;
-
-            if (!this.UnknownVirtualSize)
-                return this.VirtualListSize;
-
-            return _countFinal ? _discoveredCount : Math.Max(_discoveredCount, _topIndex + (2 * this.VisibleRowCount));
-        }
-    }
-
-    /// <summary>The item for a display row, or <see langword="false"/> when the row turned out not to exist —
-    /// which the unknown-size virtual mode only learns by asking, so a row already scheduled for painting can
-    /// disappear underneath the paint loop.</summary>
-    private bool TryGetRowItem(int index, out ListViewItem item)
-    {
-        if (!this.VirtualMode)
-        {
-            if (index < 0 || index >= this.Items.Count)
-            {
-                item = _virtualPlaceholder ??= new ListViewItem(string.Empty);
-                return false;
-            }
-
-            item = this.Items[index];
-            return true;
-        }
-
-        var probe = new RetrieveVirtualItemEventArgs(index);
-        this.RetrieveVirtualItem?.Invoke(this, probe);
-        if (this.UnknownVirtualSize)
-        {
-            if (probe.EndOfList || probe.Item is null)
-            {
-                _countFinal = true;
-                _discoveredCount = index; // rows [0, index) exist; this one does not
-                item = _virtualPlaceholder ??= new ListViewItem(string.Empty);
-                return false;
-            }
-
-            if (index + 1 > _discoveredCount)
-                _discoveredCount = index + 1;
-        }
-
-        item = probe.Item ?? (_virtualPlaceholder ??= new ListViewItem(string.Empty));
-        return probe.Item is not null;
-    }
-
-    /// <summary>The item for a display row: fetched from <see cref="RetrieveVirtualItem"/> while virtual
-    /// (falling back to a shared blank placeholder), otherwise the model item.</summary>
-    private ListViewItem GetRowItem(int index)
-    {
-        this.TryGetRowItem(index, out var item);
-        return item; // the blank placeholder when the row turned out not to exist
-    }
-
-    /// <summary>How items are arranged. Defaults to <see cref="ListViewView.Details"/>. Changing the
-    /// view commits a pending label edit.</summary>
-    public ListViewView View
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            this.EndEdit(cancel: false);
-            field = value;
-            _flatDirty = true;
-            this.Invalidate();
-        }
-    } = ListViewView.Details;
-
-    /// <summary>Whether the column header row is shown (Details view only). Defaults to <see langword="true"/>.</summary>
-    public bool ShowColumnHeaders
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.Invalidate();
-        }
-    } = true;
-
-    /// <summary>Whether items render under their group's header section (in every view except
-    /// <see cref="ListViewView.List"/>, like the classic control). Defaults to
-    /// <see langword="true"/>; without any <see cref="Groups"/> it has no effect.</summary>
-    public bool ShowGroups
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            _flatDirty = true;
-            this.Invalidate();
-        }
-    } = true;
-
-    /// <summary>Whether clicking anywhere on a Details row selects it. Defaults to <see langword="true"/>.</summary>
-    public bool FullRowSelect
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.Invalidate();
-        }
-    } = true;
-
-    /// <summary>Whether the user can select more than one item (Ctrl/Shift click and keyboard, like a
-    /// <see cref="SelectionMode.MultiExtended"/> list box). Defaults to <see langword="true"/>, like
-    /// the classic control; turning it off collapses the selection to its first item.</summary>
-    public bool MultiSelect
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            if (!value && _selectedIndices.Count > 1)
-                this.FinishSelectionGesture(this.SelectOnlyCore(_selectedIndices[0]));
-        }
-    } = true;
-
-    /// <summary>Whether every item shows a themed check box; see <see cref="ListViewItem.Checked"/>.</summary>
-    public bool CheckBoxes
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.Invalidate();
-        }
-    }
-
-    /// <summary>Whether the user can edit item labels; see <see cref="BeginEdit"/>.</summary>
-    public bool LabelEdit { get; set; }
-
-    /// <summary>The icon store for <see cref="ListViewView.LargeIcon"/> and <see cref="ListViewView.Tile"/>
-    /// (via <see cref="ListViewItem.ImageIndex"/>); its image size drives those views' cell size.</summary>
-    public ImageList? LargeImageList
-    {
-        get => field;
-        set
-        {
-            if (ReferenceEquals(field, value))
-                return;
-
-            this.BindImageListAnimation(field, value);
-            field = value;
-            _flatDirty = true;
-            this.Invalidate();
-        }
-    }
-
-    /// <summary>The icon store for the remaining views (via <see cref="ListViewItem.ImageIndex"/>);
-    /// its image size drives the <see cref="ListViewView.SmallIcon"/> cell size.</summary>
-    public ImageList? SmallImageList
-    {
-        get => field;
-        set
-        {
-            if (ReferenceEquals(field, value))
-                return;
-
-            this.BindImageListAnimation(field, value);
-            field = value;
-            _flatDirty = true;
-            this.Invalidate();
-        }
-    }
-
-    /// <summary>
-    /// The automatic sort direction over the item text (or the last clicked column's text).
-    /// Assigning <see cref="SortOrder.Ascending"/>/<see cref="SortOrder.Descending"/> sorts
-    /// immediately; <see cref="SortOrder.None"/> stops sorting without restoring the old order.
-    /// </summary>
-    public SortOrder Sorting
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            if (value == SortOrder.None)
-            {
-                this.Invalidate();
-                return;
-            }
-
-            this.Sort();
-        }
-    }
-
-    /// <summary>
-    /// An optional custom item ordering — the delegate-shaped stand-in for the classic
-    /// <c>ListViewItemSorter</c>. When set it wins over <see cref="Sorting"/>; assigning a
-    /// non-<see langword="null"/> comparison sorts immediately.
-    /// </summary>
-    public Comparison<ListViewItem>? ItemSorter
-    {
-        get => field;
-        set
-        {
-            field = value;
-            if (value is not null)
-                this.Sort();
-        }
-    }
-
-    /// <summary>The pixel height of a row (and of the header). Defaults to the theme row height.</summary>
-    public int ItemHeight
-    {
-        get => _itemHeight ?? this.Theme.RowHeight;
-        set
-        {
-            _itemHeight = Math.Max(1, value);
-            _flatDirty = true;
-            this.Invalidate();
-        }
-    }
-
-    /// <summary>The first selected index, or -1 for none. Setting it replaces the whole selection.</summary>
-    public int SelectedIndex
-    {
-        get => _selectedIndices.Count > 0 ? _selectedIndices[0] : -1;
-        set
-        {
-            var clamped = value < -1 || value >= this.RowSourceCount ? -1 : value;
-            if (clamped >= 0)
-            {
-                _focusedIndex = clamped;
-                _anchorIndex = clamped;
-                this.EnsureVisible(clamped);
-            }
-
-            this.FinishSelectionGesture(clamped < 0 ? this.ClearSelectionCore() : this.SelectOnlyCore(clamped));
-        }
-    }
-
-    /// <summary>The selected row indices, sorted ascending. Empty for none.</summary>
-    public IReadOnlyList<int> SelectedIndices => _selectedIndices;
-
-    /// <summary>The selected items, in index order. A live view over <see cref="SelectedIndices"/>.</summary>
-    public IReadOnlyList<ListViewItem> SelectedItems => field ??= new SelectedItemList(this);
-
-    /// <summary>The checked item indices, sorted ascending. A live view over the items' check states.</summary>
-    public IReadOnlyList<int> CheckedIndices => field ??= new CheckedIndexList(this);
-
-    /// <summary>The checked items, in index order. A live view over the items' check states.</summary>
-    public IReadOnlyList<ListViewItem> CheckedItems => field ??= new CheckedItemList(this);
-
-    /// <summary>The first selected item, or <see langword="null"/>.</summary>
-    public ListViewItem? SelectedItem
-    {
-        get
-        {
-            var index = this.SelectedIndex;
-            return index >= 0 && index < this.RowSourceCount ? this.GetRowItem(index) : null;
-        }
-        set => this.SelectedIndex = value is null ? -1 : this.Items.IndexOf(value);
-    }
-
-    /// <summary>The caret item keyboard navigation operates on, or -1 before any interaction.</summary>
-    public int FocusedIndex => _focusedIndex;
-
-    /// <summary>The index of the first visible flattened row (scroll position). Group header rows
-    /// count as rows; in the icon views a row spans a whole rank of cells.</summary>
-    public int TopIndex => _topIndex;
-
-    /// <summary>Whether a label edit is currently in progress.</summary>
-    public bool IsEditing => _editIndex >= 0;
-
-    /// <summary>Raised once per gesture when the set of selected indices changes.</summary>
-    public event EventHandler? SelectedIndexChanged;
-
-    /// <summary>Raised when a Details column header is clicked.</summary>
-    public event EventHandler<ColumnClickEventArgs>? ColumnClick;
-
-    /// <summary>Raised before an item's check state flips; see <see cref="ItemCheckEventArgs"/>.</summary>
-    public event EventHandler<ItemCheckEventArgs>? ItemCheck;
-
-    /// <summary>Raised after an item's check state flipped.</summary>
-    public event EventHandler<ItemCheckedEventArgs>? ItemChecked;
-
-    /// <summary>Raised when an item is activated: double-clicked, or Enter while it holds the caret.</summary>
-    public event EventHandler? ItemActivate;
-
-    /// <summary>Raised before a label edit starts; setting <see cref="LabelEditEventArgs.CancelEdit"/>
-    /// keeps the label read-only for this attempt.</summary>
-    public event EventHandler<LabelEditEventArgs>? BeforeLabelEdit;
-
-    /// <summary>Raised after a label edit finished; see <see cref="LabelEditEventArgs"/>.</summary>
-    public event EventHandler<LabelEditEventArgs>? AfterLabelEdit;
-
-    /// <summary>
-    /// Replaces the rows from a model sequence (one-way binding convenience, the
-    /// <see cref="ListBox.DataSource"/> parity for this control). Because a row here is a structured
-    /// <see cref="ListViewItem"/> rather than a single display string, the mapping is a
-    /// reflection-free item factory instead of a display selector. Each produced item whose
-    /// <see cref="ListViewItem.Tag"/> the factory left <see langword="null"/> gets its source model
-    /// stored there, so the selection maps back to the model. A <see langword="null"/> sequence
-    /// just clears.
-    /// </summary>
-    /// <typeparam name="T">The model type.</typeparam>
-    /// <param name="items">The models to show, or <see langword="null"/> to clear.</param>
-    /// <param name="itemFactory">Builds the row for one model.</param>
-    public void SetDataSource<T>(IEnumerable<T>? items, Func<T, ListViewItem> itemFactory)
-    {
-        ArgumentNullException.ThrowIfNull(itemFactory);
-
-        this.Items.Clear();
-        if (items is null)
-            return;
-
-        foreach (var model in items)
-        {
-            var item = itemFactory(model);
-            item.Tag ??= model;
-            this.Items.Add(item);
-        }
-    }
-
-    /// <inheritdoc/>
-    protected override bool Focusable => true;
-
-    /// <summary>A running label edit claims Enter (commit) and Escape (cancel) ahead of the form;
-    /// outside an edit, Enter is claimed for item activation while an item holds the caret.</summary>
-    protected override bool IsInputKey(Keys keyData)
-        => this.IsEditing
-            ? keyData is Keys.Enter or Keys.Escape
-            : keyData == Keys.Enter && _focusedIndex >= 0;
-
-    /// <summary>The pixel height reserved for the header row (0 unless Details with headers shown).</summary>
-    protected int HeaderHeight => this.View == ListViewView.Details && this.ShowColumnHeaders ? this.ItemHeight : 0;
-
-    /// <summary>The number of fully visible rows (of cells, in the icon views) in the item area.</summary>
-    protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.CellSize.Height);
-
-    // --- Vertical scroll bar (overlay on the right; visible only when the content overflows) ---------
-
-    private const int _ScrollBarWidth = 14;
-    private bool _draggingScroll;
-    private int _scrollDragOffset;
-
-    /// <summary>The live rubber-band gesture, allocated only while one is in flight.</summary>
-    private MarqueeDrag? _marquee;
-
-    /// <summary>Whether the content is taller than the item area, so the scroll bar is drawn.</summary>
-    private bool ScrollBarVisible => this.FlatRowCount > this.VisibleRowCount;
-
-    private Rectangle ScrollTrack => new(this.Width - _ScrollBarWidth, this.HeaderHeight, _ScrollBarWidth, Math.Max(0, this.Height - this.HeaderHeight));
-
-    private Rectangle ScrollThumb
-    {
-        get
-        {
-            var track = this.ScrollTrack;
-            var total = this.FlatRowCount;
-            var visible = this.VisibleRowCount;
-            if (total <= visible || track.Height <= 0)
-                return Rectangle.Empty;
-
-            var thumbHeight = Math.Max(20, track.Height * visible / total);
-            var maxTop = total - visible;
-            var travel = track.Height - thumbHeight;
-            var y = track.Y + (maxTop <= 0 ? 0 : travel * Math.Clamp(_topIndex, 0, maxTop) / maxTop);
-            return new Rectangle(track.X, y, track.Width, thumbHeight);
-        }
-    }
-
-    /// <summary>Whether the current view lays cells out in a left-to-right grid.</summary>
-    private bool IsGridView => this.View is ListViewView.LargeIcon or ListViewView.SmallIcon or ListViewView.Tile;
-
-    /// <summary>Whether items are rendered under group headers right now. The List view never
-    /// groups, matching <c>System.Windows.Forms.ListView</c>.</summary>
-    private bool GroupingActive => !this.VirtualMode && this.ShowGroups && this.Groups.Count > 0 && this.View != ListViewView.List;
-
-    /// <summary>The icon size of the large-icon views: the large image list's size, or 32×32.</summary>
-    private Size LargeIconSize => this.LargeImageList?.ImageSize ?? new Size(32, 32);
-
-    /// <summary>The icon size of the small-icon views: the small image list's size, or 16×16.</summary>
-    private Size SmallIconSize => this.SmallImageList?.ImageSize ?? new Size(16, 16);
-
-    /// <summary>
-    /// The pixel size of one item cell in the current view. Details and List cells span the full
-    /// width at <see cref="ItemHeight"/>; the icon views derive their cell from the icon size plus
-    /// the label: LargeIcon centers the icon above one text line, SmallIcon and Tile put a fixed
-    /// label block beside the icon (Tile two lines tall).
-    /// </summary>
-    private Size CellSize
-    {
-        get
-        {
-            switch (this.View)
-            {
-                case ListViewView.LargeIcon:
-                {
-                    var icon = this.LargeIconSize;
-                    return new(Math.Max(icon.Width + (2 * _LargeIconCellPad), _MinLargeIconCellWidth), icon.Height + _LargeIconLabelGap + this.ItemHeight);
-                }
-
-                case ListViewView.SmallIcon:
-                {
-                    var icon = this.SmallIconSize;
-                    return new(icon.Width + _IconGap + _SmallIconLabelWidth + (2 * _CellPad), this.ItemHeight);
-                }
-
-                case ListViewView.Tile:
-                {
-                    var icon = this.LargeIconSize;
-                    return new(icon.Width + _IconGap + _TileLabelWidth + (2 * _CellPad), Math.Max(icon.Height + 4, 2 * this.ItemHeight));
-                }
-
-                default:
-                    return new(this.Width, this.ItemHeight);
-            }
-        }
-    }
-
-    /// <summary>The number of cells per row: 1 outside the grid views.</summary>
-    private int ItemsPerRow => this.IsGridView ? Math.Max(1, this.Width / this.CellSize.Width) : 1;
-
-    /// <summary>The check-glyph indent of the inline (non-overlay) views, 0 while checks are off.</summary>
-    private int CheckIndent => this.CheckBoxes ? GlyphRenderer.CheckBoxSize + _CheckGap : 0;
-
-    /// <summary>Raises <see cref="SelectedIndexChanged"/>.</summary>
-    protected virtual void OnSelectedIndexChanged(EventArgs e) => this.SelectedIndexChanged?.Invoke(this, e);
-
-    /// <summary>Raises <see cref="ColumnClick"/>.</summary>
-    protected virtual void OnColumnClick(ColumnClickEventArgs e) => this.ColumnClick?.Invoke(this, e);
-
-    /// <summary>Raises <see cref="ItemCheck"/>.</summary>
-    protected virtual void OnItemCheck(ItemCheckEventArgs e) => this.ItemCheck?.Invoke(this, e);
-
-    /// <summary>Raises <see cref="ItemChecked"/>.</summary>
-    protected virtual void OnItemChecked(ItemCheckedEventArgs e) => this.ItemChecked?.Invoke(this, e);
-
-    /// <summary>Raises <see cref="ItemActivate"/>.</summary>
-    protected virtual void OnItemActivate(EventArgs e) => this.ItemActivate?.Invoke(this, e);
-
-    /// <summary>Raises <see cref="BeforeLabelEdit"/>.</summary>
-    protected virtual void OnBeforeLabelEdit(LabelEditEventArgs e) => this.BeforeLabelEdit?.Invoke(this, e);
-
-    /// <summary>Raises <see cref="AfterLabelEdit"/>.</summary>
-    protected virtual void OnAfterLabelEdit(LabelEditEventArgs e) => this.AfterLabelEdit?.Invoke(this, e);
-
-    // --- Flattened presentation ------------------------------------------------------------------
-    //
-    // Every view paints "flat rows": group header rows interleaved with runs of items (one item per
-    // row in Details/List, up to ItemsPerRow in the grid views). While no grouping is active the
-    // rows are pure arithmetic over the item indices — nothing is materialized, so huge ungrouped
-    // lists cost nothing. With grouping, the display order and rows are flattened lazily into lists
-    // (the TreeRowList idea, localized): structural changes only mark them dirty and the next access
-    // rebuilds, never the paint loop itself.
-
-    /// <summary>One visual row: a group header (<see cref="Count"/> &lt; 0) or a run of display positions.</summary>
-    private readonly struct FlatRow(int groupIndex, int start, int count)
-    {
-        /// <summary>The header's index into <see cref="Groups"/>, or -1 for the default section.</summary>
-        public readonly int GroupIndex = groupIndex;
-
-        /// <summary>The first display position of an item row.</summary>
-        public readonly int Start = start;
-
-        /// <summary>The number of items in the row, or -1 for a header row.</summary>
-        public readonly int Count = count;
-    }
-
-    /// <summary>Rebuilds the display order and flat rows when grouping is active and stale.</summary>
-    private void EnsureFlat()
-    {
-        if (!_flatDirty)
-            return;
-
-        _flatDirty = false;
-        if (!this.GroupingActive)
-        {
-            _displayItems = null;
-            _flatRows = null;
-            this.ClampScroll();
-            return;
-        }
-
-        var display = _displayItems ??= [];
-        var rows = _flatRows ??= [];
-        display.Clear();
-        rows.Clear();
-
-        var groupCount = this.Groups.Count;
-        var buckets = new List<int>?[groupCount + 1];
-        for (var i = 0; i < this.Items.Count; ++i)
-        {
-            var slot = this.IndexOfGroup(this.Items[i].Group);
-            if (slot < 0)
-                slot = groupCount;
-
-            (buckets[slot] ??= []).Add(i);
-        }
-
-        var itemsPerRow = this.ItemsPerRow;
-        for (var slot = 0; slot <= groupCount; ++slot)
-        {
-            var bucket = buckets[slot];
-            if (bucket is null || bucket.Count == 0)
-                continue;
-
-            rows.Add(new FlatRow(slot == groupCount ? -1 : slot, 0, -1));
-            var start = display.Count;
-            display.AddRange(bucket);
-            for (var offset = 0; offset < bucket.Count; offset += itemsPerRow)
-                rows.Add(new FlatRow(-1, start + offset, Math.Min(itemsPerRow, bucket.Count - offset)));
-        }
-
-        this.ClampScroll();
-    }
-
-    /// <summary>The index of the group in <see cref="Groups"/>, or -1 (ungrouped/unlisted).</summary>
-    private int IndexOfGroup(ListViewGroup? group)
-    {
-        if (group is null)
-            return -1;
-
-        for (var i = 0; i < this.Groups.Count; ++i)
-            if (ReferenceEquals(this.Groups[i], group))
-                return i;
-
-        return -1;
-    }
-
-    /// <summary>The number of flat rows the current presentation occupies.</summary>
-    private int FlatRowCount
-    {
-        get
-        {
-            this.EnsureFlat();
-            if (_flatRows is { } rows)
-                return rows.Count;
-
-            var itemsPerRow = this.ItemsPerRow;
-            return (this.RowSourceCount + itemsPerRow - 1) / itemsPerRow;
-        }
-    }
-
-    /// <summary>The flat row at the given index.</summary>
-    private FlatRow GetFlatRow(int rowIndex)
-    {
-        if (_flatRows is { } rows)
-            return rows[rowIndex];
-
-        var itemsPerRow = this.ItemsPerRow;
-        var start = rowIndex * itemsPerRow;
-
-        // Clamped at zero: a negative Count is the group-header sentinel, and the unknown-size virtual mode
-        // can shrink RowSourceCount underneath a row the paint loop already scheduled.
-        return new(-1, start, Math.Max(0, Math.Min(itemsPerRow, this.RowSourceCount - start)));
-    }
-
-    /// <summary>The pixel height of a flat row: headers at <see cref="ItemHeight"/>, item rows at the cell height.</summary>
-    private int RowHeightOf(in FlatRow row) => row.Count < 0 ? this.ItemHeight : this.CellSize.Height;
-
-    /// <summary>The model item index at the given display position.</summary>
-    private int DisplayItem(int position) => _displayItems is { } display ? display[position] : position;
-
-    /// <summary>The display position of the given model item index.</summary>
-    private int DisplayPosOf(int itemIndex)
-    {
-        this.EnsureFlat();
-        return _displayItems is { } display ? display.IndexOf(itemIndex) : itemIndex;
-    }
-
-    /// <summary>The flat row containing the given display position, or -1.</summary>
-    private int RowOfDisplayPos(int position)
-    {
-        this.EnsureFlat();
-        if (position < 0)
-            return -1;
-
-        if (_flatRows is not { } rows)
-            return position / this.ItemsPerRow;
-
-        for (var i = 0; i < rows.Count; ++i)
-        {
-            var row = rows[i];
-            if (row.Count > 0 && position >= row.Start && position < row.Start + row.Count)
-                return i;
-        }
-
-        return -1;
-    }
-
-    /// <summary>
-    /// The cell rectangle of the item at the given index, in client coordinates for the current
-    /// scroll position (possibly outside the visible area). Details and List cells span the full
-    /// control width.
-    /// </summary>
-    public Rectangle GetItemBounds(int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.RowSourceCount);
-
-        var position = this.DisplayPosOf(index);
-        var row = this.RowOfDisplayPos(position);
-        var y = this.HeaderHeight;
-        if (row >= _topIndex)
-            for (var r = _topIndex; r < row; ++r)
-                y += this.RowHeightOf(this.GetFlatRow(r));
-        else
-            for (var r = row; r < _topIndex; ++r)
-                y -= this.RowHeightOf(this.GetFlatRow(r));
-
-        var flatRow = this.GetFlatRow(row);
-        var cell = this.CellSize;
-        return new((position - flatRow.Start) * cell.Width, y, cell.Width, this.RowHeightOf(flatRow));
-    }
-
-    /// <summary>Scrolls so the given item index is visible.</summary>
-    public void EnsureVisible(int index)
-    {
-        if (index < 0 || index >= this.RowSourceCount)
-            return;
-
-        var row = this.RowOfDisplayPos(this.DisplayPosOf(index));
-        if (row < 0)
-            return;
-
-        if (row < _topIndex)
-            _topIndex = row;
-        else if (row >= _topIndex + this.VisibleRowCount)
-            _topIndex = row - this.VisibleRowCount + 1;
-
-        this.ClampScroll();
-    }
-
-    private void ClampScroll()
-    {
-        var maxTop = Math.Max(0, this.FlatRowCount - this.VisibleRowCount);
-        _topIndex = Math.Clamp(_topIndex, 0, maxTop);
-    }
-
-    /// <inheritdoc/>
-    private protected override void OnBoundsChanged() => _flatDirty = true;
-
-    /// <inheritdoc/>
-    private protected override void OnUnrealized()
-    {
-        base.OnUnrealized();
-        this.AbandonEdit();
-
-        // A band in flight owns an auto-scroll timer, whose source is the backend that just went away.
-        _marquee?.Dispose();
-        _marquee = null;
-    }
-
-    /// <summary>Drops a pending label edit without committing or raising events — the edited item
-    /// vanished (or the control unrealized), so there is nothing left to commit to.</summary>
-    private void AbandonEdit()
-    {
-        _editIndex = -1;
-        if (_labelEditor is { } editor)
-            editor.Visible = false;
-    }
-
-    // --- Collection bookkeeping ------------------------------------------------------------------
-
-    private void OnItemsChanged(object? sender, ListChangedEventArgs e)
-    {
-        var count = this.Items.Count;
-        var changed = false;
-        switch (e.ChangeType)
-        {
-            case ListChangeType.Added:
-            {
-                var item = this.Items[e.Index];
-                item.Owner = this;
-                item.SetSelectedCore(false);
-                _attachedItems.Insert(e.Index, item);
-
-                var pos = _selectedIndices.BinarySearch(e.Index);
-                for (var i = pos >= 0 ? pos : ~pos; i < _selectedIndices.Count; ++i)
-                    ++_selectedIndices[i];
-
-                if (_focusedIndex >= e.Index)
-                    ++_focusedIndex;
-                if (_anchorIndex >= e.Index)
-                    ++_anchorIndex;
-                if (_editIndex >= e.Index)
-                    ++_editIndex;
-                break;
-            }
-
-            case ListChangeType.Removed:
-            {
-                var removed = _attachedItems[e.Index];
-                removed.Owner = null;
-                removed.SetSelectedCore(false);
-                _attachedItems.RemoveAt(e.Index);
-
-                var pos = _selectedIndices.BinarySearch(e.Index);
-                var wasSelected = pos >= 0;
-                if (wasSelected)
-                {
-                    _selectedIndices.RemoveAt(pos);
-                    changed = true;
-                }
-
-                for (var i = wasSelected ? pos : ~pos; i < _selectedIndices.Count; ++i)
-                    --_selectedIndices[i];
-
-                if (_focusedIndex > e.Index)
-                    --_focusedIndex;
-                else if (_focusedIndex >= count)
-                    _focusedIndex = count - 1;
-
-                if (_anchorIndex > e.Index)
-                    --_anchorIndex;
-                else if (_anchorIndex >= count)
-                    _anchorIndex = count - 1;
-
-                if (_editIndex == e.Index)
-                    this.AbandonEdit();
-                else if (_editIndex > e.Index)
-                    --_editIndex;
-                break;
-            }
-
-            case ListChangeType.Replaced:
-            {
-                var old = _attachedItems[e.Index];
-                old.Owner = null;
-                old.SetSelectedCore(false);
-
-                var item = this.Items[e.Index];
-                item.Owner = this;
-                item.SetSelectedCore(false);
-                _attachedItems[e.Index] = item;
-
-                var pos = _selectedIndices.BinarySearch(e.Index);
-                if (pos >= 0)
-                {
-                    _selectedIndices.RemoveAt(pos);
-                    changed = true;
-                }
-
-                break;
-            }
-
-            case ListChangeType.Reset:
-            {
-                // Covers Clear and the in-place Sort alike: re-attach whatever the list now holds
-                // and rebuild the selection from the per-item flags, which survive a reorder.
-                var oldCount = _selectedIndices.Count;
-                for (var i = 0; i < _attachedItems.Count; ++i)
-                    _attachedItems[i].Owner = null;
-
-                _attachedItems.Clear();
-                _selectedIndices.Clear();
-                for (var i = 0; i < count; ++i)
-                {
-                    var item = this.Items[i];
-                    item.Owner = this;
-                    _attachedItems.Add(item);
-                    if (item.Selected)
-                        _selectedIndices.Add(i);
-                }
-
-                changed = _selectedIndices.Count != oldCount;
-                if (_focusedIndex >= count)
-                    _focusedIndex = count - 1;
-                if (_anchorIndex >= count)
-                    _anchorIndex = count - 1;
-                if (_editIndex >= count)
-                    this.AbandonEdit();
-                break;
-            }
-        }
-
+  }
+
+  /// <summary>The row count exposed while <see cref="VirtualMode"/> is on, or <c>-1</c> for an unknown
+  /// size: the list then probes a window past what it has confirmed, growing as you scroll until
+  /// <see cref="RetrieveVirtualItem"/> reports the end, at which point the scroll extent is fixed. Setting
+  /// it repaints.</summary>
+  public int VirtualListSize {
+    get => field;
+    set {
+      value = value < 0 ? -1 : value;
+      if (field == value)
+        return;
+
+      field = value;
+      _discoveredCount = 0;
+      _countFinal = false;
+      if (this.VirtualMode) {
         _flatDirty = true;
         this.Invalidate();
-        if (changed)
-            this.OnSelectedIndexChanged(EventArgs.Empty);
+      }
+    }
+  }
+
+  private int _discoveredCount;   // confirmed rows in the unknown-size mode
+  private bool _countFinal;       // set once the provider reported the end
+
+  /// <summary>Raised while <see cref="VirtualMode"/> is on to fetch the row at
+  /// <see cref="RetrieveVirtualItemEventArgs.ItemIndex"/>; the handler sets
+  /// <see cref="RetrieveVirtualItemEventArgs.Item"/>. Called once per visible row per paint — keep it cheap.</summary>
+  public event EventHandler<RetrieveVirtualItemEventArgs>? RetrieveVirtualItem;
+
+  /// <summary>Whether the list is in the unknown-size virtual mode.</summary>
+  private bool UnknownVirtualSize => this.VirtualMode && this.VirtualListSize < 0;
+
+  /// <summary>The number of rows the presentation draws from: the model count normally, the fixed
+  /// <see cref="VirtualListSize"/> in known virtual mode, or a probe window past the confirmed rows in the
+  /// unknown-size mode (so the user can scroll a little further to discover more, until the end is found).</summary>
+  private int RowSourceCount {
+    get {
+      if (!this.VirtualMode)
+        return this.Items.Count;
+
+      if (!this.UnknownVirtualSize)
+        return this.VirtualListSize;
+
+      return _countFinal ? _discoveredCount : Math.Max(_discoveredCount, _topIndex + (2 * this.VisibleRowCount));
+    }
+  }
+
+  /// <summary>The item for a display row, or <see langword="false"/> when the row turned out not to exist —
+  /// which the unknown-size virtual mode only learns by asking, so a row already scheduled for painting can
+  /// disappear underneath the paint loop.</summary>
+  private bool TryGetRowItem(int index, out ListViewItem item) {
+    if (!this.VirtualMode) {
+      if (index < 0 || index >= this.Items.Count) {
+        item = _virtualPlaceholder ??= new ListViewItem(string.Empty);
+        return false;
+      }
+
+      item = this.Items[index];
+      return true;
     }
 
-    private void OnColumnsChanged(object? sender, ListChangedEventArgs e) => this.Invalidate();
+    var probe = new RetrieveVirtualItemEventArgs(index);
+    this.RetrieveVirtualItem?.Invoke(this, probe);
+    if (this.UnknownVirtualSize) {
+      if (probe.EndOfList || probe.Item is null) {
+        _countFinal = true;
+        _discoveredCount = index; // rows [0, index) exist; this one does not
+        item = _virtualPlaceholder ??= new ListViewItem(string.Empty);
+        return false;
+      }
 
-    private void OnGroupsChanged(object? sender, ListChangedEventArgs e)
-    {
-        _flatDirty = true;
+      if (index + 1 > _discoveredCount)
+        _discoveredCount = index + 1;
+    }
+
+    item = probe.Item ?? (_virtualPlaceholder ??= new ListViewItem(string.Empty));
+    return probe.Item is not null;
+  }
+
+  /// <summary>The item for a display row: fetched from <see cref="RetrieveVirtualItem"/> while virtual
+  /// (falling back to a shared blank placeholder), otherwise the model item.</summary>
+  private ListViewItem GetRowItem(int index) {
+    this.TryGetRowItem(index, out var item);
+    return item; // the blank placeholder when the row turned out not to exist
+  }
+
+  /// <summary>How items are arranged. Defaults to <see cref="ListViewView.Details"/>. Changing the
+  /// view commits a pending label edit.</summary>
+  public ListViewView View {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      this.EndEdit(cancel: false);
+      field = value;
+      _flatDirty = true;
+      this.Invalidate();
+    }
+  } = ListViewView.Details;
+
+  /// <summary>Whether the column header row is shown (Details view only). Defaults to <see langword="true"/>.</summary>
+  public bool ShowColumnHeaders {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.Invalidate();
+    }
+  } = true;
+
+  /// <summary>Whether items render under their group's header section (in every view except
+  /// <see cref="ListViewView.List"/>, like the classic control). Defaults to
+  /// <see langword="true"/>; without any <see cref="Groups"/> it has no effect.</summary>
+  public bool ShowGroups {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      _flatDirty = true;
+      this.Invalidate();
+    }
+  } = true;
+
+  /// <summary>Whether clicking anywhere on a Details row selects it. Defaults to <see langword="true"/>.</summary>
+  public bool FullRowSelect {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.Invalidate();
+    }
+  } = true;
+
+  /// <summary>Whether the user can select more than one item (Ctrl/Shift click and keyboard, like a
+  /// <see cref="SelectionMode.MultiExtended"/> list box). Defaults to <see langword="true"/>, like
+  /// the classic control; turning it off collapses the selection to its first item.</summary>
+  public bool MultiSelect {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      if (!value && _selectedIndices.Count > 1)
+        this.FinishSelectionGesture(this.SelectOnlyCore(_selectedIndices[0]));
+    }
+  } = true;
+
+  /// <summary>Whether every item shows a themed check box; see <see cref="ListViewItem.Checked"/>.</summary>
+  public bool CheckBoxes {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.Invalidate();
+    }
+  }
+
+  /// <summary>Whether the user can edit item labels; see <see cref="BeginEdit"/>.</summary>
+  public bool LabelEdit { get; set; }
+
+  /// <summary>The icon store for <see cref="ListViewView.LargeIcon"/> and <see cref="ListViewView.Tile"/>
+  /// (via <see cref="ListViewItem.ImageIndex"/>); its image size drives those views' cell size.</summary>
+  public ImageList? LargeImageList {
+    get => field;
+    set {
+      if (ReferenceEquals(field, value))
+        return;
+
+      this.BindImageListAnimation(field, value);
+      field = value;
+      _flatDirty = true;
+      this.Invalidate();
+    }
+  }
+
+  /// <summary>The icon store for the remaining views (via <see cref="ListViewItem.ImageIndex"/>);
+  /// its image size drives the <see cref="ListViewView.SmallIcon"/> cell size.</summary>
+  public ImageList? SmallImageList {
+    get => field;
+    set {
+      if (ReferenceEquals(field, value))
+        return;
+
+      this.BindImageListAnimation(field, value);
+      field = value;
+      _flatDirty = true;
+      this.Invalidate();
+    }
+  }
+
+  /// <summary>
+  /// The automatic sort direction over the item text (or the last clicked column's text).
+  /// Assigning <see cref="SortOrder.Ascending"/>/<see cref="SortOrder.Descending"/> sorts
+  /// immediately; <see cref="SortOrder.None"/> stops sorting without restoring the old order.
+  /// </summary>
+  public SortOrder Sorting {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      if (value == SortOrder.None) {
         this.Invalidate();
+        return;
+      }
+
+      this.Sort();
     }
+  }
 
-    /// <summary>Called by an attached item after its <see cref="ListViewItem.Group"/> changed.</summary>
-    internal void OnItemGroupChanged()
-    {
-        _flatDirty = true;
-        this.Invalidate();
-    }
-
-    // --- Selection core: mutate the sorted index list, keep the item flags aligned ---------------
-
-    /// <summary>Whether the row at the given index is selected.</summary>
-    private bool IsSelected(int index) => _selectedIndices.BinarySearch(index) >= 0;
-
-    /// <summary>Mirrors the selection onto the model item's own flag; a no-op in virtual mode, whose rows
-    /// are transient and carry no persistent flag.</summary>
-    private void SyncItemSelected(int index, bool value)
-    {
-        if (!this.VirtualMode && index >= 0 && index < this.Items.Count)
-            this.Items[index].SetSelectedCore(value);
-    }
-
-    private bool ClearSelectionCore()
-    {
-        if (_selectedIndices.Count == 0)
-            return false;
-
-        for (var i = 0; i < _selectedIndices.Count; ++i)
-            this.SyncItemSelected(_selectedIndices[i], false);
-
-        _selectedIndices.Clear();
-        return true;
-    }
-
-    private bool SelectOnlyCore(int index)
-    {
-        if (_selectedIndices.Count == 1 && _selectedIndices[0] == index)
-            return false;
-
-        this.ClearSelectionCore();
-        _selectedIndices.Add(index);
-        this.SyncItemSelected(index, true);
-        return true;
-    }
-
-    private bool ToggleCore(int index)
-    {
-        var pos = _selectedIndices.BinarySearch(index);
-        if (pos >= 0)
-        {
-            _selectedIndices.RemoveAt(pos);
-            this.SyncItemSelected(index, false);
-        }
-        else
-        {
-            _selectedIndices.Insert(~pos, index);
-            this.SyncItemSelected(index, true);
-        }
-
-        return true;
-    }
-
-    /// <summary>Adds one index to the sorted selection, reporting whether it was not already there.</summary>
-    private bool AddToSelectionCore(int index)
-    {
-        var position = _selectedIndices.BinarySearch(index);
-        if (position >= 0)
-            return false;
-
-        _selectedIndices.Insert(~position, index);
-        this.SyncItemSelected(index, true);
-        return true;
-    }
-
-    private bool SelectRangeCore(int from, int to)
-    {
-        var low = Math.Min(from, to);
-        var high = Math.Max(from, to);
-        if (_selectedIndices.Count == high - low + 1 && _selectedIndices[0] == low && _selectedIndices[^1] == high)
-            return false; // sorted and contiguous, so endpoints + count identify the range
-
-        this.ClearSelectionCore();
-        for (var i = low; i <= high; ++i)
-        {
-            _selectedIndices.Add(i);
-            this.SyncItemSelected(i, true);
-        }
-
-        return true;
-    }
-
-    /// <summary>Ends a user gesture: one repaint and at most one <see cref="SelectedIndexChanged"/>.</summary>
-    private void FinishSelectionGesture(bool changed)
-    {
-        if (!changed)
-            return;
-
-        this.Invalidate();
-        this.OnSelectedIndexChanged(EventArgs.Empty);
-    }
-
-    /// <summary>Applies an attached item's <see cref="ListViewItem.Selected"/> write to the selection.</summary>
-    internal void SetItemSelected(ListViewItem item, bool value)
-    {
-        var index = this.Items.IndexOf(item);
-        if (index < 0)
-        {
-            item.SetSelectedCore(value);
-            return;
-        }
-
-        if (value)
-        {
-            _focusedIndex = index;
-            _anchorIndex = index;
-            if (!this.MultiSelect)
-                this.FinishSelectionGesture(this.SelectOnlyCore(index));
-            else if (!this.IsSelected(index))
-                this.FinishSelectionGesture(this.ToggleCore(index));
-        }
-        else if (this.IsSelected(index))
-            this.FinishSelectionGesture(this.ToggleCore(index));
-    }
-
-    // --- Checkboxes ------------------------------------------------------------------------------
-
-    /// <summary>Runs an attached item's <see cref="ListViewItem.Checked"/> write through the vetoable
-    /// <see cref="ItemCheck"/>/<see cref="ItemChecked"/> pipeline.</summary>
-    internal void RequestItemCheck(ListViewItem item, bool value)
-        => this.RequestItemCheckAt(this.Items.IndexOf(item), item, value);
-
-    private void RequestItemCheckAt(int index, ListViewItem item, bool value)
-    {
-        var current = item.Checked;
-        if (current == value)
-            return;
-
-        var args = new ItemCheckEventArgs(index, current, value);
-        this.OnItemCheck(args);
-        if (args.NewValue == current)
-            return;
-
-        item.SetCheckedCore(args.NewValue);
-        this.Invalidate();
-        this.OnItemChecked(new(item));
-    }
-
-    /// <summary>Flips the check state of every selected item (or of the caret item with no selection).</summary>
-    private void ToggleSelectionChecks()
-    {
-        if (this.VirtualMode)
-            return; // transient virtual rows carry no persistent check state
-
-        if (_selectedIndices.Count == 0)
-        {
-            if (_focusedIndex >= 0 && _focusedIndex < this.Items.Count)
-                this.RequestItemCheckAt(_focusedIndex, this.Items[_focusedIndex], !this.Items[_focusedIndex].Checked);
-
-            return;
-        }
-
-        for (var i = 0; i < _selectedIndices.Count; ++i)
-        {
-            var index = _selectedIndices[i];
-            this.RequestItemCheckAt(index, this.Items[index], !this.Items[index].Checked);
-        }
-    }
-
-    // --- Sorting ---------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Sorts <see cref="Items"/> in place — stably — by <see cref="ItemSorter"/> when set, else by
-    /// the active column's text in the <see cref="Sorting"/> direction; a no-op while neither is
-    /// active. Selected items stay selected and the caret follows its item. See the class remarks
-    /// for why this mutates the collection where <see cref="DataGridView"/> sorts by indirection.
-    /// </summary>
-    public void Sort()
-    {
-        var comparison = this.ItemSorter;
-        if (comparison is null)
-        {
-            if (this.Sorting == SortOrder.None)
-                return;
-
-            var column = Math.Max(0, _sortColumn);
-            var descending = this.Sorting == SortOrder.Descending;
-            comparison = (a, b) =>
-            {
-                var result = string.CompareOrdinal(GetColumnText(a, column), GetColumnText(b, column));
-                return descending ? -result : result;
-            };
-        }
-
-        if (this.Items.Count > 1)
-        {
-            var focusedItem = _focusedIndex >= 0 && _focusedIndex < this.Items.Count ? this.Items[_focusedIndex] : null;
-            var anchorItem = _anchorIndex >= 0 && _anchorIndex < this.Items.Count ? this.Items[_anchorIndex] : null;
-
-            this.Items.Sort(comparison); // one Reset; the handler re-derives the selection from the item flags
-
-            if (focusedItem is not null)
-                _focusedIndex = this.Items.IndexOf(focusedItem);
-            if (anchorItem is not null)
-                _anchorIndex = this.Items.IndexOf(anchorItem);
-        }
-
-        this.Invalidate();
-    }
-
-    /// <summary>The text the given column shows for an item: the label, or the mapped sub-item.</summary>
-    private static string GetColumnText(ListViewItem item, int column)
-        => column <= 0 ? item.Text : column - 1 < item.SubItems.Count ? item.SubItems[column - 1] : string.Empty;
-
-    /// <summary>Handles a click in the Details header band: <see cref="ColumnClick"/>, then the
-    /// automatic sort when one is active (repeat clicks on the sorted column flip the direction).</summary>
-    private void HandleHeaderClick(int x)
-    {
-        var columnIndex = -1;
-        var left = 0;
-        for (var c = 0; c < this.Columns.Count; ++c)
-        {
-            var width = this.Columns[c].Width;
-            if (x >= left && x < left + width)
-            {
-                columnIndex = c;
-                break;
-            }
-
-            left += width;
-        }
-
-        if (columnIndex < 0)
-            return;
-
-        this.OnColumnClick(new(columnIndex));
-
-        var hasSorter = this.ItemSorter is not null;
-        if (!hasSorter && this.Sorting == SortOrder.None)
-            return;
-
-        if (!hasSorter && columnIndex == _sortColumn)
-        {
-            this.Sorting = this.Sorting == SortOrder.Ascending ? SortOrder.Descending : SortOrder.Ascending;
-            return;
-        }
-
-        _sortColumn = columnIndex;
+  /// <summary>
+  /// An optional custom item ordering — the delegate-shaped stand-in for the classic
+  /// <c>ListViewItemSorter</c>. When set it wins over <see cref="Sorting"/>; assigning a
+  /// non-<see langword="null"/> comparison sorts immediately.
+  /// </summary>
+  public Comparison<ListViewItem>? ItemSorter {
+    get => field;
+    set {
+      field = value;
+      if (value is not null)
         this.Sort();
     }
+  }
 
-    // --- Label editing ---------------------------------------------------------------------------
+  /// <summary>The pixel height of a row (and of the header). Defaults to the theme row height.</summary>
+  public int ItemHeight {
+    get => _itemHeight ?? this.Theme.RowHeight;
+    set {
+      _itemHeight = Math.Max(1, value);
+      _flatDirty = true;
+      this.Invalidate();
+    }
+  }
 
-    /// <summary>
-    /// Starts editing the given item's label: a hosted native text box appears over the label,
-    /// pre-filled and fully selected. <see cref="BeforeLabelEdit"/> runs first and may veto the
-    /// edit. See the class remarks for the commit points.
-    /// </summary>
-    /// <exception cref="InvalidOperationException"><see cref="LabelEdit"/> is disabled.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">The index is out of range.</exception>
-    public void BeginEdit(int index)
-    {
-        if (!this.LabelEdit)
-            throw new InvalidOperationException("LabelEdit must be enabled to edit item labels.");
+  /// <summary>The first selected index, or -1 for none. Setting it replaces the whole selection.</summary>
+  public int SelectedIndex {
+    get => _selectedIndices.Count > 0 ? _selectedIndices[0] : -1;
+    set {
+      var clamped = value < -1 || value >= this.RowSourceCount ? -1 : value;
+      if (clamped >= 0) {
+        _focusedIndex = clamped;
+        _anchorIndex = clamped;
+        this.EnsureVisible(clamped);
+      }
 
-        if (this.VirtualMode)
-            throw new InvalidOperationException("Label editing is unavailable in virtual mode.");
+      this.FinishSelectionGesture(clamped < 0 ? this.ClearSelectionCore() : this.SelectOnlyCore(clamped));
+    }
+  }
 
-        ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.Items.Count);
+  /// <summary>The selected row indices, sorted ascending. Empty for none.</summary>
+  public IReadOnlyList<int> SelectedIndices => _selectedIndices;
 
-        this.EndEdit(cancel: false);
+  /// <summary>The selected items, in index order. A live view over <see cref="SelectedIndices"/>.</summary>
+  public IReadOnlyList<ListViewItem> SelectedItems => field ??= new SelectedItemList(this);
 
-        var pending = new LabelEditEventArgs(index, this.Items[index].Text);
-        this.OnBeforeLabelEdit(pending);
-        if (pending.CancelEdit)
-            return;
+  /// <summary>The checked item indices, sorted ascending. A live view over the items' check states.</summary>
+  public IReadOnlyList<int> CheckedIndices => field ??= new CheckedIndexList(this);
 
-        this.EnsureVisible(index);
+  /// <summary>The checked items, in index order. A live view over the items' check states.</summary>
+  public IReadOnlyList<ListViewItem> CheckedItems => field ??= new CheckedItemList(this);
 
-        var editor = _labelEditor;
-        if (editor is null)
-        {
-            _labelEditor = editor = new() { Visible = false, TabStop = false };
-            this.Controls.Add(editor);
-        }
+  /// <summary>The first selected item, or <see langword="null"/>.</summary>
+  public ListViewItem? SelectedItem {
+    get {
+      var index = this.SelectedIndex;
+      return index >= 0 && index < this.RowSourceCount ? this.GetRowItem(index) : null;
+    }
+    set => this.SelectedIndex = value is null ? -1 : this.Items.IndexOf(value);
+  }
 
-        _editIndex = index;
-        var text = this.Items[index].Text;
-        editor.Bounds = this.GetLabelBounds(index);
-        editor.Text = text;
-        editor.SelectionStart = 0;
-        editor.SelectionLength = text.Length;
-        editor.Visible = true;
-        this.Invalidate();
+  /// <summary>The caret item keyboard navigation operates on, or -1 before any interaction.</summary>
+  public int FocusedIndex => _focusedIndex;
+
+  /// <summary>The index of the first visible flattened row (scroll position). Group header rows
+  /// count as rows; in the icon views a row spans a whole rank of cells.</summary>
+  public int TopIndex => _topIndex;
+
+  /// <summary>Whether a label edit is currently in progress.</summary>
+  public bool IsEditing => _editIndex >= 0;
+
+  /// <summary>Raised once per gesture when the set of selected indices changes.</summary>
+  public event EventHandler? SelectedIndexChanged;
+
+  /// <summary>Raised when a Details column header is clicked.</summary>
+  public event EventHandler<ColumnClickEventArgs>? ColumnClick;
+
+  /// <summary>Raised before an item's check state flips; see <see cref="ItemCheckEventArgs"/>.</summary>
+  public event EventHandler<ItemCheckEventArgs>? ItemCheck;
+
+  /// <summary>Raised after an item's check state flipped.</summary>
+  public event EventHandler<ItemCheckedEventArgs>? ItemChecked;
+
+  /// <summary>Raised when an item is activated: double-clicked, or Enter while it holds the caret.</summary>
+  public event EventHandler? ItemActivate;
+
+  /// <summary>Raised before a label edit starts; setting <see cref="LabelEditEventArgs.CancelEdit"/>
+  /// keeps the label read-only for this attempt.</summary>
+  public event EventHandler<LabelEditEventArgs>? BeforeLabelEdit;
+
+  /// <summary>Raised after a label edit finished; see <see cref="LabelEditEventArgs"/>.</summary>
+  public event EventHandler<LabelEditEventArgs>? AfterLabelEdit;
+
+  /// <summary>
+  /// Replaces the rows from a model sequence (one-way binding convenience, the
+  /// <see cref="ListBox.DataSource"/> parity for this control). Because a row here is a structured
+  /// <see cref="ListViewItem"/> rather than a single display string, the mapping is a
+  /// reflection-free item factory instead of a display selector. Each produced item whose
+  /// <see cref="ListViewItem.Tag"/> the factory left <see langword="null"/> gets its source model
+  /// stored there, so the selection maps back to the model. A <see langword="null"/> sequence
+  /// just clears.
+  /// </summary>
+  /// <typeparam name="T">The model type.</typeparam>
+  /// <param name="items">The models to show, or <see langword="null"/> to clear.</param>
+  /// <param name="itemFactory">Builds the row for one model.</param>
+  public void SetDataSource<T>(IEnumerable<T>? items, Func<T, ListViewItem> itemFactory) {
+    ArgumentNullException.ThrowIfNull(itemFactory);
+
+    this.Items.Clear();
+    if (items is null)
+      return;
+
+    foreach (var model in items) {
+      var item = itemFactory(model);
+      item.Tag ??= model;
+      this.Items.Add(item);
+    }
+  }
+
+  /// <inheritdoc/>
+  protected override bool Focusable => true;
+
+  /// <summary>A running label edit claims Enter (commit) and Escape (cancel) ahead of the form;
+  /// outside an edit, Enter is claimed for item activation while an item holds the caret.</summary>
+  protected override bool IsInputKey(Keys keyData)
+      => this.IsEditing
+          ? keyData is Keys.Enter or Keys.Escape
+          : keyData == Keys.Enter && _focusedIndex >= 0;
+
+  /// <summary>The pixel height reserved for the header row (0 unless Details with headers shown).</summary>
+  protected int HeaderHeight => this.View == ListViewView.Details && this.ShowColumnHeaders ? this.ItemHeight : 0;
+
+  /// <summary>The number of fully visible rows (of cells, in the icon views) in the item area.</summary>
+  protected int VisibleRowCount => Math.Max(1, (this.Height - this.HeaderHeight) / this.CellSize.Height);
+
+  // --- Vertical scroll bar (overlay on the right; visible only when the content overflows) ---------
+
+  private const int _ScrollBarWidth = 14;
+  private bool _draggingScroll;
+  private int _scrollDragOffset;
+
+  /// <summary>The live rubber-band gesture, allocated only while one is in flight.</summary>
+  private MarqueeDrag? _marquee;
+
+  /// <summary>Whether the content is taller than the item area, so the scroll bar is drawn.</summary>
+  private bool ScrollBarVisible => this.FlatRowCount > this.VisibleRowCount;
+
+  private Rectangle ScrollTrack => new(this.Width - _ScrollBarWidth, this.HeaderHeight, _ScrollBarWidth, Math.Max(0, this.Height - this.HeaderHeight));
+
+  private Rectangle ScrollThumb {
+    get {
+      var track = this.ScrollTrack;
+      var total = this.FlatRowCount;
+      var visible = this.VisibleRowCount;
+      if (total <= visible || track.Height <= 0)
+        return Rectangle.Empty;
+
+      var thumbHeight = Math.Max(20, track.Height * visible / total);
+      var maxTop = total - visible;
+      var travel = track.Height - thumbHeight;
+      var y = track.Y + (maxTop <= 0 ? 0 : travel * Math.Clamp(_topIndex, 0, maxTop) / maxTop);
+      return new Rectangle(track.X, y, track.Width, thumbHeight);
+    }
+  }
+
+  /// <summary>Whether the current view lays cells out in a left-to-right grid.</summary>
+  private bool IsGridView => this.View is ListViewView.LargeIcon or ListViewView.SmallIcon or ListViewView.Tile;
+
+  /// <summary>Whether items are rendered under group headers right now. The List view never
+  /// groups, matching <c>System.Windows.Forms.ListView</c>.</summary>
+  private bool GroupingActive => !this.VirtualMode && this.ShowGroups && this.Groups.Count > 0 && this.View != ListViewView.List;
+
+  /// <summary>The icon size of the large-icon views: the large image list's size, or 32×32.</summary>
+  private Size LargeIconSize => this.LargeImageList?.ImageSize ?? new Size(32, 32);
+
+  /// <summary>The icon size of the small-icon views: the small image list's size, or 16×16.</summary>
+  private Size SmallIconSize => this.SmallImageList?.ImageSize ?? new Size(16, 16);
+
+  /// <summary>
+  /// The pixel size of one item cell in the current view. Details and List cells span the full
+  /// width at <see cref="ItemHeight"/>; the icon views derive their cell from the icon size plus
+  /// the label: LargeIcon centers the icon above one text line, SmallIcon and Tile put a fixed
+  /// label block beside the icon (Tile two lines tall).
+  /// </summary>
+  private Size CellSize {
+    get {
+      switch (this.View) {
+        case ListViewView.LargeIcon: {
+            var icon = this.LargeIconSize;
+            return new(Math.Max(icon.Width + (2 * _LargeIconCellPad), _MinLargeIconCellWidth), icon.Height + _LargeIconLabelGap + this.ItemHeight);
+          }
+
+        case ListViewView.SmallIcon: {
+            var icon = this.SmallIconSize;
+            return new(icon.Width + _IconGap + _SmallIconLabelWidth + (2 * _CellPad), this.ItemHeight);
+          }
+
+        case ListViewView.Tile: {
+            var icon = this.LargeIconSize;
+            return new(icon.Width + _IconGap + _TileLabelWidth + (2 * _CellPad), Math.Max(icon.Height + 4, 2 * this.ItemHeight));
+          }
+
+        default:
+          return new(this.Width, this.ItemHeight);
+      }
+    }
+  }
+
+  /// <summary>The number of cells per row: 1 outside the grid views.</summary>
+  private int ItemsPerRow => this.IsGridView ? Math.Max(1, this.Width / this.CellSize.Width) : 1;
+
+  /// <summary>The check-glyph indent of the inline (non-overlay) views, 0 while checks are off.</summary>
+  private int CheckIndent => this.CheckBoxes ? GlyphRenderer.CheckBoxSize + _CheckGap : 0;
+
+  /// <summary>Raises <see cref="SelectedIndexChanged"/>.</summary>
+  protected virtual void OnSelectedIndexChanged(EventArgs e) => this.SelectedIndexChanged?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="ColumnClick"/>.</summary>
+  protected virtual void OnColumnClick(ColumnClickEventArgs e) => this.ColumnClick?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="ItemCheck"/>.</summary>
+  protected virtual void OnItemCheck(ItemCheckEventArgs e) => this.ItemCheck?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="ItemChecked"/>.</summary>
+  protected virtual void OnItemChecked(ItemCheckedEventArgs e) => this.ItemChecked?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="ItemActivate"/>.</summary>
+  protected virtual void OnItemActivate(EventArgs e) => this.ItemActivate?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="BeforeLabelEdit"/>.</summary>
+  protected virtual void OnBeforeLabelEdit(LabelEditEventArgs e) => this.BeforeLabelEdit?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="AfterLabelEdit"/>.</summary>
+  protected virtual void OnAfterLabelEdit(LabelEditEventArgs e) => this.AfterLabelEdit?.Invoke(this, e);
+
+  // --- Flattened presentation ------------------------------------------------------------------
+  //
+  // Every view paints "flat rows": group header rows interleaved with runs of items (one item per
+  // row in Details/List, up to ItemsPerRow in the grid views). While no grouping is active the
+  // rows are pure arithmetic over the item indices — nothing is materialized, so huge ungrouped
+  // lists cost nothing. With grouping, the display order and rows are flattened lazily into lists
+  // (the TreeRowList idea, localized): structural changes only mark them dirty and the next access
+  // rebuilds, never the paint loop itself.
+
+  /// <summary>One visual row: a group header (<see cref="Count"/> &lt; 0) or a run of display positions.</summary>
+  private readonly struct FlatRow(int groupIndex, int start, int count) {
+    /// <summary>The header's index into <see cref="Groups"/>, or -1 for the default section.</summary>
+    public readonly int GroupIndex = groupIndex;
+
+    /// <summary>The first display position of an item row.</summary>
+    public readonly int Start = start;
+
+    /// <summary>The number of items in the row, or -1 for a header row.</summary>
+    public readonly int Count = count;
+  }
+
+  /// <summary>Rebuilds the display order and flat rows when grouping is active and stale.</summary>
+  private void EnsureFlat() {
+    if (!_flatDirty)
+      return;
+
+    _flatDirty = false;
+    if (!this.GroupingActive) {
+      _displayItems = null;
+      _flatRows = null;
+      this.ClampScroll();
+      return;
     }
 
-    /// <summary>
-    /// Ends a pending label edit, committing the editor's text (or discarding it when
-    /// <paramref name="cancel"/> is set), and raises <see cref="AfterLabelEdit"/> — whose handler
-    /// may still veto the commit. A no-op while no edit is in progress.
-    /// </summary>
-    /// <param name="cancel">Whether to discard the entered text.</param>
-    public void EndEdit(bool cancel)
-    {
-        var index = _editIndex;
-        if (index < 0)
-            return;
+    var display = _displayItems ??= [];
+    var rows = _flatRows ??= [];
+    display.Clear();
+    rows.Clear();
 
-        _editIndex = -1;
-        var editor = _labelEditor!;
-        var text = editor.Text;
-        editor.Visible = false;
+    var groupCount = this.Groups.Count;
+    var buckets = new List<int>?[groupCount + 1];
+    for (var i = 0; i < this.Items.Count; ++i) {
+      var slot = this.IndexOfGroup(this.Items[i].Group);
+      if (slot < 0)
+        slot = groupCount;
 
-        var args = new LabelEditEventArgs(index, cancel ? null : text);
-        this.OnAfterLabelEdit(args);
-        if (!cancel && !args.CancelEdit && index < this.Items.Count)
-            this.Items[index].Text = text;
-
-        this.Invalidate();
+      (buckets[slot] ??= []).Add(i);
     }
 
-    /// <summary>The rectangle the label (and its hosted editor) occupies inside the item's cell.</summary>
-    private Rectangle GetLabelBounds(int index)
-    {
-        var cell = this.GetItemBounds(index);
-        switch (this.View)
-        {
-            case ListViewView.LargeIcon:
-            {
-                var icon = this.LargeIconSize;
-                return new(cell.X + _CellPad, cell.Y + icon.Height + _LargeIconLabelGap, cell.Width - (2 * _CellPad), this.ItemHeight);
-            }
+    var itemsPerRow = this.ItemsPerRow;
+    for (var slot = 0; slot <= groupCount; ++slot) {
+      var bucket = buckets[slot];
+      if (bucket is null || bucket.Count == 0)
+        continue;
 
-            case ListViewView.Tile:
-            {
-                var left = cell.X + _CellPad + this.LargeIconSize.Width + _IconGap;
-                return new(left, cell.Y, Math.Max(0, cell.Right - left - _CellPad), cell.Height / 2);
-            }
+      rows.Add(new FlatRow(slot == groupCount ? -1 : slot, 0, -1));
+      var start = display.Count;
+      display.AddRange(bucket);
+      for (var offset = 0; offset < bucket.Count; offset += itemsPerRow)
+        rows.Add(new FlatRow(-1, start + offset, Math.Min(itemsPerRow, bucket.Count - offset)));
+    }
 
-            default:
-            {
-                var item = this.Items[index];
-                var left = cell.X + _CellPad + this.CheckIndent;
-                if (this.GetIcon(item) is not null)
-                    left += (this.View == ListViewView.SmallIcon ? this.SmallIconSize.Width : cell.Height - 4) + _IconGap;
+    this.ClampScroll();
+  }
 
-                var right = this.View == ListViewView.Details && this.Columns.Count > 0 ? cell.X + this.Columns[0].Width : cell.Right;
-                return new(left, cell.Y, Math.Max(0, right - left - _CellPad), cell.Height);
-            }
+  /// <summary>The index of the group in <see cref="Groups"/>, or -1 (ungrouped/unlisted).</summary>
+  private int IndexOfGroup(ListViewGroup? group) {
+    if (group is null)
+      return -1;
+
+    for (var i = 0; i < this.Groups.Count; ++i)
+      if (ReferenceEquals(this.Groups[i], group))
+        return i;
+
+    return -1;
+  }
+
+  /// <summary>The number of flat rows the current presentation occupies.</summary>
+  private int FlatRowCount {
+    get {
+      this.EnsureFlat();
+      if (_flatRows is { } rows)
+        return rows.Count;
+
+      var itemsPerRow = this.ItemsPerRow;
+      return (this.RowSourceCount + itemsPerRow - 1) / itemsPerRow;
+    }
+  }
+
+  /// <summary>The flat row at the given index.</summary>
+  private FlatRow GetFlatRow(int rowIndex) {
+    if (_flatRows is { } rows)
+      return rows[rowIndex];
+
+    var itemsPerRow = this.ItemsPerRow;
+    var start = rowIndex * itemsPerRow;
+
+    // Clamped at zero: a negative Count is the group-header sentinel, and the unknown-size virtual mode
+    // can shrink RowSourceCount underneath a row the paint loop already scheduled.
+    return new(-1, start, Math.Max(0, Math.Min(itemsPerRow, this.RowSourceCount - start)));
+  }
+
+  /// <summary>The pixel height of a flat row: headers at <see cref="ItemHeight"/>, item rows at the cell height.</summary>
+  private int RowHeightOf(in FlatRow row) => row.Count < 0 ? this.ItemHeight : this.CellSize.Height;
+
+  /// <summary>The model item index at the given display position.</summary>
+  private int DisplayItem(int position) => _displayItems is { } display ? display[position] : position;
+
+  /// <summary>The display position of the given model item index.</summary>
+  private int DisplayPosOf(int itemIndex) {
+    this.EnsureFlat();
+    return _displayItems is { } display ? display.IndexOf(itemIndex) : itemIndex;
+  }
+
+  /// <summary>The flat row containing the given display position, or -1.</summary>
+  private int RowOfDisplayPos(int position) {
+    this.EnsureFlat();
+    if (position < 0)
+      return -1;
+
+    if (_flatRows is not { } rows)
+      return position / this.ItemsPerRow;
+
+    for (var i = 0; i < rows.Count; ++i) {
+      var row = rows[i];
+      if (row.Count > 0 && position >= row.Start && position < row.Start + row.Count)
+        return i;
+    }
+
+    return -1;
+  }
+
+  /// <summary>
+  /// The cell rectangle of the item at the given index, in client coordinates for the current
+  /// scroll position (possibly outside the visible area). Details and List cells span the full
+  /// control width.
+  /// </summary>
+  public Rectangle GetItemBounds(int index) {
+    ArgumentOutOfRangeException.ThrowIfNegative(index);
+    ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.RowSourceCount);
+
+    var position = this.DisplayPosOf(index);
+    var row = this.RowOfDisplayPos(position);
+    var y = this.HeaderHeight;
+    if (row >= _topIndex)
+      for (var r = _topIndex; r < row; ++r)
+        y += this.RowHeightOf(this.GetFlatRow(r));
+    else
+      for (var r = row; r < _topIndex; ++r)
+        y -= this.RowHeightOf(this.GetFlatRow(r));
+
+    var flatRow = this.GetFlatRow(row);
+    var cell = this.CellSize;
+    return new((position - flatRow.Start) * cell.Width, y, cell.Width, this.RowHeightOf(flatRow));
+  }
+
+  /// <summary>Scrolls so the given item index is visible.</summary>
+  public void EnsureVisible(int index) {
+    if (index < 0 || index >= this.RowSourceCount)
+      return;
+
+    var row = this.RowOfDisplayPos(this.DisplayPosOf(index));
+    if (row < 0)
+      return;
+
+    if (row < _topIndex)
+      _topIndex = row;
+    else if (row >= _topIndex + this.VisibleRowCount)
+      _topIndex = row - this.VisibleRowCount + 1;
+
+    this.ClampScroll();
+  }
+
+  private void ClampScroll() {
+    var maxTop = Math.Max(0, this.FlatRowCount - this.VisibleRowCount);
+    _topIndex = Math.Clamp(_topIndex, 0, maxTop);
+  }
+
+  /// <inheritdoc/>
+  private protected override void OnBoundsChanged() => _flatDirty = true;
+
+  /// <inheritdoc/>
+  private protected override void OnUnrealized() {
+    base.OnUnrealized();
+    this.AbandonEdit();
+
+    // A band in flight owns an auto-scroll timer, whose source is the backend that just went away.
+    _marquee?.Dispose();
+    _marquee = null;
+  }
+
+  /// <summary>Drops a pending label edit without committing or raising events — the edited item
+  /// vanished (or the control unrealized), so there is nothing left to commit to.</summary>
+  private void AbandonEdit() {
+    _editIndex = -1;
+    if (_labelEditor is { } editor)
+      editor.Visible = false;
+  }
+
+  // --- Collection bookkeeping ------------------------------------------------------------------
+
+  private void OnItemsChanged(object? sender, ListChangedEventArgs e) {
+    var count = this.Items.Count;
+    var changed = false;
+    switch (e.ChangeType) {
+      case ListChangeType.Added: {
+          var item = this.Items[e.Index];
+          item.Owner = this;
+          item.SetSelectedCore(false);
+          _attachedItems.Insert(e.Index, item);
+
+          var pos = _selectedIndices.BinarySearch(e.Index);
+          for (var i = pos >= 0 ? pos : ~pos; i < _selectedIndices.Count; ++i)
+            ++_selectedIndices[i];
+
+          if (_focusedIndex >= e.Index)
+            ++_focusedIndex;
+          if (_anchorIndex >= e.Index)
+            ++_anchorIndex;
+          if (_editIndex >= e.Index)
+            ++_editIndex;
+          break;
+        }
+
+      case ListChangeType.Removed: {
+          var removed = _attachedItems[e.Index];
+          removed.Owner = null;
+          removed.SetSelectedCore(false);
+          _attachedItems.RemoveAt(e.Index);
+
+          var pos = _selectedIndices.BinarySearch(e.Index);
+          var wasSelected = pos >= 0;
+          if (wasSelected) {
+            _selectedIndices.RemoveAt(pos);
+            changed = true;
+          }
+
+          for (var i = wasSelected ? pos : ~pos; i < _selectedIndices.Count; ++i)
+            --_selectedIndices[i];
+
+          if (_focusedIndex > e.Index)
+            --_focusedIndex;
+          else if (_focusedIndex >= count)
+            _focusedIndex = count - 1;
+
+          if (_anchorIndex > e.Index)
+            --_anchorIndex;
+          else if (_anchorIndex >= count)
+            _anchorIndex = count - 1;
+
+          if (_editIndex == e.Index)
+            this.AbandonEdit();
+          else if (_editIndex > e.Index)
+            --_editIndex;
+          break;
+        }
+
+      case ListChangeType.Replaced: {
+          var old = _attachedItems[e.Index];
+          old.Owner = null;
+          old.SetSelectedCore(false);
+
+          var item = this.Items[e.Index];
+          item.Owner = this;
+          item.SetSelectedCore(false);
+          _attachedItems[e.Index] = item;
+
+          var pos = _selectedIndices.BinarySearch(e.Index);
+          if (pos >= 0) {
+            _selectedIndices.RemoveAt(pos);
+            changed = true;
+          }
+
+          break;
+        }
+
+      case ListChangeType.Reset: {
+          // Covers Clear and the in-place Sort alike: re-attach whatever the list now holds
+          // and rebuild the selection from the per-item flags, which survive a reorder.
+          var oldCount = _selectedIndices.Count;
+          for (var i = 0; i < _attachedItems.Count; ++i)
+            _attachedItems[i].Owner = null;
+
+          _attachedItems.Clear();
+          _selectedIndices.Clear();
+          for (var i = 0; i < count; ++i) {
+            var item = this.Items[i];
+            item.Owner = this;
+            _attachedItems.Add(item);
+            if (item.Selected)
+              _selectedIndices.Add(i);
+          }
+
+          changed = _selectedIndices.Count != oldCount;
+          if (_focusedIndex >= count)
+            _focusedIndex = count - 1;
+          if (_anchorIndex >= count)
+            _anchorIndex = count - 1;
+          if (_editIndex >= count)
+            this.AbandonEdit();
+          break;
         }
     }
 
-    /// <summary>The icon to draw for an item: its explicit image, or its index into the view's image list.</summary>
-    private IImage? GetIcon(ListViewItem item)
-    {
-        // Resolve through CurrentFrameOf: an explicitly assigned image may be an AnimatedImage — what
-        // the decoders return, and what a caller builds for a thumbnail — which describes pixels
-        // rather than being a bitmap the backend can blit. Handed over raw it paints nothing.
-        if (item.Image is { } image)
-            return this.CurrentFrameOf(image);
+    _flatDirty = true;
+    this.Invalidate();
+    if (changed)
+      this.OnSelectedIndexChanged(EventArgs.Empty);
+  }
 
-        var list = this.View is ListViewView.LargeIcon or ListViewView.Tile ? this.LargeImageList : this.SmallImageList;
-        var backend = this.Backend;
-        if (list is null || backend is null)
-            return null;
+  private void OnColumnsChanged(object? sender, ListChangedEventArgs e) => this.Invalidate();
 
-        var index = ImageList.ResolveIndex(list, item.ImageIndex, item.ImageKey);
-        return index >= 0 && index < list.Count ? list.GetImage(index, backend) : null;
+  private void OnGroupsChanged(object? sender, ListChangedEventArgs e) {
+    _flatDirty = true;
+    this.Invalidate();
+  }
+
+  /// <summary>Called by an attached item after its <see cref="ListViewItem.Group"/> changed.</summary>
+  internal void OnItemGroupChanged() {
+    _flatDirty = true;
+    this.Invalidate();
+  }
+
+  // --- Selection core: mutate the sorted index list, keep the item flags aligned ---------------
+
+  /// <summary>Whether the row at the given index is selected.</summary>
+  private bool IsSelected(int index) => _selectedIndices.BinarySearch(index) >= 0;
+
+  /// <summary>Mirrors the selection onto the model item's own flag; a no-op in virtual mode, whose rows
+  /// are transient and carry no persistent flag.</summary>
+  private void SyncItemSelected(int index, bool value) {
+    if (!this.VirtualMode && index >= 0 && index < this.Items.Count)
+      this.Items[index].SetSelectedCore(value);
+  }
+
+  private bool ClearSelectionCore() {
+    if (_selectedIndices.Count == 0)
+      return false;
+
+    for (var i = 0; i < _selectedIndices.Count; ++i)
+      this.SyncItemSelected(_selectedIndices[i], false);
+
+    _selectedIndices.Clear();
+    return true;
+  }
+
+  private bool SelectOnlyCore(int index) {
+    if (_selectedIndices.Count == 1 && _selectedIndices[0] == index)
+      return false;
+
+    this.ClearSelectionCore();
+    _selectedIndices.Add(index);
+    this.SyncItemSelected(index, true);
+    return true;
+  }
+
+  private bool ToggleCore(int index) {
+    var pos = _selectedIndices.BinarySearch(index);
+    if (pos >= 0) {
+      _selectedIndices.RemoveAt(pos);
+      this.SyncItemSelected(index, false);
+    } else {
+      _selectedIndices.Insert(~pos, index);
+      this.SyncItemSelected(index, true);
     }
 
-    // --- Input -----------------------------------------------------------------------------------
+    return true;
+  }
 
-    /// <summary>Finds the item cell at the given client coordinates by walking the visible flat rows.</summary>
-    private int HitTest(int x, int y, out Rectangle cellBounds)
-    {
-        cellBounds = default;
-        if (x < 0 || x >= this.Width)
-            return -1;
+  /// <summary>Adds one index to the sorted selection, reporting whether it was not already there.</summary>
+  private bool AddToSelectionCore(int index) {
+    var position = _selectedIndices.BinarySearch(index);
+    if (position >= 0)
+      return false;
 
-        var yAccum = this.HeaderHeight;
-        if (y < yAccum)
-            return -1;
+    _selectedIndices.Insert(~position, index);
+    this.SyncItemSelected(index, true);
+    return true;
+  }
 
-        var rowCount = this.FlatRowCount;
-        var height = this.Height;
-        var cell = this.CellSize;
-        var grid = this.IsGridView;
-        for (var r = _topIndex; r < rowCount && yAccum < height; ++r)
-        {
-            var row = this.GetFlatRow(r);
-            var rowHeight = this.RowHeightOf(row);
-            if (y < yAccum + rowHeight)
-            {
-                if (row.Count < 0)
-                    return -1; // group header row
+  private bool SelectRangeCore(int from, int to) {
+    var low = Math.Min(from, to);
+    var high = Math.Max(from, to);
+    if (_selectedIndices.Count == high - low + 1 && _selectedIndices[0] == low && _selectedIndices[^1] == high)
+      return false; // sorted and contiguous, so endpoints + count identify the range
 
-                var column = grid ? x / cell.Width : 0;
-                if (column >= row.Count)
-                    return -1;
-
-                cellBounds = new(column * cell.Width, yAccum, cell.Width, rowHeight);
-                return this.DisplayItem(row.Start + column);
-            }
-
-            yAccum += rowHeight;
-        }
-
-        return -1;
+    this.ClearSelectionCore();
+    for (var i = low; i <= high; ++i) {
+      _selectedIndices.Add(i);
+      this.SyncItemSelected(i, true);
     }
 
-    /// <summary>Whether the given point hits the check glyph of the cell (overlay corner in the
-    /// LargeIcon/Tile views, inline leading glyph elsewhere).</summary>
-    private bool IsInCheckGlyph(int x, int y, Rectangle cellBounds)
-    {
-        if (this.View is ListViewView.LargeIcon or ListViewView.Tile)
-            return x >= cellBounds.X + _CellPad && x < cellBounds.X + _CellPad + GlyphRenderer.CheckBoxSize
-                && y >= cellBounds.Y + _CellPad && y < cellBounds.Y + _CellPad + GlyphRenderer.CheckBoxSize;
+    return true;
+  }
 
-        return x >= cellBounds.X + _CellPad && x < cellBounds.X + _CellPad + GlyphRenderer.CheckBoxSize;
+  /// <summary>Ends a user gesture: one repaint and at most one <see cref="SelectedIndexChanged"/>.</summary>
+  private void FinishSelectionGesture(bool changed) {
+    if (!changed)
+      return;
+
+    this.Invalidate();
+    this.OnSelectedIndexChanged(EventArgs.Empty);
+  }
+
+  /// <summary>Applies an attached item's <see cref="ListViewItem.Selected"/> write to the selection.</summary>
+  internal void SetItemSelected(ListViewItem item, bool value) {
+    var index = this.Items.IndexOf(item);
+    if (index < 0) {
+      item.SetSelectedCore(value);
+      return;
     }
 
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        this.Focus();
-        if (e.Button != MouseButtons.Left)
-            return;
+    if (value) {
+      _focusedIndex = index;
+      _anchorIndex = index;
+      if (!this.MultiSelect)
+        this.FinishSelectionGesture(this.SelectOnlyCore(index));
+      else if (!this.IsSelected(index))
+        this.FinishSelectionGesture(this.ToggleCore(index));
+    } else if (this.IsSelected(index))
+      this.FinishSelectionGesture(this.ToggleCore(index));
+  }
 
-        this.EndEdit(cancel: false); // a click anywhere is a commit point for a pending label edit
+  // --- Checkboxes ------------------------------------------------------------------------------
 
-        if (this.ScrollBarVisible && e.X >= this.Width - _ScrollBarWidth && e.Y >= this.HeaderHeight)
-        {
-            this.BeginScrollDrag(e.Y);
-            return;
+  /// <summary>Runs an attached item's <see cref="ListViewItem.Checked"/> write through the vetoable
+  /// <see cref="ItemCheck"/>/<see cref="ItemChecked"/> pipeline.</summary>
+  internal void RequestItemCheck(ListViewItem item, bool value)
+      => this.RequestItemCheckAt(this.Items.IndexOf(item), item, value);
+
+  private void RequestItemCheckAt(int index, ListViewItem item, bool value) {
+    var current = item.Checked;
+    if (current == value)
+      return;
+
+    var args = new ItemCheckEventArgs(index, current, value);
+    this.OnItemCheck(args);
+    if (args.NewValue == current)
+      return;
+
+    item.SetCheckedCore(args.NewValue);
+    this.Invalidate();
+    this.OnItemChecked(new(item));
+  }
+
+  /// <summary>Flips the check state of every selected item (or of the caret item with no selection).</summary>
+  private void ToggleSelectionChecks() {
+    if (this.VirtualMode)
+      return; // transient virtual rows carry no persistent check state
+
+    if (_selectedIndices.Count == 0) {
+      if (_focusedIndex >= 0 && _focusedIndex < this.Items.Count)
+        this.RequestItemCheckAt(_focusedIndex, this.Items[_focusedIndex], !this.Items[_focusedIndex].Checked);
+
+      return;
+    }
+
+    for (var i = 0; i < _selectedIndices.Count; ++i) {
+      var index = _selectedIndices[i];
+      this.RequestItemCheckAt(index, this.Items[index], !this.Items[index].Checked);
+    }
+  }
+
+  // --- Sorting ---------------------------------------------------------------------------------
+
+  /// <summary>
+  /// Sorts <see cref="Items"/> in place — stably — by <see cref="ItemSorter"/> when set, else by
+  /// the active column's text in the <see cref="Sorting"/> direction; a no-op while neither is
+  /// active. Selected items stay selected and the caret follows its item. See the class remarks
+  /// for why this mutates the collection where <see cref="DataGridView"/> sorts by indirection.
+  /// </summary>
+  public void Sort() {
+    var comparison = this.ItemSorter;
+    if (comparison is null) {
+      if (this.Sorting == SortOrder.None)
+        return;
+
+      var column = Math.Max(0, _sortColumn);
+      var descending = this.Sorting == SortOrder.Descending;
+      comparison = (a, b) => {
+        var result = string.CompareOrdinal(GetColumnText(a, column), GetColumnText(b, column));
+        return descending ? -result : result;
+      };
+    }
+
+    if (this.Items.Count > 1) {
+      var focusedItem = _focusedIndex >= 0 && _focusedIndex < this.Items.Count ? this.Items[_focusedIndex] : null;
+      var anchorItem = _anchorIndex >= 0 && _anchorIndex < this.Items.Count ? this.Items[_anchorIndex] : null;
+
+      this.Items.Sort(comparison); // one Reset; the handler re-derives the selection from the item flags
+
+      if (focusedItem is not null)
+        _focusedIndex = this.Items.IndexOf(focusedItem);
+      if (anchorItem is not null)
+        _anchorIndex = this.Items.IndexOf(anchorItem);
+    }
+
+    this.Invalidate();
+  }
+
+  /// <summary>The text the given column shows for an item: the label, or the mapped sub-item.</summary>
+  private static string GetColumnText(ListViewItem item, int column)
+      => column <= 0 ? item.Text : column - 1 < item.SubItems.Count ? item.SubItems[column - 1] : string.Empty;
+
+  /// <summary>Handles a click in the Details header band: <see cref="ColumnClick"/>, then the
+  /// automatic sort when one is active (repeat clicks on the sorted column flip the direction).</summary>
+  private void HandleHeaderClick(int x) {
+    var columnIndex = -1;
+    var left = 0;
+    for (var c = 0; c < this.Columns.Count; ++c) {
+      var width = this.Columns[c].Width;
+      if (x >= left && x < left + width) {
+        columnIndex = c;
+        break;
+      }
+
+      left += width;
+    }
+
+    if (columnIndex < 0)
+      return;
+
+    this.OnColumnClick(new(columnIndex));
+
+    var hasSorter = this.ItemSorter is not null;
+    if (!hasSorter && this.Sorting == SortOrder.None)
+      return;
+
+    if (!hasSorter && columnIndex == _sortColumn) {
+      this.Sorting = this.Sorting == SortOrder.Ascending ? SortOrder.Descending : SortOrder.Ascending;
+      return;
+    }
+
+    _sortColumn = columnIndex;
+    this.Sort();
+  }
+
+  // --- Label editing ---------------------------------------------------------------------------
+
+  /// <summary>
+  /// Starts editing the given item's label: a hosted native text box appears over the label,
+  /// pre-filled and fully selected. <see cref="BeforeLabelEdit"/> runs first and may veto the
+  /// edit. See the class remarks for the commit points.
+  /// </summary>
+  /// <exception cref="InvalidOperationException"><see cref="LabelEdit"/> is disabled.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">The index is out of range.</exception>
+  public void BeginEdit(int index) {
+    if (!this.LabelEdit)
+      throw new InvalidOperationException("LabelEdit must be enabled to edit item labels.");
+
+    if (this.VirtualMode)
+      throw new InvalidOperationException("Label editing is unavailable in virtual mode.");
+
+    ArgumentOutOfRangeException.ThrowIfNegative(index);
+    ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, this.Items.Count);
+
+    this.EndEdit(cancel: false);
+
+    var pending = new LabelEditEventArgs(index, this.Items[index].Text);
+    this.OnBeforeLabelEdit(pending);
+    if (pending.CancelEdit)
+      return;
+
+    this.EnsureVisible(index);
+
+    var editor = _labelEditor;
+    if (editor is null) {
+      _labelEditor = editor = new() { Visible = false, TabStop = false };
+      this.Controls.Add(editor);
+    }
+
+    _editIndex = index;
+    var text = this.Items[index].Text;
+    editor.Bounds = this.GetLabelBounds(index);
+    editor.Text = text;
+    editor.SelectionStart = 0;
+    editor.SelectionLength = text.Length;
+    editor.Visible = true;
+    this.Invalidate();
+  }
+
+  /// <summary>
+  /// Ends a pending label edit, committing the editor's text (or discarding it when
+  /// <paramref name="cancel"/> is set), and raises <see cref="AfterLabelEdit"/> — whose handler
+  /// may still veto the commit. A no-op while no edit is in progress.
+  /// </summary>
+  /// <param name="cancel">Whether to discard the entered text.</param>
+  public void EndEdit(bool cancel) {
+    var index = _editIndex;
+    if (index < 0)
+      return;
+
+    _editIndex = -1;
+    var editor = _labelEditor!;
+    var text = editor.Text;
+    editor.Visible = false;
+
+    var args = new LabelEditEventArgs(index, cancel ? null : text);
+    this.OnAfterLabelEdit(args);
+    if (!cancel && !args.CancelEdit && index < this.Items.Count)
+      this.Items[index].Text = text;
+
+    this.Invalidate();
+  }
+
+  /// <summary>The rectangle the label (and its hosted editor) occupies inside the item's cell.</summary>
+  private Rectangle GetLabelBounds(int index) {
+    var cell = this.GetItemBounds(index);
+    switch (this.View) {
+      case ListViewView.LargeIcon: {
+          var icon = this.LargeIconSize;
+          return new(cell.X + _CellPad, cell.Y + icon.Height + _LargeIconLabelGap, cell.Width - (2 * _CellPad), this.ItemHeight);
         }
 
-        if (this.View == ListViewView.Details && this.ShowColumnHeaders && e.Y < this.HeaderHeight)
-        {
-            this.HandleHeaderClick(e.X);
-            return;
+      case ListViewView.Tile: {
+          var left = cell.X + _CellPad + this.LargeIconSize.Width + _IconGap;
+          return new(left, cell.Y, Math.Max(0, cell.Right - left - _CellPad), cell.Height / 2);
         }
 
-        var index = this.HitTest(e.X, e.Y, out var cellBounds);
-        if (index < 0)
-        {
-            _lastClickIndex = -1;
+      default: {
+          var item = this.Items[index];
+          var left = cell.X + _CellPad + this.CheckIndent;
+          if (this.GetIcon(item) is not null)
+            left += (this.View == ListViewView.SmallIcon ? this.SmallIconSize.Width : cell.Height - 4) + _IconGap;
 
-            // Empty space is where a rubber band starts, exactly as it does in a file manager: a press
-            // on an item means "drag the item", so only the gaps are free to sweep.
-            this.BeginMarquee(e);
-            return;
+          var right = this.View == ListViewView.Details && this.Columns.Count > 0 ? cell.X + this.Columns[0].Width : cell.Right;
+          return new(left, cell.Y, Math.Max(0, right - left - _CellPad), cell.Height);
         }
+    }
+  }
 
-        if (this.CheckBoxes && !this.VirtualMode && this.IsInCheckGlyph(e.X, e.Y, cellBounds))
-        {
-            _lastClickIndex = -1;
-            this.RequestItemCheckAt(index, this.Items[index], !this.Items[index].Checked);
-            return;
-        }
+  /// <summary>The icon to draw for an item: its explicit image, or its index into the view's image list.</summary>
+  private IImage? GetIcon(ListViewItem item) {
+    // Resolve through CurrentFrameOf: an explicitly assigned image may be an AnimatedImage — what
+    // the decoders return, and what a caller builds for a thumbnail — which describes pixels
+    // rather than being a bitmap the backend can blit. Handed over raw it paints nothing.
+    if (item.Image is { } image)
+      return this.CurrentFrameOf(image);
 
-        _focusedIndex = index;
-        if (this.MultiSelect && e.Shift)
-        {
-            if (_anchorIndex < 0)
-                _anchorIndex = index;
+    var list = this.View is ListViewView.LargeIcon or ListViewView.Tile ? this.LargeImageList : this.SmallImageList;
+    var backend = this.Backend;
+    if (list is null || backend is null)
+      return null;
 
-            this.FinishSelectionGesture(this.SelectRangeCore(_anchorIndex, index));
-            return;
-        }
+    var index = ImageList.ResolveIndex(list, item.ImageIndex, item.ImageKey);
+    return index >= 0 && index < list.Count ? list.GetImage(index, backend) : null;
+  }
 
+  // --- Input -----------------------------------------------------------------------------------
+
+  /// <summary>Finds the item cell at the given client coordinates by walking the visible flat rows.</summary>
+  private int HitTest(int x, int y, out Rectangle cellBounds) {
+    cellBounds = default;
+    if (x < 0 || x >= this.Width)
+      return -1;
+
+    var yAccum = this.HeaderHeight;
+    if (y < yAccum)
+      return -1;
+
+    var rowCount = this.FlatRowCount;
+    var height = this.Height;
+    var cell = this.CellSize;
+    var grid = this.IsGridView;
+    for (var r = _topIndex; r < rowCount && yAccum < height; ++r) {
+      var row = this.GetFlatRow(r);
+      var rowHeight = this.RowHeightOf(row);
+      if (y < yAccum + rowHeight) {
+        if (row.Count < 0)
+          return -1; // group header row
+
+        var column = grid ? x / cell.Width : 0;
+        if (column >= row.Count)
+          return -1;
+
+        cellBounds = new(column * cell.Width, yAccum, cell.Width, rowHeight);
+        return this.DisplayItem(row.Start + column);
+      }
+
+      yAccum += rowHeight;
+    }
+
+    return -1;
+  }
+
+  /// <summary>Whether the given point hits the check glyph of the cell (overlay corner in the
+  /// LargeIcon/Tile views, inline leading glyph elsewhere).</summary>
+  private bool IsInCheckGlyph(int x, int y, Rectangle cellBounds) {
+    if (this.View is ListViewView.LargeIcon or ListViewView.Tile)
+      return x >= cellBounds.X + _CellPad && x < cellBounds.X + _CellPad + GlyphRenderer.CheckBoxSize
+          && y >= cellBounds.Y + _CellPad && y < cellBounds.Y + _CellPad + GlyphRenderer.CheckBoxSize;
+
+    return x >= cellBounds.X + _CellPad && x < cellBounds.X + _CellPad + GlyphRenderer.CheckBoxSize;
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) {
+    this.Focus();
+    if (e.Button != MouseButtons.Left)
+      return;
+
+    this.EndEdit(cancel: false); // a click anywhere is a commit point for a pending label edit
+
+    if (this.ScrollBarVisible && e.X >= this.Width - _ScrollBarWidth && e.Y >= this.HeaderHeight) {
+      this.BeginScrollDrag(e.Y);
+      return;
+    }
+
+    if (this.View == ListViewView.Details && this.ShowColumnHeaders && e.Y < this.HeaderHeight) {
+      this.HandleHeaderClick(e.X);
+      return;
+    }
+
+    var index = this.HitTest(e.X, e.Y, out var cellBounds);
+    if (index < 0) {
+      _lastClickIndex = -1;
+
+      // Empty space is where a rubber band starts, exactly as it does in a file manager: a press
+      // on an item means "drag the item", so only the gaps are free to sweep.
+      this.BeginMarquee(e);
+      return;
+    }
+
+    if (this.CheckBoxes && !this.VirtualMode && this.IsInCheckGlyph(e.X, e.Y, cellBounds)) {
+      _lastClickIndex = -1;
+      this.RequestItemCheckAt(index, this.Items[index], !this.Items[index].Checked);
+      return;
+    }
+
+    _focusedIndex = index;
+    if (this.MultiSelect && e.Shift) {
+      if (_anchorIndex < 0)
         _anchorIndex = index;
-        this.FinishSelectionGesture(this.MultiSelect && e.Control ? this.ToggleCore(index) : this.SelectOnlyCore(index));
 
-        var now = Environment.TickCount64;
-        if (index == _lastClickIndex && now - _lastClickTicks <= _DoubleClickMs)
-        {
-            _lastClickIndex = -1;
-            this.OnItemActivate(EventArgs.Empty);
-            return;
+      this.FinishSelectionGesture(this.SelectRangeCore(_anchorIndex, index));
+      return;
+    }
+
+    _anchorIndex = index;
+    this.FinishSelectionGesture(this.MultiSelect && e.Control ? this.ToggleCore(index) : this.SelectOnlyCore(index));
+
+    var now = Environment.TickCount64;
+    if (index == _lastClickIndex && now - _lastClickTicks <= _DoubleClickMs) {
+      _lastClickIndex = -1;
+      this.OnItemActivate(EventArgs.Empty);
+      return;
+    }
+
+    _lastClickIndex = index;
+    _lastClickTicks = now;
+  }
+
+  // Starts a thumb drag, or pages toward a click on the track above/below the thumb.
+  private void BeginScrollDrag(int y) {
+    var thumb = this.ScrollThumb;
+    if (thumb.IsEmpty)
+      return;
+
+    if (y < thumb.Y)
+      _topIndex -= this.VisibleRowCount;
+    else if (y >= thumb.Bottom)
+      _topIndex += this.VisibleRowCount;
+    else {
+      _draggingScroll = true;
+      _scrollDragOffset = y - thumb.Y;
+    }
+
+    this.ClampScroll();
+    this.Invalidate();
+  }
+
+  private void ScrollDragTo(int y) {
+    var track = this.ScrollTrack;
+    var total = this.FlatRowCount;
+    var visible = this.VisibleRowCount;
+    var maxTop = total - visible;
+    if (maxTop <= 0)
+      return;
+
+    var thumbHeight = Math.Max(20, track.Height * visible / total);
+    var travel = track.Height - thumbHeight;
+    _topIndex = travel <= 0 ? 0 : (y - _scrollDragOffset - track.Y) * maxTop / travel;
+    this.ClampScroll();
+    this.Invalidate();
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseMove(MouseEventArgs e) {
+    if (_draggingScroll) {
+      this.ScrollDragTo(e.Y);
+      return;
+    }
+
+    this.DragMarquee(e);
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseUp(MouseEventArgs e) {
+    _draggingScroll = false;
+    this.EndMarquee();
+  }
+
+  // --- Rubber-band selection -------------------------------------------------------------------
+
+  /// <summary>
+  /// Arms a rubber band at the press point, snapshotting the selection <em>before</em> the press
+  /// changes it. Nothing is selected or deselected until the pointer passes
+  /// <see cref="MarqueeDrag.Threshold"/>, so a plain click on empty space behaves as it always did.
+  /// </summary>
+  private void BeginMarquee(MouseEventArgs e) {
+    if (!this.MultiSelect)
+      return;
+
+    var combine = (e.Modifiers & KeyModifiers.Control) != 0
+        ? MarqueeCombine.Toggle
+        : (e.Modifiers & KeyModifiers.Shift) != 0
+            ? MarqueeCombine.Add
+            : MarqueeCombine.Replace;
+
+    _marquee?.Dispose();
+    _marquee = new(new(e.X, e.Y), combine, [.. _selectedIndices]);
+  }
+
+  /// <summary>Grows the band to the pointer and re-derives the selection it implies.</summary>
+  private void DragMarquee(MouseEventArgs e) {
+    var drag = _marquee;
+    if (drag is null)
+      return;
+
+    if (!drag.MoveTo(new(e.X, e.Y)))
+      return;
+
+    this.ApplyMarquee();
+    drag.AutoScroll(this.Backend, this.OnMarqueeScroll, e.Y < this.HeaderHeight || e.Y >= this.Height);
+    this.Invalidate();
+  }
+
+  /// <summary>Ends the gesture, keeping whatever the band last selected.</summary>
+  private void EndMarquee() {
+    var drag = _marquee;
+    if (drag is null)
+      return;
+
+    _marquee = null;
+    var swept = drag.Active;
+    drag.Dispose();
+
+    if (swept)
+      this.Invalidate();
+  }
+
+  /// <summary>Scrolls one row while the pointer sits outside the viewport, and re-sweeps the band.</summary>
+  private void OnMarqueeScroll(object? sender, EventArgs e) {
+    var drag = _marquee;
+    if (drag is null)
+      return;
+
+    _topIndex += drag.Current.Y < this.HeaderHeight ? -1 : 1;
+    this.ClampScroll();
+    this.ApplyMarquee();
+    this.Invalidate();
+  }
+
+  /// <summary>
+  /// Replaces the selection with the one the band implies, at most one
+  /// <see cref="SelectedIndexChanged"/> per move.
+  /// </summary>
+  private void ApplyMarquee() {
+    var drag = _marquee;
+    if (drag is null || !drag.Active)
+      return;
+
+    this.CollectBandItems(drag.Band, drag.Covered);
+    drag.BuildDesired(static _ => true);
+    if (drag.Matches(_selectedIndices))
+      return;
+
+    this.ClearSelectionCore();
+    foreach (var index in drag.Desired)
+      this.AddToSelectionCore(index);
+
+    this.FinishSelectionGesture(true);
+  }
+
+  /// <summary>
+  /// Collects the items whose cells the band touches, walking the visible flat rows once. Only the
+  /// visible ones can be touched — the band lives in client coordinates — so this costs a screenful
+  /// rather than the whole list, which is what keeps a band over a virtual list of a million rows
+  /// as cheap as one over ten.
+  /// </summary>
+  private void CollectBandItems(Rectangle band, List<int> into) {
+    into.Clear();
+
+    var rowCount = this.FlatRowCount;
+    var height = this.Height;
+    var cell = this.CellSize;
+    var y = this.HeaderHeight;
+
+    for (var r = _topIndex; r < rowCount && y < height; ++r) {
+      var row = this.GetFlatRow(r);
+      var rowHeight = this.RowHeightOf(row);
+      if (row.Count == 0)
+        break; // the row source ran out, as in the paint walk
+
+      if (row.Count > 0 && band.Y < y + rowHeight && band.Bottom > y)
+        for (var k = 0; k < row.Count; ++k) {
+          var left = k * cell.Width;
+          if (band.X < left + cell.Width && band.Right > left)
+            into.Add(this.DisplayItem(row.Start + k));
         }
 
-        _lastClickIndex = index;
-        _lastClickTicks = now;
+      y += rowHeight;
     }
+  }
 
-    // Starts a thumb drag, or pages toward a click on the track above/below the thumb.
-    private void BeginScrollDrag(int y)
-    {
-        var thumb = this.ScrollThumb;
-        if (thumb.IsEmpty)
-            return;
+  /// <inheritdoc/>
+  protected override void OnMouseWheel(MouseEventArgs e) {
+    _topIndex -= Math.Sign(e.Delta) * 3;
+    this.ClampScroll();
+    this.Invalidate();
+  }
 
-        if (y < thumb.Y)
-            _topIndex -= this.VisibleRowCount;
-        else if (y >= thumb.Bottom)
-            _topIndex += this.VisibleRowCount;
-        else
-        {
-            _draggingScroll = true;
-            _scrollDragOffset = y - thumb.Y;
-        }
-
-        this.ClampScroll();
-        this.Invalidate();
-    }
-
-    private void ScrollDragTo(int y)
-    {
-        var track = this.ScrollTrack;
-        var total = this.FlatRowCount;
-        var visible = this.VisibleRowCount;
-        var maxTop = total - visible;
-        if (maxTop <= 0)
-            return;
-
-        var thumbHeight = Math.Max(20, track.Height * visible / total);
-        var travel = track.Height - thumbHeight;
-        _topIndex = travel <= 0 ? 0 : (y - _scrollDragOffset - track.Y) * maxTop / travel;
-        this.ClampScroll();
-        this.Invalidate();
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseMove(MouseEventArgs e)
-    {
-        if (_draggingScroll)
-        {
-            this.ScrollDragTo(e.Y);
-            return;
-        }
-
-        this.DragMarquee(e);
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        _draggingScroll = false;
-        this.EndMarquee();
-    }
-
-    // --- Rubber-band selection -------------------------------------------------------------------
-
-    /// <summary>
-    /// Arms a rubber band at the press point, snapshotting the selection <em>before</em> the press
-    /// changes it. Nothing is selected or deselected until the pointer passes
-    /// <see cref="MarqueeDrag.Threshold"/>, so a plain click on empty space behaves as it always did.
-    /// </summary>
-    private void BeginMarquee(MouseEventArgs e)
-    {
-        if (!this.MultiSelect)
-            return;
-
-        var combine = (e.Modifiers & KeyModifiers.Control) != 0
-            ? MarqueeCombine.Toggle
-            : (e.Modifiers & KeyModifiers.Shift) != 0
-                ? MarqueeCombine.Add
-                : MarqueeCombine.Replace;
-
-        _marquee?.Dispose();
-        _marquee = new(new(e.X, e.Y), combine, [.. _selectedIndices]);
-    }
-
-    /// <summary>Grows the band to the pointer and re-derives the selection it implies.</summary>
-    private void DragMarquee(MouseEventArgs e)
-    {
-        var drag = _marquee;
-        if (drag is null)
-            return;
-
-        if (!drag.MoveTo(new(e.X, e.Y)))
-            return;
-
-        this.ApplyMarquee();
-        drag.AutoScroll(this.Backend, this.OnMarqueeScroll, e.Y < this.HeaderHeight || e.Y >= this.Height);
-        this.Invalidate();
-    }
-
-    /// <summary>Ends the gesture, keeping whatever the band last selected.</summary>
-    private void EndMarquee()
-    {
-        var drag = _marquee;
-        if (drag is null)
-            return;
-
-        _marquee = null;
-        var swept = drag.Active;
-        drag.Dispose();
-
-        if (swept)
-            this.Invalidate();
-    }
-
-    /// <summary>Scrolls one row while the pointer sits outside the viewport, and re-sweeps the band.</summary>
-    private void OnMarqueeScroll(object? sender, EventArgs e)
-    {
-        var drag = _marquee;
-        if (drag is null)
-            return;
-
-        _topIndex += drag.Current.Y < this.HeaderHeight ? -1 : 1;
-        this.ClampScroll();
-        this.ApplyMarquee();
-        this.Invalidate();
-    }
-
-    /// <summary>
-    /// Replaces the selection with the one the band implies, at most one
-    /// <see cref="SelectedIndexChanged"/> per move.
-    /// </summary>
-    private void ApplyMarquee()
-    {
-        var drag = _marquee;
-        if (drag is null || !drag.Active)
-            return;
-
-        this.CollectBandItems(drag.Band, drag.Covered);
-        drag.BuildDesired(static _ => true);
-        if (drag.Matches(_selectedIndices))
-            return;
-
-        this.ClearSelectionCore();
-        foreach (var index in drag.Desired)
-            this.AddToSelectionCore(index);
-
-        this.FinishSelectionGesture(true);
-    }
-
-    /// <summary>
-    /// Collects the items whose cells the band touches, walking the visible flat rows once. Only the
-    /// visible ones can be touched — the band lives in client coordinates — so this costs a screenful
-    /// rather than the whole list, which is what keeps a band over a virtual list of a million rows
-    /// as cheap as one over ten.
-    /// </summary>
-    private void CollectBandItems(Rectangle band, List<int> into)
-    {
-        into.Clear();
-
-        var rowCount = this.FlatRowCount;
-        var height = this.Height;
-        var cell = this.CellSize;
-        var y = this.HeaderHeight;
-
-        for (var r = _topIndex; r < rowCount && y < height; ++r)
-        {
-            var row = this.GetFlatRow(r);
-            var rowHeight = this.RowHeightOf(row);
-            if (row.Count == 0)
-                break; // the row source ran out, as in the paint walk
-
-            if (row.Count > 0 && band.Y < y + rowHeight && band.Bottom > y)
-                for (var k = 0; k < row.Count; ++k)
-                {
-                    var left = k * cell.Width;
-                    if (band.X < left + cell.Width && band.Right > left)
-                        into.Add(this.DisplayItem(row.Start + k));
-                }
-
-            y += rowHeight;
-        }
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseWheel(MouseEventArgs e)
-    {
-        _topIndex -= Math.Sign(e.Delta) * 3;
-        this.ClampScroll();
-        this.Invalidate();
-    }
-
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (_editIndex >= 0)
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                this.EndEdit(cancel: false);
-                e.Handled = true;
-            }
-            else if (e.KeyCode == Keys.Escape)
-            {
-                this.EndEdit(cancel: true);
-                e.Handled = true;
-            }
-
-            return;
-        }
-
-        var count = this.RowSourceCount;
-        if (e.KeyCode == Keys.Enter)
-        {
-            if (_focusedIndex >= 0 && _focusedIndex < count)
-            {
-                this.OnItemActivate(EventArgs.Empty);
-                e.Handled = true;
-            }
-
-            return;
-        }
-
-        if (e.KeyCode == Keys.Space)
-        {
-            if (this.CheckBoxes)
-            {
-                this.ToggleSelectionChecks();
-                e.Handled = true;
-            }
-            else if (this.MultiSelect && _focusedIndex >= 0 && _focusedIndex < count)
-            {
-                _anchorIndex = _focusedIndex;
-                this.FinishSelectionGesture(this.ToggleCore(_focusedIndex));
-                e.Handled = true;
-            }
-
-            return;
-        }
-
-        if (e.KeyCode == Keys.F2 && this.LabelEdit && !this.VirtualMode && _focusedIndex >= 0 && _focusedIndex < count)
-        {
-            this.BeginEdit(_focusedIndex);
-            e.Handled = true;
-            return;
-        }
-
-        this.EnsureFlat(); // navigation maps through the display order
-        var grid = this.IsGridView;
-        var columns = this.ItemsPerRow;
-        var position = _focusedIndex >= 0 ? this.DisplayPosOf(_focusedIndex) : -1;
-        int target;
-        switch (e.KeyCode)
-        {
-            case Keys.Down: target = position < 0 ? 0 : Math.Min(count - 1, position + columns); break;
-            case Keys.Up: target = position < 0 ? 0 : Math.Max(0, position - columns); break;
-            case Keys.Right when grid: target = position < 0 ? 0 : Math.Min(count - 1, position + 1); break;
-            case Keys.Left when grid: target = position < 0 ? 0 : Math.Max(0, position - 1); break;
-            case Keys.Home: target = 0; break;
-            case Keys.End: target = count - 1; break;
-            case Keys.PageDown: target = position < 0 ? 0 : Math.Min(count - 1, position + (columns * this.VisibleRowCount)); break;
-            case Keys.PageUp: target = position < 0 ? 0 : Math.Max(0, position - (columns * this.VisibleRowCount)); break;
-            default: return;
-        }
-
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    if (_editIndex >= 0) {
+      if (e.KeyCode == Keys.Enter) {
+        this.EndEdit(cancel: false);
         e.Handled = true;
-        if (target < 0 || target >= count)
-            return;
+      } else if (e.KeyCode == Keys.Escape) {
+        this.EndEdit(cancel: true);
+        e.Handled = true;
+      }
 
-        var itemIndex = this.DisplayItem(target);
-        _focusedIndex = itemIndex;
-        this.EnsureVisible(itemIndex);
-        if (this.MultiSelect && e.Shift)
-        {
-            if (_anchorIndex < 0)
-                _anchorIndex = itemIndex;
+      return;
+    }
 
-            this.FinishSelectionGesture(this.SelectRangeCore(_anchorIndex, itemIndex));
-            return;
-        }
+    var count = this.RowSourceCount;
+    if (e.KeyCode == Keys.Enter) {
+      if (_focusedIndex >= 0 && _focusedIndex < count) {
+        this.OnItemActivate(EventArgs.Empty);
+        e.Handled = true;
+      }
 
+      return;
+    }
+
+    if (e.KeyCode == Keys.Space) {
+      if (this.CheckBoxes) {
+        this.ToggleSelectionChecks();
+        e.Handled = true;
+      } else if (this.MultiSelect && _focusedIndex >= 0 && _focusedIndex < count) {
+        _anchorIndex = _focusedIndex;
+        this.FinishSelectionGesture(this.ToggleCore(_focusedIndex));
+        e.Handled = true;
+      }
+
+      return;
+    }
+
+    if (e.KeyCode == Keys.F2 && this.LabelEdit && !this.VirtualMode && _focusedIndex >= 0 && _focusedIndex < count) {
+      this.BeginEdit(_focusedIndex);
+      e.Handled = true;
+      return;
+    }
+
+    this.EnsureFlat(); // navigation maps through the display order
+    var grid = this.IsGridView;
+    var columns = this.ItemsPerRow;
+    var position = _focusedIndex >= 0 ? this.DisplayPosOf(_focusedIndex) : -1;
+    int target;
+    switch (e.KeyCode) {
+      case Keys.Down: target = position < 0 ? 0 : Math.Min(count - 1, position + columns); break;
+      case Keys.Up: target = position < 0 ? 0 : Math.Max(0, position - columns); break;
+      case Keys.Right when grid: target = position < 0 ? 0 : Math.Min(count - 1, position + 1); break;
+      case Keys.Left when grid: target = position < 0 ? 0 : Math.Max(0, position - 1); break;
+      case Keys.Home: target = 0; break;
+      case Keys.End: target = count - 1; break;
+      case Keys.PageDown: target = position < 0 ? 0 : Math.Min(count - 1, position + (columns * this.VisibleRowCount)); break;
+      case Keys.PageUp: target = position < 0 ? 0 : Math.Max(0, position - (columns * this.VisibleRowCount)); break;
+      default: return;
+    }
+
+    e.Handled = true;
+    if (target < 0 || target >= count)
+      return;
+
+    var itemIndex = this.DisplayItem(target);
+    _focusedIndex = itemIndex;
+    this.EnsureVisible(itemIndex);
+    if (this.MultiSelect && e.Shift) {
+      if (_anchorIndex < 0)
         _anchorIndex = itemIndex;
-        this.FinishSelectionGesture(this.SelectOnlyCore(itemIndex));
+
+      this.FinishSelectionGesture(this.SelectRangeCore(_anchorIndex, itemIndex));
+      return;
     }
 
-    // --- Painting --------------------------------------------------------------------------------
+    _anchorIndex = itemIndex;
+    this.FinishSelectionGesture(this.SelectOnlyCore(itemIndex));
+  }
 
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        var width = this.Width;
-        var height = this.Height;
-        g.FillRectangle(this.BackColor, new Rectangle(0, 0, width, height));
+  // --- Painting --------------------------------------------------------------------------------
 
-        var headerHeight = this.HeaderHeight;
-        if (headerHeight > 0)
-        {
-            HeaderRowPainter.Draw(g, theme, this.Columns, width, headerHeight);
-            this.PaintSortArrow(g, theme, headerHeight);
-        }
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var theme = this.Theme;
+    var width = this.Width;
+    var height = this.Height;
+    g.FillRectangle(this.BackColor, new Rectangle(0, 0, width, height));
 
-        var rowCount = this.FlatRowCount;
-        var cell = this.CellSize;
-        var y = headerHeight;
-
-        // Rows span the full width, so clip them off the scroll bar's gutter instead of letting a long label
-        // run underneath the thumb.
-        var gutter = this.ScrollBarVisible ? _ScrollBarWidth : 0;
-        if (gutter > 0)
-            g.PushClip(new Rectangle(0, 0, Math.Max(0, width - gutter), height));
-
-        for (var r = _topIndex; r < rowCount && y < height; ++r)
-        {
-            var row = this.GetFlatRow(r);
-            var rowHeight = this.RowHeightOf(row);
-            if (row.Count < 0)
-                this.PaintGroupHeader(g, theme, row.GroupIndex, y, rowHeight);
-            else if (row.Count == 0)
-                break; // the row source ran out (unknown-size virtual mode discovers the end as it paints)
-            else
-                for (var k = 0; k < row.Count; ++k)
-                    this.PaintItem(g, theme, this.DisplayItem(row.Start + k), k * cell.Width, y, cell.Width, rowHeight);
-
-            y += rowHeight;
-        }
-
-        if (_marquee is { Active: true } marquee)
-            GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band, theme.FieldBackground);
-
-        if (gutter > 0)
-            g.PopClip();
-
-        this.PaintScrollBar(g, theme);
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
+    var headerHeight = this.HeaderHeight;
+    if (headerHeight > 0) {
+      HeaderRowPainter.Draw(g, theme, this.Columns, width, headerHeight);
+      this.PaintSortArrow(g, theme, headerHeight);
     }
 
-    private void PaintScrollBar(IGraphics g, ITheme theme)
-    {
-        if (!this.ScrollBarVisible)
-            return;
+    var rowCount = this.FlatRowCount;
+    var cell = this.CellSize;
+    var y = headerHeight;
 
-        var track = this.ScrollTrack;
-        g.FillRectangle(theme.ControlBackground, track);
-        g.DrawLine(theme.Border, track.X, track.Y, track.X, track.Bottom);
+    // Rows span the full width, so clip them off the scroll bar's gutter instead of letting a long label
+    // run underneath the thumb.
+    var gutter = this.ScrollBarVisible ? _ScrollBarWidth : 0;
+    if (gutter > 0)
+      g.PushClip(new Rectangle(0, 0, Math.Max(0, width - gutter), height));
 
-        var thumb = this.ScrollThumb;
-        if (!thumb.IsEmpty)
-            g.FillRoundedRectangle(theme.Border, new Rectangle(thumb.X + 2, thumb.Y + 1, thumb.Width - 4, thumb.Height - 2), (thumb.Width - 4) / 2);
+    for (var r = _topIndex; r < rowCount && y < height; ++r) {
+      var row = this.GetFlatRow(r);
+      var rowHeight = this.RowHeightOf(row);
+      if (row.Count < 0)
+        this.PaintGroupHeader(g, theme, row.GroupIndex, y, rowHeight);
+      else if (row.Count == 0)
+        break; // the row source ran out (unknown-size virtual mode discovers the end as it paints)
+      else
+        for (var k = 0; k < row.Count; ++k)
+          this.PaintItem(g, theme, this.DisplayItem(row.Start + k), k * cell.Width, y, cell.Width, rowHeight);
+
+      y += rowHeight;
     }
 
-    /// <summary>Draws the themed direction triangle on the active sort column's header.</summary>
-    private void PaintSortArrow(IGraphics g, ITheme theme, int headerHeight)
-    {
-        if (_sortColumn < 0 || _sortColumn >= this.Columns.Count)
-            return;
+    if (_marquee is { Active: true } marquee)
+      GlyphRenderer.DrawSelectionBand(g, theme, marquee.Band, theme.FieldBackground);
 
-        if (this.ItemSorter is null && this.Sorting == SortOrder.None)
-            return;
+    if (gutter > 0)
+      g.PopClip();
 
-        var left = 0;
-        for (var c = 0; c < _sortColumn; ++c)
-            left += this.Columns[c].Width;
+    this.PaintScrollBar(g, theme);
+    g.DrawRectangle(theme.Border, new Rectangle(0, 0, width - 1, height - 1));
+  }
 
-        var ascending = this.ItemSorter is not null || this.Sorting == SortOrder.Ascending;
-        GlyphRenderer.DrawSortArrow(g, theme.HeaderText, new Rectangle(left + this.Columns[_sortColumn].Width - 14, 0, _SortArrowWidth, headerHeight), ascending);
+  private void PaintScrollBar(IGraphics g, ITheme theme) {
+    if (!this.ScrollBarVisible)
+      return;
+
+    var track = this.ScrollTrack;
+    g.FillRectangle(theme.ControlBackground, track);
+    g.DrawLine(theme.Border, track.X, track.Y, track.X, track.Bottom);
+
+    var thumb = this.ScrollThumb;
+    if (!thumb.IsEmpty)
+      g.FillRoundedRectangle(theme.Border, new Rectangle(thumb.X + 2, thumb.Y + 1, thumb.Width - 4, thumb.Height - 2), (thumb.Width - 4) / 2);
+  }
+
+  /// <summary>Draws the themed direction triangle on the active sort column's header.</summary>
+  private void PaintSortArrow(IGraphics g, ITheme theme, int headerHeight) {
+    if (_sortColumn < 0 || _sortColumn >= this.Columns.Count)
+      return;
+
+    if (this.ItemSorter is null && this.Sorting == SortOrder.None)
+      return;
+
+    var left = 0;
+    for (var c = 0; c < _sortColumn; ++c)
+      left += this.Columns[c].Width;
+
+    var ascending = this.ItemSorter is not null || this.Sorting == SortOrder.Ascending;
+    GlyphRenderer.DrawSortArrow(g, theme.HeaderText, new Rectangle(left + this.Columns[_sortColumn].Width - 14, 0, _SortArrowWidth, headerHeight), ascending);
+  }
+
+  /// <summary>Draws a group's header row: accent caption plus the accent separator rule.</summary>
+  private void PaintGroupHeader(IGraphics g, ITheme theme, int groupIndex, int y, int rowHeight) {
+    var text = groupIndex >= 0 ? this.Groups[groupIndex].Header : Strings.DefaultListViewGroupHeader;
+    g.DrawText(text, this.Font, theme.Accent, new Rectangle(_CellPad + 2, y, this.Width - 8, rowHeight), ContentAlignment.MiddleLeft);
+    g.DrawLine(theme.Accent, _CellPad, y + rowHeight - 2, this.Width - _CellPad, y + rowHeight - 2);
+  }
+
+  /// <summary>Draws one item cell in the current view.</summary>
+  private void PaintItem(IGraphics g, ITheme theme, int index, int cellX, int y, int cellWidth, int rowHeight) {
+    if (!this.TryGetRowItem(index, out var item))
+      return; // the row does not exist after all — draw nothing rather than a blank placeholder
+
+    var selected = this.IsSelected(index);
+    switch (this.View) {
+      case ListViewView.Details:
+        this.PaintDetailsRow(g, theme, item, selected, y, rowHeight);
+        break;
+
+      case ListViewView.LargeIcon:
+        this.PaintLargeIconCell(g, theme, item, selected, cellX, y, cellWidth, rowHeight);
+        break;
+
+      case ListViewView.Tile:
+        this.PaintTileCell(g, theme, item, selected, cellX, y, cellWidth, rowHeight);
+        break;
+
+      default: // List and SmallIcon: one leading icon plus label
+        this.PaintListCell(g, theme, item, selected, cellX, y, cellWidth, rowHeight);
+        break;
+    }
+  }
+
+  private void PaintDetailsRow(IGraphics g, ITheme theme, ListViewItem item, bool selected, int y, int rowHeight) {
+    if (selected) {
+      var selWidth = this.FullRowSelect || this.Columns.Count == 0 ? this.Width : this.Columns[0].Width;
+      GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, selWidth, rowHeight));
     }
 
-    /// <summary>Draws a group's header row: accent caption plus the accent separator rule.</summary>
-    private void PaintGroupHeader(IGraphics g, ITheme theme, int groupIndex, int y, int rowHeight)
-    {
-        var text = groupIndex >= 0 ? this.Groups[groupIndex].Header : Strings.DefaultListViewGroupHeader;
-        g.DrawText(text, this.Font, theme.Accent, new Rectangle(_CellPad + 2, y, this.Width - 8, rowHeight), ContentAlignment.MiddleLeft);
-        g.DrawLine(theme.Accent, _CellPad, y + rowHeight - 2, this.Width - _CellPad, y + rowHeight - 2);
+    var textColor = selected ? theme.SelectionText : this.ForeColor;
+    if (this.Columns.Count == 0) {
+      this.PaintPrimaryCell(g, theme, item, textColor, 0, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
+      return;
     }
 
-    /// <summary>Draws one item cell in the current view.</summary>
-    private void PaintItem(IGraphics g, ITheme theme, int index, int cellX, int y, int cellWidth, int rowHeight)
-    {
-        if (!this.TryGetRowItem(index, out var item))
-            return; // the row does not exist after all — draw nothing rather than a blank placeholder
+    var x = 0;
+    for (var c = 0; c < this.Columns.Count; ++c) {
+      var col = this.Columns[c];
+      g.PushClip(new Rectangle(x, y, col.Width, rowHeight));
+      if (c == 0)
+        this.PaintPrimaryCell(g, theme, item, textColor, x, y, col.Width, rowHeight, col.TextAlign);
+      else {
+        var subIndex = c - 1;
+        var text = subIndex < item.SubItems.Count ? item.SubItems[subIndex] : string.Empty;
+        var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
+        g.DrawText(TextTrim.ToWidth(g, text, this.Font, textRect.Width), this.Font, textColor, textRect, col.TextAlign);
+      }
 
-        var selected = this.IsSelected(index);
-        switch (this.View)
-        {
-            case ListViewView.Details:
-                this.PaintDetailsRow(g, theme, item, selected, y, rowHeight);
-                break;
+      g.PopClip();
+      x += col.Width;
+    }
+  }
 
-            case ListViewView.LargeIcon:
-                this.PaintLargeIconCell(g, theme, item, selected, cellX, y, cellWidth, rowHeight);
-                break;
-
-            case ListViewView.Tile:
-                this.PaintTileCell(g, theme, item, selected, cellX, y, cellWidth, rowHeight);
-                break;
-
-            default: // List and SmallIcon: one leading icon plus label
-                this.PaintListCell(g, theme, item, selected, cellX, y, cellWidth, rowHeight);
-                break;
-        }
+  /// <summary>Paints the leading cell shared by Details and List: check glyph, icon, then the label.</summary>
+  private void PaintPrimaryCell(
+      IGraphics g,
+      ITheme theme,
+      ListViewItem item,
+      Color textColor,
+      int x,
+      int y,
+      int width,
+      int rowHeight,
+      ContentAlignment alignment) {
+    var left = x + _CellPad;
+    if (this.CheckBoxes) {
+      var boxTop = y + Math.Max(0, (rowHeight - GlyphRenderer.CheckBoxSize) / 2);
+      GlyphRenderer.DrawCheckBox(g, theme, new(left, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+      left += GlyphRenderer.CheckBoxSize + _CheckGap;
     }
 
-    private void PaintDetailsRow(IGraphics g, ITheme theme, ListViewItem item, bool selected, int y, int rowHeight)
-    {
-        if (selected)
-        {
-            var selWidth = this.FullRowSelect || this.Columns.Count == 0 ? this.Width : this.Columns[0].Width;
-            GlyphRenderer.FillSelection(g, theme, new Rectangle(0, y, selWidth, rowHeight));
-        }
-
-        var textColor = selected ? theme.SelectionText : this.ForeColor;
-        if (this.Columns.Count == 0)
-        {
-            this.PaintPrimaryCell(g, theme, item, textColor, 0, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
-            return;
-        }
-
-        var x = 0;
-        for (var c = 0; c < this.Columns.Count; ++c)
-        {
-            var col = this.Columns[c];
-            g.PushClip(new Rectangle(x, y, col.Width, rowHeight));
-            if (c == 0)
-                this.PaintPrimaryCell(g, theme, item, textColor, x, y, col.Width, rowHeight, col.TextAlign);
-            else
-            {
-                var subIndex = c - 1;
-                var text = subIndex < item.SubItems.Count ? item.SubItems[subIndex] : string.Empty;
-                var textRect = new Rectangle(x + _CellPad, y, col.Width - (2 * _CellPad), rowHeight);
-                g.DrawText(TextTrim.ToWidth(g, text, this.Font, textRect.Width), this.Font, textColor, textRect, col.TextAlign);
-            }
-
-            g.PopClip();
-            x += col.Width;
-        }
+    if (this.GetIcon(item) is { } icon) {
+      var iconSize = rowHeight - 4;
+      g.DrawImage(icon, new Rectangle(left, y + 2, iconSize, iconSize));
+      left += iconSize + _IconGap;
     }
 
-    /// <summary>Paints the leading cell shared by Details and List: check glyph, icon, then the label.</summary>
-    private void PaintPrimaryCell(
-        IGraphics g,
-        ITheme theme,
-        ListViewItem item,
-        Color textColor,
-        int x,
-        int y,
-        int width,
-        int rowHeight,
-        ContentAlignment alignment)
-    {
-        var left = x + _CellPad;
-        if (this.CheckBoxes)
-        {
-            var boxTop = y + Math.Max(0, (rowHeight - GlyphRenderer.CheckBoxSize) / 2);
-            GlyphRenderer.DrawCheckBox(g, theme, new(left, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
-            left += GlyphRenderer.CheckBoxSize + _CheckGap;
-        }
+    var textRect = new Rectangle(left, y, x + width - left - _CellPad, rowHeight);
+    g.DrawText(TextTrim.ToWidth(g, item.Text, this.Font, textRect.Width), this.Font, textColor, textRect, alignment);
+  }
 
-        if (this.GetIcon(item) is { } icon)
-        {
-            var iconSize = rowHeight - 4;
-            g.DrawImage(icon, new Rectangle(left, y + 2, iconSize, iconSize));
-            left += iconSize + _IconGap;
-        }
+  /// <summary>Paints a List or SmallIcon cell: selection fill, check glyph, icon and label.</summary>
+  private void PaintListCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight) {
+    var smallIcon = this.View == ListViewView.SmallIcon;
+    if (selected)
+      GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, smallIcon ? cellWidth : this.Width, rowHeight));
 
-        var textRect = new Rectangle(left, y, x + width - left - _CellPad, rowHeight);
-        g.DrawText(TextTrim.ToWidth(g, item.Text, this.Font, textRect.Width), this.Font, textColor, textRect, alignment);
+    if (smallIcon) {
+      g.PushClip(new Rectangle(cellX, y, cellWidth, rowHeight));
+      var left = cellX + _CellPad;
+      if (this.CheckBoxes) {
+        var boxTop = y + Math.Max(0, (rowHeight - GlyphRenderer.CheckBoxSize) / 2);
+        GlyphRenderer.DrawCheckBox(g, theme, new(left, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+        left += GlyphRenderer.CheckBoxSize + _CheckGap;
+      }
+
+      var iconSize = this.SmallIconSize;
+      if (this.GetIcon(item) is { } icon) {
+        g.DrawImage(icon, new Rectangle(left, y + Math.Max(0, (rowHeight - iconSize.Height) / 2), iconSize.Width, iconSize.Height));
+        left += iconSize.Width + _IconGap;
+      }
+
+      var textColor = selected ? theme.SelectionText : this.ForeColor;
+      g.DrawText(item.Text, this.Font, textColor, new Rectangle(left, y, cellX + cellWidth - left - _CellPad, rowHeight), ContentAlignment.MiddleLeft);
+      g.PopClip();
+      return;
     }
 
-    /// <summary>Paints a List or SmallIcon cell: selection fill, check glyph, icon and label.</summary>
-    private void PaintListCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight)
-    {
-        var smallIcon = this.View == ListViewView.SmallIcon;
-        if (selected)
-            GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, smallIcon ? cellWidth : this.Width, rowHeight));
+    this.PaintPrimaryCell(g, theme, item, selected ? theme.SelectionText : this.ForeColor, cellX, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
+  }
 
-        if (smallIcon)
-        {
-            g.PushClip(new Rectangle(cellX, y, cellWidth, rowHeight));
-            var left = cellX + _CellPad;
-            if (this.CheckBoxes)
-            {
-                var boxTop = y + Math.Max(0, (rowHeight - GlyphRenderer.CheckBoxSize) / 2);
-                GlyphRenderer.DrawCheckBox(g, theme, new(left, boxTop, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
-                left += GlyphRenderer.CheckBoxSize + _CheckGap;
-            }
+  /// <summary>Paints a LargeIcon cell: icon centered above the (clipped) centered label, check overlay top-left.</summary>
+  private void PaintLargeIconCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight) {
+    if (selected)
+      GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, cellWidth, rowHeight));
 
-            var iconSize = this.SmallIconSize;
-            if (this.GetIcon(item) is { } icon)
-            {
-                g.DrawImage(icon, new Rectangle(left, y + Math.Max(0, (rowHeight - iconSize.Height) / 2), iconSize.Width, iconSize.Height));
-                left += iconSize.Width + _IconGap;
-            }
+    var iconSize = this.LargeIconSize;
+    if (this.GetIcon(item) is { } icon)
+      g.DrawImage(icon, new Rectangle(cellX + ((cellWidth - iconSize.Width) / 2), y + 2, iconSize.Width, iconSize.Height));
 
-            var textColor = selected ? theme.SelectionText : this.ForeColor;
-            g.DrawText(item.Text, this.Font, textColor, new Rectangle(left, y, cellX + cellWidth - left - _CellPad, rowHeight), ContentAlignment.MiddleLeft);
-            g.PopClip();
-            return;
-        }
+    // Centred, so clipping alone would eat the start of the name as well as the end and say
+    // nothing about either. Shortened to fit, the name keeps the part that identifies it.
+    var labelRect = new Rectangle(cellX + _CellPad, y + iconSize.Height + _LargeIconLabelGap, cellWidth - (2 * _CellPad), this.ItemHeight);
+    var label = TextTrim.ToWidth(g, item.Text, this.Font, labelRect.Width);
+    g.PushClip(labelRect);
+    g.DrawText(label, this.Font, selected ? theme.SelectionText : this.ForeColor, labelRect, ContentAlignment.MiddleCenter);
+    g.PopClip();
 
-        this.PaintPrimaryCell(g, theme, item, selected ? theme.SelectionText : this.ForeColor, cellX, y, this.Width, rowHeight, ContentAlignment.MiddleLeft);
+    if (this.CheckBoxes)
+      GlyphRenderer.DrawCheckBox(g, theme, new(cellX + _CellPad, y + _CellPad, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+  }
+
+  /// <summary>Paints a Tile cell: icon at the left, the label above the greyed first sub-item, check overlay top-left.</summary>
+  private void PaintTileCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight) {
+    if (selected)
+      GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, cellWidth, rowHeight));
+
+    var iconSize = this.LargeIconSize;
+    if (this.GetIcon(item) is { } icon)
+      g.DrawImage(icon, new Rectangle(cellX + _CellPad, y + Math.Max(0, (rowHeight - iconSize.Height) / 2), iconSize.Width, iconSize.Height));
+
+    var left = cellX + _CellPad + iconSize.Width + _IconGap;
+    var labelWidth = Math.Max(0, cellX + cellWidth - left - _CellPad);
+    var lineHeight = rowHeight / 2;
+    g.PushClip(new Rectangle(left, y, labelWidth, rowHeight));
+    var label = TextTrim.ToWidth(g, item.Text, this.Font, labelWidth);
+    g.DrawText(label, this.Font, selected ? theme.SelectionText : this.ForeColor, new Rectangle(left, y, labelWidth, lineHeight), ContentAlignment.MiddleLeft);
+    if (item.SubItems.Count > 0)
+      g.DrawText(TextTrim.ToWidth(g, item.SubItems[0], this.Font, labelWidth), this.Font, selected ? theme.SelectionText : theme.DisabledText, new Rectangle(left, y + lineHeight, labelWidth, rowHeight - lineHeight), ContentAlignment.MiddleLeft);
+
+    g.PopClip();
+
+    if (this.CheckBoxes)
+      GlyphRenderer.DrawCheckBox(g, theme, new(cellX + _CellPad, y + _CellPad, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+  }
+
+  /// <summary>A live, sorted view of the indices whose item is checked.</summary>
+  private sealed class CheckedIndexList(ListView owner) : IReadOnlyList<int> {
+    public int Count {
+      get {
+        var count = 0;
+        var items = owner.Items;
+        for (var i = 0; i < items.Count; ++i)
+          if (items[i].Checked)
+            ++count;
+
+        return count;
+      }
     }
 
-    /// <summary>Paints a LargeIcon cell: icon centered above the (clipped) centered label, check overlay top-left.</summary>
-    private void PaintLargeIconCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight)
-    {
-        if (selected)
-            GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, cellWidth, rowHeight));
+    public int this[int index] {
+      get {
+        var items = owner.Items;
+        for (var i = 0; i < items.Count; ++i)
+          if (items[i].Checked && index-- == 0)
+            return i;
 
-        var iconSize = this.LargeIconSize;
-        if (this.GetIcon(item) is { } icon)
-            g.DrawImage(icon, new Rectangle(cellX + ((cellWidth - iconSize.Width) / 2), y + 2, iconSize.Width, iconSize.Height));
-
-        // Centred, so clipping alone would eat the start of the name as well as the end and say
-        // nothing about either. Shortened to fit, the name keeps the part that identifies it.
-        var labelRect = new Rectangle(cellX + _CellPad, y + iconSize.Height + _LargeIconLabelGap, cellWidth - (2 * _CellPad), this.ItemHeight);
-        var label = TextTrim.ToWidth(g, item.Text, this.Font, labelRect.Width);
-        g.PushClip(labelRect);
-        g.DrawText(label, this.Font, selected ? theme.SelectionText : this.ForeColor, labelRect, ContentAlignment.MiddleCenter);
-        g.PopClip();
-
-        if (this.CheckBoxes)
-            GlyphRenderer.DrawCheckBox(g, theme, new(cellX + _CellPad, y + _CellPad, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+        throw new ArgumentOutOfRangeException(nameof(index));
+      }
     }
 
-    /// <summary>Paints a Tile cell: icon at the left, the label above the greyed first sub-item, check overlay top-left.</summary>
-    private void PaintTileCell(IGraphics g, ITheme theme, ListViewItem item, bool selected, int cellX, int y, int cellWidth, int rowHeight)
-    {
-        if (selected)
-            GlyphRenderer.FillSelection(g, theme, new Rectangle(cellX, y, cellWidth, rowHeight));
-
-        var iconSize = this.LargeIconSize;
-        if (this.GetIcon(item) is { } icon)
-            g.DrawImage(icon, new Rectangle(cellX + _CellPad, y + Math.Max(0, (rowHeight - iconSize.Height) / 2), iconSize.Width, iconSize.Height));
-
-        var left = cellX + _CellPad + iconSize.Width + _IconGap;
-        var labelWidth = Math.Max(0, cellX + cellWidth - left - _CellPad);
-        var lineHeight = rowHeight / 2;
-        g.PushClip(new Rectangle(left, y, labelWidth, rowHeight));
-        var label = TextTrim.ToWidth(g, item.Text, this.Font, labelWidth);
-        g.DrawText(label, this.Font, selected ? theme.SelectionText : this.ForeColor, new Rectangle(left, y, labelWidth, lineHeight), ContentAlignment.MiddleLeft);
-        if (item.SubItems.Count > 0)
-            g.DrawText(TextTrim.ToWidth(g, item.SubItems[0], this.Font, labelWidth), this.Font, selected ? theme.SelectionText : theme.DisabledText, new Rectangle(left, y + lineHeight, labelWidth, rowHeight - lineHeight), ContentAlignment.MiddleLeft);
-
-        g.PopClip();
-
-        if (this.CheckBoxes)
-            GlyphRenderer.DrawCheckBox(g, theme, new(cellX + _CellPad, y + _CellPad, GlyphRenderer.CheckBoxSize, GlyphRenderer.CheckBoxSize), item.Checked);
+    public IEnumerator<int> GetEnumerator() {
+      for (var i = 0; i < owner.Items.Count; ++i)
+        if (owner.Items[i].Checked)
+          yield return i;
     }
 
-    /// <summary>A live, sorted view of the indices whose item is checked.</summary>
-    private sealed class CheckedIndexList(ListView owner) : IReadOnlyList<int>
-    {
-        public int Count
-        {
-            get
-            {
-                var count = 0;
-                var items = owner.Items;
-                for (var i = 0; i < items.Count; ++i)
-                    if (items[i].Checked)
-                        ++count;
+    IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+  }
 
-                return count;
-            }
-        }
+  /// <summary>A live view of the checked items, in index order.</summary>
+  private sealed class CheckedItemList(ListView owner) : IReadOnlyList<ListViewItem> {
+    public int Count => owner.CheckedIndices.Count;
 
-        public int this[int index]
-        {
-            get
-            {
-                var items = owner.Items;
-                for (var i = 0; i < items.Count; ++i)
-                    if (items[i].Checked && index-- == 0)
-                        return i;
+    public ListViewItem this[int index] => owner.Items[owner.CheckedIndices[index]];
 
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
-        }
-
-        public IEnumerator<int> GetEnumerator()
-        {
-            for (var i = 0; i < owner.Items.Count; ++i)
-                if (owner.Items[i].Checked)
-                    yield return i;
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+    public IEnumerator<ListViewItem> GetEnumerator() {
+      for (var i = 0; i < owner.Items.Count; ++i)
+        if (owner.Items[i].Checked)
+          yield return owner.Items[i];
     }
 
-    /// <summary>A live view of the checked items, in index order.</summary>
-    private sealed class CheckedItemList(ListView owner) : IReadOnlyList<ListViewItem>
-    {
-        public int Count => owner.CheckedIndices.Count;
+    IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+  }
 
-        public ListViewItem this[int index] => owner.Items[owner.CheckedIndices[index]];
+  /// <summary>A live, allocation-free mapping of the selected indices onto their items.</summary>
+  private sealed class SelectedItemList(ListView owner) : IReadOnlyList<ListViewItem> {
+    public int Count => owner._selectedIndices.Count;
 
-        public IEnumerator<ListViewItem> GetEnumerator()
-        {
-            for (var i = 0; i < owner.Items.Count; ++i)
-                if (owner.Items[i].Checked)
-                    yield return owner.Items[i];
-        }
+    public ListViewItem this[int index] => owner.Items[owner._selectedIndices[index]];
 
-        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+    public IEnumerator<ListViewItem> GetEnumerator() {
+      for (var i = 0; i < owner._selectedIndices.Count; ++i)
+        yield return owner.Items[owner._selectedIndices[i]];
     }
 
-    /// <summary>A live, allocation-free mapping of the selected indices onto their items.</summary>
-    private sealed class SelectedItemList(ListView owner) : IReadOnlyList<ListViewItem>
-    {
-        public int Count => owner._selectedIndices.Count;
-
-        public ListViewItem this[int index] => owner.Items[owner._selectedIndices[index]];
-
-        public IEnumerator<ListViewItem> GetEnumerator()
-        {
-            for (var i = 0; i < owner._selectedIndices.Count; ++i)
-                yield return owner.Items[owner._selectedIndices[i]];
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+  }
 }

@@ -6,7 +6,6 @@ namespace Hawkynt.NativeForms;
 /// the drawn shell. It adds no instance state over <see cref="TextBox"/>, only the frame override, so a
 /// hosted editor costs no extra footprint.
 /// </summary>
-internal sealed class FramelessTextBox : TextBox
-{
-    private protected override bool HasFrame => false;
+internal sealed class FramelessTextBox : TextBox {
+  private protected override bool HasFrame => false;
 }

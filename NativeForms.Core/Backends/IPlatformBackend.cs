@@ -9,201 +9,200 @@ namespace Hawkynt.NativeForms.Backends;
 /// The core never talks to a native API directly — it creates peers through this factory and drives
 /// the platform event loop through <see cref="Run"/>.
 /// </summary>
-public interface IPlatformBackend
-{
-    /// <summary>A short, stable identifier used in diagnostics (for example <c>"Win32"</c>).</summary>
-    string Name { get; }
+public interface IPlatformBackend {
+  /// <summary>A short, stable identifier used in diagnostics (for example <c>"Win32"</c>).</summary>
+  string Name { get; }
 
-    /// <summary>
-    /// Whether this backend can run on the current OS. The registry uses it to pick a backend; a
-    /// backend compiled into an app for another platform simply reports <see langword="false"/>.
-    /// </summary>
-    bool IsSupported { get; }
+  /// <summary>
+  /// Whether this backend can run on the current OS. The registry uses it to pick a backend; a
+  /// backend compiled into an app for another platform simply reports <see langword="false"/>.
+  /// </summary>
+  bool IsSupported { get; }
 
-    /// <summary>The native theme (colors, font, metrics) owner-drawn controls paint with.</summary>
-    ITheme Theme { get; }
+  /// <summary>The native theme (colors, font, metrics) owner-drawn controls paint with.</summary>
+  ITheme Theme { get; }
 
-    /// <summary>
-    /// Raised after the desktop theme changes (light/dark switch, accent or system-color change,
-    /// high-contrast toggle). By the time it fires, <see cref="Theme"/> already serves the fresh
-    /// values; realized owner-drawn controls re-read it and repaint.
-    /// </summary>
-    event EventHandler? ThemeChanged;
+  /// <summary>
+  /// Raised after the desktop theme changes (light/dark switch, accent or system-color change,
+  /// high-contrast toggle). By the time it fires, <see cref="Theme"/> already serves the fresh
+  /// values; realized owner-drawn controls re-read it and repaint.
+  /// </summary>
+  event EventHandler? ThemeChanged;
 
-    /// <summary>
-    /// The ratio of device pixels to logical (96-DPI) pixels on the primary monitor — 1.0 at 100%,
-    /// 1.5 at 150%, and so on. The groundwork for per-monitor DPI awareness: callers map logical
-    /// lengths through it (see <see cref="Control.LogicalToDevice(int)"/>); per-monitor rescale on
-    /// window move is tracked separately in <c>docs/PRD.md</c> §8.
-    /// </summary>
-    double GetDpiScale();
+  /// <summary>
+  /// The ratio of device pixels to logical (96-DPI) pixels on the primary monitor — 1.0 at 100%,
+  /// 1.5 at 150%, and so on. The groundwork for per-monitor DPI awareness: callers map logical
+  /// lengths through it (see <see cref="Control.LogicalToDevice(int)"/>); per-monitor rescale on
+  /// window move is tracked separately in <c>docs/PRD.md</c> §8.
+  /// </summary>
+  double GetDpiScale();
 
-    /// <summary>Creates an unrealized top-level window peer.</summary>
-    IWindowPeer CreateWindow();
+  /// <summary>Creates an unrealized top-level window peer.</summary>
+  IWindowPeer CreateWindow();
 
-    /// <summary>Creates an unrealized push-button peer.</summary>
-    IButtonPeer CreateButton();
+  /// <summary>Creates an unrealized push-button peer.</summary>
+  IButtonPeer CreateButton();
 
-    /// <summary>Creates an unrealized static-text peer.</summary>
-    ILabelPeer CreateLabel();
+  /// <summary>Creates an unrealized static-text peer.</summary>
+  ILabelPeer CreateLabel();
 
-    /// <summary>Creates an unrealized text-input peer.</summary>
-    ITextBoxPeer CreateTextBox();
+  /// <summary>Creates an unrealized text-input peer.</summary>
+  ITextBoxPeer CreateTextBox();
 
-    /// <summary>Creates an unrealized rich-text-editor peer.</summary>
-    IRichTextBoxPeer CreateRichTextBox();
+  /// <summary>Creates an unrealized rich-text-editor peer.</summary>
+  IRichTextBoxPeer CreateRichTextBox();
 
-    /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
-    ICanvasPeer CreateCanvas();
+  /// <summary>Creates an unrealized owner-draw canvas peer (the surface all custom controls use).</summary>
+  ICanvasPeer CreateCanvas();
 
-    /// <summary>
-    /// Creates a native check-box peer, or <see langword="null"/> to decline — which is the default, so a
-    /// backend opts in by overriding rather than being broken by a new member. Declining leaves the
-    /// control on its owner-drawn path (PRD §12).
-    /// </summary>
-    ICheckBoxPeer? CreateCheckBox() => null;
+  /// <summary>
+  /// Creates a native check-box peer, or <see langword="null"/> to decline — which is the default, so a
+  /// backend opts in by overriding rather than being broken by a new member. Declining leaves the
+  /// control on its owner-drawn path (PRD §12).
+  /// </summary>
+  ICheckBoxPeer? CreateCheckBox() => null;
 
-    /// <summary>
-    /// Whether this backend's button widget can render an image <em>and</em> a caption on one face.
-    /// </summary>
-    /// <remarks>
-    /// A capability question rather than a rendering rule, because the answer differs per platform and
-    /// only the backend knows it: GTK places the image beside the label
-    /// (<c>gtk_button_set_image</c>), AppKit has <c>imagePosition</c>, and a classic Win32
-    /// <c>BUTTON</c> renders the bitmap alone and drops the caption outright. A backend that says yes
-    /// keeps the widget, which is faster than painting and is what makes the control feel native;
-    /// only the one that says no falls back to the owner-drawn face (PRD §12). Defaulting to
-    /// <see langword="false"/> keeps a backend that has not been asked this question correct rather
-    /// than silently dropping half of what it was told to show.
-    /// </remarks>
-    bool ButtonRendersImageWithText => false;
+  /// <summary>
+  /// Whether this backend's button widget can render an image <em>and</em> a caption on one face.
+  /// </summary>
+  /// <remarks>
+  /// A capability question rather than a rendering rule, because the answer differs per platform and
+  /// only the backend knows it: GTK places the image beside the label
+  /// (<c>gtk_button_set_image</c>), AppKit has <c>imagePosition</c>, and a classic Win32
+  /// <c>BUTTON</c> renders the bitmap alone and drops the caption outright. A backend that says yes
+  /// keeps the widget, which is faster than painting and is what makes the control feel native;
+  /// only the one that says no falls back to the owner-drawn face (PRD §12). Defaulting to
+  /// <see langword="false"/> keeps a backend that has not been asked this question correct rather
+  /// than silently dropping half of what it was told to show.
+  /// </remarks>
+  bool ButtonRendersImageWithText => false;
 
-    /// <summary>Creates a native progress-indicator peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    IProgressBarPeer? CreateProgressBar() => null;
+  /// <summary>Creates a native progress-indicator peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  IProgressBarPeer? CreateProgressBar() => null;
 
-    /// <summary>Creates a native slider peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    /// <param name="vertical">Whether the slider runs vertically; GTK fixes this at construction.</param>
-    ITrackBarPeer? CreateTrackBar(bool vertical) => null;
+  /// <summary>Creates a native slider peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  /// <param name="vertical">Whether the slider runs vertically; GTK fixes this at construction.</param>
+  ITrackBarPeer? CreateTrackBar(bool vertical) => null;
 
-    /// <summary>Creates a native radio-button peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    IRadioButtonPeer? CreateRadioButton() => null;
+  /// <summary>Creates a native radio-button peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  IRadioButtonPeer? CreateRadioButton() => null;
 
-    /// <summary>Creates a native scroll-bar peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    /// <param name="vertical">Whether the bar runs vertically; both platforms fix this at construction.</param>
-    IScrollBarPeer? CreateScrollBar(bool vertical) => null;
+  /// <summary>Creates a native scroll-bar peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  /// <param name="vertical">Whether the bar runs vertically; both platforms fix this at construction.</param>
+  IScrollBarPeer? CreateScrollBar(bool vertical) => null;
 
-    /// <summary>Creates a native caption-frame peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    /// <remarks>The peer hosts the control's children itself; see <see cref="IGroupBoxPeer"/> for why.</remarks>
-    IGroupBoxPeer? CreateGroupBox() => null;
+  /// <summary>Creates a native caption-frame peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  /// <remarks>The peer hosts the control's children itself; see <see cref="IGroupBoxPeer"/> for why.</remarks>
+  IGroupBoxPeer? CreateGroupBox() => null;
 
-    /// <summary>Creates a native drop-down-list peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    IComboBoxPeer? CreateComboBox() => null;
+  /// <summary>Creates a native drop-down-list peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  IComboBoxPeer? CreateComboBox() => null;
 
-    /// <summary>Creates a native string-list peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    IListBoxPeer? CreateListBox() => null;
+  /// <summary>Creates a native string-list peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  IListBoxPeer? CreateListBox() => null;
 
-    /// <summary>Creates a native hyperlink peer, or <see langword="null"/> to decline (PRD §12).</summary>
-    ILinkLabelPeer? CreateLinkLabel() => null;
+  /// <summary>Creates a native hyperlink peer, or <see langword="null"/> to decline (PRD §12).</summary>
+  ILinkLabelPeer? CreateLinkLabel() => null;
 
-    /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
-    /// <param name="owner">
-    /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.
-    /// A floating surface is a separate native window, and a platform that is not told which window
-    /// owns it treats it as an unrelated application window: it cannot anchor it to the owner (X11
-    /// warns "temporary window without parent, application will not be able to position it on
-    /// screen"), and it marks the owner inactive while the surface is up, so opening an application's
-    /// own menu greys out the window behind it. Naming the owner is what makes a drop-down land where
-    /// it was asked to and leaves its window looking focused.
-    /// </param>
-    IPopupPeer CreatePopup(IWindowPeer? owner);
+  /// <summary>Creates a hidden light-dismiss popup surface peer (drop-downs, menus, tooltips).</summary>
+  /// <param name="owner">
+  /// The top-level window the surface belongs to, or <see langword="null"/> when none is known.
+  /// A floating surface is a separate native window, and a platform that is not told which window
+  /// owns it treats it as an unrelated application window: it cannot anchor it to the owner (X11
+  /// warns "temporary window without parent, application will not be able to position it on
+  /// screen"), and it marks the owner inactive while the surface is up, so opening an application's
+  /// own menu greys out the window behind it. Naming the owner is what makes a drop-down land where
+  /// it was asked to and leaves its window looking focused.
+  /// </param>
+  IPopupPeer CreatePopup(IWindowPeer? owner);
 
-    /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
-    IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);
+  /// <summary>Creates a native image from 32-bit ARGB pixels (row-major, length = width * height).</summary>
+  IImage CreateImage(int width, int height, ReadOnlySpan<int> argb);
 
-    /// <summary>
-    /// Reads the on-screen colour at a screen point — the eyedropper's source. Returns
-    /// <see cref="Color.Empty"/> when the platform cannot sample the screen (Wayland forbids reading
-    /// other surfaces, the placeholder backends do not implement it), so a caller falls back gracefully.
-    /// </summary>
-    Color SampleScreenPixel(Point screen) => Color.Empty;
+  /// <summary>
+  /// Reads the on-screen colour at a screen point — the eyedropper's source. Returns
+  /// <see cref="Color.Empty"/> when the platform cannot sample the screen (Wayland forbids reading
+  /// other surfaces, the placeholder backends do not implement it), so a caller falls back gracefully.
+  /// </summary>
+  Color SampleScreenPixel(Point screen) => Color.Empty;
 
-    /// <summary>Creates a stopped UI-thread timer peer.</summary>
-    ITimerPeer CreateTimer();
+  /// <summary>Creates a stopped UI-thread timer peer.</summary>
+  ITimerPeer CreateTimer();
 
-    /// <summary>
-    /// Creates a hidden tray/status-area icon peer. Backends whose platform has no supported tray
-    /// surface throw <see cref="NotSupportedException"/> — honestly, at creation time — rather than
-    /// silently dropping the icon.
-    /// </summary>
-    INotifyIconPeer CreateNotifyIcon();
+  /// <summary>
+  /// Creates a hidden tray/status-area icon peer. Backends whose platform has no supported tray
+  /// surface throw <see cref="NotSupportedException"/> — honestly, at creation time — rather than
+  /// silently dropping the icon.
+  /// </summary>
+  INotifyIconPeer CreateNotifyIcon();
 
-    /// <summary>
-    /// The pixel size of the primary screen. The core uses it to place forms whose
-    /// <see cref="Form.StartPosition"/> asks for centering — the policy stays platform-agnostic and
-    /// the peers only ever see the resulting bounds.
-    /// </summary>
-    Size GetScreenSize();
+  /// <summary>
+  /// The pixel size of the primary screen. The core uses it to place forms whose
+  /// <see cref="Form.StartPosition"/> asks for centering — the policy stays platform-agnostic and
+  /// the peers only ever see the resulting bounds.
+  /// </summary>
+  Size GetScreenSize();
 
-    /// <summary>
-    /// Measures the pixel size <paramref name="text"/> would occupy in <paramref name="font"/>, without
-    /// needing a paint surface — the seam auto-sizing controls use before and between paints. Uses the
-    /// same native text engine as <see cref="IGraphics.MeasureText"/>, so both agree.
-    /// </summary>
-    Size MeasureText(string text, Font font);
+  /// <summary>
+  /// Measures the pixel size <paramref name="text"/> would occupy in <paramref name="font"/>, without
+  /// needing a paint surface — the seam auto-sizing controls use before and between paints. Uses the
+  /// same native text engine as <see cref="IGraphics.MeasureText"/>, so both agree.
+  /// </summary>
+  Size MeasureText(string text, Font font);
 
-    /// <summary>
-    /// Shows the platform's native message box, application-modal, and blocks until the user picks a
-    /// button. With an <paramref name="owner"/> the box is owned by (transient to) that window.
-    /// Returns which button was pressed.
-    /// </summary>
-    DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null);
+  /// <summary>
+  /// Shows the platform's native message box, application-modal, and blocks until the user picks a
+  /// button. With an <paramref name="owner"/> the box is owned by (transient to) that window.
+  /// Returns which button was pressed.
+  /// </summary>
+  DialogResult ShowMessageBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, IWindowPeer? owner = null);
 
-    /// <summary>
-    /// Shows the platform's native file, save or folder dialog, application-modal. Returns the chosen
-    /// absolute path(s) — one element unless <see cref="FileDialogOptions.Multiselect"/> — or
-    /// <see langword="null"/> when the user cancelled.
-    /// </summary>
-    string[]? ShowFileDialog(in FileDialogOptions options);
+  /// <summary>
+  /// Shows the platform's native file, save or folder dialog, application-modal. Returns the chosen
+  /// absolute path(s) — one element unless <see cref="FileDialogOptions.Multiselect"/> — or
+  /// <see langword="null"/> when the user cancelled.
+  /// </summary>
+  string[]? ShowFileDialog(in FileDialogOptions options);
 
-    /// <summary>
-    /// Shows the platform's native color picker preselecting <paramref name="color"/>,
-    /// application-modal. Returns the chosen color, or <see langword="null"/> when cancelled.
-    /// </summary>
-    Color? ShowColorDialog(Color color);
+  /// <summary>
+  /// Shows the platform's native color picker preselecting <paramref name="color"/>,
+  /// application-modal. Returns the chosen color, or <see langword="null"/> when cancelled.
+  /// </summary>
+  Color? ShowColorDialog(Color color);
 
-    /// <summary>
-    /// Shows the platform's native font picker preselecting <paramref name="font"/>,
-    /// application-modal. Returns the chosen font, or <see langword="null"/> when cancelled.
-    /// </summary>
-    Font? ShowFontDialog(Font font);
+  /// <summary>
+  /// Shows the platform's native font picker preselecting <paramref name="font"/>,
+  /// application-modal. Returns the chosen font, or <see langword="null"/> when cancelled.
+  /// </summary>
+  Font? ShowFontDialog(Font font);
 
-    /// <summary>
-    /// Places plain text on the system clipboard, replacing its current content. The seam behind copy
-    /// gestures (a grid's Ctrl+C); non-text formats are not part of the contract.
-    /// </summary>
-    void SetClipboardText(string text);
+  /// <summary>
+  /// Places plain text on the system clipboard, replacing its current content. The seam behind copy
+  /// gestures (a grid's Ctrl+C); non-text formats are not part of the contract.
+  /// </summary>
+  void SetClipboardText(string text);
 
-    /// <summary>
-    /// Reads the plain-text content of the system clipboard, or <see langword="null"/> when it holds
-    /// no text. The seam behind paste gestures (a grid's Ctrl+V); non-text formats are not part of
-    /// the contract.
-    /// </summary>
-    string? GetClipboardText();
+  /// <summary>
+  /// Reads the plain-text content of the system clipboard, or <see langword="null"/> when it holds
+  /// no text. The seam behind paste gestures (a grid's Ctrl+V); non-text formats are not part of
+  /// the contract.
+  /// </summary>
+  string? GetClipboardText();
 
-    /// <summary>
-    /// Queues <paramref name="action"/> for execution on the UI thread the message loop runs on and
-    /// returns immediately. Safe to call from any thread; the loop executes queued work in posting
-    /// order. The seam behind <see cref="Control.BeginInvoke"/> and the toolkit's
-    /// <see cref="System.Threading.SynchronizationContext"/>.
-    /// </summary>
-    void Post(Action action);
+  /// <summary>
+  /// Queues <paramref name="action"/> for execution on the UI thread the message loop runs on and
+  /// returns immediately. Safe to call from any thread; the loop executes queued work in posting
+  /// order. The seam behind <see cref="Control.BeginInvoke"/> and the toolkit's
+  /// <see cref="System.Threading.SynchronizationContext"/>.
+  /// </summary>
+  void Post(Action action);
 
-    /// <summary>
-    /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>
-    /// is called. Must be invoked on the thread that created the widgets.
-    /// </summary>
-    void Run(IWindowPeer mainWindow);
+  /// <summary>
+  /// Enters the platform message loop and blocks until the main window closes or <see cref="Quit"/>
+  /// is called. Must be invoked on the thread that created the widgets.
+  /// </summary>
+  void Run(IWindowPeer mainWindow);
 
-    /// <summary>Requests that the running message loop exit.</summary>
-    void Quit();
+  /// <summary>Requests that the running message loop exit.</summary>
+  void Quit();
 }

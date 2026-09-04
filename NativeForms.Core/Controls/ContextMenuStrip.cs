@@ -18,95 +18,89 @@ namespace Hawkynt.NativeForms;
 /// <see cref="Backends.IControlPeer.ContextMenuRequested"/>, which each backend raises from a
 /// right-click or the Menu / Shift+F10 keyboard request.
 /// </remarks>
-public class ContextMenuStrip : Component
-{
-    private MenuDropDown? _dropDown;
-    private IPlatformBackend? _backend;
+public class ContextMenuStrip : Component {
+  private MenuDropDown? _dropDown;
+  private IPlatformBackend? _backend;
 
-    /// <summary>Creates an empty context menu.</summary>
-    public ContextMenuStrip() => this.Items = new();
+  /// <summary>Creates an empty context menu.</summary>
+  public ContextMenuStrip() => this.Items = new();
 
-    /// <summary>The menu items, sharing the <see cref="MenuStrip"/> item model.</summary>
-    public ToolStripItemCollection Items { get; }
+  /// <summary>The menu items, sharing the <see cref="MenuStrip"/> item model.</summary>
+  public ToolStripItemCollection Items { get; }
 
-    /// <summary>Whether the menu is currently open.</summary>
-    public bool IsOpen => _dropDown is { IsOpen: true };
+  /// <summary>Whether the menu is currently open.</summary>
+  public bool IsOpen => _dropDown is { IsOpen: true };
 
-    /// <summary>
-    /// Whether the menu opens with a search field as its first row, narrowing the items below it as
-    /// you type (PRD §14). Off by default, because it costs the menu its mnemonics: type-to-filter and
-    /// mnemonic access are the same keystrokes, so one menu cannot offer both.
-    /// </summary>
-    /// <remarks>
-    /// Worth turning on for the menus that got long enough to be worth searching — a column list, a
-    /// set of distinct values, a recent-files list — and worth leaving off for the short verb menus
-    /// where a mnemonic is faster than a substring.
-    /// </remarks>
-    public bool ShowSearchBox { get; set; }
+  /// <summary>
+  /// Whether the menu opens with a search field as its first row, narrowing the items below it as
+  /// you type (PRD §14). Off by default, because it costs the menu its mnemonics: type-to-filter and
+  /// mnemonic access are the same keystrokes, so one menu cannot offer both.
+  /// </summary>
+  /// <remarks>
+  /// Worth turning on for the menus that got long enough to be worth searching — a column list, a
+  /// set of distinct values, a recent-files list — and worth leaving off for the short verb menus
+  /// where a mnemonic is faster than a substring.
+  /// </remarks>
+  public bool ShowSearchBox { get; set; }
 
-    /// <summary>Raised before the menu opens — on the right-click path through
-    /// <see cref="Control.ContextMenuStrip"/> and on explicit <see cref="Show"/> alike; set
-    /// <see cref="CancelEventArgs.Cancel"/> to keep it closed.</summary>
-    public event EventHandler<CancelEventArgs>? Opening;
+  /// <summary>Raised before the menu opens — on the right-click path through
+  /// <see cref="Control.ContextMenuStrip"/> and on explicit <see cref="Show"/> alike; set
+  /// <see cref="CancelEventArgs.Cancel"/> to keep it closed.</summary>
+  public event EventHandler<CancelEventArgs>? Opening;
 
-    /// <summary>Raised after the menu (and its whole cascade) has closed.</summary>
-    public event EventHandler? Closed;
+  /// <summary>Raised after the menu (and its whole cascade) has closed.</summary>
+  public event EventHandler? Closed;
 
-    /// <summary>Raises <see cref="Opening"/>.</summary>
-    protected virtual void OnOpening(CancelEventArgs e) => this.Opening?.Invoke(this, e);
+  /// <summary>Raises <see cref="Opening"/>.</summary>
+  protected virtual void OnOpening(CancelEventArgs e) => this.Opening?.Invoke(this, e);
 
-    /// <summary>
-    /// Opens the menu at a position given in <paramref name="control"/>'s client space. The control
-    /// must be realized — only a live widget knows its screen position.
-    /// </summary>
-    public void Show(Control control, Point clientLocation)
-    {
-        ArgumentNullException.ThrowIfNull(control);
-        var backend = control.Backend;
-        if (backend is null)
-            return;
+  /// <summary>
+  /// Opens the menu at a position given in <paramref name="control"/>'s client space. The control
+  /// must be realized — only a live widget knows its screen position.
+  /// </summary>
+  public void Show(Control control, Point clientLocation) {
+    ArgumentNullException.ThrowIfNull(control);
+    var backend = control.Backend;
+    if (backend is null)
+      return;
 
-        this.ShowAt(backend, control.PointToScreen(clientLocation), control.OwnerWindowPeer);
+    this.ShowAt(backend, control.PointToScreen(clientLocation), control.OwnerWindowPeer);
+  }
+
+  /// <summary>Opens the menu at an absolute screen position on the given backend, unless a
+  /// <see cref="Opening"/> handler vetoes it.</summary>
+  /// <param name="backend">The backend that owns the display connection the menu is put up on.</param>
+  /// <param name="screenLocation">Where the menu's top-left corner goes, in screen coordinates.</param>
+  /// <param name="owner">The window the cascade belongs to. Not optional: a menu with no owner is
+  /// an unrelated top-level window to the display server, which cannot then anchor it and greys out
+  /// the window it was opened from.</param>
+  internal void ShowAt(IPlatformBackend backend, Point screenLocation, IWindowPeer? owner) {
+    if (this.Opening is not null) {
+      var pending = new CancelEventArgs();
+      this.OnOpening(pending);
+      if (pending.Cancel)
+        return;
     }
 
-    /// <summary>Opens the menu at an absolute screen position on the given backend, unless a
-    /// <see cref="Opening"/> handler vetoes it.</summary>
-    /// <param name="backend">The backend that owns the display connection the menu is put up on.</param>
-    /// <param name="screenLocation">Where the menu's top-left corner goes, in screen coordinates.</param>
-    /// <param name="owner">The window the cascade belongs to. Not optional: a menu with no owner is
-    /// an unrelated top-level window to the display server, which cannot then anchor it and greys out
-    /// the window it was opened from.</param>
-    internal void ShowAt(IPlatformBackend backend, Point screenLocation, IWindowPeer? owner)
-    {
-        if (this.Opening is not null)
-        {
-            var pending = new CancelEventArgs();
-            this.OnOpening(pending);
-            if (pending.Cancel)
-                return;
-        }
-
-        var engine = _dropDown;
-        if (engine is null || !ReferenceEquals(_backend, backend))
-        {
-            engine?.CloseAll();
-            _backend = backend;
-            _dropDown = engine = new(backend, backend.Theme);
-            engine.Closed += (_, _) => this.Closed?.Invoke(this, EventArgs.Empty);
-        }
-
-        engine.Owner = owner;
-        engine.Open(this.Items, screenLocation, this.ShowSearchBox);
+    var engine = _dropDown;
+    if (engine is null || !ReferenceEquals(_backend, backend)) {
+      engine?.CloseAll();
+      _backend = backend;
+      _dropDown = engine = new(backend, backend.Theme);
+      engine.Closed += (_, _) => this.Closed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Closes the menu, if open.</summary>
-    public void Close() => _dropDown?.CloseAll();
+    engine.Owner = owner;
+    engine.Open(this.Items, screenLocation, this.ShowSearchBox);
+  }
 
-    /// <summary>Closes the menu and drops the drop-down engine (and with it the native popups).</summary>
-    protected override void Dispose(bool disposing)
-    {
-        _dropDown?.CloseAll();
-        _dropDown = null;
-        _backend = null;
-    }
+  /// <summary>Closes the menu, if open.</summary>
+  public void Close() => _dropDown?.CloseAll();
+
+  /// <summary>Closes the menu and drops the drop-down engine (and with it the native popups).</summary>
+  protected override void Dispose(bool disposing) {
+    _dropDown?.CloseAll();
+    _dropDown = null;
+    _backend = null;
+  }
 }

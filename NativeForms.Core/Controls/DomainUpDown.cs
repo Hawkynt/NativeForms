@@ -12,140 +12,125 @@ namespace Hawkynt.NativeForms;
 /// text is matched case-insensitively against <see cref="Items"/> — a hit selects that item and
 /// normalizes the casing, a miss reverts the editor to the current item.
 /// </remarks>
-public class DomainUpDown : UpDownBase
-{
-    private int _selectedIndex = -1;
+public class DomainUpDown : UpDownBase {
+  private int _selectedIndex = -1;
 
-    /// <summary>Creates an empty spinner with nothing selected.</summary>
-    public DomainUpDown()
-    {
-        this.Items = new();
-        this.Items.ListChanged += this.OnItemsListChanged;
+  /// <summary>Creates an empty spinner with nothing selected.</summary>
+  public DomainUpDown() {
+    this.Items = new();
+    this.Items.ListChanged += this.OnItemsListChanged;
+  }
+
+  /// <summary>The items the spinner walks through. Mutations keep the selection on the same item.</summary>
+  public ObservableList<string> Items { get; }
+
+  /// <summary>Whether stepping past either end wraps around to the other.</summary>
+  public bool Wrap { get; set; }
+
+  /// <summary>The selected item's index, or -1 for none. Setting it mirrors the item into the
+  /// editor and raises <see cref="SelectedItemChanged"/> when the value actually changes.</summary>
+  public int SelectedIndex {
+    get => _selectedIndex;
+    set {
+      var clamped = value < -1 || value >= this.Items.Count ? -1 : value;
+      if (_selectedIndex == clamped)
+        return;
+
+      _selectedIndex = clamped;
+      this.UpdateEditText();
+      this.OnSelectedItemChanged(EventArgs.Empty);
     }
+  }
 
-    /// <summary>The items the spinner walks through. Mutations keep the selection on the same item.</summary>
-    public ObservableList<string> Items { get; }
+  /// <summary>The selected item, or <see langword="null"/> for none.</summary>
+  public string? SelectedItem {
+    get => _selectedIndex >= 0 ? this.Items[_selectedIndex] : null;
+    set => this.SelectedIndex = value is null ? -1 : this.Items.IndexOf(value);
+  }
 
-    /// <summary>Whether stepping past either end wraps around to the other.</summary>
-    public bool Wrap { get; set; }
+  /// <summary>Raised when the selection changes, by stepping, typing or assignment.</summary>
+  public event EventHandler? SelectedItemChanged;
 
-    /// <summary>The selected item's index, or -1 for none. Setting it mirrors the item into the
-    /// editor and raises <see cref="SelectedItemChanged"/> when the value actually changes.</summary>
-    public int SelectedIndex
-    {
-        get => _selectedIndex;
-        set
-        {
-            var clamped = value < -1 || value >= this.Items.Count ? -1 : value;
-            if (_selectedIndex == clamped)
-                return;
+  /// <summary>Raises <see cref="SelectedItemChanged"/>.</summary>
+  protected virtual void OnSelectedItemChanged(EventArgs e) => this.SelectedItemChanged?.Invoke(this, e);
 
-            _selectedIndex = clamped;
-            this.UpdateEditText();
-            this.OnSelectedItemChanged(EventArgs.Empty);
-        }
-    }
+  /// <inheritdoc/>
+  public override void UpButton() {
+    this.CommitEdit();
+    this.MoveSelection(-1);
+  }
 
-    /// <summary>The selected item, or <see langword="null"/> for none.</summary>
-    public string? SelectedItem
-    {
-        get => _selectedIndex >= 0 ? this.Items[_selectedIndex] : null;
-        set => this.SelectedIndex = value is null ? -1 : this.Items.IndexOf(value);
-    }
+  /// <inheritdoc/>
+  public override void DownButton() {
+    this.CommitEdit();
+    this.MoveSelection(+1);
+  }
 
-    /// <summary>Raised when the selection changes, by stepping, typing or assignment.</summary>
-    public event EventHandler? SelectedItemChanged;
+  /// <inheritdoc/>
+  protected override void UpdateEditText()
+      => this.SetEditorText(_selectedIndex >= 0 ? this.Items[_selectedIndex] : string.Empty);
 
-    /// <summary>Raises <see cref="SelectedItemChanged"/>.</summary>
-    protected virtual void OnSelectedItemChanged(EventArgs e) => this.SelectedItemChanged?.Invoke(this, e);
+  /// <inheritdoc/>
+  protected override void ValidateEditText() {
+    var match = this.IndexOfText(this.Text);
+    if (match >= 0)
+      this.SelectedIndex = match; // a no-op when the same item is already selected
 
-    /// <inheritdoc/>
-    public override void UpButton()
-    {
-        this.CommitEdit();
-        this.MoveSelection(-1);
-    }
+    this.UpdateEditText(); // normalize the casing on a match, revert on a miss
+  }
 
-    /// <inheritdoc/>
-    public override void DownButton()
-    {
-        this.CommitEdit();
-        this.MoveSelection(+1);
-    }
+  /// <summary>Walks the selection by <paramref name="delta"/>: from nothing to the first item,
+  /// otherwise clamped at the ends or wrapped around them per <see cref="Wrap"/>.</summary>
+  private void MoveSelection(int delta) {
+    var count = this.Items.Count;
+    if (count == 0)
+      return;
 
-    /// <inheritdoc/>
-    protected override void UpdateEditText()
-        => this.SetEditorText(_selectedIndex >= 0 ? this.Items[_selectedIndex] : string.Empty);
+    var next = _selectedIndex < 0 ? 0 : _selectedIndex + delta;
+    this.SelectedIndex = this.Wrap ? (next % count + count) % count : Math.Clamp(next, 0, count - 1);
+  }
 
-    /// <inheritdoc/>
-    protected override void ValidateEditText()
-    {
-        var match = this.IndexOfText(this.Text);
-        if (match >= 0)
-            this.SelectedIndex = match; // a no-op when the same item is already selected
+  /// <summary>Finds the item matching <paramref name="text"/> case-insensitively; -1 for none.</summary>
+  private int IndexOfText(string text) {
+    for (var i = 0; i < this.Items.Count; ++i)
+      if (string.Equals(this.Items[i], text, StringComparison.OrdinalIgnoreCase))
+        return i;
 
-        this.UpdateEditText(); // normalize the casing on a match, revert on a miss
-    }
+    return -1;
+  }
 
-    /// <summary>Walks the selection by <paramref name="delta"/>: from nothing to the first item,
-    /// otherwise clamped at the ends or wrapped around them per <see cref="Wrap"/>.</summary>
-    private void MoveSelection(int delta)
-    {
-        var count = this.Items.Count;
-        if (count == 0)
-            return;
+  /// <summary>Keeps the selection pointing at the same item across item mutations: shifted by
+  /// inserts/removes before it, cleared (with one event) when the selected item vanishes.</summary>
+  private void OnItemsListChanged(object? sender, ListChangedEventArgs e) {
+    var changed = false;
+    switch (e.ChangeType) {
+      case ListChangeType.Added:
+        if (_selectedIndex >= e.Index)
+          ++_selectedIndex;
+        break;
 
-        var next = _selectedIndex < 0 ? 0 : _selectedIndex + delta;
-        this.SelectedIndex = this.Wrap ? (next % count + count) % count : Math.Clamp(next, 0, count - 1);
-    }
+      case ListChangeType.Removed:
+        if (_selectedIndex == e.Index) {
+          _selectedIndex = -1;
+          changed = true;
+        } else if (_selectedIndex > e.Index)
+          --_selectedIndex;
 
-    /// <summary>Finds the item matching <paramref name="text"/> case-insensitively; -1 for none.</summary>
-    private int IndexOfText(string text)
-    {
-        for (var i = 0; i < this.Items.Count; ++i)
-            if (string.Equals(this.Items[i], text, StringComparison.OrdinalIgnoreCase))
-                return i;
+        break;
 
-        return -1;
-    }
-
-    /// <summary>Keeps the selection pointing at the same item across item mutations: shifted by
-    /// inserts/removes before it, cleared (with one event) when the selected item vanishes.</summary>
-    private void OnItemsListChanged(object? sender, ListChangedEventArgs e)
-    {
-        var changed = false;
-        switch (e.ChangeType)
-        {
-            case ListChangeType.Added:
-                if (_selectedIndex >= e.Index)
-                    ++_selectedIndex;
-                break;
-
-            case ListChangeType.Removed:
-                if (_selectedIndex == e.Index)
-                {
-                    _selectedIndex = -1;
-                    changed = true;
-                }
-                else if (_selectedIndex > e.Index)
-                    --_selectedIndex;
-
-                break;
-
-            case ListChangeType.Reset:
-                if (_selectedIndex >= this.Items.Count)
-                {
-                    _selectedIndex = -1;
-                    changed = true;
-                }
-
-                break;
+      case ListChangeType.Reset:
+        if (_selectedIndex >= this.Items.Count) {
+          _selectedIndex = -1;
+          changed = true;
         }
 
-        if (!changed)
-            return;
-
-        this.UpdateEditText();
-        this.OnSelectedItemChanged(EventArgs.Empty);
+        break;
     }
+
+    if (!changed)
+      return;
+
+    this.UpdateEditText();
+    this.OnSelectedItemChanged(EventArgs.Empty);
+  }
 }

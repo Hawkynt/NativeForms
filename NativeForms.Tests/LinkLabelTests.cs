@@ -4,158 +4,144 @@ using Hawkynt.NativeForms.Tests.Fakes;
 namespace Hawkynt.NativeForms.Tests;
 
 [TestFixture]
-internal sealed class LinkLabelTests
-{
-    // DefaultTheme.Accent as the recording graphics formats it.
-    private const string _Accent = "#FF0078D4";
+internal sealed class LinkLabelTests {
+  // DefaultTheme.Accent as the recording graphics formats it.
+  private const string _Accent = "#FF0078D4";
 
-    private static HeadlessCanvasPeer Realize(LinkLabel link)
-    {
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(link);
-        Application.Run(form, backend);
-        return backend.Created.OfType<HeadlessCanvasPeer>().Single();
-    }
+  private static HeadlessCanvasPeer Realize(LinkLabel link) {
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(link);
+    Application.Run(form, backend);
+    return backend.Created.OfType<HeadlessCanvasPeer>().Single();
+  }
 
-    [Test]
-    public void Paints_text_in_accent_color_with_underline()
-    {
-        // "Link" measures 28x16 in the headless backend; MiddleLeft in a 30px-high control puts it at y = 7.
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var canvas = Realize(link);
+  [Test]
+  public void Paints_text_in_accent_color_with_underline() {
+    // "Link" measures 28x16 in the headless backend; MiddleLeft in a 30px-high control puts it at y = 7.
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var canvas = Realize(link);
 
-        var g = canvas.RaisePaint();
+    var g = canvas.RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True, "accent text");
-            Assert.That(g.Operations.Exists(o => o == $"line {_Accent} 0,22-28,22"), Is.True, "underline under the text extent");
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True, "accent text");
+      Assert.That(g.Operations.Exists(o => o == $"line {_Accent} 0,22-28,22"), Is.True, "underline under the text extent");
+    });
+  }
 
-    [Test]
-    public void MouseUp_inside_text_extent_raises_LinkClicked()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var clicks = 0;
-        link.LinkClicked += (_, _) => ++clicks;
-        var canvas = Realize(link);
+  [Test]
+  public void MouseUp_inside_text_extent_raises_LinkClicked() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var clicks = 0;
+    link.LinkClicked += (_, _) => ++clicks;
+    var canvas = Realize(link);
 
-        canvas.RaiseMouseUp(10, 15);
+    canvas.RaiseMouseUp(10, 15);
 
-        Assert.That(clicks, Is.EqualTo(1));
-    }
+    Assert.That(clicks, Is.EqualTo(1));
+  }
 
-    [Test]
-    public void MouseUp_outside_text_extent_does_not_raise()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var clicks = 0;
-        link.LinkClicked += (_, _) => ++clicks;
-        var canvas = Realize(link);
+  [Test]
+  public void MouseUp_outside_text_extent_does_not_raise() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var clicks = 0;
+    link.LinkClicked += (_, _) => ++clicks;
+    var canvas = Realize(link);
 
-        canvas.RaiseMouseUp(100, 15); // right of the 28px text extent
-        canvas.RaiseMouseUp(10, 2);   // above it
+    canvas.RaiseMouseUp(100, 15); // right of the 28px text extent
+    canvas.RaiseMouseUp(10, 2);   // above it
 
-        Assert.That(clicks, Is.Zero);
-    }
+    Assert.That(clicks, Is.Zero);
+  }
 
-    [Test]
-    public void Space_raises_LinkClicked_when_focused()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var clicks = 0;
-        link.LinkClicked += (_, _) => ++clicks;
-        var canvas = Realize(link);
+  [Test]
+  public void Space_raises_LinkClicked_when_focused() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var clicks = 0;
+    link.LinkClicked += (_, _) => ++clicks;
+    var canvas = Realize(link);
 
-        Assert.That(canvas.Focusable, Is.True, "link labels take keyboard focus");
+    Assert.That(canvas.Focusable, Is.True, "link labels take keyboard focus");
 
-        canvas.RaiseKeyDown(Keys.Space);
+    canvas.RaiseKeyDown(Keys.Space);
 
-        Assert.That(clicks, Is.EqualTo(1));
-    }
+    Assert.That(clicks, Is.EqualTo(1));
+  }
 
-    [Test]
-    public void Visited_shifts_the_painted_color_away_from_accent()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var canvas = Realize(link);
+  [Test]
+  public void Visited_shifts_the_painted_color_away_from_accent() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var canvas = Realize(link);
 
-        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True);
+    Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True);
 
-        link.Visited = true; // the legacy alias forwards to LinkVisited
-        Assert.That(link.LinkVisited, Is.True);
+    link.Visited = true; // the legacy alias forwards to LinkVisited
+    Assert.That(link.LinkVisited, Is.True);
 
-        var g = canvas.RaisePaint();
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.DrewText("Link"), Is.True, "still paints the text");
-            Assert.That(g.Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.False, "no longer plain accent");
-        });
-    }
+    var g = canvas.RaisePaint();
+    Assert.Multiple(() => {
+      Assert.That(g.DrewText("Link"), Is.True, "still paints the text");
+      Assert.That(g.Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.False, "no longer plain accent");
+    });
+  }
 
-    [Test]
-    public void Hover_over_text_shifts_the_color_and_leave_restores_it()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var canvas = Realize(link);
+  [Test]
+  public void Hover_over_text_shifts_the_color_and_leave_restores_it() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var canvas = Realize(link);
 
-        canvas.RaiseMouseMove(10, 15);
-        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.False, "hover shifts color");
+    canvas.RaiseMouseMove(10, 15);
+    Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.False, "hover shifts color");
 
-        canvas.RaiseMouseLeave();
-        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True, "leave restores accent");
-    }
+    canvas.RaiseMouseLeave();
+    Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith($"text \"Link\" {_Accent}")), Is.True, "leave restores accent");
+  }
 
-    [Test]
-    public void Focus_paints_the_ring_around_the_text_extent_and_blur_removes_it()
-    {
-        // "Link" measures 28x16; MiddleLeft in a 30px control puts the extent at y = 7. The ring is
-        // the shared faint-accent primitive: accent blended halfway toward the control background.
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var canvas = Realize(link);
+  [Test]
+  public void Focus_paints_the_ring_around_the_text_extent_and_blur_removes_it() {
+    // "Link" measures 28x16; MiddleLeft in a 30px control puts the extent at y = 7. The ring is
+    // the shared faint-accent primitive: accent blended halfway toward the control background.
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var canvas = Realize(link);
 
-        // Initial focus lands on the link (first control in tab order), so blur it first.
-        canvas.RaiseLostFocus();
-        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "no ring while unfocused");
+    // Initial focus lands on the link (first control in tab order), so blur it first.
+    canvas.RaiseLostFocus();
+    Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "no ring while unfocused");
 
-        canvas.RaiseGotFocus();
-        Assert.That(canvas.RaisePaint().Operations, Does.Contain("rect #FF7EBAE8 0,7,28,16"), "faint accent ring around the text");
+    canvas.RaiseGotFocus();
+    Assert.That(canvas.RaisePaint().Operations, Does.Contain("rect #FF7EBAE8 0,7,28,16"), "faint accent ring around the text");
 
-        canvas.RaiseLostFocus();
-        Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "blur removes the ring");
-    }
+    canvas.RaiseLostFocus();
+    Assert.That(canvas.RaisePaint().Operations.Exists(o => o.StartsWith("rect ")), Is.False, "blur removes the ring");
+  }
 
-    [Test]
-    public void Enter_raises_LinkClicked_when_focused()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var clicks = 0;
-        link.LinkClicked += (_, _) => ++clicks;
-        var canvas = Realize(link);
+  [Test]
+  public void Enter_raises_LinkClicked_when_focused() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var clicks = 0;
+    link.LinkClicked += (_, _) => ++clicks;
+    var canvas = Realize(link);
 
-        canvas.RaiseKeyDown(Keys.Enter);
+    canvas.RaiseKeyDown(Keys.Enter);
 
-        Assert.That(clicks, Is.EqualTo(1));
-    }
+    Assert.That(clicks, Is.EqualTo(1));
+  }
 
-    [Test]
-    public void MouseUp_inside_the_link_raises_Click_and_LinkClicked()
-    {
-        var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
-        var clicks = 0;
-        var linkClicks = 0;
-        link.Click += (_, _) => ++clicks;
-        link.LinkClicked += (_, _) => ++linkClicks;
-        var canvas = Realize(link);
+  [Test]
+  public void MouseUp_inside_the_link_raises_Click_and_LinkClicked() {
+    var link = new LinkLabel { Text = "Link", Bounds = new(0, 0, 120, 30) };
+    var clicks = 0;
+    var linkClicks = 0;
+    link.Click += (_, _) => ++clicks;
+    link.LinkClicked += (_, _) => ++linkClicks;
+    var canvas = Realize(link);
 
-        canvas.RaiseMouseUp(10, 15);
+    canvas.RaiseMouseUp(10, 15);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(clicks, Is.EqualTo(1), "Windows Forms raises the generic Click too");
-            Assert.That(linkClicks, Is.EqualTo(1));
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(clicks, Is.EqualTo(1), "Windows Forms raises the generic Click too");
+      Assert.That(linkClicks, Is.EqualTo(1));
+    });
+  }
 }

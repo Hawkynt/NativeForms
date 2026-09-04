@@ -10,56 +10,49 @@ namespace Hawkynt.NativeForms.Tests;
 /// classic text placement stays untouched.
 /// </summary>
 [TestFixture]
-internal sealed class CheckBoxImageTests
-{
-    private static HeadlessCanvasPeer Realize(CheckBox box)
-    {
-        var backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(box);
-        Application.Run(form, backend);
-        return backend.Created.OfType<HeadlessCanvasPeer>().First();
-    }
+internal sealed class CheckBoxImageTests {
+  private static HeadlessCanvasPeer Realize(CheckBox box) {
+    var backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(box);
+    Application.Run(form, backend);
+    return backend.Created.OfType<HeadlessCanvasPeer>().First();
+  }
 
-    [Test]
-    public void Image_paints_after_the_glyph_and_shifts_the_text()
-    {
-        var box = new CheckBox { Text = "Go", Bounds = new(0, 0, 200, 30), Image = new HeadlessImage(16, 16) };
-        var canvas = Realize(box);
+  [Test]
+  public void Image_paints_after_the_glyph_and_shifts_the_text() {
+    var box = new CheckBox { Text = "Go", Bounds = new(0, 0, 200, 30), Image = new HeadlessImage(16, 16) };
+    var canvas = Realize(box);
 
-        var g = canvas.RaisePaint();
+    var g = canvas.RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16 @20,7,16,16")), Is.True, "icon sits past the 14px glyph + 6px gap, vertically centered");
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Go\"") && o.EndsWith("@40,7")), Is.True, "text shifts right past the image");
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16 @20,7,16,16")), Is.True, "icon sits past the 14px glyph + 6px gap, vertically centered");
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Go\"") && o.EndsWith("@40,7")), Is.True, "text shifts right past the image");
+    });
+  }
 
-    [Test]
-    public void Without_an_image_the_text_keeps_its_place()
-    {
-        var box = new CheckBox { Text = "Go", Bounds = new(0, 0, 200, 30) };
-        var canvas = Realize(box);
+  [Test]
+  public void Without_an_image_the_text_keeps_its_place() {
+    var box = new CheckBox { Text = "Go", Bounds = new(0, 0, 200, 30) };
+    var canvas = Realize(box);
 
-        var g = canvas.RaisePaint();
+    var g = canvas.RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image ")), Is.False);
-            Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Go\"") && o.EndsWith("@20,0")), Is.True);
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image ")), Is.False);
+      Assert.That(g.Operations.Exists(o => o.StartsWith("text \"Go\"") && o.EndsWith("@20,0")), Is.True);
+    });
+  }
 
-    [Test]
-    public void Image_change_invalidates()
-    {
-        var box = new CheckBox { Bounds = new(0, 0, 200, 30) };
-        var canvas = Realize(box);
-        var before = canvas.InvalidateCount;
+  [Test]
+  public void Image_change_invalidates() {
+    var box = new CheckBox { Bounds = new(0, 0, 200, 30) };
+    var canvas = Realize(box);
+    var before = canvas.InvalidateCount;
 
-        box.Image = new HeadlessImage(16, 16);
+    box.Image = new HeadlessImage(16, 16);
 
-        Assert.That(canvas.InvalidateCount, Is.EqualTo(before + 1));
-    }
+    Assert.That(canvas.InvalidateCount, Is.EqualTo(before + 1));
+  }
 }

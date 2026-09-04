@@ -11,155 +11,133 @@ namespace Hawkynt.NativeForms;
 /// <c>InvariantGlobalization</c> means <see cref="DateTimeFormat"/> defaults to the invariant
 /// culture; supply a hand-built <see cref="DateTimeFormatInfo"/> to localize month and day names.
 /// </summary>
-public static class Strings
-{
-    private static readonly string[] _DefaultDayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+public static class Strings {
+  private static readonly string[] _DefaultDayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-    private static readonly string[] _DefaultMonthNames =
-        ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  private static readonly string[] _DefaultMonthNames =
+      ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    /// <summary>The placeholder a <see cref="SearchBox"/> shows while empty (read at construction).</summary>
-    public static string SearchPlaceholder
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "Search";
-
-    /// <summary>The all-or-nothing entry heading a column's filter menu.</summary>
-    public static string FilterAll
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "(All)";
-
-    /// <summary>What a column's filter menu calls the empty value, which would otherwise be a blank row.</summary>
-    public static string FilterBlank
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "(Blank)";
-
-    /// <summary>The header of the implicit <see cref="ListView"/> group holding ungrouped items.</summary>
-    public static string DefaultListViewGroupHeader
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "Default";
-
-    /// <summary>The Control-key prefix in rendered menu shortcut chords ("Ctrl+S").</summary>
-    public static string ShortcutControlPrefix
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "Ctrl+";
-
-    /// <summary>The Shift-key prefix in rendered menu shortcut chords.</summary>
-    public static string ShortcutShiftPrefix
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "Shift+";
-
-    /// <summary>The Alt-key prefix in rendered menu shortcut chords.</summary>
-    public static string ShortcutAltPrefix
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = "Alt+";
-
-    /// <summary>
-    /// The seven abbreviated day names the calendar header paints, indexed by
-    /// <see cref="DayOfWeek"/> (Sunday first). Assigning copies the array, so later caller mutations
-    /// do not leak into painting.
-    /// </summary>
-    /// <exception cref="ArgumentException">The array does not hold exactly seven names.</exception>
-    public static string[] AbbreviatedDayNames
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            if (value.Length != 7)
-                throw new ArgumentException($"Expected 7 day names (Sunday first), got {value.Length}.", nameof(value));
-
-            field = (string[])value.Clone();
-        }
-    } = _DefaultDayNames;
-
-    /// <summary>
-    /// The twelve abbreviated month names the calendar's month grid paints when the title is drilled
-    /// out of the day page, January first. Assigning copies the array, so later caller mutations do
-    /// not leak into painting.
-    /// </summary>
-    /// <exception cref="ArgumentException">The array does not hold exactly twelve names.</exception>
-    public static string[] AbbreviatedMonthNames
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            if (value.Length != 12)
-                throw new ArgumentException($"Expected 12 month names (January first), got {value.Length}.", nameof(value));
-
-            field = (string[])value.Clone();
-        }
-    } = _DefaultMonthNames;
-
-    /// <summary>
-    /// The format provider behind every date/time string the toolkit renders (the calendar's month
-    /// title, <see cref="DateTimePicker"/> text). Typically a hand-built
-    /// <see cref="DateTimeFormatInfo"/> carrying localized month/day names.
-    /// </summary>
-    public static IFormatProvider DateTimeFormat
-    {
-        get => field;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            field = value;
-        }
-    } = CultureInfo.InvariantCulture;
-
-    /// <summary>Restores every provider to its built-in default.</summary>
-    public static void Reset()
-    {
-        SearchPlaceholder = "Search";
-        FilterAll = "(All)";
-        FilterBlank = "(Blank)";
-        DefaultListViewGroupHeader = "Default";
-        ShortcutControlPrefix = "Ctrl+";
-        ShortcutShiftPrefix = "Shift+";
-        ShortcutAltPrefix = "Alt+";
-        AbbreviatedDayNames = _DefaultDayNames;
-        AbbreviatedMonthNames = _DefaultMonthNames;
-        DateTimeFormat = CultureInfo.InvariantCulture;
+  /// <summary>The placeholder a <see cref="SearchBox"/> shows while empty (read at construction).</summary>
+  public static string SearchPlaceholder {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
     }
+  } = "Search";
+
+  /// <summary>The all-or-nothing entry heading a column's filter menu.</summary>
+  public static string FilterAll {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = "(All)";
+
+  /// <summary>What a column's filter menu calls the empty value, which would otherwise be a blank row.</summary>
+  public static string FilterBlank {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = "(Blank)";
+
+  /// <summary>The header of the implicit <see cref="ListView"/> group holding ungrouped items.</summary>
+  public static string DefaultListViewGroupHeader {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = "Default";
+
+  /// <summary>The Control-key prefix in rendered menu shortcut chords ("Ctrl+S").</summary>
+  public static string ShortcutControlPrefix {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = "Ctrl+";
+
+  /// <summary>The Shift-key prefix in rendered menu shortcut chords.</summary>
+  public static string ShortcutShiftPrefix {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = "Shift+";
+
+  /// <summary>The Alt-key prefix in rendered menu shortcut chords.</summary>
+  public static string ShortcutAltPrefix {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = "Alt+";
+
+  /// <summary>
+  /// The seven abbreviated day names the calendar header paints, indexed by
+  /// <see cref="DayOfWeek"/> (Sunday first). Assigning copies the array, so later caller mutations
+  /// do not leak into painting.
+  /// </summary>
+  /// <exception cref="ArgumentException">The array does not hold exactly seven names.</exception>
+  public static string[] AbbreviatedDayNames {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      if (value.Length != 7)
+        throw new ArgumentException($"Expected 7 day names (Sunday first), got {value.Length}.", nameof(value));
+
+      field = (string[])value.Clone();
+    }
+  } = _DefaultDayNames;
+
+  /// <summary>
+  /// The twelve abbreviated month names the calendar's month grid paints when the title is drilled
+  /// out of the day page, January first. Assigning copies the array, so later caller mutations do
+  /// not leak into painting.
+  /// </summary>
+  /// <exception cref="ArgumentException">The array does not hold exactly twelve names.</exception>
+  public static string[] AbbreviatedMonthNames {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      if (value.Length != 12)
+        throw new ArgumentException($"Expected 12 month names (January first), got {value.Length}.", nameof(value));
+
+      field = (string[])value.Clone();
+    }
+  } = _DefaultMonthNames;
+
+  /// <summary>
+  /// The format provider behind every date/time string the toolkit renders (the calendar's month
+  /// title, <see cref="DateTimePicker"/> text). Typically a hand-built
+  /// <see cref="DateTimeFormatInfo"/> carrying localized month/day names.
+  /// </summary>
+  public static IFormatProvider DateTimeFormat {
+    get => field;
+    set {
+      ArgumentNullException.ThrowIfNull(value);
+      field = value;
+    }
+  } = CultureInfo.InvariantCulture;
+
+  /// <summary>Restores every provider to its built-in default.</summary>
+  public static void Reset() {
+    SearchPlaceholder = "Search";
+    FilterAll = "(All)";
+    FilterBlank = "(Blank)";
+    DefaultListViewGroupHeader = "Default";
+    ShortcutControlPrefix = "Ctrl+";
+    ShortcutShiftPrefix = "Shift+";
+    ShortcutAltPrefix = "Alt+";
+    AbbreviatedDayNames = _DefaultDayNames;
+    AbbreviatedMonthNames = _DefaultMonthNames;
+    DateTimeFormat = CultureInfo.InvariantCulture;
+  }
 }

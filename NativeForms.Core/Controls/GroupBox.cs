@@ -10,164 +10,152 @@ namespace Hawkynt.NativeForms;
 /// small <see cref="Image"/>. Purely decorative — it takes no focus and handles no input; children
 /// are added to <see cref="Control.Controls"/> as usual.
 /// </summary>
-public class GroupBox : OwnerDrawnControl
-{
-    /// <inheritdoc/>
-    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Grouping;
+public class GroupBox : OwnerDrawnControl {
+  /// <inheritdoc/>
+  private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Grouping;
 
-    private const int _CaptionInset = 8;
-    private const int _CaptionPadding = 4;
+  private const int _CaptionInset = 8;
+  private const int _CaptionPadding = 4;
 
-    /// <summary>
-    /// An optional icon rendered with the caption in the frame gap through the shared content layout;
-    /// <see cref="TextImageRelation"/> places it before or after the text.
-    /// </summary>
-    public IImage? Image
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>
+  /// An optional icon rendered with the caption in the frame gap through the shared content layout;
+  /// <see cref="TextImageRelation"/> places it before or after the text.
+  /// </summary>
+  public IImage? Image {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            this.UpdateImageAnimation();
-            if (this.IsNativeWidget != this.WouldBeNative)
-                this.RerealizePeer();
+      field = value;
+      this.UpdateImageAnimation();
+      if (this.IsNativeWidget != this.WouldBeNative)
+        this.RerealizePeer();
 
-            this.Invalidate();
-        }
+      this.Invalidate();
+    }
+  }
+
+  /// <inheritdoc/>
+  private protected override IImage? AnimatedImageSlot => this.Image;
+
+  private IGroupBoxPeer? _native;
+  private bool? _nativeOffered;
+
+
+  /// <summary>Whether this frame is currently rendered by a real platform widget.</summary>
+  public override bool IsNativeWidget => _native is not null;
+
+  /// <summary>
+  /// Whether the current property values are all expressible by a platform frame. A stock frame's
+  /// caption is text, so an <see cref="Image"/> beside it keeps the painter.
+  /// </summary>
+  private bool IsNativeEligible => this.Image is null;
+
+  /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
+  private bool WouldBeNative
+      => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
+
+  /// <inheritdoc/>
+  private protected override IControlPeer CreatePeer(IPlatformBackend backend) {
+    if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible) {
+      var offered = backend.CreateGroupBox();
+      _nativeOffered = offered is not null;
+      if (offered is { } peer) {
+        _native = peer;
+        return peer;
+      }
     }
 
-    /// <inheritdoc/>
-    private protected override IImage? AnimatedImageSlot => this.Image;
+    return base.CreatePeer(backend);
+  }
 
-    private IGroupBoxPeer? _native;
-    private bool? _nativeOffered;
+  /// <inheritdoc/>
+  private protected override void OnUnrealized() {
+    _native = null;
+    base.OnUnrealized();
+  }
 
+  /// <summary>
+  /// Where the <see cref="Image"/> sits relative to the caption. Defaults to
+  /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
+  /// to put the icon after the text. The header is a single horizontal strip, so the before/after
+  /// values are the meaningful ones.
+  /// </summary>
+  public TextImageRelation TextImageRelation {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-    /// <summary>Whether this frame is currently rendered by a real platform widget.</summary>
-    public override bool IsNativeWidget => _native is not null;
-
-    /// <summary>
-    /// Whether the current property values are all expressible by a platform frame. A stock frame's
-    /// caption is text, so an <see cref="Image"/> beside it keeps the painter.
-    /// </summary>
-    private bool IsNativeEligible => this.Image is null;
-
-    /// <summary>What <see cref="IsNativeWidget"/> would be if the peer were built right now.</summary>
-    private bool WouldBeNative
-        => (this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible && (_nativeOffered ?? true);
-
-    /// <inheritdoc/>
-    private protected override IControlPeer CreatePeer(IPlatformBackend backend)
-    {
-        if ((this.UseNativeWidget ?? Application.PreferNativeWidgets) && this.IsNativeEligible)
-        {
-            var offered = backend.CreateGroupBox();
-            _nativeOffered = offered is not null;
-            if (offered is { } peer)
-            {
-                _native = peer;
-                return peer;
-            }
-        }
-
-        return base.CreatePeer(backend);
+      field = value;
+      this.Invalidate();
     }
+  } = TextImageRelation.ImageBeforeText;
 
-    /// <inheritdoc/>
-    private protected override void OnUnrealized()
-    {
-        _native = null;
-        base.OnUnrealized();
+  /// <summary>
+  /// The area available to children: the client area inside the frame line and the caption
+  /// strip, deflated by <see cref="Control.Padding"/> — the owner-drawn counterpart of the
+  /// WinForms group-box display rectangle.
+  /// </summary>
+  public override Rectangle DisplayRectangle {
+    get {
+      var captionHeight = 0;
+      if (this.Text.Length > 0 && this.Backend is { } backend)
+        captionHeight = backend.MeasureText(this.Text, this.Font).Height;
+
+      if (this.Image is { } image)
+        captionHeight = Math.Max(captionHeight, image.Height);
+
+      var padding = this.Padding;
+      var top = Math.Max(1, captionHeight) + padding.Top;
+      return new(
+          1 + padding.Left,
+          top,
+          Math.Max(0, this.Width - 2 - padding.Horizontal),
+          Math.Max(0, this.Height - top - 1 - padding.Bottom));
     }
+  }
 
-    /// <summary>
-    /// Where the <see cref="Image"/> sits relative to the caption. Defaults to
-    /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
-    /// to put the icon after the text. The header is a single horizontal strip, so the before/after
-    /// values are the meaningful ones.
-    /// </summary>
-    public TextImageRelation TextImageRelation
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var theme = this.Theme;
+    var font = this.Font;
+    var backColor = this.BackColor;
+    g.FillRectangle(backColor, new Rectangle(0, 0, this.Width, this.Height));
 
-            field = value;
-            this.Invalidate();
-        }
-    } = TextImageRelation.ImageBeforeText;
+    var caption = this.Text;
+    var image = this.Image;
+    var captionSize = string.IsNullOrEmpty(caption) ? Size.Empty : g.MeasureText(caption, font);
+    var imageSize = image is null ? Size.Empty : new Size(image.Width, image.Height);
+    var contentWidth = captionSize.Width + imageSize.Width + (captionSize.Width > 0 && imageSize.Width > 0 ? ContentLayout.Gap : 0);
+    var contentHeight = Math.Max(captionSize.Height, imageSize.Height);
 
-    /// <summary>
-    /// The area available to children: the client area inside the frame line and the caption
-    /// strip, deflated by <see cref="Control.Padding"/> — the owner-drawn counterpart of the
-    /// WinForms group-box display rectangle.
-    /// </summary>
-    public override Rectangle DisplayRectangle
-    {
-        get
-        {
-            var captionHeight = 0;
-            if (this.Text.Length > 0 && this.Backend is { } backend)
-                captionHeight = backend.MeasureText(this.Text, this.Font).Height;
+    // Drop the frame so its top edge runs through the caption strip's vertical middle.
+    var frameTop = contentHeight / 2;
+    g.DrawRectangle(theme.Border, new Rectangle(0, frameTop, this.Width - 1, this.Height - 1 - frameTop));
 
-            if (this.Image is { } image)
-                captionHeight = Math.Max(captionHeight, image.Height);
+    if (contentWidth <= 0)
+      return;
 
-            var padding = this.Padding;
-            var top = Math.Max(1, captionHeight) + padding.Top;
-            return new(
-                1 + padding.Left,
-                top,
-                Math.Max(0, this.Width - 2 - padding.Horizontal),
-                Math.Max(0, this.Height - top - 1 - padding.Bottom));
-        }
-    }
+    // Punch a gap in the top border for icon + caption, then paint them over it.
+    var gap = new Rectangle(_CaptionInset, 0, contentWidth + 2 * _CaptionPadding, contentHeight);
+    g.FillRectangle(backColor, gap);
 
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        var font = this.Font;
-        var backColor = this.BackColor;
-        g.FillRectangle(backColor, new Rectangle(0, 0, this.Width, this.Height));
+    ContentLayout.Arrange(
+        new Rectangle(_CaptionInset + _CaptionPadding, 0, contentWidth, contentHeight),
+        imageSize,
+        captionSize,
+        this.TextImageRelation,
+        ContentAlignment.MiddleLeft,
+        out var imageRect,
+        out var textRect);
 
-        var caption = this.Text;
-        var image = this.Image;
-        var captionSize = string.IsNullOrEmpty(caption) ? Size.Empty : g.MeasureText(caption, font);
-        var imageSize = image is null ? Size.Empty : new Size(image.Width, image.Height);
-        var contentWidth = captionSize.Width + imageSize.Width + (captionSize.Width > 0 && imageSize.Width > 0 ? ContentLayout.Gap : 0);
-        var contentHeight = Math.Max(captionSize.Height, imageSize.Height);
+    if (image is not null)
+      g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
 
-        // Drop the frame so its top edge runs through the caption strip's vertical middle.
-        var frameTop = contentHeight / 2;
-        g.DrawRectangle(theme.Border, new Rectangle(0, frameTop, this.Width - 1, this.Height - 1 - frameTop));
-
-        if (contentWidth <= 0)
-            return;
-
-        // Punch a gap in the top border for icon + caption, then paint them over it.
-        var gap = new Rectangle(_CaptionInset, 0, contentWidth + 2 * _CaptionPadding, contentHeight);
-        g.FillRectangle(backColor, gap);
-
-        ContentLayout.Arrange(
-            new Rectangle(_CaptionInset + _CaptionPadding, 0, contentWidth, contentHeight),
-            imageSize,
-            captionSize,
-            this.TextImageRelation,
-            ContentAlignment.MiddleLeft,
-            out var imageRect,
-            out var textRect);
-
-        if (image is not null)
-            g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
-
-        if (!string.IsNullOrEmpty(caption))
-            g.DrawText(caption, font, this.Enabled ? this.ForeColor : theme.DisabledText, textRect, ContentAlignment.TopLeft);
-    }
+    if (!string.IsNullOrEmpty(caption))
+      g.DrawText(caption, font, this.Enabled ? this.ForeColor : theme.DisabledText, textRect, ContentAlignment.TopLeft);
+  }
 }

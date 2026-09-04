@@ -10,362 +10,336 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// it to the native HWND once one exists (immediately for a window, on first parenting for a child).
 /// Property writes made before the handle is created are flushed by <see cref="FlushState"/>.
 /// </summary>
-internal abstract class Win32ControlPeer : IControlPeer
-{
-    /// <summary>Buffered caption/content text, applied whenever a native handle exists.</summary>
-    protected string _text = string.Empty;
+internal abstract class Win32ControlPeer : IControlPeer {
+  /// <summary>Buffered caption/content text, applied whenever a native handle exists.</summary>
+  protected string _text = string.Empty;
 
-    private protected Rectangle _bounds;
-    private bool _visible = true;
-    private bool _enabled = true;
-    private Font? _font;
-    private Color _foreColor;
-    private Color _backColor;
-    private nint _backBrush;
+  private protected Rectangle _bounds;
+  private bool _visible = true;
+  private bool _enabled = true;
+  private Font? _font;
+  private Color _foreColor;
+  private Color _backColor;
+  private nint _backBrush;
 
-    /// <summary>The buffered cursor, resolved by the parent's <c>WM_SETCURSOR</c> handler; null = default.</summary>
-    internal Cursor? CursorValue;
+  /// <summary>The buffered cursor, resolved by the parent's <c>WM_SETCURSOR</c> handler; null = default.</summary>
+  internal Cursor? CursorValue;
 
-    /// <summary>The native window handle, or 0 before realization / after destruction.</summary>
-    internal nint Handle;
+  /// <summary>The native window handle, or 0 before realization / after destruction.</summary>
+  internal nint Handle;
 
-    /// <inheritdoc/>
-    public virtual void SetBounds(Rectangle bounds)
-    {
-        _bounds = bounds;
-        if (Handle != 0)
-            NativeMethods.MoveWindow(Handle, bounds.X, bounds.Y, bounds.Width, bounds.Height, true);
+  /// <inheritdoc/>
+  public virtual void SetBounds(Rectangle bounds) {
+    _bounds = bounds;
+    if (Handle != 0)
+      NativeMethods.MoveWindow(Handle, bounds.X, bounds.Y, bounds.Width, bounds.Height, true);
+  }
+
+  /// <inheritdoc/>
+  public virtual void SetText(string text) {
+    _text = text ?? string.Empty;
+    if (Handle != 0)
+      NativeMethods.SetWindowTextW(Handle, _text);
+  }
+
+  /// <inheritdoc/>
+  public void SetVisible(bool visible) {
+    _visible = visible;
+    if (Handle != 0)
+      NativeMethods.ShowWindow(Handle, visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
+  }
+
+  /// <inheritdoc/>
+  public void SetEnabled(bool enabled) {
+    _enabled = enabled;
+    if (Handle != 0)
+      NativeMethods.EnableWindow(Handle, enabled);
+  }
+
+  /// <inheritdoc/>
+  public event EventHandler? GotFocus;
+
+  /// <inheritdoc/>
+  public event EventHandler? LostFocus;
+
+  /// <inheritdoc/>
+  public void Focus() {
+    if (Handle != 0)
+      NativeMethods.SetFocus(Handle);
+  }
+
+  /// <summary>Raises <see cref="GotFocus"/>; called by subclasses translating their native focus notification.</summary>
+  protected void RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
+
+  /// <summary>Raises <see cref="LostFocus"/>; called by subclasses translating their native focus notification.</summary>
+  protected void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
+
+  /// <inheritdoc/>
+  public event EventHandler<MouseEventArgs>? PointerMove;
+
+  /// <inheritdoc/>
+  public event EventHandler? PointerLeave;
+
+  /// <summary>Whether anything is listening for hover — the subclass proc checks this before
+  /// allocating args for a message that arrives at pointer rate.</summary>
+  private protected bool HasPointerListener => PointerMove is not null;
+
+  /// <summary>Raises <see cref="PointerMove"/> from a decoded client-space position.</summary>
+  private protected void RaisePointerMove(int x, int y)
+      => PointerMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
+
+  /// <summary>Raises <see cref="PointerLeave"/>.</summary>
+  private protected void RaisePointerLeave() => PointerLeave?.Invoke(this, EventArgs.Empty);
+
+  /// <inheritdoc/>
+  public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
+
+  /// <summary>Whether anything is listening for the context-menu request — the subclass proc checks
+  /// this before decoding a <c>WM_CONTEXTMENU</c>.</summary>
+  private protected bool HasContextMenuListener => ContextMenuRequested is not null;
+
+  /// <summary>Raises <see cref="ContextMenuRequested"/> at a client-space point; returns whether the
+  /// core opened a menu, so the caller suppresses the widget's own default menu.</summary>
+  private protected bool RaiseContextMenu(Point clientLocation) {
+    if (ContextMenuRequested is not { } handler)
+      return false;
+
+    var args = new ContextMenuRequestedEventArgs(clientLocation);
+    handler(this, args);
+    return args.Handled;
+  }
+
+  /// <summary>The standard tooltip control owning this widget's tip, created on first use.</summary>
+  private nint _toolTipWindow;
+
+  /// <summary>The unmanaged copy of the current tip text — COMCTL32 reads it lazily, so it has to
+  /// outlive the call that registered it.</summary>
+  private nint _toolTipText;
+
+  /// <inheritdoc/>
+  /// <remarks>
+  /// A stock control already answers for itself — a <c>BUTTON</c> tells MSAA it is a push button with
+  /// its caption, unprompted — so this only speaks for the surfaces that do not. Our canvas class has no
+  /// window text at all, which is exactly what MSAA reads as the name of a window it knows nothing else
+  /// about; giving it one is the difference between "pane" and "Enable logging, pane". The text is never
+  /// painted (the canvas draws only what the control's <c>OnPaint</c> puts there), so it is free.
+  /// <para>
+  /// The role is not expressible this way: MSAA infers it from the window class, and saying otherwise
+  /// needs a <c>WM_GETOBJECT</c> provider. Tracked in the PRD; the name is the half that carries most of
+  /// the value, since a screen reader announcing "Enable logging" is useful even when it calls it a pane.
+  /// </para>
+  /// </remarks>
+  public virtual void SetAccessibleInfo(string? name, string? description, AccessibleRole role) {
+  }
+
+  /// <inheritdoc/>
+  public unsafe void ShowToolTip(string? text) {
+    if (Handle == 0)
+      return;
+
+    if (string.IsNullOrEmpty(text)) {
+      if (_toolTipWindow != 0)
+        NativeMethods.SendMessageW(_toolTipWindow, NativeMethods.TTM_ACTIVATE, 0, 0);
+
+      return;
     }
 
-    /// <inheritdoc/>
-    public virtual void SetText(string text)
-    {
-        _text = text ?? string.Empty;
-        if (Handle != 0)
-            NativeMethods.SetWindowTextW(Handle, _text);
-    }
+    var existing = _toolTipWindow != 0;
+    if (!existing)
+      _toolTipWindow = NativeMethods.CreateWindowExW(
+          0,
+          NativeMethods.TOOLTIPS_CLASS,
+          string.Empty,
+          NativeMethods.WS_POPUP | NativeMethods.TTS_ALWAYSTIP,
+          0,
+          0,
+          0,
+          0,
+          Handle,
+          0,
+          NativeMethods.GetModuleHandleW(null),
+          0);
 
-    /// <inheritdoc/>
-    public void SetVisible(bool visible)
-    {
-        _visible = visible;
-        if (Handle != 0)
-            NativeMethods.ShowWindow(Handle, visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
-    }
+    if (_toolTipWindow == 0)
+      return;
 
-    /// <inheritdoc/>
-    public void SetEnabled(bool enabled)
-    {
-        _enabled = enabled;
-        if (Handle != 0)
-            NativeMethods.EnableWindow(Handle, enabled);
-    }
+    if (_toolTipText != 0)
+      Marshal.FreeHGlobal(_toolTipText);
 
-    /// <inheritdoc/>
-    public event EventHandler? GotFocus;
+    _toolTipText = Marshal.StringToHGlobalUni(text);
 
-    /// <inheritdoc/>
-    public event EventHandler? LostFocus;
-
-    /// <inheritdoc/>
-    public void Focus()
-    {
-        if (Handle != 0)
-            NativeMethods.SetFocus(Handle);
-    }
-
-    /// <summary>Raises <see cref="GotFocus"/>; called by subclasses translating their native focus notification.</summary>
-    protected void RaiseGotFocus() => GotFocus?.Invoke(this, EventArgs.Empty);
-
-    /// <summary>Raises <see cref="LostFocus"/>; called by subclasses translating their native focus notification.</summary>
-    protected void RaiseLostFocus() => LostFocus?.Invoke(this, EventArgs.Empty);
-
-    /// <inheritdoc/>
-    public event EventHandler<MouseEventArgs>? PointerMove;
-
-    /// <inheritdoc/>
-    public event EventHandler? PointerLeave;
-
-    /// <summary>Whether anything is listening for hover — the subclass proc checks this before
-    /// allocating args for a message that arrives at pointer rate.</summary>
-    private protected bool HasPointerListener => PointerMove is not null;
-
-    /// <summary>Raises <see cref="PointerMove"/> from a decoded client-space position.</summary>
-    private protected void RaisePointerMove(int x, int y)
-        => PointerMove?.Invoke(this, new MouseEventArgs(MouseButtons.None, x, y, 0));
-
-    /// <summary>Raises <see cref="PointerLeave"/>.</summary>
-    private protected void RaisePointerLeave() => PointerLeave?.Invoke(this, EventArgs.Empty);
-
-    /// <inheritdoc/>
-    public event EventHandler<ContextMenuRequestedEventArgs>? ContextMenuRequested;
-
-    /// <summary>Whether anything is listening for the context-menu request — the subclass proc checks
-    /// this before decoding a <c>WM_CONTEXTMENU</c>.</summary>
-    private protected bool HasContextMenuListener => ContextMenuRequested is not null;
-
-    /// <summary>Raises <see cref="ContextMenuRequested"/> at a client-space point; returns whether the
-    /// core opened a menu, so the caller suppresses the widget's own default menu.</summary>
-    private protected bool RaiseContextMenu(Point clientLocation)
-    {
-        if (ContextMenuRequested is not { } handler)
-            return false;
-
-        var args = new ContextMenuRequestedEventArgs(clientLocation);
-        handler(this, args);
-        return args.Handled;
-    }
-
-    /// <summary>The standard tooltip control owning this widget's tip, created on first use.</summary>
-    private nint _toolTipWindow;
-
-    /// <summary>The unmanaged copy of the current tip text — COMCTL32 reads it lazily, so it has to
-    /// outlive the call that registered it.</summary>
-    private nint _toolTipText;
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// A stock control already answers for itself — a <c>BUTTON</c> tells MSAA it is a push button with
-    /// its caption, unprompted — so this only speaks for the surfaces that do not. Our canvas class has no
-    /// window text at all, which is exactly what MSAA reads as the name of a window it knows nothing else
-    /// about; giving it one is the difference between "pane" and "Enable logging, pane". The text is never
-    /// painted (the canvas draws only what the control's <c>OnPaint</c> puts there), so it is free.
-    /// <para>
-    /// The role is not expressible this way: MSAA infers it from the window class, and saying otherwise
-    /// needs a <c>WM_GETOBJECT</c> provider. Tracked in the PRD; the name is the half that carries most of
-    /// the value, since a screen reader announcing "Enable logging" is useful even when it calls it a pane.
-    /// </para>
-    /// </remarks>
-    public virtual void SetAccessibleInfo(string? name, string? description, AccessibleRole role)
-    {
-    }
-
-    /// <inheritdoc/>
-    public unsafe void ShowToolTip(string? text)
-    {
-        if (Handle == 0)
-            return;
-
-        if (string.IsNullOrEmpty(text))
-        {
-            if (_toolTipWindow != 0)
-                NativeMethods.SendMessageW(_toolTipWindow, NativeMethods.TTM_ACTIVATE, 0, 0);
-
-            return;
-        }
-
-        var existing = _toolTipWindow != 0;
-        if (!existing)
-            _toolTipWindow = NativeMethods.CreateWindowExW(
-                0,
-                NativeMethods.TOOLTIPS_CLASS,
-                string.Empty,
-                NativeMethods.WS_POPUP | NativeMethods.TTS_ALWAYSTIP,
-                0,
-                0,
-                0,
-                0,
-                Handle,
-                0,
-                NativeMethods.GetModuleHandleW(null),
-                0);
-
-        if (_toolTipWindow == 0)
-            return;
-
-        if (_toolTipText != 0)
-            Marshal.FreeHGlobal(_toolTipText);
-
-        _toolTipText = Marshal.StringToHGlobalUni(text);
-
-        var info = new NativeMethods.TOOLINFOW
-        {
-            cbSize = (uint)sizeof(NativeMethods.TOOLINFOW),
-            uFlags = NativeMethods.TTF_IDISHWND | NativeMethods.TTF_SUBCLASS,
-            hwnd = Handle,
-            uId = (nuint)Handle,
-            lpszText = _toolTipText,
-        };
-
-        // TTF_SUBCLASS lets the tooltip control drive its own hover timing, so the tip behaves
-        // exactly like every other Windows tooltip once the tool is registered.
-        NativeMethods.SendToolInfo(
-            _toolTipWindow,
-            existing ? NativeMethods.TTM_UPDATETIPTEXTW : NativeMethods.TTM_ADDTOOLW,
-            0,
-            ref info);
-        NativeMethods.SendMessageW(_toolTipWindow, NativeMethods.TTM_ACTIVATE, 1, 0);
-    }
-
-    /// <summary>Releases the tooltip control and its unmanaged text, if either was created.</summary>
-    private protected void DisposeToolTip()
-    {
-        if (_toolTipWindow != 0)
-        {
-            NativeMethods.DestroyWindow(_toolTipWindow);
-            _toolTipWindow = 0;
-        }
-
-        if (_toolTipText == 0)
-            return;
-
-        Marshal.FreeHGlobal(_toolTipText);
-        _toolTipText = 0;
-    }
-
-    /// <inheritdoc/>
-    public void SetFont(Font font)
-    {
-        _font = font;
-        this.ApplyFont();
-    }
-
-    /// <inheritdoc/>
-    public unsafe void SetColors(Color foreColor, Color backColor)
-    {
-        _foreColor = foreColor;
-        _backColor = backColor;
-
-        // The colors take effect through the next WM_CTLCOLOR* round trip; the cached brush is
-        // rebuilt on demand and the widget repaints with an erased background.
-        if (_backBrush != 0)
-        {
-            NativeMethods.DeleteObject(_backBrush);
-            _backBrush = 0;
-        }
-
-        if (Handle != 0)
-            NativeMethods.InvalidateRect(Handle, null, true);
-    }
-
-    /// <inheritdoc/>
-    public void SetCursor(Cursor cursor) => CursorValue = cursor;
-
-    /// <summary>Whether an explicit background color is buffered (drives the erase path of windows).</summary>
-    private protected bool HasBackColor => !_backColor.IsEmpty;
-
-    /// <summary>
-    /// Sends <c>WM_SETFONT</c> with the cached <c>HFONT</c> for the buffered font, or for the
-    /// desktop's own when the application named none.
-    /// </summary>
-    /// <remarks>
-    /// A stock control that is never sent this message does not fall back to the UI font — it draws in
-    /// GDI's <c>SYSTEM_FONT</c>, the Windows 3.1 raster face, which is why every native caption in the
-    /// gallery photographed in a bitmap font while the owner-drawn ones beside it were Segoe UI, and
-    /// why an em dash and an ellipsis came out as the missing-glyph bar: that face defines nothing in
-    /// the 0x80–0x9F range where cp1252 puts both. The other two backends never showed it because a
-    /// `GtkWidget` and an `NSTextField` already wear the desktop's font unasked; only Windows keeps a
-    /// thirty-year-old default for a control nobody told otherwise.
-    /// </remarks>
-    private void ApplyFont()
-    {
-        if (Handle == 0)
-            return;
-
-        var hFont = Win32FontCache.Get(_font ?? Win32Backend.DefaultUiFont, Win32FontCache.ScreenDpi);
-        if (hFont != 0)
-            NativeMethods.SendMessageW(Handle, NativeMethods.WM_SETFONT, hFont, 1);
-    }
-
-    /// <summary>
-    /// Answers a parent-routed <c>WM_CTLCOLOR*</c> for this control: applies the buffered text color
-    /// to the supplied HDC and returns the background brush to erase with, or 0 when no color is set
-    /// (letting <c>DefWindowProc</c> take over). The brush is cached per peer; an unset background
-    /// falls back to the button-face system color so an explicit foreground alone still works.
-    /// </summary>
-    internal nint HandleControlColor(nint hdc)
-    {
-        if (_foreColor.IsEmpty && _backColor.IsEmpty)
-            return 0;
-
-        NativeMethods.SetTextColor(
-            hdc,
-            _foreColor.IsEmpty ? NativeMethods.GetSysColor(NativeMethods.COLOR_WINDOWTEXT) : ToColorRef(_foreColor));
-
-        if (_backColor.IsEmpty)
-        {
-            NativeMethods.SetBkColor(hdc, NativeMethods.GetSysColor(NativeMethods.COLOR_BTNFACE));
-            return NativeMethods.GetSysColorBrush(NativeMethods.COLOR_BTNFACE);
-        }
-
-        NativeMethods.SetBkColor(hdc, ToColorRef(_backColor));
-        return this.BackBrush;
-    }
-
-    /// <summary>The cached solid brush for the buffered background color, created on first use.</summary>
-    private protected nint BackBrush
-    {
-        get
-        {
-            if (_backBrush == 0 && !_backColor.IsEmpty)
-                _backBrush = NativeMethods.CreateSolidBrush(ToColorRef(_backColor));
-
-            return _backBrush;
-        }
-    }
-
-    /// <summary>Maps a stock cursor to its <c>IDC_*</c> resource id.</summary>
-    internal static nint ToCursorResource(CursorKind kind) => kind switch
-    {
-        CursorKind.Hand => NativeMethods.IDC_HAND,
-        CursorKind.IBeam => NativeMethods.IDC_IBEAM,
-        CursorKind.Wait => NativeMethods.IDC_WAIT,
-        CursorKind.Cross => NativeMethods.IDC_CROSS,
-        CursorKind.SizeWE => NativeMethods.IDC_SIZEWE,
-        CursorKind.SizeNS => NativeMethods.IDC_SIZENS,
-        CursorKind.SizeNWSE => NativeMethods.IDC_SIZENWSE,
-        CursorKind.SizeNESW => NativeMethods.IDC_SIZENESW,
-        CursorKind.No => NativeMethods.IDC_NO,
-        CursorKind.SizeAll => NativeMethods.IDC_SIZEALL,
-        CursorKind.Help => NativeMethods.IDC_HELP,
-        CursorKind.AppStarting => NativeMethods.IDC_APPSTARTING,
-
-        // USER32 ships no splitter cursors (WinForms carries them as private resources); the plain
-        // resize arrows are the honest stock stand-ins.
-        CursorKind.VSplit => NativeMethods.IDC_SIZEWE,
-        CursorKind.HSplit => NativeMethods.IDC_SIZENS,
-        _ => NativeMethods.IDC_ARROW,
+    var info = new NativeMethods.TOOLINFOW {
+      cbSize = (uint)sizeof(NativeMethods.TOOLINFOW),
+      uFlags = NativeMethods.TTF_IDISHWND | NativeMethods.TTF_SUBCLASS,
+      hwnd = Handle,
+      uId = (nuint)Handle,
+      lpszText = _toolTipText,
     };
 
-    /// <summary>Converts a managed color to a Win32 <c>COLORREF</c> (0x00BBGGRR); alpha is dropped for GDI.</summary>
-    private protected static uint ToColorRef(Color color)
-        => (uint)(color.R | (color.G << 8) | (color.B << 16));
+    // TTF_SUBCLASS lets the tooltip control drive its own hover timing, so the tip behaves
+    // exactly like every other Windows tooltip once the tool is registered.
+    NativeMethods.SendToolInfo(
+        _toolTipWindow,
+        existing ? NativeMethods.TTM_UPDATETIPTEXTW : NativeMethods.TTM_ADDTOOLW,
+        0,
+        ref info);
+    NativeMethods.SendMessageW(_toolTipWindow, NativeMethods.TTM_ACTIVATE, 1, 0);
+  }
 
-    /// <inheritdoc/>
-    public Point PointToScreen(Point clientPoint)
-    {
-        if (Handle == 0)
-            return clientPoint;
-
-        var point = new NativeMethods.POINT { x = clientPoint.X, y = clientPoint.Y };
-        NativeMethods.ClientToScreen(Handle, ref point);
-        return new(point.x, point.y);
+  /// <summary>Releases the tooltip control and its unmanaged text, if either was created.</summary>
+  private protected void DisposeToolTip() {
+    if (_toolTipWindow != 0) {
+      NativeMethods.DestroyWindow(_toolTipWindow);
+      _toolTipWindow = 0;
     }
 
-    /// <summary>Pushes all buffered state onto the native handle. Call right after it is created.</summary>
-    protected void FlushState()
-    {
-        NativeMethods.SetWindowTextW(Handle, _text);
-        NativeMethods.MoveWindow(Handle, _bounds.X, _bounds.Y, _bounds.Width, _bounds.Height, true);
-        NativeMethods.EnableWindow(Handle, _enabled);
-        this.ApplyFont();
-        NativeMethods.ShowWindow(Handle, _visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
+    if (_toolTipText == 0)
+      return;
+
+    Marshal.FreeHGlobal(_toolTipText);
+    _toolTipText = 0;
+  }
+
+  /// <inheritdoc/>
+  public void SetFont(Font font) {
+    _font = font;
+    this.ApplyFont();
+  }
+
+  /// <inheritdoc/>
+  public unsafe void SetColors(Color foreColor, Color backColor) {
+    _foreColor = foreColor;
+    _backColor = backColor;
+
+    // The colors take effect through the next WM_CTLCOLOR* round trip; the cached brush is
+    // rebuilt on demand and the widget repaints with an erased background.
+    if (_backBrush != 0) {
+      NativeMethods.DeleteObject(_backBrush);
+      _backBrush = 0;
     }
 
-    /// <inheritdoc/>
-    public virtual void Dispose()
-    {
-        this.DisposeToolTip();
-        if (_backBrush != 0)
-        {
-            NativeMethods.DeleteObject(_backBrush);
-            _backBrush = 0;
-        }
+    if (Handle != 0)
+      NativeMethods.InvalidateRect(Handle, null, true);
+  }
 
-        if (Handle == 0)
-            return;
+  /// <inheritdoc/>
+  public void SetCursor(Cursor cursor) => CursorValue = cursor;
 
-        NativeMethods.DestroyWindow(Handle);
-        Handle = 0;
+  /// <summary>Whether an explicit background color is buffered (drives the erase path of windows).</summary>
+  private protected bool HasBackColor => !_backColor.IsEmpty;
+
+  /// <summary>
+  /// Sends <c>WM_SETFONT</c> with the cached <c>HFONT</c> for the buffered font, or for the
+  /// desktop's own when the application named none.
+  /// </summary>
+  /// <remarks>
+  /// A stock control that is never sent this message does not fall back to the UI font — it draws in
+  /// GDI's <c>SYSTEM_FONT</c>, the Windows 3.1 raster face, which is why every native caption in the
+  /// gallery photographed in a bitmap font while the owner-drawn ones beside it were Segoe UI, and
+  /// why an em dash and an ellipsis came out as the missing-glyph bar: that face defines nothing in
+  /// the 0x80–0x9F range where cp1252 puts both. The other two backends never showed it because a
+  /// `GtkWidget` and an `NSTextField` already wear the desktop's font unasked; only Windows keeps a
+  /// thirty-year-old default for a control nobody told otherwise.
+  /// </remarks>
+  private void ApplyFont() {
+    if (Handle == 0)
+      return;
+
+    var hFont = Win32FontCache.Get(_font ?? Win32Backend.DefaultUiFont, Win32FontCache.ScreenDpi);
+    if (hFont != 0)
+      NativeMethods.SendMessageW(Handle, NativeMethods.WM_SETFONT, hFont, 1);
+  }
+
+  /// <summary>
+  /// Answers a parent-routed <c>WM_CTLCOLOR*</c> for this control: applies the buffered text color
+  /// to the supplied HDC and returns the background brush to erase with, or 0 when no color is set
+  /// (letting <c>DefWindowProc</c> take over). The brush is cached per peer; an unset background
+  /// falls back to the button-face system color so an explicit foreground alone still works.
+  /// </summary>
+  internal nint HandleControlColor(nint hdc) {
+    if (_foreColor.IsEmpty && _backColor.IsEmpty)
+      return 0;
+
+    NativeMethods.SetTextColor(
+        hdc,
+        _foreColor.IsEmpty ? NativeMethods.GetSysColor(NativeMethods.COLOR_WINDOWTEXT) : ToColorRef(_foreColor));
+
+    if (_backColor.IsEmpty) {
+      NativeMethods.SetBkColor(hdc, NativeMethods.GetSysColor(NativeMethods.COLOR_BTNFACE));
+      return NativeMethods.GetSysColorBrush(NativeMethods.COLOR_BTNFACE);
     }
+
+    NativeMethods.SetBkColor(hdc, ToColorRef(_backColor));
+    return this.BackBrush;
+  }
+
+  /// <summary>The cached solid brush for the buffered background color, created on first use.</summary>
+  private protected nint BackBrush {
+    get {
+      if (_backBrush == 0 && !_backColor.IsEmpty)
+        _backBrush = NativeMethods.CreateSolidBrush(ToColorRef(_backColor));
+
+      return _backBrush;
+    }
+  }
+
+  /// <summary>Maps a stock cursor to its <c>IDC_*</c> resource id.</summary>
+  internal static nint ToCursorResource(CursorKind kind) => kind switch {
+    CursorKind.Hand => NativeMethods.IDC_HAND,
+    CursorKind.IBeam => NativeMethods.IDC_IBEAM,
+    CursorKind.Wait => NativeMethods.IDC_WAIT,
+    CursorKind.Cross => NativeMethods.IDC_CROSS,
+    CursorKind.SizeWE => NativeMethods.IDC_SIZEWE,
+    CursorKind.SizeNS => NativeMethods.IDC_SIZENS,
+    CursorKind.SizeNWSE => NativeMethods.IDC_SIZENWSE,
+    CursorKind.SizeNESW => NativeMethods.IDC_SIZENESW,
+    CursorKind.No => NativeMethods.IDC_NO,
+    CursorKind.SizeAll => NativeMethods.IDC_SIZEALL,
+    CursorKind.Help => NativeMethods.IDC_HELP,
+    CursorKind.AppStarting => NativeMethods.IDC_APPSTARTING,
+
+    // USER32 ships no splitter cursors (WinForms carries them as private resources); the plain
+    // resize arrows are the honest stock stand-ins.
+    CursorKind.VSplit => NativeMethods.IDC_SIZEWE,
+    CursorKind.HSplit => NativeMethods.IDC_SIZENS,
+    _ => NativeMethods.IDC_ARROW,
+  };
+
+  /// <summary>Converts a managed color to a Win32 <c>COLORREF</c> (0x00BBGGRR); alpha is dropped for GDI.</summary>
+  private protected static uint ToColorRef(Color color)
+      => (uint)(color.R | (color.G << 8) | (color.B << 16));
+
+  /// <inheritdoc/>
+  public Point PointToScreen(Point clientPoint) {
+    if (Handle == 0)
+      return clientPoint;
+
+    var point = new NativeMethods.POINT { x = clientPoint.X, y = clientPoint.Y };
+    NativeMethods.ClientToScreen(Handle, ref point);
+    return new(point.x, point.y);
+  }
+
+  /// <summary>Pushes all buffered state onto the native handle. Call right after it is created.</summary>
+  protected void FlushState() {
+    NativeMethods.SetWindowTextW(Handle, _text);
+    NativeMethods.MoveWindow(Handle, _bounds.X, _bounds.Y, _bounds.Width, _bounds.Height, true);
+    NativeMethods.EnableWindow(Handle, _enabled);
+    this.ApplyFont();
+    NativeMethods.ShowWindow(Handle, _visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
+  }
+
+  /// <inheritdoc/>
+  public virtual void Dispose() {
+    this.DisposeToolTip();
+    if (_backBrush != 0) {
+      NativeMethods.DeleteObject(_backBrush);
+      _backBrush = 0;
+    }
+
+    if (Handle == 0)
+      return;
+
+    NativeMethods.DestroyWindow(Handle);
+    Handle = 0;
+  }
 }

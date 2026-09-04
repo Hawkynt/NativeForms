@@ -1,14 +1,13 @@
 namespace Hawkynt.NativeForms;
 
 /// <summary>A sort direction, matching <c>System.Windows.Forms.SortOrder</c>.</summary>
-public enum SortOrder
-{
-    /// <summary>Not sorted.</summary>
-    None,
+public enum SortOrder {
+  /// <summary>Not sorted.</summary>
+  None,
 
-    /// <summary>Smallest value first.</summary>
-    Ascending,
+  /// <summary>Smallest value first.</summary>
+  Ascending,
 
-    /// <summary>Largest value first.</summary>
-    Descending,
+  /// <summary>Largest value first.</summary>
+  Descending,
 }

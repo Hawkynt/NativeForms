@@ -3,28 +3,26 @@ using Hawkynt.NativeForms.Drawing;
 
 namespace Hawkynt.NativeForms.Demo;
 
-internal sealed partial class MainForm
-{
-    /// <summary>An entry with a generated icon for the list-box and combo-box demos.</summary>
-    private sealed record IconItem(string Text, IImage Image, int IconIndex);
+internal sealed partial class MainForm {
+  /// <summary>An entry with a generated icon for the list-box and combo-box demos.</summary>
+  private sealed record IconItem(string Text, IImage Image, int IconIndex);
 
-    /// <summary>A file-system-shaped row for the tree-list-view demo.</summary>
-    private sealed record FsEntry(string Name, string Kind, string Size, FsEntry[]? Children);
+  /// <summary>A file-system-shaped row for the tree-list-view demo.</summary>
+  private sealed record FsEntry(string Name, string Kind, string Size, FsEntry[]? Children);
 
-    /// <summary>
-    /// The Lists page: a multi-select list box with icons, a checked list box, a drop-down-list
-    /// combo box with icons next to an editable one, list views in Details/SmallIcon/List layouts,
-    /// a tree view with icons and check boxes, and a tree list view filled through
-    /// <see cref="TreeListView.SetDataSource{T}"/> with three columns.
-    /// </summary>
-    private TabPage BuildListsPage()
+  /// <summary>
+  /// The Lists page: a multi-select list box with icons, a checked list box, a drop-down-list
+  /// combo box with icons next to an editable one, list views in Details/SmallIcon/List layouts,
+  /// a tree view with icons and check boxes, and a tree list view filled through
+  /// <see cref="TreeListView.SetDataSource{T}"/> with three columns.
+  /// </summary>
+  private TabPage BuildListsPage() {
+    var page = new TabPage("Lists") { ImageIndex = _IconYellow };
+
+    // --- Column 1: list box, checked list box, combo boxes ----------------------------------
+
+    var planets = new IconItem[]
     {
-        var page = new TabPage("Lists") { ImageIndex = _IconYellow };
-
-        // --- Column 1: list box, checked list box, combo boxes ----------------------------------
-
-        var planets = new IconItem[]
-        {
             new("Mercury ☿️", this.DiscImage(Color.Silver), _IconFile),
             new("Venus ♀️", this.DiscImage(Color.Gold), _IconYellow),
             new("Earth 🌍", this.DiscImage(Color.RoyalBlue), _IconBlue),
@@ -32,194 +30,184 @@ internal sealed partial class MainForm
             new("Jupiter 🪐", this.DiscImage(Color.Orange), _IconOpen),
             new("Saturn 🪐", this.DiscImage(Color.Goldenrod), _IconFolder),
             new("Neptune 🔵", this.DiscImage(Color.MediumOrchid), _IconPurple),
-        };
+    };
 
-        var listBox = new ListBox
-        {
-            Bounds = new(16, 36, 300, 140),
-            ItemHeight = 20,
-            SelectionMode = SelectionMode.MultiExtended,
-            DisplaySelector = static o => ((IconItem)o!).Text,
-            ImageSelector = static o => ((IconItem)o!).Image,
-        };
-        listBox.Items.AddRange(planets);
-        listBox.SelectedIndexChanged += (_, _) =>
-            this.SetStatus(listBox.SelectedIndices.Count == 0
-                ? "ListBox: nothing selected."
-                : $"ListBox: {listBox.SelectedIndices.Count} planet(s) selected.");
-        listBox.SelectedIndex = 2;
+    var listBox = new ListBox {
+      Bounds = new(16, 36, 300, 140),
+      ItemHeight = 20,
+      SelectionMode = SelectionMode.MultiExtended,
+      DisplaySelector = static o => ((IconItem)o!).Text,
+      ImageSelector = static o => ((IconItem)o!).Image,
+    };
+    listBox.Items.AddRange(planets);
+    listBox.SelectedIndexChanged += (_, _) =>
+        this.SetStatus(listBox.SelectedIndices.Count == 0
+            ? "ListBox: nothing selected."
+            : $"ListBox: {listBox.SelectedIndices.Count} planet(s) selected.");
+    listBox.SelectedIndex = 2;
 
-        var checkedList = new CheckedListBox
-        {
-            Bounds = new(16, 212, 300, 120),
-            ItemHeight = 20,
-            CheckOnClick = true,
-        };
-        checkedList.Items.AddRange(["Build", "Test", "Publish", "Sign", "Deploy"]);
-        checkedList.SetItemChecked(0, true);
-        checkedList.SetItemChecked(1, true);
-        checkedList.ItemCheck += (_, e) =>
-            this.SetStatus($"CheckedListBox: \"{checkedList.Items[e.Index]}\" will be {(e.NewValue ? "checked" : "unchecked")}.");
+    var checkedList = new CheckedListBox {
+      Bounds = new(16, 212, 300, 120),
+      ItemHeight = 20,
+      CheckOnClick = true,
+    };
+    checkedList.Items.AddRange(["Build", "Test", "Publish", "Sign", "Deploy"]);
+    checkedList.SetItemChecked(0, true);
+    checkedList.SetItemChecked(1, true);
+    checkedList.ItemCheck += (_, e) =>
+        this.SetStatus($"CheckedListBox: \"{checkedList.Items[e.Index]}\" will be {(e.NewValue ? "checked" : "unchecked")}.");
 
-        var comboList = new ComboBox
-        {
-            Bounds = new(16, 368, 300, 26),
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            ImageList = _icons,
-            DisplaySelector = static o => ((IconItem)o!).Text,
-            ImageIndexSelector = static o => ((IconItem)o!).IconIndex,
-        };
-        comboList.Items.AddRange(planets);
-        comboList.SelectedIndexChanged += (_, _)
-            => this.SetStatus($"ComboBox: {(comboList.SelectedItem as IconItem)?.Text ?? "(none)"} picked.");
-        comboList.SelectedIndex = 1;
+    var comboList = new ComboBox {
+      Bounds = new(16, 368, 300, 26),
+      DropDownStyle = ComboBoxStyle.DropDownList,
+      ImageList = _icons,
+      DisplaySelector = static o => ((IconItem)o!).Text,
+      ImageIndexSelector = static o => ((IconItem)o!).IconIndex,
+    };
+    comboList.Items.AddRange(planets);
+    comboList.SelectedIndexChanged += (_, _)
+        => this.SetStatus($"ComboBox: {(comboList.SelectedItem as IconItem)?.Text ?? "(none)"} picked.");
+    comboList.SelectedIndex = 1;
 
-        var comboEdit = new ComboBox
-        {
-            Bounds = new(16, 400, 300, 26),
-            DropDownStyle = ComboBoxStyle.DropDown,
-            PlaceholderText = "Type or pick a tag…",
-            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-        };
-        comboEdit.Items.AddRange(["alpha", "beta", "release-candidate", "stable"]);
+    var comboEdit = new ComboBox {
+      Bounds = new(16, 400, 300, 26),
+      DropDownStyle = ComboBoxStyle.DropDown,
+      PlaceholderText = "Type or pick a tag…",
+      AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+    };
+    comboEdit.Items.AddRange(["alpha", "beta", "release-candidate", "stable"]);
 
-        // Plain enough to clear the native-peer gate, unlike the one above it: single selection, no
-        // per-item icons, the theme's own row height (PRD §12).
-        var statusList = new ListBox { Bounds = new(16, 450, 300, 80) };
-        statusList.Items.AddRange(["Draft", "In review", "Published"]);
-        statusList.SelectedIndex = 0;
-        statusList.SelectedIndexChanged += (_, _)
-            => this.SetStatus($"ListBox: {statusList.SelectedItem ?? "(none)"} selected.");
+    // Plain enough to clear the native-peer gate, unlike the one above it: single selection, no
+    // per-item icons, the theme's own row height (PRD §12).
+    var statusList = new ListBox { Bounds = new(16, 450, 300, 80) };
+    statusList.Items.AddRange(["Draft", "In review", "Published"]);
+    statusList.SelectedIndex = 0;
+    statusList.SelectedIndexChanged += (_, _)
+        => this.SetStatus($"ListBox: {statusList.SelectedItem ?? "(none)"} selected.");
 
-        page.Controls.AddRange(
-            Caption("ListBox (MultiExtended, icons)", 16, 12),
-            listBox,
-            Caption("CheckedListBox (CheckOnClick)", 16, 188),
-            checkedList,
-            Caption("ComboBox (DropDownList + DropDown)", 16, 344),
-            comboList, comboEdit,
-            Caption("ListBox (single selection, plain)", 16, 430),
-            statusList);
+    page.Controls.AddRange(
+        Caption("ListBox (MultiExtended, icons)", 16, 12),
+        listBox,
+        Caption("CheckedListBox (CheckOnClick)", 16, 188),
+        checkedList,
+        Caption("ComboBox (DropDownList + DropDown)", 16, 344),
+        comboList, comboEdit,
+        Caption("ListBox (single selection, plain)", 16, 430),
+        statusList);
 
-        // --- Column 2: list views ---------------------------------------------------------------
+    // --- Column 2: list views ---------------------------------------------------------------
 
-        var details = new ListView
-        {
-            Bounds = new(340, 36, 300, 180),
-            ItemHeight = 22,
-            FullRowSelect = true,
-        };
-        details.Columns.AddRange([
-            new ColumnHeader("Name", 130),
+    var details = new ListView {
+      Bounds = new(340, 36, 300, 180),
+      ItemHeight = 22,
+      FullRowSelect = true,
+    };
+    details.Columns.AddRange([
+        new ColumnHeader("Name", 130),
             new ColumnHeader("Size", 70),
             new ColumnHeader("Type", 90),
         ]);
-        details.Items.AddRange([
-            new ListViewItem("Readme.md 📄", "4 KB", "Markdown") { Image = this.SquareImage(Color.CornflowerBlue) },
+    details.Items.AddRange([
+        new ListViewItem("Readme.md 📄", "4 KB", "Markdown") { Image = this.SquareImage(Color.CornflowerBlue) },
             new ListViewItem("MainForm.cs", "12 KB", "Source") { Image = this.SquareImage(Color.MediumSeaGreen) },
             new ListViewItem("Logo.png", "48 KB", "Image") { Image = this.SquareImage(Color.Orange) },
             new ListViewItem("Data.bin", "1 MB", "Binary") { Image = this.SquareImage(Color.Silver) },
             new ListViewItem("Notes.txt", "2 KB", "Text") { Image = this.SquareImage(Color.Goldenrod) },
         ]);
-        details.SelectedIndexChanged += (_, _)
-            => this.SetStatus($"ListView: {details.SelectedItem?.Text ?? "(none)"} selected.");
-        details.SelectedIndex = 0;
+    details.SelectedIndexChanged += (_, _)
+        => this.SetStatus($"ListView: {details.SelectedItem?.Text ?? "(none)"} selected.");
+    details.SelectedIndex = 0;
 
-        var smallIcons = new ListView
-        {
-            Bounds = new(340, 252, 300, 110),
-            View = ListViewView.SmallIcon,
-        };
-        smallIcons.Items.AddRange([
-            new ListViewItem("Alpha") { Image = this.DiscImage(Color.Crimson) },
+    var smallIcons = new ListView {
+      Bounds = new(340, 252, 300, 110),
+      View = ListViewView.SmallIcon,
+    };
+    smallIcons.Items.AddRange([
+        new ListViewItem("Alpha") { Image = this.DiscImage(Color.Crimson) },
             new ListViewItem("Beta") { Image = this.DiscImage(Color.MediumSeaGreen) },
             new ListViewItem("Gamma") { Image = this.DiscImage(Color.RoyalBlue) },
             new ListViewItem("Delta") { Image = this.DiscImage(Color.Gold) },
             new ListViewItem("Epsilon") { Image = this.DiscImage(Color.MediumOrchid) },
         ]);
 
-        var plainList = new ListView
-        {
-            Bounds = new(340, 398, 300, 100),
-            View = ListViewView.List,
-        };
-        plainList.Items.AddRange([
-            new ListViewItem("First"),
+    var plainList = new ListView {
+      Bounds = new(340, 398, 300, 100),
+      View = ListViewView.List,
+    };
+    plainList.Items.AddRange([
+        new ListViewItem("First"),
             new ListViewItem("Second"),
             new ListViewItem("Third"),
             new ListViewItem("Fourth"),
         ]);
 
-        page.Controls.AddRange(
-            Caption("ListView (Details, icons)", 340, 12),
-            details,
-            Caption("ListView (SmallIcon)", 340, 228),
-            smallIcons,
-            Caption("ListView (List)", 340, 374),
-            plainList);
+    page.Controls.AddRange(
+        Caption("ListView (Details, icons)", 340, 12),
+        details,
+        Caption("ListView (SmallIcon)", 340, 228),
+        smallIcons,
+        Caption("ListView (List)", 340, 374),
+        plainList);
 
-        // --- Column 3: trees --------------------------------------------------------------------
+    // --- Column 3: trees --------------------------------------------------------------------
 
-        var tree = new TreeView
-        {
-            Bounds = new(664, 36, 300, 220),
-            CheckBoxes = true,
-            ImageList = _icons,
-            ItemHeight = 22,
-            AllowReorder = true,
-            LabelEdit = true,
-        };
-        var solution = new TreeNode("Solution 🗂️") { ImageIndex = _IconFolder };
-        var core = new TreeNode("Core") { ImageIndex = _IconFolder };
-        var controlFile = new TreeNode("Control.cs") { ImageIndex = _IconFile, Checked = true };
-        var formFile = new TreeNode("Form.cs") { ImageIndex = _IconFile };
-        core.Nodes.Add(controlFile);
-        core.Nodes.Add(formFile);
-        var backends = new TreeNode("Backends") { ImageIndex = _IconFolder };
-        var win32File = new TreeNode("Win32") { ImageIndex = _IconFile };
-        var gtkFile = new TreeNode("Gtk") { ImageIndex = _IconFile, Checked = true };
-        backends.Nodes.Add(win32File);
-        backends.Nodes.Add(gtkFile);
-        solution.Nodes.Add(core);
-        solution.Nodes.Add(backends);
-        tree.Nodes.Add(solution);
+    var tree = new TreeView {
+      Bounds = new(664, 36, 300, 220),
+      CheckBoxes = true,
+      ImageList = _icons,
+      ItemHeight = 22,
+      AllowReorder = true,
+      LabelEdit = true,
+    };
+    var solution = new TreeNode("Solution 🗂️") { ImageIndex = _IconFolder };
+    var core = new TreeNode("Core") { ImageIndex = _IconFolder };
+    var controlFile = new TreeNode("Control.cs") { ImageIndex = _IconFile, Checked = true };
+    var formFile = new TreeNode("Form.cs") { ImageIndex = _IconFile };
+    core.Nodes.Add(controlFile);
+    core.Nodes.Add(formFile);
+    var backends = new TreeNode("Backends") { ImageIndex = _IconFolder };
+    var win32File = new TreeNode("Win32") { ImageIndex = _IconFile };
+    var gtkFile = new TreeNode("Gtk") { ImageIndex = _IconFile, Checked = true };
+    backends.Nodes.Add(win32File);
+    backends.Nodes.Add(gtkFile);
+    solution.Nodes.Add(core);
+    solution.Nodes.Add(backends);
+    tree.Nodes.Add(solution);
 
-        // A lazily-populated node: its children are produced by a delegate the first time it expands,
-        // the pattern a filesystem/archive browser uses to avoid walking the whole tree up front.
-        var lazy = new TreeNode("Packages (lazy)") { ImageIndex = _IconFolder };
-        lazy.SetChildLoader(node =>
-        {
-            this.SetStatus($"TreeView: populating \"{node.Text}\" on demand.");
-            return
-            [
-                new TreeNode("Newtonsoft.Json") { ImageIndex = _IconFile },
+    // A lazily-populated node: its children are produced by a delegate the first time it expands,
+    // the pattern a filesystem/archive browser uses to avoid walking the whole tree up front.
+    var lazy = new TreeNode("Packages (lazy)") { ImageIndex = _IconFolder };
+    lazy.SetChildLoader(node => {
+      this.SetStatus($"TreeView: populating \"{node.Text}\" on demand.");
+      return
+      [
+          new TreeNode("Newtonsoft.Json") { ImageIndex = _IconFile },
                 new TreeNode("NUnit") { ImageIndex = _IconFile },
                 new TreeNode("Serilog") { ImageIndex = _IconFile },
             ];
-        });
-        tree.Nodes.Add(lazy);
+    });
+    tree.Nodes.Add(lazy);
 
-        solution.Expand();
-        core.Expand();
-        tree.AfterCheck += (_, e)
-            => this.SetStatus($"TreeView: \"{e.Node?.Text}\" is {(e.Node?.Checked == true ? "checked" : "unchecked")}.");
-        tree.AfterSelect += (_, e) => this.SetStatus($"TreeView: \"{e.Node?.Text}\" selected.");
-        tree.NodeDrop += (_, e) => this.SetStatus($"TreeView: dropped \"{e.DraggedNode.Text}\" {e.Location} \"{e.TargetNode?.Text}\".");
-        tree.AfterLabelEdit += (_, e) => this.SetStatus($"TreeView: renamed to \"{e.Label}\".");
+    solution.Expand();
+    core.Expand();
+    tree.AfterCheck += (_, e)
+        => this.SetStatus($"TreeView: \"{e.Node?.Text}\" is {(e.Node?.Checked == true ? "checked" : "unchecked")}.");
+    tree.AfterSelect += (_, e) => this.SetStatus($"TreeView: \"{e.Node?.Text}\" selected.");
+    tree.NodeDrop += (_, e) => this.SetStatus($"TreeView: dropped \"{e.DraggedNode.Text}\" {e.Location} \"{e.TargetNode?.Text}\".");
+    tree.AfterLabelEdit += (_, e) => this.SetStatus($"TreeView: renamed to \"{e.Label}\".");
 
-        var treeList = new TreeListView
-        {
-            Bounds = new(664, 292, 300, 220),
-            ImageList = _icons,
-            ItemHeight = 22,
-        };
-        treeList.Columns.AddRange([
-            new TreeListViewColumn("Name", 140),
+    var treeList = new TreeListView {
+      Bounds = new(664, 292, 300, 220),
+      ImageList = _icons,
+      ItemHeight = 22,
+    };
+    treeList.Columns.AddRange([
+        new TreeListViewColumn("Name", 140),
             new TreeListViewColumn("Kind", 70, static node => ((FsEntry?)node.Tag)?.Kind ?? string.Empty),
             new TreeListViewColumn("Size", 70, static node => ((FsEntry?)node.Tag)?.Size ?? string.Empty),
         ]);
-        var roots = new FsEntry[]
-        {
+    var roots = new FsEntry[]
+    {
             new("src", "Folder", "", [
                 new("app.cs", "Source", "9 KB", null),
                 new("theme.cs", "Source", "3 KB", null),
@@ -228,80 +216,79 @@ internal sealed partial class MainForm
                 new("icons.dat", "Data", "22 KB", null),
             ]),
             new("build.sh", "Script", "1 KB", null),
-        };
-        treeList.SetDataSource(roots, static e => e.Name, static e => e.Children);
-        treeList.Nodes[0].Expand();
-        treeList.Nodes[1].Expand();
-        treeList.AfterSelect += (_, e) => this.SetStatus($"TreeListView: \"{e.Node?.Text}\" selected.");
+    };
+    treeList.SetDataSource(roots, static e => e.Name, static e => e.Children);
+    treeList.Nodes[0].Expand();
+    treeList.Nodes[1].Expand();
+    treeList.AfterSelect += (_, e) => this.SetStatus($"TreeListView: \"{e.Node?.Text}\" selected.");
 
-        page.Controls.AddRange(
-            Caption("TreeView (icons · checks · F2 rename)", 664, 12, 340),
-            tree,
-            Caption("TreeListView (SetDataSource, 3 columns)", 664, 268),
-            treeList);
+    page.Controls.AddRange(
+        Caption("TreeView (icons · checks · F2 rename)", 664, 12, 340),
+        tree,
+        Caption("TreeListView (SetDataSource, 3 columns)", 664, 268),
+        treeList);
 
-        // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
-        var listIndex = listBox.SelectedIndex;
-        var checkedIndex = checkedList.SelectedIndex;
-        var comboListIndex = comboList.SelectedIndex;
-        var comboEditText = comboEdit.Text;
-        var detailsIndex = details.SelectedIndex;
+    // Snapshotted the instant each value was authored, so the restore cannot drift away from it.
+    var listIndex = listBox.SelectedIndex;
+    var checkedIndex = checkedList.SelectedIndex;
+    var comboListIndex = comboList.SelectedIndex;
+    var comboEditText = comboEdit.Text;
+    var detailsIndex = details.SelectedIndex;
 
-        // The details view is sorted by the walkthrough, which permutes Items in place; only the
-        // authored order itself can put it back.
-        var detailsItems = new ListViewItem[details.Items.Count];
-        details.Items.CopyTo(detailsItems, 0);
-        var checkedStates = new bool[checkedList.Items.Count];
-        for (var i = 0; i < checkedStates.Length; ++i)
-            checkedStates[i] = checkedList.GetItemChecked(i);
+    // The details view is sorted by the walkthrough, which permutes Items in place; only the
+    // authored order itself can put it back.
+    var detailsItems = new ListViewItem[details.Items.Count];
+    details.Items.CopyTo(detailsItems, 0);
+    var checkedStates = new bool[checkedList.Items.Count];
+    for (var i = 0; i < checkedStates.Length; ++i)
+      checkedStates[i] = checkedList.GetItemChecked(i);
 
-        var treeChecks = new[] { controlFile, formFile, win32File, gtkFile };
-        var treeCheckStates = new bool[treeChecks.Length];
-        for (var i = 0; i < treeChecks.Length; ++i)
-            treeCheckStates[i] = treeChecks[i].Checked;
+    var treeChecks = new[] { controlFile, formFile, win32File, gtkFile };
+    var treeCheckStates = new bool[treeChecks.Length];
+    for (var i = 0; i < treeChecks.Length; ++i)
+      treeCheckStates[i] = treeChecks[i].Checked;
 
-        this.OnReset(() =>
-        {
-            listBox.ClearSelected();
-            listBox.SelectedIndex = listIndex;
-            for (var i = 0; i < checkedStates.Length; ++i)
-                checkedList.SetItemChecked(i, checkedStates[i]);
+    this.OnReset(() => {
+      listBox.ClearSelected();
+      listBox.SelectedIndex = listIndex;
+      for (var i = 0; i < checkedStates.Length; ++i)
+        checkedList.SetItemChecked(i, checkedStates[i]);
 
-            checkedList.SelectedIndex = checkedIndex;
+      checkedList.SelectedIndex = checkedIndex;
 
-            comboList.SelectedIndex = comboListIndex;
-            comboEdit.Text = comboEditText;
+      comboList.SelectedIndex = comboListIndex;
+      comboEdit.Text = comboEditText;
 
-            details.Sorting = SortOrder.None;
-            details.CheckBoxes = false;
-            details.Items.Clear();
-            details.Items.AddRange(detailsItems);
-            details.SelectedIndex = detailsIndex;
+      details.Sorting = SortOrder.None;
+      details.CheckBoxes = false;
+      details.Items.Clear();
+      details.Items.AddRange(detailsItems);
+      details.SelectedIndex = detailsIndex;
 
-            for (var i = 0; i < treeChecks.Length; ++i)
-                treeChecks[i].Checked = treeCheckStates[i];
+      for (var i = 0; i < treeChecks.Length; ++i)
+        treeChecks[i].Checked = treeCheckStates[i];
 
-            tree.SelectedNode = null;
-            solution.Expand();
-            core.Expand();
-            backends.Collapse();
-            treeList.Nodes[0].Expand();
-            treeList.Nodes[1].Expand();
-            treeList.SelectedNode = null;
-        });
+      tree.SelectedNode = null;
+      solution.Expand();
+      core.Expand();
+      backends.Collapse();
+      treeList.Nodes[0].Expand();
+      treeList.Nodes[1].Expand();
+      treeList.SelectedNode = null;
+    });
 
-        this.Publish("lists.page", page);
-        this.Publish("lists.listBox", listBox);
-        this.Publish("lists.checkedList", checkedList);
-        this.Publish("lists.comboList", comboList);
-        this.Publish("lists.comboEdit", comboEdit);
-        this.Publish("lists.statusList", statusList);
-        this.Publish("lists.details", details);
-        this.Publish("lists.smallIcons", smallIcons);
-        this.Publish("lists.tree", tree);
-        this.Publish("lists.treeCore", core);
-        this.Publish("lists.treeList", treeList);
+    this.Publish("lists.page", page);
+    this.Publish("lists.listBox", listBox);
+    this.Publish("lists.checkedList", checkedList);
+    this.Publish("lists.comboList", comboList);
+    this.Publish("lists.comboEdit", comboEdit);
+    this.Publish("lists.statusList", statusList);
+    this.Publish("lists.details", details);
+    this.Publish("lists.smallIcons", smallIcons);
+    this.Publish("lists.tree", tree);
+    this.Publish("lists.treeCore", core);
+    this.Publish("lists.treeList", treeList);
 
-        return page;
-    }
+    return page;
+  }
 }

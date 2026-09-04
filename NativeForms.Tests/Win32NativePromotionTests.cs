@@ -20,656 +20,613 @@ namespace Hawkynt.NativeForms.Tests;
 /// Off Windows the whole fixture reports itself as ignored rather than passing vacuously.
 /// </summary>
 [TestFixture]
-public sealed class Win32NativePromotionTests
-{
-    /// <summary>Everything the run on the Win32 message loop observed; the tests only assert against it.</summary>
-    private static Observations? _observed;
+public sealed class Win32NativePromotionTests {
+  /// <summary>Everything the run on the Win32 message loop observed; the tests only assert against it.</summary>
+  private static Observations? _observed;
 
-    private static string? _skipReason;
+  private static string? _skipReason;
 
-    /// <summary>What one realized control reported about itself.</summary>
-    private sealed class Observations
-    {
-        /// <summary>Per control name, whether it ended up on a real platform widget.</summary>
-        public Dictionary<string, bool> Promoted { get; } = [];
+  /// <summary>What one realized control reported about itself.</summary>
+  private sealed class Observations {
+    /// <summary>Per control name, whether it ended up on a real platform widget.</summary>
+    public Dictionary<string, bool> Promoted { get; } = [];
 
-        /// <summary>Per assertion name, whether driving the widget round-tripped.</summary>
-        public Dictionary<string, bool> RoundTrips { get; } = [];
+    /// <summary>Per assertion name, whether driving the widget round-tripped.</summary>
+    public Dictionary<string, bool> RoundTrips { get; } = [];
 
-        /// <summary>The window text MSAA would read as the owner-drawn control's name.</summary>
-        public string? CanvasAccessibleName;
+    /// <summary>The window text MSAA would read as the owner-drawn control's name.</summary>
+    public string? CanvasAccessibleName;
 
-        /// <summary>The role MSAA reports for the owner-drawn control, asked the way a screen reader asks.</summary>
-        public int CanvasAccessibleRole;
+    /// <summary>The role MSAA reports for the owner-drawn control, asked the way a screen reader asks.</summary>
+    public int CanvasAccessibleRole;
 
-        /// <summary>The role a bare stock check box reports, to tell a broken reply from a broken reader.</summary>
-        public int ShadowAccessibleRole;
+    /// <summary>The role a bare stock check box reports, to tell a broken reply from a broken reader.</summary>
+    public int ShadowAccessibleRole;
 
-        /// <summary>The theme's scroll-bar thickness, which a wrong metric index turns into a screen dimension.</summary>
-        public int ScrollBarSize;
+    /// <summary>The theme's scroll-bar thickness, which a wrong metric index turns into a screen dimension.</summary>
+    public int ScrollBarSize;
 
-        /// <summary>How many pixels an empty multiline box with a placeholder drew into its client area.</summary>
-        public int MultilineHintPixels;
+    /// <summary>How many pixels an empty multiline box with a placeholder drew into its client area.</summary>
+    public int MultilineHintPixels;
 
-        /// <summary>And how many one without a placeholder drew, which is what the first is measured against.</summary>
-        public int BlankMultilinePixels;
+    /// <summary>And how many one without a placeholder drew, which is what the first is measured against.</summary>
+    public int BlankMultilinePixels;
 
-        /// <summary>The client size of the promoted horizontal scroll bar's own window.</summary>
-        public Size HScrollClient;
+    /// <summary>The client size of the promoted horizontal scroll bar's own window.</summary>
+    public Size HScrollClient;
 
-        /// <summary>And of the vertical one's; both are read off the widget, not off the core.</summary>
-        public Size VScrollClient;
+    /// <summary>And of the vertical one's; both are read off the widget, not off the core.</summary>
+    public Size VScrollClient;
 
-        /// <summary>The theme's row height, guarded the same way.</summary>
-        public int RowHeight;
+    /// <summary>The theme's row height, guarded the same way.</summary>
+    public int RowHeight;
 
-        /// <summary>The <c>HFONT</c> a stock control the application never gave a font is drawing with.</summary>
-        public nint WidgetFont;
+    /// <summary>The <c>HFONT</c> a stock control the application never gave a font is drawing with.</summary>
+    public nint WidgetFont;
 
-        /// <summary>The one the painter would use for the same control, which it must be.</summary>
-        public nint ThemeFont;
+    /// <summary>The one the painter would use for the same control, which it must be.</summary>
+    public nint ThemeFont;
 
-        /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
-        public bool ColorTextAvailable;
+    /// <summary>Whether Direct2D was reachable at all on this machine.</summary>
+    public bool ColorTextAvailable;
 
-        /// <summary>How many colour draws the string with an emoji in it caused.</summary>
-        public int ColorRunsForEmoji;
+    /// <summary>How many colour draws the string with an emoji in it caused.</summary>
+    public int ColorRunsForEmoji;
 
-        /// <summary>How many it caused for a string of plain text.</summary>
-        public int ColorRunsForPlainText;
+    /// <summary>How many it caused for a string of plain text.</summary>
+    public int ColorRunsForPlainText;
 
-        public string? Failure;
+    public string? Failure;
+  }
+
+  /// <summary>
+  /// An owner-drawn control that paints one string with an emoji and one without, recording the
+  /// colour-path counter around each so the divert can be observed rather than inferred.
+  /// </summary>
+  private sealed class ColorGlyphPainter : OwnerDrawnControl {
+    public int ColorRunsBeforePlain;
+    public int ColorRunsAfterPlain;
+    public int ColorRunsBeforeEmoji;
+    public int ColorRunsAfterEmoji;
+
+    protected override void OnPaint(PaintEventArgs e) {
+      this.ColorRunsBeforePlain = Win32ColorText.ColorRuns;
+      e.Graphics.DrawText("plain", this.Font, Color.Black, new Rectangle(0, 0, 200, 20));
+      this.ColorRunsAfterPlain = Win32ColorText.ColorRuns;
+
+      this.ColorRunsBeforeEmoji = Win32ColorText.ColorRuns;
+      e.Graphics.DrawText("emoji \U0001F423", this.Font, Color.Black, new Rectangle(0, 24, 200, 20));
+      this.ColorRunsAfterEmoji = Win32ColorText.ColorRuns;
+    }
+  }
+
+  [OneTimeSetUp]
+  public void RunTheFormOnce() {
+    if (!OperatingSystem.IsWindows()) {
+      _skipReason = "The Win32 peers are only exercised on Windows.";
+      return;
     }
 
-    /// <summary>
-    /// An owner-drawn control that paints one string with an emoji and one without, recording the
-    /// colour-path counter around each so the divert can be observed rather than inferred.
-    /// </summary>
-    private sealed class ColorGlyphPainter : OwnerDrawnControl
-    {
-        public int ColorRunsBeforePlain;
-        public int ColorRunsAfterPlain;
-        public int ColorRunsBeforeEmoji;
-        public int ColorRunsAfterEmoji;
+    BackendRegistry.Register(new Win32Backend());
+    var observed = new Observations();
 
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            this.ColorRunsBeforePlain = Win32ColorText.ColorRuns;
-            e.Graphics.DrawText("plain", this.Font, Color.Black, new Rectangle(0, 0, 200, 20));
-            this.ColorRunsAfterPlain = Win32ColorText.ColorRuns;
+    var form = new Form { Text = "win32 promotion", Width = 700, Height = 620 };
 
-            this.ColorRunsBeforeEmoji = Win32ColorText.ColorRuns;
-            e.Graphics.DrawText("emoji \U0001F423", this.Font, Color.Black, new Rectangle(0, 24, 200, 20));
-            this.ColorRunsAfterEmoji = Win32ColorText.ColorRuns;
-        }
-    }
+    var check = new CheckBox { Bounds = new Rectangle(12, 12, 200, 20), Text = "CheckBox" };
+    var radio = new RadioButton { Bounds = new Rectangle(12, 38, 200, 20), Text = "RadioButton" };
+    var sibling = new RadioButton { Bounds = new Rectangle(12, 64, 200, 20), Text = "sibling" };
+    var link = new LinkLabel { Bounds = new Rectangle(12, 90, 200, 20), Text = "LinkLabel" };
+    var progress = new ProgressBar { Bounds = new Rectangle(12, 116, 200, 18), Value = 40 };
+    var track = new TrackBar { Bounds = new Rectangle(12, 140, 200, 28), Maximum = 10, Value = 6 };
+    var hscroll = new HScrollBar { Bounds = new Rectangle(12, 174, 200, 16), Maximum = 100, LargeChange = 10 };
+    var vscroll = new VScrollBar { Bounds = new Rectangle(230, 12, 16, 180), Maximum = 100, LargeChange = 10 };
 
-    [OneTimeSetUp]
-    public void RunTheFormOnce()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            _skipReason = "The Win32 peers are only exercised on Windows.";
-            return;
-        }
+    var combo = new ComboBox { Bounds = new Rectangle(12, 200, 200, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+    combo.Items.AddRange(["alpha", "beta", "gamma"]);
+    combo.SelectedIndex = 0;
 
-        BackendRegistry.Register(new Win32Backend());
-        var observed = new Observations();
+    var list = new ListBox { Bounds = new Rectangle(12, 232, 200, 90) };
+    list.Items.AddRange(["one", "two", "three"]);
+    list.SelectedIndex = 0;
 
-        var form = new Form { Text = "win32 promotion", Width = 700, Height = 620 };
+    var group = new GroupBox { Bounds = new Rectangle(270, 12, 260, 120), Text = "GroupBox" };
+    var inside = new Button { Bounds = new Rectangle(14, 30, 120, 26), Text = "child" };
+    group.Controls.Add(inside);
 
-        var check = new CheckBox { Bounds = new Rectangle(12, 12, 200, 20), Text = "CheckBox" };
-        var radio = new RadioButton { Bounds = new Rectangle(12, 38, 200, 20), Text = "RadioButton" };
-        var sibling = new RadioButton { Bounds = new Rectangle(12, 64, 200, 20), Text = "sibling" };
-        var link = new LinkLabel { Bounds = new Rectangle(12, 90, 200, 20), Text = "LinkLabel" };
-        var progress = new ProgressBar { Bounds = new Rectangle(12, 116, 200, 18), Value = 40 };
-        var track = new TrackBar { Bounds = new Rectangle(12, 140, 200, 28), Maximum = 10, Value = 6 };
-        var hscroll = new HScrollBar { Bounds = new Rectangle(12, 174, 200, 16), Maximum = 100, LargeChange = 10 };
-        var vscroll = new VScrollBar { Bounds = new Rectangle(230, 12, 16, 180), Maximum = 100, LargeChange = 10 };
+    // A group whose members do not share a rendering path: the gate is per control, so the image
+    // keeps one of these on the painter while the other is a real BS_RADIOBUTTON. Grouping has to
+    // reach across that split in both directions.
+    var mixedHost = new GroupBox { Bounds = new Rectangle(540, 300, 140, 90), Text = "mixed" };
+    var mixedNative = new RadioButton { Bounds = new Rectangle(10, 24, 120, 20), Text = "widget" };
+    var mixedDrawn = new RadioButton { Bounds = new Rectangle(10, 50, 120, 20), Text = "painted", Image = Pixel() };
+    mixedHost.Controls.AddRange(mixedNative, mixedDrawn);
 
-        var combo = new ComboBox { Bounds = new Rectangle(12, 200, 200, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-        combo.Items.AddRange(["alpha", "beta", "gamma"]);
-        combo.SelectedIndex = 0;
+    // Each of these puts one property outside its gate, so each must stay on the painter.
+    var icon = Pixel();
+    var gatedCheck = new CheckBox { Bounds = new Rectangle(270, 140, 240, 20), Text = "gated", Image = icon };
+    var gatedRadio = new RadioButton { Bounds = new Rectangle(270, 166, 240, 20), Text = "gated", Image = icon };
+    var gatedProgress = new ProgressBar { Bounds = new Rectangle(540, 12, 18, 90), Orientation = Orientation.Vertical };
+    var gatedCombo = new ComboBox { Bounds = new Rectangle(270, 192, 240, 26), DropDownStyle = ComboBoxStyle.DropDown };
+    var gatedList = new CheckedListBox { Bounds = new Rectangle(270, 224, 240, 70) };
+    gatedList.Items.AddRange(["a", "b"]);
+    var gatedGroup = new GroupBox { Bounds = new Rectangle(270, 300, 240, 60), Text = "gated", Image = icon };
 
-        var list = new ListBox { Bounds = new Rectangle(12, 232, 200, 90) };
-        list.Items.AddRange(["one", "two", "three"]);
-        list.SelectedIndex = 0;
+    // EM_SETCUEBANNER is a single-line message, so the multiline hint has to be painted. Two empty
+    // boxes, alike but for the placeholder: what separates "the hint drew" from "an EDIT draws
+    // something anyway" is the one that must stay blank.
+    var hinted = new TextBox {
+      Bounds = new Rectangle(270, 370, 240, 60),
+      Multiline = true,
+      PlaceholderText = "Type something here",
+    };
+    var blank = new TextBox { Bounds = new Rectangle(270, 440, 240, 60), Multiline = true };
 
-        var group = new GroupBox { Bounds = new Rectangle(270, 12, 260, 120), Text = "GroupBox" };
-        var inside = new Button { Bounds = new Rectangle(14, 30, 120, 26), Text = "child" };
-        group.Controls.Add(inside);
+    var tipped = new Button { Bounds = new Rectangle(540, 140, 140, 26), Text = "tipped" };
+    var toolTip = new ToolTip();
+    var painter = new ColorGlyphPainter { Bounds = new Rectangle(540, 400, 200, 60) };
+    var described = new CheckBox {
+      Bounds = new Rectangle(540, 470, 200, 22),
+      Text = "Enable logging",
+      UseNativeWidget = false,
+    };
 
-        // A group whose members do not share a rendering path: the gate is per control, so the image
-        // keeps one of these on the painter while the other is a real BS_RADIOBUTTON. Grouping has to
-        // reach across that split in both directions.
-        var mixedHost = new GroupBox { Bounds = new Rectangle(540, 300, 140, 90), Text = "mixed" };
-        var mixedNative = new RadioButton { Bounds = new Rectangle(10, 24, 120, 20), Text = "widget" };
-        var mixedDrawn = new RadioButton { Bounds = new Rectangle(10, 50, 120, 20), Text = "painted", Image = Pixel() };
-        mixedHost.Controls.AddRange(mixedNative, mixedDrawn);
+    form.Controls.AddRange(
+        check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped, hinted, blank,
+        gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost, painter, described);
 
-        // Each of these puts one property outside its gate, so each must stay on the painter.
-        var icon = Pixel();
-        var gatedCheck = new CheckBox { Bounds = new Rectangle(270, 140, 240, 20), Text = "gated", Image = icon };
-        var gatedRadio = new RadioButton { Bounds = new Rectangle(270, 166, 240, 20), Text = "gated", Image = icon };
-        var gatedProgress = new ProgressBar { Bounds = new Rectangle(540, 12, 18, 90), Orientation = Orientation.Vertical };
-        var gatedCombo = new ComboBox { Bounds = new Rectangle(270, 192, 240, 26), DropDownStyle = ComboBoxStyle.DropDown };
-        var gatedList = new CheckedListBox { Bounds = new Rectangle(270, 224, 240, 70) };
-        gatedList.Items.AddRange(["a", "b"]);
-        var gatedGroup = new GroupBox { Bounds = new Rectangle(270, 300, 240, 60), Text = "gated", Image = icon };
-
-        // EM_SETCUEBANNER is a single-line message, so the multiline hint has to be painted. Two empty
-        // boxes, alike but for the placeholder: what separates "the hint drew" from "an EDIT draws
-        // something anyway" is the one that must stay blank.
-        var hinted = new TextBox
-        {
-            Bounds = new Rectangle(270, 370, 240, 60),
-            Multiline = true,
-            PlaceholderText = "Type something here",
-        };
-        var blank = new TextBox { Bounds = new Rectangle(270, 440, 240, 60), Multiline = true };
-
-        var tipped = new Button { Bounds = new Rectangle(540, 140, 140, 26), Text = "tipped" };
-        var toolTip = new ToolTip();
-        var painter = new ColorGlyphPainter { Bounds = new Rectangle(540, 400, 200, 60) };
-        var described = new CheckBox
-        {
-            Bounds = new Rectangle(540, 470, 200, 22),
-            Text = "Enable logging",
-            UseNativeWidget = false,
-        };
-
-        form.Controls.AddRange(
-            check, radio, sibling, link, progress, track, hscroll, vscroll, combo, list, group, tipped, hinted, blank,
-            gatedCheck, gatedRadio, gatedProgress, gatedCombo, gatedList, gatedGroup, mixedHost, painter, described);
-
-        // Observed from a timer rather than from Load: some of this needs the window to have been shown
-        // and painted at least once — the colour-text divert is only visible after a paint has run.
-        var timer = new Timer { Interval = 250 };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            try
-            {
-                foreach (var (name, control) in new (string, Control)[]
-                         {
+    // Observed from a timer rather than from Load: some of this needs the window to have been shown
+    // and painted at least once — the colour-text divert is only visible after a paint has run.
+    var timer = new Timer { Interval = 250 };
+    timer.Tick += (_, _) => {
+      timer.Stop();
+      try {
+        foreach (var (name, control) in new (string, Control)[]
+                 {
                              ("CheckBox", check), ("RadioButton", radio), ("LinkLabel", link),
                              ("ProgressBar", progress), ("TrackBar", track), ("HScrollBar", hscroll),
                              ("VScrollBar", vscroll), ("ComboBox", combo), ("ListBox", list), ("GroupBox", group),
                              ("gated CheckBox", gatedCheck), ("gated RadioButton", gatedRadio),
                              ("vertical ProgressBar", gatedProgress), ("editable ComboBox", gatedCombo),
                              ("CheckedListBox", gatedList), ("gated GroupBox", gatedGroup),
-                         })
-                    observed.Promoted[name] = control.IsNativeWidget;
+                 })
+          observed.Promoted[name] = control.IsNativeWidget;
 
-                check.Checked = true;
-                observed.RoundTrips["CheckBox.Checked"] = check.Checked;
+        check.Checked = true;
+        observed.RoundTrips["CheckBox.Checked"] = check.Checked;
 
-                radio.Checked = true;
-                sibling.Checked = true;
-                observed.RoundTrips["radio grouping"] = sibling.Checked && !radio.Checked;
-                sibling.Checked = false;
-                observed.RoundTrips["radio cleared"] = !sibling.Checked;
+        radio.Checked = true;
+        sibling.Checked = true;
+        observed.RoundTrips["radio grouping"] = sibling.Checked && !radio.Checked;
+        sibling.Checked = false;
+        observed.RoundTrips["radio cleared"] = !sibling.Checked;
 
-                link.LinkVisited = true;
-                observed.RoundTrips["LinkLabel.LinkVisited"] = link.LinkVisited;
+        link.LinkVisited = true;
+        observed.RoundTrips["LinkLabel.LinkVisited"] = link.LinkVisited;
 
-                progress.Value = 80;
-                observed.RoundTrips["ProgressBar.Value"] = progress.Value == 80;
+        progress.Value = 80;
+        observed.RoundTrips["ProgressBar.Value"] = progress.Value == 80;
 
-                track.Value = 3;
-                observed.RoundTrips["TrackBar.Value"] = track.Value == 3;
+        track.Value = 3;
+        observed.RoundTrips["TrackBar.Value"] = track.Value == 3;
 
-                hscroll.Value = 55;
-                observed.RoundTrips["ScrollBar.Value"] = hscroll.Value == 55;
+        hscroll.Value = 55;
+        observed.RoundTrips["ScrollBar.Value"] = hscroll.Value == 55;
 
-                combo.SelectedIndex = 2;
-                observed.RoundTrips["ComboBox.SelectedIndex"] = combo.SelectedIndex == 2 && combo.Text == "gamma";
-                combo.Items.Add("delta");
-                combo.SelectedIndex = 3;
-                observed.RoundTrips["ComboBox late items"] = combo.Text == "delta";
+        combo.SelectedIndex = 2;
+        observed.RoundTrips["ComboBox.SelectedIndex"] = combo.SelectedIndex == 2 && combo.Text == "gamma";
+        combo.Items.Add("delta");
+        combo.SelectedIndex = 3;
+        observed.RoundTrips["ComboBox late items"] = combo.Text == "delta";
 
-                list.SelectedIndex = 2;
-                observed.RoundTrips["ListBox.SelectedIndex"] = list.SelectedIndex == 2 && (string?)list.SelectedItem == "three";
-                list.EnsureVisible(2);
-                observed.RoundTrips["ListBox geometry"] = list.TopIndex >= 0 && list.IndexFromPoint(10, 4) >= 0;
+        list.SelectedIndex = 2;
+        observed.RoundTrips["ListBox.SelectedIndex"] = list.SelectedIndex == 2 && (string?)list.SelectedItem == "three";
+        list.EnsureVisible(2);
+        observed.RoundTrips["ListBox geometry"] = list.TopIndex >= 0 && list.IndexFromPoint(10, 4) >= 0;
 
-                observed.RoundTrips["GroupBox child bounds"] = inside.Bounds == new Rectangle(14, 30, 120, 26);
+        observed.RoundTrips["GroupBox child bounds"] = inside.Bounds == new Rectangle(14, 30, 120, 26);
 
-                observed.Promoted["mixed widget half"] = mixedNative.IsNativeWidget;
-                observed.Promoted["mixed painted half"] = mixedDrawn.IsNativeWidget;
+        observed.Promoted["mixed widget half"] = mixedNative.IsNativeWidget;
+        observed.Promoted["mixed painted half"] = mixedDrawn.IsNativeWidget;
 
-                mixedNative.Checked = true;
-                mixedDrawn.Checked = true;
-                observed.RoundTrips["painted half takes the selection"] = mixedDrawn.Checked && !mixedNative.Checked;
-                mixedNative.Checked = true;
-                observed.RoundTrips["widget half takes it back"] = mixedNative.Checked && !mixedDrawn.Checked;
+        mixedNative.Checked = true;
+        mixedDrawn.Checked = true;
+        observed.RoundTrips["painted half takes the selection"] = mixedDrawn.Checked && !mixedNative.Checked;
+        mixedNative.Checked = true;
+        observed.RoundTrips["widget half takes it back"] = mixedNative.Checked && !mixedDrawn.Checked;
 
-                // The swap has to be invisible to the application, in both directions.
-                check.Image = icon;
-                observed.RoundTrips["swap to painter"] = !check.IsNativeWidget && check.Checked;
-                check.Image = null;
-                observed.RoundTrips["swap back to widget"] = check.IsNativeWidget && check.Checked;
+        // The swap has to be invisible to the application, in both directions.
+        check.Image = icon;
+        observed.RoundTrips["swap to painter"] = !check.IsNativeWidget && check.Checked;
+        check.Image = null;
+        observed.RoundTrips["swap back to widget"] = check.IsNativeWidget && check.Checked;
 
-                combo.ImageSelector = static _ => null;
-                observed.RoundTrips["ComboBox swap keeps selection"] = !combo.IsNativeWidget && combo.SelectedIndex == 3;
+        combo.ImageSelector = static _ => null;
+        observed.RoundTrips["ComboBox swap keeps selection"] = !combo.IsNativeWidget && combo.SelectedIndex == 3;
 
-                // The platform tooltip: a real tooltips_class32 window has to exist once a tip is raised,
-                // which is the half of this that a headless fake cannot see.
-                //
-                // What is deliberately not asserted is that none existed beforehand. That check was here
-                // and failed on Windows while passing under wine: the class is process-wide, and real
-                // common controls raise their own tips — a toolbar's, a header's — so a tooltip window
-                // being present says nothing about whether this toolkit created one. Wine simply has
-                // fewer of them, which made the assertion look sound.
-                toolTip.SetToolTip(tipped, "a native tip");
-                tipped.Peer?.ShowToolTip("a native tip");
-                observed.RoundTrips["the platform tooltip window exists"] =
-                    NativeMethods.FindWindowExW(0, 0, NativeMethods.TOOLTIPS_CLASS, null) != 0;
+        // The platform tooltip: a real tooltips_class32 window has to exist once a tip is raised,
+        // which is the half of this that a headless fake cannot see.
+        //
+        // What is deliberately not asserted is that none existed beforehand. That check was here
+        // and failed on Windows while passing under wine: the class is process-wide, and real
+        // common controls raise their own tips — a toolbar's, a header's — so a tooltip window
+        // being present says nothing about whether this toolkit created one. Wine simply has
+        // fewer of them, which made the assertion look sound.
+        toolTip.SetToolTip(tipped, "a native tip");
+        tipped.Peer?.ShowToolTip("a native tip");
+        observed.RoundTrips["the platform tooltip window exists"] =
+            NativeMethods.FindWindowExW(0, 0, NativeMethods.TOOLTIPS_CLASS, null) != 0;
 
-                // PRD §13: a string with an emoji is diverted to Direct2D, one without is not. Whether
-                // the divert can succeed is a property of the machine, so the assertion is conditional on
-                // the path being available at all rather than on it being present.
-                // PRD §8: an owner-drawn control's canvas is a nameless window to MSAA unless the toolkit
-                // gives it a window text, which is what MSAA reads as the name.
-                observed.CanvasAccessibleName = WindowTextOf(described);
-                observed.CanvasAccessibleRole = MsaaRoleOf(described);
-                observed.ShadowAccessibleRole = ShadowRoleProbe(described);
+        // PRD §13: a string with an emoji is diverted to Direct2D, one without is not. Whether
+        // the divert can succeed is a property of the machine, so the assertion is conditional on
+        // the path being available at all rather than on it being present.
+        // PRD §8: an owner-drawn control's canvas is a nameless window to MSAA unless the toolkit
+        // gives it a window text, which is what MSAA reads as the name.
+        observed.CanvasAccessibleName = WindowTextOf(described);
+        observed.CanvasAccessibleRole = MsaaRoleOf(described);
+        observed.ShadowAccessibleRole = ShadowRoleProbe(described);
 
-                observed.MultilineHintPixels = ForegroundPixels(hinted);
-                observed.BlankMultilinePixels = ForegroundPixels(blank);
+        observed.MultilineHintPixels = ForegroundPixels(hinted);
+        observed.BlankMultilinePixels = ForegroundPixels(blank);
 
-                // The window the promotion produced has to be the size the control asked for. A stand-alone
-                // SCROLLBAR that ignored its rectangle draws as a hairline, which reads in a screenshot as
-                // "the scroll bar did not render" and is indistinguishable from a paint bug until measured.
-                observed.HScrollClient = ClientSizeOf(hscroll);
-                observed.VScrollClient = ClientSizeOf(vscroll);
+        // The window the promotion produced has to be the size the control asked for. A stand-alone
+        // SCROLLBAR that ignored its rectangle draws as a hairline, which reads in a screenshot as
+        // "the scroll bar did not render" and is indistinguishable from a paint bug until measured.
+        observed.HScrollClient = ClientSizeOf(hscroll);
+        observed.VScrollClient = ClientSizeOf(vscroll);
 
-                var theme = BackendRegistry.Resolve().Theme;
-                observed.ScrollBarSize = theme.ScrollBarSize;
-                observed.RowHeight = theme.RowHeight;
+        var theme = BackendRegistry.Resolve().Theme;
+        observed.ScrollBarSize = theme.ScrollBarSize;
+        observed.RowHeight = theme.RowHeight;
 
-                // A stock control that is never sent WM_SETFONT draws in GDI's SYSTEM_FONT, the raster
-                // face from Windows 3.1 — which is a different font from the one the painter uses two
-                // pixels away, and has no em dash and no ellipsis. Nothing in the gallery gives this
-                // button a font, so what it is wearing is what every unstyled widget wears.
-                observed.WidgetFont = tipped.Peer is Win32ControlPeer widget && widget.Handle != 0
-                    ? NativeMethods.SendMessageW(widget.Handle, NativeMethods.WM_GETFONT, 0, 0)
-                    : 0;
-                observed.ThemeFont = Win32FontCache.Get(theme.DefaultFont, Win32FontCache.ScreenDpi);
+        // A stock control that is never sent WM_SETFONT draws in GDI's SYSTEM_FONT, the raster
+        // face from Windows 3.1 — which is a different font from the one the painter uses two
+        // pixels away, and has no em dash and no ellipsis. Nothing in the gallery gives this
+        // button a font, so what it is wearing is what every unstyled widget wears.
+        observed.WidgetFont = tipped.Peer is Win32ControlPeer widget && widget.Handle != 0
+            ? NativeMethods.SendMessageW(widget.Handle, NativeMethods.WM_GETFONT, 0, 0)
+            : 0;
+        observed.ThemeFont = Win32FontCache.Get(theme.DefaultFont, Win32FontCache.ScreenDpi);
 
-                observed.ColorTextAvailable = !Win32ColorText.Unavailable;
-                observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
-                observed.ColorRunsForPlainText = painter.ColorRunsAfterPlain - painter.ColorRunsBeforePlain;
-            }
-            catch (Exception exception)
-            {
-                observed.Failure = exception.ToString();
-            }
-            finally
-            {
-                form.Close();
-            }
-        };
+        observed.ColorTextAvailable = !Win32ColorText.Unavailable;
+        observed.ColorRunsForEmoji = painter.ColorRunsAfterEmoji - painter.ColorRunsBeforeEmoji;
+        observed.ColorRunsForPlainText = painter.ColorRunsAfterPlain - painter.ColorRunsBeforePlain;
+      } catch (Exception exception) {
+        observed.Failure = exception.ToString();
+      } finally {
+        form.Close();
+      }
+    };
 
-        form.Load += (_, _) => timer.Start();
+    form.Load += (_, _) => timer.Start();
 
-        // A failure to open a window at all (a runner without an interactive window station, say) must
-        // arrive as a legible message on every test rather than as an opaque fixture error.
-        try
-        {
-            Application.Run(form);
-        }
-        catch (Exception exception)
-        {
-            observed.Failure ??= $"the Win32 message loop could not run: {exception}";
-        }
-
-        _observed = observed;
+    // A failure to open a window at all (a runner without an interactive window station, say) must
+    // arrive as a legible message on every test rather than as an opaque fixture error.
+    try {
+      Application.Run(form);
+    } catch (Exception exception) {
+      observed.Failure ??= $"the Win32 message loop could not run: {exception}";
     }
 
-    private static Observations Result()
-    {
-        if (_skipReason is { } reason)
-            Assert.Ignore(reason);
+    _observed = observed;
+  }
 
-        Assert.That(_observed, Is.Not.Null, "the Win32 loop never reached the observation point.");
-        Assert.That(_observed!.Failure, Is.Null, _observed.Failure);
-        return _observed;
+  private static Observations Result() {
+    if (_skipReason is { } reason)
+      Assert.Ignore(reason);
+
+    Assert.That(_observed, Is.Not.Null, "the Win32 loop never reached the observation point.");
+    Assert.That(_observed!.Failure, Is.Null, _observed.Failure);
+    return _observed;
+  }
+
+  /// <summary>The window text of a control's peer, read back out of the OS.</summary>
+  /// <summary>
+  /// How many pixels of a control's client area are not its background — a count rather than a
+  /// yes/no, because an empty EDIT is not necessarily blank: it may be carrying a caret, and a
+  /// boolean would read that as drawing. The background is sampled from the far corner rather than
+  /// the near one: text starts at the top left, and the top-left client pixel is where a themed
+  /// control's own edge lands. The window is repainted first, so the answer is about this moment
+  /// rather than about whatever the queue had got round to.
+  /// </summary>
+  private static int ForegroundPixels(Control control) {
+    if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+      return 0;
+
+    unsafe {
+      NativeMethods.InvalidateRect(peer.Handle, null, true);
     }
 
-    /// <summary>The window text of a control's peer, read back out of the OS.</summary>
-    /// <summary>
-    /// How many pixels of a control's client area are not its background — a count rather than a
-    /// yes/no, because an empty EDIT is not necessarily blank: it may be carrying a caret, and a
-    /// boolean would read that as drawing. The background is sampled from the far corner rather than
-    /// the near one: text starts at the top left, and the top-left client pixel is where a themed
-    /// control's own edge lands. The window is repainted first, so the answer is about this moment
-    /// rather than about whatever the queue had got round to.
-    /// </summary>
-    private static int ForegroundPixels(Control control)
-    {
-        if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
-            return 0;
+    NativeMethods.UpdateWindow(peer.Handle);
+    if (!NativeMethods.GetClientRect(peer.Handle, out var rect))
+      return 0;
 
-        unsafe
-        {
-            NativeMethods.InvalidateRect(peer.Handle, null, true);
-        }
+    var hdc = NativeMethods.GetDC(peer.Handle);
+    if (hdc == 0)
+      return 0;
 
-        NativeMethods.UpdateWindow(peer.Handle);
-        if (!NativeMethods.GetClientRect(peer.Handle, out var rect))
-            return 0;
+    try {
+      var background = NativeMethods.GetPixel(hdc, rect.right - 3, rect.bottom - 3);
+      var count = 0;
+      for (var y = 2; y < rect.bottom - 2; ++y)
+        for (var x = 2; x < rect.right - 2; ++x)
+          if (NativeMethods.GetPixel(hdc, x, y) != background)
+            ++count;
 
-        var hdc = NativeMethods.GetDC(peer.Handle);
-        if (hdc == 0)
-            return 0;
-
-        try
-        {
-            var background = NativeMethods.GetPixel(hdc, rect.right - 3, rect.bottom - 3);
-            var count = 0;
-            for (var y = 2; y < rect.bottom - 2; ++y)
-                for (var x = 2; x < rect.right - 2; ++x)
-                    if (NativeMethods.GetPixel(hdc, x, y) != background)
-                        ++count;
-
-            return count;
-        }
-        finally
-        {
-            NativeMethods.ReleaseDC(peer.Handle, hdc);
-        }
+      return count;
+    } finally {
+      NativeMethods.ReleaseDC(peer.Handle, hdc);
     }
+  }
 
-    /// <summary>The client size of the native window behind a control, or empty when it has none.</summary>
-    private static Size ClientSizeOf(Control control)
-        => control.Peer is Win32ControlPeer peer && peer.Handle != 0 && NativeMethods.GetClientRect(peer.Handle, out var rect)
-            ? new Size(rect.right - rect.left, rect.bottom - rect.top)
-            : Size.Empty;
+  /// <summary>The client size of the native window behind a control, or empty when it has none.</summary>
+  private static Size ClientSizeOf(Control control)
+      => control.Peer is Win32ControlPeer peer && peer.Handle != 0 && NativeMethods.GetClientRect(peer.Handle, out var rect)
+          ? new Size(rect.right - rect.left, rect.bottom - rect.top)
+          : Size.Empty;
 
-    private static string? WindowTextOf(Control control)
-    {
-        if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
-            return null;
+  private static string? WindowTextOf(Control control) {
+    if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+      return null;
 
-        var length = NativeMethods.GetWindowTextLengthW(peer.Handle);
-        if (length <= 0)
-            return string.Empty;
+    var length = NativeMethods.GetWindowTextLengthW(peer.Handle);
+    if (length <= 0)
+      return string.Empty;
 
-        var buffer = new char[length + 1];
-        unsafe
-        {
-            fixed (char* text = buffer)
-            {
-                var copied = NativeMethods.GetWindowTextW(peer.Handle, text, buffer.Length);
-                return new string(buffer, 0, Math.Max(0, copied));
-            }
-        }
+    var buffer = new char[length + 1];
+    unsafe {
+      fixed (char* text = buffer) {
+        var copied = NativeMethods.GetWindowTextW(peer.Handle, text, buffer.Length);
+        return new string(buffer, 0, Math.Max(0, copied));
+      }
     }
+  }
 
-    /// <summary>
-    /// The MSAA role of a control's window, obtained exactly as assistive technology obtains it: ask
-    /// <c>oleacc</c> for the window's accessible object, then ask that object what it is.
-    /// </summary>
-    private static int MsaaRoleOf(Control control)
-    {
-        if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
-            return 0;
+  /// <summary>
+  /// The MSAA role of a control's window, obtained exactly as assistive technology obtains it: ask
+  /// <c>oleacc</c> for the window's accessible object, then ask that object what it is.
+  /// </summary>
+  private static int MsaaRoleOf(Control control) {
+    if (control.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+      return 0;
 
-        return RoleOfWindow(peer.Handle);
+    return RoleOfWindow(peer.Handle);
+  }
+
+  /// <summary>
+  /// The role a plain stock check box reports, asked exactly as above. A control group for the test
+  /// beside it: if even this comes back generic, the reading is broken rather than the reply.
+  /// </summary>
+  private static int ShadowRoleProbe(Control host) {
+    if (host.Peer is not Win32ControlPeer peer || peer.Handle == 0)
+      return 0;
+
+    var probe = NativeMethods.CreateWindowExW(
+        0,
+        "BUTTON",
+        "probe",
+        NativeMethods.WS_CHILD | NativeMethods.BS_AUTOCHECKBOX,
+        0,
+        0,
+        10,
+        10,
+        peer.Handle,
+        0,
+        NativeMethods.GetModuleHandleW(null),
+        0);
+
+    if (probe == 0)
+      return 0;
+
+    try {
+      return RoleOfWindow(probe);
+    } finally {
+      NativeMethods.DestroyWindow(probe);
     }
+  }
 
-    /// <summary>
-    /// The role a plain stock check box reports, asked exactly as above. A control group for the test
-    /// beside it: if even this comes back generic, the reading is broken rather than the reply.
-    /// </summary>
-    private static int ShadowRoleProbe(Control host)
-    {
-        if (host.Peer is not Win32ControlPeer peer || peer.Handle == 0)
-            return 0;
+  /// <summary>The MSAA role of a window, asked the way assistive technology asks.</summary>
+  private static int RoleOfWindow(nint handle) {
+    if (NativeMethods.AccessibleObjectFromWindow(handle, unchecked((uint)NativeMethods.OBJID_CLIENT), NativeMethods.IID_IAccessible, out var accessible) < 0
+        || accessible == 0)
+      return 0;
 
-        var probe = NativeMethods.CreateWindowExW(
-            0,
-            "BUTTON",
-            "probe",
-            NativeMethods.WS_CHILD | NativeMethods.BS_AUTOCHECKBOX,
-            0,
-            0,
-            10,
-            10,
-            peer.Handle,
-            0,
-            NativeMethods.GetModuleHandleW(null),
-            0);
-
-        if (probe == 0)
-            return 0;
-
-        try
-        {
-            return RoleOfWindow(probe);
-        }
-        finally
-        {
-            NativeMethods.DestroyWindow(probe);
-        }
+    try {
+      return NativeMethods.GetAccessibleRole(accessible, out var role) < 0 ? 0 : (int)role.value;
+    } finally {
+      NativeMethods.Release(accessible);
     }
+  }
 
-    /// <summary>The MSAA role of a window, asked the way assistive technology asks.</summary>
-    private static int RoleOfWindow(nint handle)
-    {
-        if (NativeMethods.AccessibleObjectFromWindow(handle, unchecked((uint)NativeMethods.OBJID_CLIENT), NativeMethods.IID_IAccessible, out var accessible) < 0
-            || accessible == 0)
-            return 0;
+  private static IImage Pixel() {
+    var argb = new int[64];
+    Array.Fill(argb, unchecked((int)0xFF3366CC));
+    return BackendRegistry.Resolve().CreateImage(8, 8, argb);
+  }
 
-        try
-        {
-            return NativeMethods.GetAccessibleRole(accessible, out var role) < 0 ? 0 : (int)role.value;
-        }
-        finally
-        {
-            NativeMethods.Release(accessible);
-        }
-    }
+  [TestCase("CheckBox")]
+  [TestCase("RadioButton")]
+  [TestCase("ProgressBar")]
+  [TestCase("TrackBar")]
+  [TestCase("HScrollBar")]
+  [TestCase("VScrollBar")]
+  [TestCase("ComboBox")]
+  [TestCase("ListBox")]
+  [TestCase("GroupBox")]
+  [TestCase("mixed widget half")]
+  public void An_eligible_control_realizes_onto_a_real_widget(string control)
+      => Assert.That(Result().Promoted[control], Is.True, $"{control} stayed on the owner-drawn painter");
 
-    private static IImage Pixel()
-    {
-        var argb = new int[64];
-        Array.Fill(argb, unchecked((int)0xFF3366CC));
-        return BackendRegistry.Resolve().CreateImage(8, 8, argb);
-    }
+  /// <summary>
+  /// The one promotion whose window class can genuinely be missing: <c>SysLink</c> arrived with ComCtl32
+  /// version 6, which a process only reaches through an application manifest. The rule is therefore not
+  /// "always promoted" but "promoted exactly when the class resolved" — because the alternative, creating
+  /// a window that fails and leaving the control invisible, is what this pins against.
+  /// </summary>
+  [Test]
+  public void The_hyperlink_is_promoted_exactly_when_its_window_class_resolved() {
+    var promoted = Result().Promoted["LinkLabel"];
+    var available = NativeMethods.GetClassInfoExW(0, NativeMethods.WC_LINK, out _);
 
-    [TestCase("CheckBox")]
-    [TestCase("RadioButton")]
-    [TestCase("ProgressBar")]
-    [TestCase("TrackBar")]
-    [TestCase("HScrollBar")]
-    [TestCase("VScrollBar")]
-    [TestCase("ComboBox")]
-    [TestCase("ListBox")]
-    [TestCase("GroupBox")]
-    [TestCase("mixed widget half")]
-    public void An_eligible_control_realizes_onto_a_real_widget(string control)
-        => Assert.That(Result().Promoted[control], Is.True, $"{control} stayed on the owner-drawn painter");
+    Assert.That(
+        promoted,
+        Is.EqualTo(available),
+        available
+            ? "SysLink is registered, so the promotion should have been taken"
+            : "SysLink is absent, so the backend must decline and leave the painter in charge");
+  }
 
-    /// <summary>
-    /// The one promotion whose window class can genuinely be missing: <c>SysLink</c> arrived with ComCtl32
-    /// version 6, which a process only reaches through an application manifest. The rule is therefore not
-    /// "always promoted" but "promoted exactly when the class resolved" — because the alternative, creating
-    /// a window that fails and leaving the control invisible, is what this pins against.
-    /// </summary>
-    [Test]
-    public void The_hyperlink_is_promoted_exactly_when_its_window_class_resolved()
-    {
-        var promoted = Result().Promoted["LinkLabel"];
-        var available = NativeMethods.GetClassInfoExW(0, NativeMethods.WC_LINK, out _);
+  [TestCase("gated CheckBox")]
+  [TestCase("gated RadioButton")]
+  [TestCase("vertical ProgressBar")]
+  [TestCase("editable ComboBox")]
+  [TestCase("CheckedListBox")]
+  [TestCase("gated GroupBox")]
+  [TestCase("mixed painted half")]
+  public void A_control_outside_its_gate_stays_owner_drawn(string control)
+      => Assert.That(Result().Promoted[control], Is.False, $"{control} was promoted despite its state");
 
-        Assert.That(
-            promoted,
-            Is.EqualTo(available),
-            available
-                ? "SysLink is registered, so the promotion should have been taken"
-                : "SysLink is absent, so the backend must decline and leave the painter in charge");
-    }
+  [TestCase("CheckBox.Checked")]
+  [TestCase("radio grouping")]
+  [TestCase("radio cleared")]
+  [TestCase("LinkLabel.LinkVisited")]
+  [TestCase("ProgressBar.Value")]
+  [TestCase("TrackBar.Value")]
+  [TestCase("ScrollBar.Value")]
+  [TestCase("ComboBox.SelectedIndex")]
+  [TestCase("ComboBox late items")]
+  [TestCase("ListBox.SelectedIndex")]
+  [TestCase("ListBox geometry")]
+  [TestCase("GroupBox child bounds")]
+  [TestCase("painted half takes the selection")]
+  [TestCase("widget half takes it back")]
+  [TestCase("the platform tooltip window exists")]
+  public void Driving_the_real_widget_round_trips(string what)
+      => Assert.That(Result().RoundTrips[what], Is.True, $"{what} did not survive the platform widget");
 
-    [TestCase("gated CheckBox")]
-    [TestCase("gated RadioButton")]
-    [TestCase("vertical ProgressBar")]
-    [TestCase("editable ComboBox")]
-    [TestCase("CheckedListBox")]
-    [TestCase("gated GroupBox")]
-    [TestCase("mixed painted half")]
-    public void A_control_outside_its_gate_stays_owner_drawn(string control)
-        => Assert.That(Result().Promoted[control], Is.False, $"{control} was promoted despite its state");
+  [TestCase("swap to painter")]
+  [TestCase("swap back to widget")]
+  [TestCase("ComboBox swap keeps selection")]
+  public void A_property_change_that_crosses_the_gate_swaps_the_peer_with_the_state_intact(string what)
+      => Assert.That(Result().RoundTrips[what], Is.True, $"{what} lost state across the peer swap");
 
-    [TestCase("CheckBox.Checked")]
-    [TestCase("radio grouping")]
-    [TestCase("radio cleared")]
-    [TestCase("LinkLabel.LinkVisited")]
-    [TestCase("ProgressBar.Value")]
-    [TestCase("TrackBar.Value")]
-    [TestCase("ScrollBar.Value")]
-    [TestCase("ComboBox.SelectedIndex")]
-    [TestCase("ComboBox late items")]
-    [TestCase("ListBox.SelectedIndex")]
-    [TestCase("ListBox geometry")]
-    [TestCase("GroupBox child bounds")]
-    [TestCase("painted half takes the selection")]
-    [TestCase("widget half takes it back")]
-    [TestCase("the platform tooltip window exists")]
-    public void Driving_the_real_widget_round_trips(string what)
-        => Assert.That(Result().RoundTrips[what], Is.True, $"{what} did not survive the platform widget");
+  /// <summary>
+  /// PRD §13: a string carrying an emoji goes to Direct2D, because GDI would draw it in black. The
+  /// machine decides whether that is possible; the toolkit decides whether it is attempted.
+  /// </summary>
+  [Test]
+  public void A_string_with_an_emoji_is_drawn_by_the_colour_path() {
+    var observed = Result();
+    if (!observed.ColorTextAvailable)
+      Assert.Ignore("Direct2D is not usable on this machine, so the fallback is the correct behaviour.");
 
-    [TestCase("swap to painter")]
-    [TestCase("swap back to widget")]
-    [TestCase("ComboBox swap keeps selection")]
-    public void A_property_change_that_crosses_the_gate_swaps_the_peer_with_the_state_intact(string what)
-        => Assert.That(Result().RoundTrips[what], Is.True, $"{what} lost state across the peer swap");
+    Assert.That(observed.ColorRunsForEmoji, Is.EqualTo(1), "the emoji string should have been diverted once");
+  }
 
-    /// <summary>
-    /// PRD §13: a string carrying an emoji goes to Direct2D, because GDI would draw it in black. The
-    /// machine decides whether that is possible; the toolkit decides whether it is attempted.
-    /// </summary>
-    [Test]
-    public void A_string_with_an_emoji_is_drawn_by_the_colour_path()
-    {
-        var observed = Result();
-        if (!observed.ColorTextAvailable)
-            Assert.Ignore("Direct2D is not usable on this machine, so the fallback is the correct behaviour.");
+  /// <summary>
+  /// The other half, and the one that protects every other string in the application: plain text must
+  /// never reach the slower renderer.
+  /// </summary>
+  [Test]
+  public void A_string_without_one_never_reaches_the_colour_path()
+      => Assert.That(Result().ColorRunsForPlainText, Is.Zero);
 
-        Assert.That(observed.ColorRunsForEmoji, Is.EqualTo(1), "the emoji string should have been diverted once");
-    }
+  /// <summary>
+  /// PRD §8: MSAA names a window it knows nothing else about by its window text, and our canvas class
+  /// has none — so an owner-drawn control is announced as a bare pane until the toolkit supplies one.
+  /// </summary>
+  /// <summary>
+  /// PRD §7.1: a multiline box shows its placeholder. <c>EM_SETCUEBANNER</c> reaches single-line EDIT
+  /// controls only — a multiline one accepts the message and draws nothing — so the hint is painted
+  /// over the empty control, and only a live desktop can say whether those pixels landed. The box
+  /// without a placeholder is the control: an empty EDIT that drew anything would make the other
+  /// assertion pass for free.
+  /// </summary>
+  [Test]
+  public void An_empty_multiline_box_paints_its_placeholder() {
+    var observed = Result();
+    Assert.That(
+        observed.MultilineHintPixels,
+        Is.GreaterThan(observed.BlankMultilinePixels + 50),
+        $"the hint drew {observed.MultilineHintPixels} px where a box without one drew {observed.BlankMultilinePixels}");
+  }
 
-    /// <summary>
-    /// The other half, and the one that protects every other string in the application: plain text must
-    /// never reach the slower renderer.
-    /// </summary>
-    [Test]
-    public void A_string_without_one_never_reaches_the_colour_path()
-        => Assert.That(Result().ColorRunsForPlainText, Is.Zero);
+  /// <summary>
+  /// A promoted scroll bar has to occupy the rectangle the control was given. A stand-alone
+  /// <c>SCROLLBAR</c> is the one promotion whose window can silently collapse along its cross axis —
+  /// the alignment style bits decide whether the control honours the rectangle or substitutes the
+  /// system metric — and a collapsed one photographs as a hairline, which reads as "the scroll bar did
+  /// not paint" and sends the next reader into the paint path instead of the geometry.
+  /// </summary>
+  [TestCase("HScrollBar")]
+  [TestCase("VScrollBar")]
+  public void A_promoted_scroll_bar_fills_the_rectangle_it_was_given(string name) {
+    var observed = Result();
+    var (measured, asked) = name == "HScrollBar"
+        ? (observed.HScrollClient, new Size(200, 16))
+        : (observed.VScrollClient, new Size(16, 180));
 
-    /// <summary>
-    /// PRD §8: MSAA names a window it knows nothing else about by its window text, and our canvas class
-    /// has none — so an owner-drawn control is announced as a bare pane until the toolkit supplies one.
-    /// </summary>
-    /// <summary>
-    /// PRD §7.1: a multiline box shows its placeholder. <c>EM_SETCUEBANNER</c> reaches single-line EDIT
-    /// controls only — a multiline one accepts the message and draws nothing — so the hint is painted
-    /// over the empty control, and only a live desktop can say whether those pixels landed. The box
-    /// without a placeholder is the control: an empty EDIT that drew anything would make the other
-    /// assertion pass for free.
-    /// </summary>
-    [Test]
-    public void An_empty_multiline_box_paints_its_placeholder()
-    {
-        var observed = Result();
-        Assert.That(
-            observed.MultilineHintPixels,
-            Is.GreaterThan(observed.BlankMultilinePixels + 50),
-            $"the hint drew {observed.MultilineHintPixels} px where a box without one drew {observed.BlankMultilinePixels}");
-    }
+    Assert.That(measured, Is.Not.EqualTo(Size.Empty), "the promotion produced no window to measure");
+    Assert.That(measured, Is.EqualTo(asked));
+  }
 
-    /// <summary>
-    /// A promoted scroll bar has to occupy the rectangle the control was given. A stand-alone
-    /// <c>SCROLLBAR</c> is the one promotion whose window can silently collapse along its cross axis —
-    /// the alignment style bits decide whether the control honours the rectangle or substitutes the
-    /// system metric — and a collapsed one photographs as a hairline, which reads as "the scroll bar did
-    /// not paint" and sends the next reader into the paint path instead of the geometry.
-    /// </summary>
-    [TestCase("HScrollBar")]
-    [TestCase("VScrollBar")]
-    public void A_promoted_scroll_bar_fills_the_rectangle_it_was_given(string name)
-    {
-        var observed = Result();
-        var (measured, asked) = name == "HScrollBar"
-            ? (observed.HScrollClient, new Size(200, 16))
-            : (observed.VScrollClient, new Size(16, 180));
+  /// <summary>
+  /// A theme metric read through the wrong <c>GetSystemMetrics</c> index does not fail — it returns
+  /// another metric, and the only sign is that everything sized by it is wrong. <c>SM_CXVSCROLL</c> was
+  /// declared as 0, which is <c>SM_CXSCREEN</c>, so every scroll bar was as wide as the display and every
+  /// control that reserves room for one had no room left for anything else.
+  /// </summary>
+  [TestCase("scroll bar thickness")]
+  [TestCase("row height")]
+  public void A_theme_metric_is_a_control_measurement_and_not_a_screen_one(string metric) {
+    var value = metric == "scroll bar thickness" ? Result().ScrollBarSize : Result().RowHeight;
 
-        Assert.That(measured, Is.Not.EqualTo(Size.Empty), "the promotion produced no window to measure");
-        Assert.That(measured, Is.EqualTo(asked));
-    }
+    Assert.That(
+        value,
+        Is.InRange(1, 200),
+        $"{metric} came back as {value}, which is a display dimension rather than a control one");
+  }
 
-    /// <summary>
-    /// A theme metric read through the wrong <c>GetSystemMetrics</c> index does not fail — it returns
-    /// another metric, and the only sign is that everything sized by it is wrong. <c>SM_CXVSCROLL</c> was
-    /// declared as 0, which is <c>SM_CXSCREEN</c>, so every scroll bar was as wide as the display and every
-    /// control that reserves room for one had no room left for anything else.
-    /// </summary>
-    [TestCase("scroll bar thickness")]
-    [TestCase("row height")]
-    public void A_theme_metric_is_a_control_measurement_and_not_a_screen_one(string metric)
-    {
-        var value = metric == "scroll bar thickness" ? Result().ScrollBarSize : Result().RowHeight;
+  [Test]
+  public void An_owner_drawn_controls_name_reaches_the_window_MSAA_will_read()
+      => Assert.That(Result().CanvasAccessibleName, Is.EqualTo("Enable logging"));
 
-        Assert.That(
-            value,
-            Is.InRange(1, 200),
-            $"{metric} came back as {value}, which is a display dimension rather than a control one");
-    }
+  /// <summary>
+  /// A stock control nobody gave a font to must still wear the desktop's, which on this platform only
+  /// happens if something sends it <c>WM_SETFONT</c>: the default is GDI's <c>SYSTEM_FONT</c>, a raster
+  /// face that defines nothing where cp1252 puts the em dash and the ellipsis. Every native caption in
+  /// the gallery drew in it, and the two characters came out as the missing-glyph bar, for as long as
+  /// the peer only applied a font the application had named.
+  /// </summary>
+  [Test]
+  public void A_widget_given_no_font_wears_the_one_the_painter_uses() {
+    var observed = Result();
+    Assert.That(observed.WidgetFont, Is.Not.Zero, "the widget answered WM_GETFONT with the stock system font");
+    Assert.That(observed.WidgetFont, Is.EqualTo(observed.ThemeFont));
+  }
 
-    [Test]
-    public void An_owner_drawn_controls_name_reaches_the_window_MSAA_will_read()
-        => Assert.That(Result().CanvasAccessibleName, Is.EqualTo("Enable logging"));
+  /// <summary>
+  /// The role is the half a window text cannot carry: MSAA takes it from the window class, so an
+  /// owner-drawn check box would be announced as a pane. Asking <c>oleacc</c> the way a screen reader
+  /// does is the only way to know the borrowed identity actually arrived.
+  /// </summary>
+  /// <remarks>
+  /// Asserted against a real stock check box built alongside rather than against the literal
+  /// <c>ROLE_SYSTEM_CHECKBUTTON</c>, because the number is the platform's business: wine's <c>oleacc</c>
+  /// answers <c>ROLE_SYSTEM_CLIENT</c> for every window it is asked about, including a genuine check box,
+  /// so a hard-coded 44 would fail there for a reason that has nothing to do with this toolkit. What is
+  /// actually being claimed is that our canvas is announced as whatever <em>this</em> machine announces a
+  /// check box as — which is the contract, holds everywhere, and still fails if the borrowed object never
+  /// reaches <c>WM_GETOBJECT</c>.
+  /// </remarks>
+  [Test]
+  public void An_owner_drawn_control_is_announced_as_what_it_imitates() {
+    var observed = Result();
+    if (observed.ShadowAccessibleRole == 0)
+      Assert.Ignore("oleacc did not answer on this machine, so there is nothing to compare against.");
 
-    /// <summary>
-    /// A stock control nobody gave a font to must still wear the desktop's, which on this platform only
-    /// happens if something sends it <c>WM_SETFONT</c>: the default is GDI's <c>SYSTEM_FONT</c>, a raster
-    /// face that defines nothing where cp1252 puts the em dash and the ellipsis. Every native caption in
-    /// the gallery drew in it, and the two characters came out as the missing-glyph bar, for as long as
-    /// the peer only applied a font the application had named.
-    /// </summary>
-    [Test]
-    public void A_widget_given_no_font_wears_the_one_the_painter_uses()
-    {
-        var observed = Result();
-        Assert.That(observed.WidgetFont, Is.Not.Zero, "the widget answered WM_GETFONT with the stock system font");
-        Assert.That(observed.WidgetFont, Is.EqualTo(observed.ThemeFont));
-    }
-
-    /// <summary>
-    /// The role is the half a window text cannot carry: MSAA takes it from the window class, so an
-    /// owner-drawn check box would be announced as a pane. Asking <c>oleacc</c> the way a screen reader
-    /// does is the only way to know the borrowed identity actually arrived.
-    /// </summary>
-    /// <remarks>
-    /// Asserted against a real stock check box built alongside rather than against the literal
-    /// <c>ROLE_SYSTEM_CHECKBUTTON</c>, because the number is the platform's business: wine's <c>oleacc</c>
-    /// answers <c>ROLE_SYSTEM_CLIENT</c> for every window it is asked about, including a genuine check box,
-    /// so a hard-coded 44 would fail there for a reason that has nothing to do with this toolkit. What is
-    /// actually being claimed is that our canvas is announced as whatever <em>this</em> machine announces a
-    /// check box as — which is the contract, holds everywhere, and still fails if the borrowed object never
-    /// reaches <c>WM_GETOBJECT</c>.
-    /// </remarks>
-    [Test]
-    public void An_owner_drawn_control_is_announced_as_what_it_imitates()
-    {
-        var observed = Result();
-        if (observed.ShadowAccessibleRole == 0)
-            Assert.Ignore("oleacc did not answer on this machine, so there is nothing to compare against.");
-
-        Assert.That(
-            observed.CanvasAccessibleRole,
-            Is.EqualTo(observed.ShadowAccessibleRole),
-            "the canvas answered for itself — the borrowed accessible object did not reach WM_GETOBJECT");
-    }
+    Assert.That(
+        observed.CanvasAccessibleRole,
+        Is.EqualTo(observed.ShadowAccessibleRole),
+        "the canvas answered for itself — the borrowed accessible object did not reach WM_GETOBJECT");
+  }
 }

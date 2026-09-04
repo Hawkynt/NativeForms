@@ -15,33 +15,29 @@ namespace Hawkynt.NativeForms.Tests;
 /// <see cref="MissingMethodException"/> on a machine where nothing was rebuilt.
 /// </remarks>
 [TestFixture]
-internal sealed class BackendAbiTests
-{
-    private static ConstructorInfo? Ctor(params Type[] parameters)
-        => typeof(MouseEventArgs).GetConstructor(parameters);
+internal sealed class BackendAbiTests {
+  private static ConstructorInfo? Ctor(params Type[] parameters)
+      => typeof(MouseEventArgs).GetConstructor(parameters);
 
-    [Test]
-    public void A_mouse_event_can_still_be_built_the_way_a_backend_builds_one()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(
-                Ctor(typeof(MouseButtons), typeof(int), typeof(int), typeof(int), typeof(KeyModifiers)),
-                Is.Not.Null,
-                "the five-argument form every shipped backend calls");
+  [Test]
+  public void A_mouse_event_can_still_be_built_the_way_a_backend_builds_one() {
+    Assert.Multiple(() => {
+      Assert.That(
+          Ctor(typeof(MouseButtons), typeof(int), typeof(int), typeof(int), typeof(KeyModifiers)),
+          Is.Not.Null,
+          "the five-argument form every shipped backend calls");
 
-            Assert.That(
-                Ctor(typeof(MouseButtons), typeof(int), typeof(int), typeof(int), typeof(KeyModifiers), typeof(int)),
-                Is.Not.Null,
-                "and the form that carries the click count");
-        });
-    }
+      Assert.That(
+          Ctor(typeof(MouseButtons), typeof(int), typeof(int), typeof(int), typeof(KeyModifiers), typeof(int)),
+          Is.Not.Null,
+          "and the form that carries the click count");
+    });
+  }
 
-    [Test]
-    public void The_five_argument_form_means_one_click()
-    {
-        var e = new MouseEventArgs(MouseButtons.Left, 3, 4, 0, KeyModifiers.None);
+  [Test]
+  public void The_five_argument_form_means_one_click() {
+    var e = new MouseEventArgs(MouseButtons.Left, 3, 4, 0, KeyModifiers.None);
 
-        Assert.That(e.Clicks, Is.EqualTo(1));
-    }
+    Assert.That(e.Clicks, Is.EqualTo(1));
+  }
 }

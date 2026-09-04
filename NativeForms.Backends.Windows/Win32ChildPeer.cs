@@ -10,217 +10,203 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// owning <see cref="WindowPeer"/> parents the peer through <see cref="CreateChildHandle"/>, at which
 /// point the buffered state captured by <see cref="Win32ControlPeer"/> is flushed onto it.
 /// </summary>
-internal abstract class Win32ChildPeer : Win32ControlPeer
-{
-    /// <summary>The subclass identity — one per peer class is enough, the HWND disambiguates.</summary>
-    private const nuint _PointerSubclassId = 1;
+internal abstract class Win32ChildPeer : Win32ControlPeer {
+  /// <summary>The subclass identity — one per peer class is enough, the HWND disambiguates.</summary>
+  private const nuint _PointerSubclassId = 1;
 
-    /// <summary>The parent window this peer was created under, for <see cref="RecreateHandle"/>.</summary>
-    private nint _parent;
+  /// <summary>The parent window this peer was created under, for <see cref="RecreateHandle"/>.</summary>
+  private nint _parent;
 
-    /// <summary>The HMENU control id this peer was created with, for <see cref="RecreateHandle"/>.</summary>
-    private int _controlId;
+  /// <summary>The HMENU control id this peer was created with, for <see cref="RecreateHandle"/>.</summary>
+  private int _controlId;
 
-    /// <summary>
-    /// The subclassed windows and the peers behind them, keyed by HWND.
-    /// </summary>
-    /// <remarks>
-    /// A map rather than a <see cref="GCHandle"/> in COMCTL32's reference data, which is what this used
-    /// to be, and which is the one operation in the subclass procedure that can fault: recovering a
-    /// handle that has been freed — or was never one — is undefined and takes the process down with no
-    /// managed exception to show for it. A dictionary lookup on a stale HWND simply misses. The sibling
-    /// subclass on this very window (<c>TextBoxPeer.EditProc</c>) already worked this way; the two agree
-    /// now.
-    /// </remarks>
-    private static readonly ConcurrentDictionary<nint, Win32ChildPeer> _pointerPeers = new();
+  /// <summary>
+  /// The subclassed windows and the peers behind them, keyed by HWND.
+  /// </summary>
+  /// <remarks>
+  /// A map rather than a <see cref="GCHandle"/> in COMCTL32's reference data, which is what this used
+  /// to be, and which is the one operation in the subclass procedure that can fault: recovering a
+  /// handle that has been freed — or was never one — is undefined and takes the process down with no
+  /// managed exception to show for it. A dictionary lookup on a stale HWND simply misses. The sibling
+  /// subclass on this very window (<c>TextBoxPeer.EditProc</c>) already worked this way; the two agree
+  /// now.
+  /// </remarks>
+  private static readonly ConcurrentDictionary<nint, Win32ChildPeer> _pointerPeers = new();
 
-    /// <summary>Whether leave tracking is currently armed, so it is re-armed once per crossing.</summary>
-    private bool _leaveTracked;
+  /// <summary>Whether leave tracking is currently armed, so it is re-armed once per crossing.</summary>
+  private bool _leaveTracked;
 
-    /// <summary>The native window class the control is built from (for example <c>"BUTTON"</c>).</summary>
-    protected abstract string WindowClass { get; }
+  /// <summary>The native window class the control is built from (for example <c>"BUTTON"</c>).</summary>
+  protected abstract string WindowClass { get; }
 
-    /// <summary>Extra window-style bits OR-ed on top of <c>WS_CHILD | WS_VISIBLE</c>.</summary>
-    protected abstract uint ExtraStyle { get; }
+  /// <summary>Extra window-style bits OR-ed on top of <c>WS_CHILD | WS_VISIBLE</c>.</summary>
+  protected abstract uint ExtraStyle { get; }
 
-    /// <summary>
-    /// Creates the native child window parented to <paramref name="parent"/>, using
-    /// <paramref name="controlId"/> as the HMENU control identifier so <c>WM_COMMAND</c> notifications
-    /// can be routed back to this peer, then flushes buffered state.
-    /// </summary>
-    internal virtual void CreateChildHandle(nint parent, int controlId)
-    {
-        // Remembered so a creation-time style bit can be changed later by rebuilding the window.
-        _parent = parent;
-        _controlId = controlId;
+  /// <summary>
+  /// Creates the native child window parented to <paramref name="parent"/>, using
+  /// <paramref name="controlId"/> as the HMENU control identifier so <c>WM_COMMAND</c> notifications
+  /// can be routed back to this peer, then flushes buffered state.
+  /// </summary>
+  internal virtual void CreateChildHandle(nint parent, int controlId) {
+    // Remembered so a creation-time style bit can be changed later by rebuilding the window.
+    _parent = parent;
+    _controlId = controlId;
 
-        var style = NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE | ExtraStyle;
-        Handle = NativeMethods.CreateWindowExW(
-            0,
-            WindowClass,
-            string.Empty,
-            style,
-            0,
-            0,
-            0,
-            0,
-            parent,
-            controlId,
-            NativeMethods.GetModuleHandleW(null),
-            0);
+    var style = NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE | ExtraStyle;
+    Handle = NativeMethods.CreateWindowExW(
+        0,
+        WindowClass,
+        string.Empty,
+        style,
+        0,
+        0,
+        0,
+        0,
+        parent,
+        controlId,
+        NativeMethods.GetModuleHandleW(null),
+        0);
 
-        this.InstallPointerSubclass();
-        FlushState();
+    this.InstallPointerSubclass();
+    FlushState();
+  }
+
+  /// <summary>
+  /// Subclasses the stock control so its pointer messages become <see cref="IControlPeer.PointerMove"/>
+  /// and <see cref="IControlPeer.PointerLeave"/>. A stock class owns its own window procedure, so
+  /// this is the only way to observe hover on a native child; the messages are passed straight on
+  /// to <c>DefSubclassProc</c>, so the control's own behavior is untouched.
+  /// </summary>
+  /// <summary>
+  /// Whether this peer needs the subclass to report hover. A peer that already owns its window
+  /// class and sees every message itself — the canvas — overrides this to <see langword="false"/>
+  /// and feeds the pointer channel from its own procedure instead.
+  /// </summary>
+  private protected virtual bool NeedsPointerSubclass => true;
+
+  private unsafe void InstallPointerSubclass() {
+    if (Handle == 0 || !this.NeedsPointerSubclass)
+      return;
+
+    _pointerPeers[Handle] = this;
+    NativeMethods.SetWindowSubclass(
+        Handle,
+        (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
+        _PointerSubclassId,
+        0);
+  }
+
+  /// <summary>
+  /// The subclass procedure: observes the pointer messages, then always defers. Static and
+  /// <see cref="UnmanagedCallersOnlyAttribute"/> so COMCTL32 can call it through a function
+  /// pointer, with the peer found by HWND rather than through a captured closure or a handle in the
+  /// reference data — a window the map does not know is simply passed straight on.
+  /// </summary>
+  [UnmanagedCallersOnly]
+  private static nint PointerSubclassProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nint refData) {
+    if (_pointerPeers.TryGetValue(hwnd, out var peer))
+      switch (msg) {
+        case NativeMethods.WM_MOUSEMOVE:
+          peer.OnPointerMoveMessage(lParam);
+          break;
+        case NativeMethods.WM_MOUSELEAVE:
+          peer._leaveTracked = false;
+          peer.RaisePointerLeave();
+          break;
+        case NativeMethods.WM_CONTEXTMENU:
+          // A control that opened its own menu suppresses the default one (an edit's
+          // cut/copy/paste) by not deferring to DefSubclassProc.
+          if (peer.OnContextMenu(lParam))
+            return 0;
+          break;
+        default:
+          break;
+      }
+
+    return NativeMethods.DefSubclassProc(hwnd, msg, wParam, lParam);
+  }
+
+  /// <summary>
+  /// Turns a <c>WM_CONTEXTMENU</c> into a client-space context-menu request: the cursor position for a
+  /// right-click, or the control's centre when the Menu/Shift+F10 key raised it (<paramref name="lParam"/>
+  /// is -1). Returns whether the core opened a menu, so the caller can suppress the default one.
+  /// </summary>
+  private bool OnContextMenu(nint lParam) {
+    if (!this.HasContextMenuListener)
+      return false;
+
+    Point client;
+    if (lParam == -1) {
+      NativeMethods.GetClientRect(Handle, out var rect);
+      client = new((rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2);
+    } else {
+      var point = new NativeMethods.POINT { x = (short)(lParam & 0xFFFF), y = (short)((lParam >> 16) & 0xFFFF) };
+      NativeMethods.ScreenToClient(Handle, ref point);
+      client = new(point.x, point.y);
     }
 
-    /// <summary>
-    /// Subclasses the stock control so its pointer messages become <see cref="IControlPeer.PointerMove"/>
-    /// and <see cref="IControlPeer.PointerLeave"/>. A stock class owns its own window procedure, so
-    /// this is the only way to observe hover on a native child; the messages are passed straight on
-    /// to <c>DefSubclassProc</c>, so the control's own behavior is untouched.
-    /// </summary>
-    /// <summary>
-    /// Whether this peer needs the subclass to report hover. A peer that already owns its window
-    /// class and sees every message itself — the canvas — overrides this to <see langword="false"/>
-    /// and feeds the pointer channel from its own procedure instead.
-    /// </summary>
-    private protected virtual bool NeedsPointerSubclass => true;
+    return this.RaiseContextMenu(client);
+  }
 
-    private unsafe void InstallPointerSubclass()
-    {
-        if (Handle == 0 || !this.NeedsPointerSubclass)
-            return;
+  /// <summary>Arms leave tracking once per crossing and raises the move with client-space coordinates.</summary>
+  private unsafe void OnPointerMoveMessage(nint lParam) {
+    if (!this.HasPointerListener)
+      return;
 
-        _pointerPeers[Handle] = this;
-        NativeMethods.SetWindowSubclass(
-            Handle,
-            (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
-            _PointerSubclassId,
-            0);
+    if (!_leaveTracked) {
+      var track = new NativeMethods.TRACKMOUSEEVENT {
+        cbSize = (uint)sizeof(NativeMethods.TRACKMOUSEEVENT),
+        dwFlags = NativeMethods.TME_LEAVE,
+        hwndTrack = Handle,
+      };
+      _leaveTracked = NativeMethods.TrackMouseEvent(ref track);
     }
 
-    /// <summary>
-    /// The subclass procedure: observes the pointer messages, then always defers. Static and
-    /// <see cref="UnmanagedCallersOnlyAttribute"/> so COMCTL32 can call it through a function
-    /// pointer, with the peer found by HWND rather than through a captured closure or a handle in the
-    /// reference data — a window the map does not know is simply passed straight on.
-    /// </summary>
-    [UnmanagedCallersOnly]
-    private static nint PointerSubclassProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nint refData)
-    {
-        if (_pointerPeers.TryGetValue(hwnd, out var peer))
-            switch (msg)
-            {
-                case NativeMethods.WM_MOUSEMOVE:
-                    peer.OnPointerMoveMessage(lParam);
-                    break;
-                case NativeMethods.WM_MOUSELEAVE:
-                    peer._leaveTracked = false;
-                    peer.RaisePointerLeave();
-                    break;
-                case NativeMethods.WM_CONTEXTMENU:
-                    // A control that opened its own menu suppresses the default one (an edit's
-                    // cut/copy/paste) by not deferring to DefSubclassProc.
-                    if (peer.OnContextMenu(lParam))
-                        return 0;
-                    break;
-                default:
-                    break;
-            }
+    this.RaisePointerMove((short)(lParam & 0xFFFF), (short)((lParam >> 16) & 0xFFFF));
+  }
 
-        return NativeMethods.DefSubclassProc(hwnd, msg, wParam, lParam);
-    }
+  /// <summary>Removes the pointer subclass and forgets the window before it goes.</summary>
+  public override unsafe void Dispose() {
+    if (Handle != 0 && _pointerPeers.TryRemove(Handle, out _))
+      NativeMethods.RemoveWindowSubclass(
+          Handle,
+          (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
+          _PointerSubclassId);
 
-    /// <summary>
-    /// Turns a <c>WM_CONTEXTMENU</c> into a client-space context-menu request: the cursor position for a
-    /// right-click, or the control's centre when the Menu/Shift+F10 key raised it (<paramref name="lParam"/>
-    /// is -1). Returns whether the core opened a menu, so the caller can suppress the default one.
-    /// </summary>
-    private bool OnContextMenu(nint lParam)
-    {
-        if (!this.HasContextMenuListener)
-            return false;
+    base.Dispose();
+  }
 
-        Point client;
-        if (lParam == -1)
-        {
-            NativeMethods.GetClientRect(Handle, out var rect);
-            client = new((rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2);
-        }
-        else
-        {
-            var point = new NativeMethods.POINT { x = (short)(lParam & 0xFFFF), y = (short)((lParam >> 16) & 0xFFFF) };
-            NativeMethods.ScreenToClient(Handle, ref point);
-            client = new(point.x, point.y);
-        }
+  /// <summary>
+  /// Rebuilds the HWND with the current style bits. Several stock controls read their style only at
+  /// creation (<c>BS_DEFPUSHBUTTON</c>, <c>PBS_MARQUEE</c>, <c>TBS_VERT</c>), so changing one means
+  /// making a new window; buffered state is re-flushed by creation.
+  /// </summary>
+  private protected void RecreateHandle() {
+    if (Handle == 0)
+      return;
 
-        return this.RaiseContextMenu(client);
-    }
+    NativeMethods.DestroyWindow(Handle);
+    Handle = 0;
+    this.CreateChildHandle(_parent, _controlId);
+  }
 
-    /// <summary>Arms leave tracking once per crossing and raises the move with client-space coordinates.</summary>
-    private unsafe void OnPointerMoveMessage(nint lParam)
-    {
-        if (!this.HasPointerListener)
-            return;
+  /// <summary>
+  /// Handles a <c>WM_COMMAND</c> notification addressed to this control. The base implementation does
+  /// nothing; interactive controls (buttons) override it.
+  /// </summary>
+  internal virtual void OnCommand(int notifyCode) { }
 
-        if (!_leaveTracked)
-        {
-            var track = new NativeMethods.TRACKMOUSEEVENT
-            {
-                cbSize = (uint)sizeof(NativeMethods.TRACKMOUSEEVENT),
-                dwFlags = NativeMethods.TME_LEAVE,
-                hwndTrack = Handle,
-            };
-            _leaveTracked = NativeMethods.TrackMouseEvent(ref track);
-        }
+  /// <summary>
+  /// Handles a <c>WM_HSCROLL</c>/<c>WM_VSCROLL</c> notification this control sent to its parent. The
+  /// base implementation does nothing; sliders and scroll bars override it.
+  /// </summary>
+  /// <param name="scrollCode">The <c>SB_*</c> code in the low word of <c>wParam</c>.</param>
+  internal virtual void OnScroll(int scrollCode) { }
 
-        this.RaisePointerMove((short)(lParam & 0xFFFF), (short)((lParam >> 16) & 0xFFFF));
-    }
-
-    /// <summary>Removes the pointer subclass and forgets the window before it goes.</summary>
-    public override unsafe void Dispose()
-    {
-        if (Handle != 0 && _pointerPeers.TryRemove(Handle, out _))
-            NativeMethods.RemoveWindowSubclass(
-                Handle,
-                (nint)(delegate* unmanaged<nint, uint, nint, nint, nuint, nint, nint>)&PointerSubclassProc,
-                _PointerSubclassId);
-
-        base.Dispose();
-    }
-
-    /// <summary>
-    /// Rebuilds the HWND with the current style bits. Several stock controls read their style only at
-    /// creation (<c>BS_DEFPUSHBUTTON</c>, <c>PBS_MARQUEE</c>, <c>TBS_VERT</c>), so changing one means
-    /// making a new window; buffered state is re-flushed by creation.
-    /// </summary>
-    private protected void RecreateHandle()
-    {
-        if (Handle == 0)
-            return;
-
-        NativeMethods.DestroyWindow(Handle);
-        Handle = 0;
-        this.CreateChildHandle(_parent, _controlId);
-    }
-
-    /// <summary>
-    /// Handles a <c>WM_COMMAND</c> notification addressed to this control. The base implementation does
-    /// nothing; interactive controls (buttons) override it.
-    /// </summary>
-    internal virtual void OnCommand(int notifyCode) { }
-
-    /// <summary>
-    /// Handles a <c>WM_HSCROLL</c>/<c>WM_VSCROLL</c> notification this control sent to its parent. The
-    /// base implementation does nothing; sliders and scroll bars override it.
-    /// </summary>
-    /// <param name="scrollCode">The <c>SB_*</c> code in the low word of <c>wParam</c>.</param>
-    internal virtual void OnScroll(int scrollCode) { }
-
-    /// <summary>
-    /// Handles a <c>WM_NOTIFY</c> notification addressed to this control; <paramref name="lParam"/>
-    /// points at the notification-specific structure (which starts with an <c>NMHDR</c>). The base
-    /// implementation does nothing; controls with structured notifications (rich edits) override it.
-    /// </summary>
-    internal virtual void OnNotify(int code, nint lParam) { }
+  /// <summary>
+  /// Handles a <c>WM_NOTIFY</c> notification addressed to this control; <paramref name="lParam"/>
+  /// points at the notification-specific structure (which starts with an <c>NMHDR</c>). The base
+  /// implementation does nothing; controls with structured notifications (rich edits) override it.
+  /// </summary>
+  internal virtual void OnNotify(int code, nint lParam) { }
 }

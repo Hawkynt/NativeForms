@@ -11,200 +11,180 @@ namespace Hawkynt.NativeForms.Tests;
 /// toggled by a header click or the Space key.
 /// </summary>
 [TestFixture]
-internal sealed class ExpanderTests
-{
-    private const int _HeaderHeight = 22; // DefaultTheme.RowHeight
+internal sealed class ExpanderTests {
+  private const int _HeaderHeight = 22; // DefaultTheme.RowHeight
 
-    private static HeadlessCanvasPeer Realize(Expander expander, out HeadlessBackend backend)
-    {
-        backend = new HeadlessBackend();
-        var form = new Form();
-        form.Controls.Add(expander);
-        Application.Run(form, backend);
-        return backend.Created.OfType<HeadlessCanvasPeer>().First();
-    }
+  private static HeadlessCanvasPeer Realize(Expander expander, out HeadlessBackend backend) {
+    backend = new HeadlessBackend();
+    var form = new Form();
+    form.Controls.Add(expander);
+    Application.Run(form, backend);
+    return backend.Created.OfType<HeadlessCanvasPeer>().First();
+  }
 
-    [Test]
-    public void Collapsing_shrinks_to_the_header_and_hides_the_child_peers()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        var button = new Button { Bounds = new(10, 40, 80, 24) };
-        expander.Controls.Add(button);
-        var changes = 0;
-        expander.ExpandedChanged += (_, _) => ++changes;
-        var canvas = Realize(expander, out var backend);
-        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+  [Test]
+  public void Collapsing_shrinks_to_the_header_and_hides_the_child_peers() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    var button = new Button { Bounds = new(10, 40, 80, 24) };
+    expander.Controls.Add(button);
+    var changes = 0;
+    expander.ExpandedChanged += (_, _) => ++changes;
+    var canvas = Realize(expander, out var backend);
+    var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
 
-        expander.Expanded = false;
+    expander.Expanded = false;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(expander.Height, Is.EqualTo(_HeaderHeight));
-            Assert.That(canvas.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, _HeaderHeight)));
-            Assert.That(buttonPeer.Visible, Is.False);
-            Assert.That(
-                button.Visible,
-                Is.False,
-                "Visible is effective: a child the collapsed expander vetoed is not on screen");
-            Assert.That(changes, Is.EqualTo(1));
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(expander.Height, Is.EqualTo(_HeaderHeight));
+      Assert.That(canvas.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, _HeaderHeight)));
+      Assert.That(buttonPeer.Visible, Is.False);
+      Assert.That(
+          button.Visible,
+          Is.False,
+          "Visible is effective: a child the collapsed expander vetoed is not on screen");
+      Assert.That(changes, Is.EqualTo(1));
+    });
+  }
 
-    [Test]
-    public void Expanding_restores_the_height_and_the_child_peers()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        var button = new Button { Bounds = new(10, 40, 80, 24) };
-        expander.Controls.Add(button);
-        var canvas = Realize(expander, out var backend);
-        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
-        expander.Expanded = false;
+  [Test]
+  public void Expanding_restores_the_height_and_the_child_peers() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    var button = new Button { Bounds = new(10, 40, 80, 24) };
+    expander.Controls.Add(button);
+    var canvas = Realize(expander, out var backend);
+    var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+    expander.Expanded = false;
 
-        expander.Expanded = true;
+    expander.Expanded = true;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(expander.Height, Is.EqualTo(150), "remembered expanded height");
-            Assert.That(canvas.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, 150)));
-            Assert.That(buttonPeer.Visible, Is.True);
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(expander.Height, Is.EqualTo(150), "remembered expanded height");
+      Assert.That(canvas.Bounds, Is.EqualTo(new Rectangle(0, 0, 200, 150)));
+      Assert.That(buttonPeer.Visible, Is.True);
+    });
+  }
 
-    [Test]
-    public void Clicking_the_header_toggles()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        var canvas = Realize(expander, out _);
+  [Test]
+  public void Clicking_the_header_toggles() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    var canvas = Realize(expander, out _);
 
-        canvas.RaiseMouseUp(10, _HeaderHeight / 2);
-        Assert.That(expander.Expanded, Is.False);
+    canvas.RaiseMouseUp(10, _HeaderHeight / 2);
+    Assert.That(expander.Expanded, Is.False);
 
-        canvas.RaiseMouseUp(10, _HeaderHeight / 2);
-        Assert.That(expander.Expanded, Is.True);
-    }
+    canvas.RaiseMouseUp(10, _HeaderHeight / 2);
+    Assert.That(expander.Expanded, Is.True);
+  }
 
-    [Test]
-    public void Clicking_the_content_area_does_not_toggle()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        var canvas = Realize(expander, out _);
+  [Test]
+  public void Clicking_the_content_area_does_not_toggle() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    var canvas = Realize(expander, out _);
 
-        canvas.RaiseMouseUp(10, 100);
+    canvas.RaiseMouseUp(10, 100);
 
-        Assert.That(expander.Expanded, Is.True);
-    }
+    Assert.That(expander.Expanded, Is.True);
+  }
 
-    [Test]
-    public void Space_toggles()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        var canvas = Realize(expander, out _);
+  [Test]
+  public void Space_toggles() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    var canvas = Realize(expander, out _);
 
-        canvas.RaiseKeyDown(Keys.Space);
-        Assert.That(expander.Expanded, Is.False);
+    canvas.RaiseKeyDown(Keys.Space);
+    Assert.That(expander.Expanded, Is.False);
 
-        canvas.RaiseKeyDown(Keys.Space);
-        Assert.That(expander.Expanded, Is.True);
-    }
+    canvas.RaiseKeyDown(Keys.Space);
+    Assert.That(expander.Expanded, Is.True);
+  }
 
-    [Test]
-    public void Child_added_while_collapsed_realizes_hidden()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        Realize(expander, out var backend);
-        expander.Expanded = false;
+  [Test]
+  public void Child_added_while_collapsed_realizes_hidden() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    Realize(expander, out var backend);
+    expander.Expanded = false;
 
-        expander.Controls.Add(new Button { Bounds = new(10, 40, 80, 24) });
+    expander.Controls.Add(new Button { Bounds = new(10, 40, 80, 24) });
 
-        var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
-        Assert.That(buttonPeer.Visible, Is.False);
-    }
+    var buttonPeer = backend.Created.OfType<HeadlessButtonPeer>().Single();
+    Assert.That(buttonPeer.Visible, Is.False);
+  }
 
-    [Test]
-    public void Header_paints_the_caption_and_a_glyph()
-    {
-        var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
-        var canvas = Realize(expander, out _);
+  [Test]
+  public void Header_paints_the_caption_and_a_glyph() {
+    var expander = new Expander { Text = "Details", Bounds = new(0, 0, 200, 150) };
+    var canvas = Realize(expander, out _);
 
-        var g = canvas.RaisePaint();
+    var g = canvas.RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.DrewText("Details"), Is.True);
-            Assert.That(g.Operations.Exists(o => o.StartsWith("line ")), Is.True, "triangle glyph strokes");
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.DrewText("Details"), Is.True);
+      Assert.That(g.Operations.Exists(o => o.StartsWith("line ")), Is.True, "triangle glyph strokes");
+    });
+  }
 
-    [Test]
-    public void Checkable_Checked_mirrors_Expanded_and_raises_CheckedChanged()
-    {
-        var expander = new Expander { Text = "Options", Bounds = new(0, 0, 200, 150), ShowCheckBox = true };
-        Realize(expander, out _);
-        var checkedChanges = 0;
-        expander.CheckedChanged += (_, _) => ++checkedChanges;
+  [Test]
+  public void Checkable_Checked_mirrors_Expanded_and_raises_CheckedChanged() {
+    var expander = new Expander { Text = "Options", Bounds = new(0, 0, 200, 150), ShowCheckBox = true };
+    Realize(expander, out _);
+    var checkedChanges = 0;
+    expander.CheckedChanged += (_, _) => ++checkedChanges;
 
-        Assert.That(expander.Checked, Is.True, "checked tracks the default-expanded state");
+    Assert.That(expander.Checked, Is.True, "checked tracks the default-expanded state");
 
-        expander.Checked = false;
+    expander.Checked = false;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(expander.Expanded, Is.False, "clearing the check collapses the content");
-            Assert.That(expander.Height, Is.EqualTo(_HeaderHeight));
-            Assert.That(checkedChanges, Is.EqualTo(1), "CheckedChanged fired for the binding hook");
-        });
+    Assert.Multiple(() => {
+      Assert.That(expander.Expanded, Is.False, "clearing the check collapses the content");
+      Assert.That(expander.Height, Is.EqualTo(_HeaderHeight));
+      Assert.That(checkedChanges, Is.EqualTo(1), "CheckedChanged fired for the binding hook");
+    });
 
-        expander.Checked = true;
-        Assert.That(expander.Expanded, Is.True, "ticking the check re-opens the content");
-    }
+    expander.Checked = true;
+    Assert.That(expander.Expanded, Is.True, "ticking the check re-opens the content");
+  }
 
-    [Test]
-    public void Checkable_header_paints_a_check_box_that_reflects_the_state()
-    {
-        var expander = new Expander { Text = "Options", Bounds = new(0, 0, 200, 150), ShowCheckBox = true };
-        var canvas = Realize(expander, out _);
+  [Test]
+  public void Checkable_header_paints_a_check_box_that_reflects_the_state() {
+    var expander = new Expander { Text = "Options", Bounds = new(0, 0, 200, 150), ShowCheckBox = true };
+    var canvas = Realize(expander, out _);
 
-        var checkedPaint = canvas.RaisePaint();
-        Assert.That(checkedPaint.Operations.Exists(o => o.StartsWith("line #FF0078D4")), Is.True,
-            "a ticked check box draws the accent check mark");
+    var checkedPaint = canvas.RaisePaint();
+    Assert.That(checkedPaint.Operations.Exists(o => o.StartsWith("line #FF0078D4")), Is.True,
+        "a ticked check box draws the accent check mark");
 
-        expander.Checked = false;
-        var clearedPaint = canvas.RaisePaint();
-        Assert.That(clearedPaint.Operations.Exists(o => o.StartsWith("line #FF0078D4")), Is.False,
-            "a cleared check box draws no accent check mark");
-    }
+    expander.Checked = false;
+    var clearedPaint = canvas.RaisePaint();
+    Assert.That(clearedPaint.Operations.Exists(o => o.StartsWith("line #FF0078D4")), Is.False,
+        "a cleared check box draws no accent check mark");
+  }
 
-    private static int AtX(RecordingGraphics g, string prefix)
-    {
-        var op = g.Operations.First(o => o.StartsWith(prefix));
-        return int.Parse(op[(op.IndexOf('@') + 1)..].Split(',')[0]);
-    }
+  private static int AtX(RecordingGraphics g, string prefix) {
+    var op = g.Operations.First(o => o.StartsWith(prefix));
+    return int.Parse(op[(op.IndexOf('@') + 1)..].Split(',')[0]);
+  }
 
-    [Test]
-    public void A_header_image_paints_before_the_caption_by_default()
-    {
-        var expander = new Expander { Text = "Mail", Bounds = new(0, 0, 200, 120), Image = new HeadlessImage(16, 16) };
-        var g = Realize(expander, out _).RaisePaint();
+  [Test]
+  public void A_header_image_paints_before_the_caption_by_default() {
+    var expander = new Expander { Text = "Mail", Bounds = new(0, 0, 200, 120), Image = new HeadlessImage(16, 16) };
+    var g = Realize(expander, out _).RaisePaint();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16")), Is.True, "the header icon paints");
-            Assert.That(AtX(g, "image 16x16"), Is.LessThan(AtX(g, "text \"Mail\"")), "icon before caption by default");
-        });
-    }
+    Assert.Multiple(() => {
+      Assert.That(g.Operations.Exists(o => o.StartsWith("image 16x16")), Is.True, "the header icon paints");
+      Assert.That(AtX(g, "image 16x16"), Is.LessThan(AtX(g, "text \"Mail\"")), "icon before caption by default");
+    });
+  }
 
-    [Test]
-    public void TextBeforeImage_puts_the_header_icon_after_the_caption()
-    {
-        var expander = new Expander
-        {
-            Text = "Mail",
-            Bounds = new(0, 0, 200, 120),
-            Image = new HeadlessImage(16, 16),
-            TextImageRelation = TextImageRelation.TextBeforeImage,
-        };
-        var g = Realize(expander, out _).RaisePaint();
+  [Test]
+  public void TextBeforeImage_puts_the_header_icon_after_the_caption() {
+    var expander = new Expander {
+      Text = "Mail",
+      Bounds = new(0, 0, 200, 120),
+      Image = new HeadlessImage(16, 16),
+      TextImageRelation = TextImageRelation.TextBeforeImage,
+    };
+    var g = Realize(expander, out _).RaisePaint();
 
-        Assert.That(AtX(g, "text \"Mail\""), Is.LessThan(AtX(g, "image 16x16")), "caption first, icon after");
-    }
+    Assert.That(AtX(g, "text \"Mail\""), Is.LessThan(AtX(g, "image 16x16")), "caption first, icon after");
+  }
 }

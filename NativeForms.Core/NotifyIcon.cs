@@ -14,121 +14,111 @@ namespace Hawkynt.NativeForms;
 /// toolkit yet (<c>GtkStatusIcon</c> is deprecated; StatusNotifier/D-Bus is tracked in
 /// <c>docs/PRD.md</c> §7.7), so showing the icon there throws <see cref="NotSupportedException"/>.
 /// </remarks>
-public sealed class NotifyIcon : Component
-{
-    private readonly IPlatformBackend? _backend;
-    private INotifyIconPeer? _peer;
-    private int[]? _iconPixels;
-    private int _iconWidth;
-    private int _iconHeight;
-    private string _text = string.Empty;
-    private bool _visible;
+public sealed class NotifyIcon : Component {
+  private readonly IPlatformBackend? _backend;
+  private INotifyIconPeer? _peer;
+  private int[]? _iconPixels;
+  private int _iconWidth;
+  private int _iconHeight;
+  private string _text = string.Empty;
+  private bool _visible;
 
-    /// <summary>Creates a tray icon bound to whatever backend the application runs on.</summary>
-    public NotifyIcon() { }
+  /// <summary>Creates a tray icon bound to whatever backend the application runs on.</summary>
+  public NotifyIcon() { }
 
-    /// <summary>Creates a tray icon against an explicit backend. Intended for tests.</summary>
-    internal NotifyIcon(IPlatformBackend backend)
-    {
-        ArgumentNullException.ThrowIfNull(backend);
-        _backend = backend;
+  /// <summary>Creates a tray icon against an explicit backend. Intended for tests.</summary>
+  internal NotifyIcon(IPlatformBackend backend) {
+    ArgumentNullException.ThrowIfNull(backend);
+    _backend = backend;
+  }
+
+  /// <summary>Raised when the user clicks the icon with the primary button.</summary>
+  public event EventHandler? Click;
+
+  /// <summary>Raised when the user double-clicks the icon with the primary button.</summary>
+  public event EventHandler? DoubleClick;
+
+  /// <summary>The hover text the shell shows next to the icon.</summary>
+  public string Text {
+    get => _text;
+    set {
+      value ??= string.Empty;
+      if (_text == value)
+        return;
+
+      _text = value;
+      _peer?.SetToolTip(value);
     }
+  }
 
-    /// <summary>Raised when the user clicks the icon with the primary button.</summary>
-    public event EventHandler? Click;
+  /// <summary>
+  /// Whether the icon sits in the tray. The first show creates the native peer and flushes the
+  /// buffered icon and text into it; without a running application loop the wish is kept until the
+  /// property is touched while one runs.
+  /// </summary>
+  public bool Visible {
+    get => _visible;
+    set {
+      _visible = value;
+      if (!value) {
+        _peer?.SetVisible(false);
+        return;
+      }
 
-    /// <summary>Raised when the user double-clicks the icon with the primary button.</summary>
-    public event EventHandler? DoubleClick;
-
-    /// <summary>The hover text the shell shows next to the icon.</summary>
-    public string Text
-    {
-        get => _text;
-        set
-        {
-            value ??= string.Empty;
-            if (_text == value)
-                return;
-
-            _text = value;
-            _peer?.SetToolTip(value);
-        }
+      var peer = _peer ?? this.RealizePeer();
+      peer?.SetVisible(true);
     }
+  }
 
-    /// <summary>
-    /// Whether the icon sits in the tray. The first show creates the native peer and flushes the
-    /// buffered icon and text into it; without a running application loop the wish is kept until the
-    /// property is touched while one runs.
-    /// </summary>
-    public bool Visible
-    {
-        get => _visible;
-        set
-        {
-            _visible = value;
-            if (!value)
-            {
-                _peer?.SetVisible(false);
-                return;
-            }
+  /// <summary>Replaces the icon from 32-bit ARGB pixels (row-major, length = width * height).</summary>
+  /// <exception cref="ArgumentException">The pixel count does not match the dimensions.</exception>
+  public void SetIcon(int width, int height, ReadOnlySpan<int> argb) {
+    ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(width, 0);
+    ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(height, 0);
+    if (argb.Length != width * height)
+      throw new ArgumentException($"Expected {width * height} pixels ({width}×{height}), got {argb.Length}.", nameof(argb));
 
-            var peer = _peer ?? this.RealizePeer();
-            peer?.SetVisible(true);
-        }
-    }
+    _iconWidth = width;
+    _iconHeight = height;
+    _iconPixels = argb.ToArray();
+    _peer?.SetIcon(width, height, _iconPixels);
+  }
 
-    /// <summary>Replaces the icon from 32-bit ARGB pixels (row-major, length = width * height).</summary>
-    /// <exception cref="ArgumentException">The pixel count does not match the dimensions.</exception>
-    public void SetIcon(int width, int height, ReadOnlySpan<int> argb)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(width, 0);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(height, 0);
-        if (argb.Length != width * height)
-            throw new ArgumentException($"Expected {width * height} pixels ({width}×{height}), got {argb.Length}.", nameof(argb));
+  /// <summary>Removes the icon from the tray and releases the native peer.</summary>
+  protected override void Dispose(bool disposing) {
+    _visible = false;
+    var peer = _peer;
+    if (peer is null)
+      return;
 
-        _iconWidth = width;
-        _iconHeight = height;
-        _iconPixels = argb.ToArray();
-        _peer?.SetIcon(width, height, _iconPixels);
-    }
+    _peer = null;
+    peer.Click -= this.OnPeerClick;
+    peer.DoubleClick -= this.OnPeerDoubleClick;
+    peer.Dispose();
+  }
 
-    /// <summary>Removes the icon from the tray and releases the native peer.</summary>
-    protected override void Dispose(bool disposing)
-    {
-        _visible = false;
-        var peer = _peer;
-        if (peer is null)
-            return;
+  /// <summary>Creates the peer against the bound (or running) backend and flushes the buffered state.</summary>
+  private INotifyIconPeer? RealizePeer() {
+    var backend = _backend ?? Application.Current;
+    if (backend is null)
+      return null;
 
-        _peer = null;
-        peer.Click -= this.OnPeerClick;
-        peer.DoubleClick -= this.OnPeerDoubleClick;
-        peer.Dispose();
-    }
+    var peer = backend.CreateNotifyIcon();
+    _peer = peer;
+    peer.Click += this.OnPeerClick;
+    peer.DoubleClick += this.OnPeerDoubleClick;
+    if (_iconPixels is { } pixels)
+      peer.SetIcon(_iconWidth, _iconHeight, pixels);
 
-    /// <summary>Creates the peer against the bound (or running) backend and flushes the buffered state.</summary>
-    private INotifyIconPeer? RealizePeer()
-    {
-        var backend = _backend ?? Application.Current;
-        if (backend is null)
-            return null;
+    if (_text.Length > 0)
+      peer.SetToolTip(_text);
 
-        var peer = backend.CreateNotifyIcon();
-        _peer = peer;
-        peer.Click += this.OnPeerClick;
-        peer.DoubleClick += this.OnPeerDoubleClick;
-        if (_iconPixels is { } pixels)
-            peer.SetIcon(_iconWidth, _iconHeight, pixels);
+    return peer;
+  }
 
-        if (_text.Length > 0)
-            peer.SetToolTip(_text);
+  /// <summary>Forwards a native primary-button click to <see cref="Click"/>.</summary>
+  private void OnPeerClick(object? sender, EventArgs e) => this.Click?.Invoke(this, EventArgs.Empty);
 
-        return peer;
-    }
-
-    /// <summary>Forwards a native primary-button click to <see cref="Click"/>.</summary>
-    private void OnPeerClick(object? sender, EventArgs e) => this.Click?.Invoke(this, EventArgs.Empty);
-
-    /// <summary>Forwards a native primary-button double-click to <see cref="DoubleClick"/>.</summary>
-    private void OnPeerDoubleClick(object? sender, EventArgs e) => this.DoubleClick?.Invoke(this, EventArgs.Empty);
+  /// <summary>Forwards a native primary-button double-click to <see cref="DoubleClick"/>.</summary>
+  private void OnPeerDoubleClick(object? sender, EventArgs e) => this.DoubleClick?.Invoke(this, EventArgs.Empty);
 }

@@ -1,13 +1,12 @@
 namespace Hawkynt.NativeForms;
 
 /// <summary>Identifies the page a <see cref="TabControl"/> event is about.</summary>
-public sealed class TabPageEventArgs(TabPage page, int index) : EventArgs
-{
-    /// <summary>The page the event concerns.</summary>
-    public TabPage Page { get; } = page;
+public sealed class TabPageEventArgs(TabPage page, int index) : EventArgs {
+  /// <summary>The page the event concerns.</summary>
+  public TabPage Page { get; } = page;
 
-    /// <summary>The page's index within <see cref="TabControl.TabPages"/> at the time of the event.</summary>
-    public int Index { get; } = index;
+  /// <summary>The page's index within <see cref="TabControl.TabPages"/> at the time of the event.</summary>
+  public int Index { get; } = index;
 }
 
 /// <summary>
@@ -15,11 +14,10 @@ public sealed class TabPageEventArgs(TabPage page, int index) : EventArgs
 /// <see cref="System.ComponentModel.CancelEventArgs.Cancel"/> — the page then stays in the control.
 /// </summary>
 public sealed class TabPageCancelEventArgs(TabPage page, int index)
-    : System.ComponentModel.CancelEventArgs
-{
-    /// <summary>The page about to close.</summary>
-    public TabPage Page { get; } = page;
+    : System.ComponentModel.CancelEventArgs {
+  /// <summary>The page about to close.</summary>
+  public TabPage Page { get; } = page;
 
-    /// <summary>The page's index within <see cref="TabControl.TabPages"/>.</summary>
-    public int Index { get; } = index;
+  /// <summary>The page's index within <see cref="TabControl.TabPages"/>.</summary>
+  public int Index { get; } = index;
 }

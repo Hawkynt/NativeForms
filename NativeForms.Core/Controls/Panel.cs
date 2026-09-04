@@ -4,16 +4,15 @@ using Hawkynt.NativeForms.Drawing;
 namespace Hawkynt.NativeForms;
 
 /// <summary>The border a control paints around itself.</summary>
-public enum BorderStyle
-{
-    /// <summary>No border.</summary>
-    None,
+public enum BorderStyle {
+  /// <summary>No border.</summary>
+  None,
 
-    /// <summary>A single flat line.</summary>
-    FixedSingle,
+  /// <summary>A single flat line.</summary>
+  FixedSingle,
 
-    /// <summary>A sunken 3-D edge.</summary>
-    Fixed3D,
+  /// <summary>A sunken 3-D edge.</summary>
+  Fixed3D,
 }
 
 /// <summary>
@@ -22,326 +21,292 @@ public enum BorderStyle
 /// paints themed scrollbars whenever children overflow the client area and scrolls by physically
 /// moving the child peers — each child's logical <see cref="Control.Bounds"/> stays untouched.
 /// </summary>
-public class Panel : OwnerDrawnControl
-{
-    /// <inheritdoc/>
-    private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Pane;
+public class Panel : OwnerDrawnControl {
+  /// <inheritdoc/>
+  private protected override AccessibleRole DefaultAccessibleRole => AccessibleRole.Pane;
 
-    private const int _NoThumbDrag = 0;
-    private const int _VerticalThumbDrag = 1;
-    private const int _HorizontalThumbDrag = 2;
+  private const int _NoThumbDrag = 0;
+  private const int _VerticalThumbDrag = 1;
+  private const int _HorizontalThumbDrag = 2;
 
-    private Point _scroll;
-    private int _thumbDrag;
-    private int _thumbDragPixel;
-    private int _thumbDragOrigin;
+  private Point _scroll;
+  private int _thumbDrag;
+  private int _thumbDragPixel;
+  private int _thumbDragOrigin;
 
-    /// <summary>The border drawn around the panel.</summary>
-    public BorderStyle BorderStyle
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>The border drawn around the panel.</summary>
+  public BorderStyle BorderStyle {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            this.Invalidate();
-        }
-    } = BorderStyle.None;
+      field = value;
+      this.Invalidate();
+    }
+  } = BorderStyle.None;
 
-    /// <summary>
-    /// Whether the panel scrolls children that overflow its client area. Turning it off snaps the
-    /// scroll offset back to zero.
-    /// </summary>
-    public bool AutoScroll
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>
+  /// Whether the panel scrolls children that overflow its client area. Turning it off snaps the
+  /// scroll offset back to zero.
+  /// </summary>
+  public bool AutoScroll {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            if (!value)
-                this.ScrollTo(0, 0);
+      field = value;
+      if (!value)
+        this.ScrollTo(0, 0);
 
-            this.Invalidate();
-        }
+      this.Invalidate();
+    }
+  }
+
+  /// <summary>
+  /// The scroll offset, negated exactly like its Windows Forms namesake: a panel scrolled 10px down
+  /// reports (0, -10). Assigning accepts either sign and scrolls to the absolute offset.
+  /// </summary>
+  public Point AutoScrollPosition {
+    get => new(-_scroll.X, -_scroll.Y);
+    set => this.ScrollTo(Math.Abs(value.X), Math.Abs(value.Y));
+  }
+
+  /// <summary>
+  /// The client rectangle available to content, with the band a visible scrollbar occupies taken
+  /// out — exactly like Windows Forms, where showing a scrollbar shrinks the client area so docked
+  /// and anchored children are never laid out underneath one.
+  /// </summary>
+  public override Rectangle DisplayRectangle {
+    get {
+      var display = base.DisplayRectangle;
+      if (!this.AutoScroll)
+        return display;
+
+      this.GetScrollState(out _, out var verticalBar, out var horizontalBar, out _);
+      var barSize = this.Theme.ScrollBarSize;
+      return new(
+          display.X,
+          display.Y,
+          Math.Max(0, display.Width - (verticalBar ? barSize : 0)),
+          Math.Max(0, display.Height - (horizontalBar ? barSize : 0)));
+    }
+  }
+
+  /// <summary>
+  /// The scroll offset applied to a child's peer, with any trailing edge that would reach past the
+  /// viewport pulled back to it.
+  ///
+  /// Only the trailing edges are touched: the leading ones must stay free to go negative — that is
+  /// what scrolling a child up and out of view means — and cutting a child's top or left off would
+  /// move it rather than clip it. Trimming the trailing edges is not the same as relying on the
+  /// parent to clip, because a native child peer sits <em>above</em> the container's own surface:
+  /// nothing the panel paints can cover it, so a child scrolled half out of the viewport draws
+  /// across the panel's own border and over whatever lies beyond it. That includes a visible
+  /// scrollbar's band, which a child placed at absolute coordinates — one the Anchor/Dock engine
+  /// never passed through <see cref="DisplayRectangle"/> — would otherwise overhang, swallowing
+  /// every press aimed at the thumb.
+  /// </summary>
+  /// <summary>The viewport held for the duration of a scroll pass, so re-placing every child does not
+  /// re-derive the content extent (an O(n) walk) once per child — which made scrolling quadratic.</summary>
+  private Size? _scrollPassViewport;
+
+  private protected override Rectangle GetChildPeerBounds(Control child) {
+    var bounds = child.Bounds;
+    if (!this.AutoScroll)
+      return bounds;
+
+    var viewport = _scrollPassViewport ?? this.ScrollViewport();
+    var x = bounds.X - _scroll.X;
+    var y = bounds.Y - _scroll.Y;
+    return new(
+        x,
+        y,
+        Math.Max(0, Math.Min(bounds.Width, viewport.Width - x)),
+        Math.Max(0, Math.Min(bounds.Height, viewport.Height - y)));
+  }
+
+  /// <summary>
+  /// The union bottom-right corner of all children plus the trailing <see cref="Control.Padding"/>
+  /// — the size of the scrollable content, so a padded panel keeps breathing room after the last
+  /// child exactly like its Windows Forms namesake.
+  /// </summary>
+  private Size GetContentExtent() {
+    var width = 0;
+    var height = 0;
+
+    // ChildrenOrNull, not Controls: the extent is now read on every layout pass through
+    // DisplayRectangle, and the public getter would materialize a collection a childless panel
+    // never needed — straight off the per-instance allocation budget.
+    if (this.ChildrenOrNull is { } children)
+      for (var i = 0; i < children.Count; ++i) {
+        var bounds = children[i].Bounds;
+        width = Math.Max(width, bounds.Right);
+        height = Math.Max(height, bounds.Bottom);
+      }
+
+    if (width == 0 && height == 0)
+      return Size.Empty;
+
+    var padding = this.Padding;
+    return new(width + padding.Right, height + padding.Bottom);
+  }
+
+  /// <summary>The scroll viewport once — the shared helper behind <see cref="GetChildPeerBounds"/>.</summary>
+  private Size ScrollViewport() {
+    this.GetScrollState(out _, out _, out _, out var viewport);
+    return viewport;
+  }
+
+  /// <summary>Determines which scrollbars are needed; each bar steals room from the other's axis.</summary>
+  private void GetScrollState(out Size extent, out bool verticalBar, out bool horizontalBar, out Size viewport) {
+    if (!this.AutoScroll) {
+      extent = this.GetContentExtent();
+      verticalBar = horizontalBar = false;
+      viewport = this.Size;
+      return;
     }
 
-    /// <summary>
-    /// The scroll offset, negated exactly like its Windows Forms namesake: a panel scrolled 10px down
-    /// reports (0, -10). Assigning accepts either sign and scrolls to the absolute offset.
-    /// </summary>
-    public Point AutoScrollPosition
-    {
-        get => new(-_scroll.X, -_scroll.Y);
-        set => this.ScrollTo(Math.Abs(value.X), Math.Abs(value.Y));
+    extent = this.GetContentExtent();
+    var barSize = this.Theme.ScrollBarSize;
+    verticalBar = extent.Height > this.Height;
+    horizontalBar = extent.Width > this.Width - (verticalBar ? barSize : 0);
+    verticalBar = extent.Height > this.Height - (horizontalBar ? barSize : 0);
+    viewport = new(
+        this.Width - (verticalBar ? barSize : 0),
+        this.Height - (horizontalBar ? barSize : 0));
+  }
+
+  private Rectangle GetVerticalTrack(bool horizontalBar) {
+    var barSize = this.Theme.ScrollBarSize;
+    return new(this.Width - barSize, 0, barSize, this.Height - (horizontalBar ? barSize : 0));
+  }
+
+  private Rectangle GetHorizontalTrack(bool verticalBar) {
+    var barSize = this.Theme.ScrollBarSize;
+    return new(0, this.Height - barSize, this.Width - (verticalBar ? barSize : 0), barSize);
+  }
+
+  /// <summary>Scrolls to the given (positive) offset, clamped to the content, and moves the child peers.</summary>
+  private void ScrollTo(int x, int y) {
+    this.GetScrollState(out var extent, out _, out _, out var viewport);
+    var clamped = new Point(
+        Math.Clamp(x, 0, Math.Max(0, extent.Width - viewport.Width)),
+        Math.Clamp(y, 0, Math.Max(0, extent.Height - viewport.Height)));
+    if (clamped == _scroll)
+      return;
+
+    _scroll = clamped;
+
+    // One viewport for the whole re-push: each child's GetChildPeerBounds reads it from the cache
+    // instead of walking every child to re-derive the extent, keeping the scroll linear in children.
+    _scrollPassViewport = viewport;
+    try {
+      for (var i = 0; i < this.Controls.Count; ++i)
+        this.Controls[i].PushPeerBounds();
+    } finally {
+      _scrollPassViewport = null;
     }
 
-    /// <summary>
-    /// The client rectangle available to content, with the band a visible scrollbar occupies taken
-    /// out — exactly like Windows Forms, where showing a scrollbar shrinks the client area so docked
-    /// and anchored children are never laid out underneath one.
-    /// </summary>
-    public override Rectangle DisplayRectangle
-    {
-        get
-        {
-            var display = base.DisplayRectangle;
-            if (!this.AutoScroll)
-                return display;
+    this.Invalidate();
+  }
 
-            this.GetScrollState(out _, out var verticalBar, out var horizontalBar, out _);
-            var barSize = this.Theme.ScrollBarSize;
-            return new(
-                display.X,
-                display.Y,
-                Math.Max(0, display.Width - (verticalBar ? barSize : 0)),
-                Math.Max(0, display.Height - (horizontalBar ? barSize : 0)));
-        }
+  /// <inheritdoc/>
+  protected override void OnMouseWheel(MouseEventArgs e) {
+    if (!this.AutoScroll)
+      return;
+
+    this.ScrollTo(_scroll.X, _scroll.Y - (Math.Sign(e.Delta) * 3 * this.Theme.RowHeight));
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) {
+    if (!this.AutoScroll || e.Button != MouseButtons.Left)
+      return;
+
+    this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
+    if (verticalBar) {
+      var verticalTrack = this.GetVerticalTrack(horizontalBar);
+      if (verticalTrack.Contains(e.Location)) {
+        var thumb = ScrollBarRenderer.GetThumb(verticalTrack, vertical: true, extent.Height, viewport.Height, _scroll.Y);
+        if (thumb.Contains(e.Location)) {
+          _thumbDrag = _VerticalThumbDrag;
+          _thumbDragPixel = e.Y;
+          _thumbDragOrigin = _scroll.Y;
+        } else
+          this.ScrollTo(_scroll.X, _scroll.Y + (e.Y < thumb.Y ? -viewport.Height : viewport.Height));
+
+        return;
+      }
     }
 
-    /// <summary>
-    /// The scroll offset applied to a child's peer, with any trailing edge that would reach past the
-    /// viewport pulled back to it.
-    ///
-    /// Only the trailing edges are touched: the leading ones must stay free to go negative — that is
-    /// what scrolling a child up and out of view means — and cutting a child's top or left off would
-    /// move it rather than clip it. Trimming the trailing edges is not the same as relying on the
-    /// parent to clip, because a native child peer sits <em>above</em> the container's own surface:
-    /// nothing the panel paints can cover it, so a child scrolled half out of the viewport draws
-    /// across the panel's own border and over whatever lies beyond it. That includes a visible
-    /// scrollbar's band, which a child placed at absolute coordinates — one the Anchor/Dock engine
-    /// never passed through <see cref="DisplayRectangle"/> — would otherwise overhang, swallowing
-    /// every press aimed at the thumb.
-    /// </summary>
-    /// <summary>The viewport held for the duration of a scroll pass, so re-placing every child does not
-    /// re-derive the content extent (an O(n) walk) once per child — which made scrolling quadratic.</summary>
-    private Size? _scrollPassViewport;
+    if (!horizontalBar)
+      return;
 
-    private protected override Rectangle GetChildPeerBounds(Control child)
-    {
-        var bounds = child.Bounds;
-        if (!this.AutoScroll)
-            return bounds;
+    var horizontalTrack = this.GetHorizontalTrack(verticalBar);
+    if (!horizontalTrack.Contains(e.Location))
+      return;
 
-        var viewport = _scrollPassViewport ?? this.ScrollViewport();
-        var x = bounds.X - _scroll.X;
-        var y = bounds.Y - _scroll.Y;
-        return new(
-            x,
-            y,
-            Math.Max(0, Math.Min(bounds.Width, viewport.Width - x)),
-            Math.Max(0, Math.Min(bounds.Height, viewport.Height - y)));
+    var horizontalThumb = ScrollBarRenderer.GetThumb(horizontalTrack, vertical: false, extent.Width, viewport.Width, _scroll.X);
+    if (horizontalThumb.Contains(e.Location)) {
+      _thumbDrag = _HorizontalThumbDrag;
+      _thumbDragPixel = e.X;
+      _thumbDragOrigin = _scroll.X;
+    } else
+      this.ScrollTo(_scroll.X + (e.X < horizontalThumb.X ? -viewport.Width : viewport.Width), _scroll.Y);
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseMove(MouseEventArgs e) {
+    if (_thumbDrag == _NoThumbDrag)
+      return;
+
+    this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
+    if (_thumbDrag == _VerticalThumbDrag) {
+      var position = ScrollBarRenderer.PositionFromThumbDelta(
+          this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _thumbDragOrigin, e.Y - _thumbDragPixel);
+      this.ScrollTo(_scroll.X, position);
+    } else {
+      var position = ScrollBarRenderer.PositionFromThumbDelta(
+          this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _thumbDragOrigin, e.X - _thumbDragPixel);
+      this.ScrollTo(position, _scroll.Y);
+    }
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseUp(MouseEventArgs e) => _thumbDrag = _NoThumbDrag;
+
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var full = new Rectangle(0, 0, this.Width, this.Height);
+    g.FillRectangle(this.BackColor, full);
+
+    switch (this.BorderStyle) {
+      case BorderStyle.FixedSingle:
+        g.DrawRectangle(this.Theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+        break;
+      case BorderStyle.Fixed3D:
+        g.DrawLine(this.Theme.Border, 0, 0, this.Width - 1, 0);
+        g.DrawLine(this.Theme.Border, 0, 0, 0, this.Height - 1);
+        break;
+      case BorderStyle.None:
+      default:
+        break;
     }
 
-    /// <summary>
-    /// The union bottom-right corner of all children plus the trailing <see cref="Control.Padding"/>
-    /// — the size of the scrollable content, so a padded panel keeps breathing room after the last
-    /// child exactly like its Windows Forms namesake.
-    /// </summary>
-    private Size GetContentExtent()
-    {
-        var width = 0;
-        var height = 0;
+    if (!this.AutoScroll)
+      return;
 
-        // ChildrenOrNull, not Controls: the extent is now read on every layout pass through
-        // DisplayRectangle, and the public getter would materialize a collection a childless panel
-        // never needed — straight off the per-instance allocation budget.
-        if (this.ChildrenOrNull is { } children)
-            for (var i = 0; i < children.Count; ++i)
-            {
-                var bounds = children[i].Bounds;
-                width = Math.Max(width, bounds.Right);
-                height = Math.Max(height, bounds.Bottom);
-            }
+    this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
+    if (verticalBar)
+      ScrollBarRenderer.Paint(g, this.Theme, this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _scroll.Y);
 
-        if (width == 0 && height == 0)
-            return Size.Empty;
+    if (horizontalBar)
+      ScrollBarRenderer.Paint(g, this.Theme, this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _scroll.X);
 
-        var padding = this.Padding;
-        return new(width + padding.Right, height + padding.Bottom);
-    }
-
-    /// <summary>The scroll viewport once — the shared helper behind <see cref="GetChildPeerBounds"/>.</summary>
-    private Size ScrollViewport()
-    {
-        this.GetScrollState(out _, out _, out _, out var viewport);
-        return viewport;
-    }
-
-    /// <summary>Determines which scrollbars are needed; each bar steals room from the other's axis.</summary>
-    private void GetScrollState(out Size extent, out bool verticalBar, out bool horizontalBar, out Size viewport)
-    {
-        if (!this.AutoScroll)
-        {
-            extent = this.GetContentExtent();
-            verticalBar = horizontalBar = false;
-            viewport = this.Size;
-            return;
-        }
-
-        extent = this.GetContentExtent();
-        var barSize = this.Theme.ScrollBarSize;
-        verticalBar = extent.Height > this.Height;
-        horizontalBar = extent.Width > this.Width - (verticalBar ? barSize : 0);
-        verticalBar = extent.Height > this.Height - (horizontalBar ? barSize : 0);
-        viewport = new(
-            this.Width - (verticalBar ? barSize : 0),
-            this.Height - (horizontalBar ? barSize : 0));
-    }
-
-    private Rectangle GetVerticalTrack(bool horizontalBar)
-    {
-        var barSize = this.Theme.ScrollBarSize;
-        return new(this.Width - barSize, 0, barSize, this.Height - (horizontalBar ? barSize : 0));
-    }
-
-    private Rectangle GetHorizontalTrack(bool verticalBar)
-    {
-        var barSize = this.Theme.ScrollBarSize;
-        return new(0, this.Height - barSize, this.Width - (verticalBar ? barSize : 0), barSize);
-    }
-
-    /// <summary>Scrolls to the given (positive) offset, clamped to the content, and moves the child peers.</summary>
-    private void ScrollTo(int x, int y)
-    {
-        this.GetScrollState(out var extent, out _, out _, out var viewport);
-        var clamped = new Point(
-            Math.Clamp(x, 0, Math.Max(0, extent.Width - viewport.Width)),
-            Math.Clamp(y, 0, Math.Max(0, extent.Height - viewport.Height)));
-        if (clamped == _scroll)
-            return;
-
-        _scroll = clamped;
-
-        // One viewport for the whole re-push: each child's GetChildPeerBounds reads it from the cache
-        // instead of walking every child to re-derive the extent, keeping the scroll linear in children.
-        _scrollPassViewport = viewport;
-        try
-        {
-            for (var i = 0; i < this.Controls.Count; ++i)
-                this.Controls[i].PushPeerBounds();
-        }
-        finally
-        {
-            _scrollPassViewport = null;
-        }
-
-        this.Invalidate();
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseWheel(MouseEventArgs e)
-    {
-        if (!this.AutoScroll)
-            return;
-
-        this.ScrollTo(_scroll.X, _scroll.Y - (Math.Sign(e.Delta) * 3 * this.Theme.RowHeight));
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        if (!this.AutoScroll || e.Button != MouseButtons.Left)
-            return;
-
-        this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
-        if (verticalBar)
-        {
-            var verticalTrack = this.GetVerticalTrack(horizontalBar);
-            if (verticalTrack.Contains(e.Location))
-            {
-                var thumb = ScrollBarRenderer.GetThumb(verticalTrack, vertical: true, extent.Height, viewport.Height, _scroll.Y);
-                if (thumb.Contains(e.Location))
-                {
-                    _thumbDrag = _VerticalThumbDrag;
-                    _thumbDragPixel = e.Y;
-                    _thumbDragOrigin = _scroll.Y;
-                }
-                else
-                    this.ScrollTo(_scroll.X, _scroll.Y + (e.Y < thumb.Y ? -viewport.Height : viewport.Height));
-
-                return;
-            }
-        }
-
-        if (!horizontalBar)
-            return;
-
-        var horizontalTrack = this.GetHorizontalTrack(verticalBar);
-        if (!horizontalTrack.Contains(e.Location))
-            return;
-
-        var horizontalThumb = ScrollBarRenderer.GetThumb(horizontalTrack, vertical: false, extent.Width, viewport.Width, _scroll.X);
-        if (horizontalThumb.Contains(e.Location))
-        {
-            _thumbDrag = _HorizontalThumbDrag;
-            _thumbDragPixel = e.X;
-            _thumbDragOrigin = _scroll.X;
-        }
-        else
-            this.ScrollTo(_scroll.X + (e.X < horizontalThumb.X ? -viewport.Width : viewport.Width), _scroll.Y);
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseMove(MouseEventArgs e)
-    {
-        if (_thumbDrag == _NoThumbDrag)
-            return;
-
-        this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
-        if (_thumbDrag == _VerticalThumbDrag)
-        {
-            var position = ScrollBarRenderer.PositionFromThumbDelta(
-                this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _thumbDragOrigin, e.Y - _thumbDragPixel);
-            this.ScrollTo(_scroll.X, position);
-        }
-        else
-        {
-            var position = ScrollBarRenderer.PositionFromThumbDelta(
-                this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _thumbDragOrigin, e.X - _thumbDragPixel);
-            this.ScrollTo(position, _scroll.Y);
-        }
-    }
-
-    /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e) => _thumbDrag = _NoThumbDrag;
-
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var full = new Rectangle(0, 0, this.Width, this.Height);
-        g.FillRectangle(this.BackColor, full);
-
-        switch (this.BorderStyle)
-        {
-            case BorderStyle.FixedSingle:
-                g.DrawRectangle(this.Theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
-                break;
-            case BorderStyle.Fixed3D:
-                g.DrawLine(this.Theme.Border, 0, 0, this.Width - 1, 0);
-                g.DrawLine(this.Theme.Border, 0, 0, 0, this.Height - 1);
-                break;
-            case BorderStyle.None:
-            default:
-                break;
-        }
-
-        if (!this.AutoScroll)
-            return;
-
-        this.GetScrollState(out var extent, out var verticalBar, out var horizontalBar, out var viewport);
-        if (verticalBar)
-            ScrollBarRenderer.Paint(g, this.Theme, this.GetVerticalTrack(horizontalBar), vertical: true, extent.Height, viewport.Height, _scroll.Y);
-
-        if (horizontalBar)
-            ScrollBarRenderer.Paint(g, this.Theme, this.GetHorizontalTrack(verticalBar), vertical: false, extent.Width, viewport.Width, _scroll.X);
-
-        if (verticalBar && horizontalBar)
-            g.FillRectangle(this.Theme.ControlBackground, new Rectangle(viewport.Width, viewport.Height, this.Width - viewport.Width, this.Height - viewport.Height));
-    }
+    if (verticalBar && horizontalBar)
+      g.FillRectangle(this.Theme.ControlBackground, new Rectangle(viewport.Width, viewport.Height, this.Width - viewport.Width, this.Height - viewport.Height));
+  }
 }

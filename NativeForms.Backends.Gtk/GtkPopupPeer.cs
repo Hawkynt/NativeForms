@@ -19,330 +19,309 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// hide. The keyboard is deliberately not grabbed, so Escape only arrives while the application holds
 /// keyboard focus; richer keyboard forwarding is left to the owning control.
 /// </summary>
-internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer
-{
-    private readonly nint _window;
-    private bool _shown;
+internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer {
+  private readonly nint _window;
+  private bool _shown;
 
-    /// <summary>Whether the grabs taken by the last <see cref="ShowAt"/> are still standing, so
-    /// <see cref="Hide"/> releases exactly what it took even if the flag changed in between.</summary>
-    private bool _grabbed;
+  /// <summary>Whether the grabs taken by the last <see cref="ShowAt"/> are still standing, so
+  /// <see cref="Hide"/> releases exactly what it took even if the flag changed in between.</summary>
+  private bool _grabbed;
 
-    /// <inheritdoc />
-    public event EventHandler? Dismissed;
+  /// <inheritdoc />
+  public event EventHandler? Dismissed;
 
-    /// <inheritdoc />
-    public bool LightDismiss { get; set; } = true;
+  /// <inheritdoc />
+  public bool LightDismiss { get; set; } = true;
 
-    /// <inheritdoc />
-    public Func<Point, bool>? OutsidePress { get; set; }
+  /// <inheritdoc />
+  public Func<Point, bool>? OutsidePress { get; set; }
 
-    /// <inheritdoc />
-    public Action<Point>? OutsidePointerMove { get; set; }
+  /// <inheritdoc />
+  public Action<Point>? OutsidePointerMove { get; set; }
 
-    /// <summary>Creates the popup top-level, realizes the canvas into it and wires the dismissal signals.</summary>
-    /// <param name="owner">The <c>GtkWindow</c> this surface belongs to, or zero when none is known.</param>
-    internal GtkPopupPeer(nint owner)
-    {
-        _window = NativeMethods.gtk_window_new(NativeMethods.GTK_WINDOW_POPUP);
+  /// <summary>Creates the popup top-level, realizes the canvas into it and wires the dismissal signals.</summary>
+  /// <param name="owner">The <c>GtkWindow</c> this surface belongs to, or zero when none is known.</param>
+  internal GtkPopupPeer(nint owner) {
+    _window = NativeMethods.gtk_window_new(NativeMethods.GTK_WINDOW_POPUP);
 
-        // Without a transient parent a GTK_WINDOW_POPUP is an unrelated, override-redirect top-level:
-        // GDK says so out loud ("temporary window without parent, application will not be able to
-        // position it on screen") and cannot anchor it to the window that opened it, and GTK has no
-        // reason to keep that window looking focused — so pulling down the application's own menu put
-        // the whole window into its :backdrop state and greyed out every widget behind the menu.
-        // Naming the owner fixes both: the surface is positioned relative to a real parent, and the
-        // parent stays active for as long as its transient child is up.
-        if (owner != 0)
-            NativeMethods.gtk_window_set_transient_for(_window, owner);
+    // Without a transient parent a GTK_WINDOW_POPUP is an unrelated, override-redirect top-level:
+    // GDK says so out loud ("temporary window without parent, application will not be able to
+    // position it on screen") and cannot anchor it to the window that opened it, and GTK has no
+    // reason to keep that window looking focused — so pulling down the application's own menu put
+    // the whole window into its :backdrop state and greyed out every widget behind the menu.
+    // Naming the owner fixes both: the surface is positioned relative to a real parent, and the
+    // parent stays active for as long as its transient child is up.
+    if (owner != 0)
+      NativeMethods.gtk_window_set_transient_for(_window, owner);
 
-        // Realize the canvas eagerly: no container ever parents a top-level surface, so the lazy
-        // child path never runs for a popup.
-        _widget = CreateWidget();
-        OnWidgetRealized();
-        ConnectFocusSignals();
-        ConnectAllocationClamp();
-        NativeMethods.gtk_container_add(_window, _widget);
+    // Realize the canvas eagerly: no container ever parents a top-level surface, so the lazy
+    // child path never runs for a popup.
+    _widget = CreateWidget();
+    OnWidgetRealized();
+    ConnectFocusSignals();
+    ConnectAllocationClamp();
+    NativeMethods.gtk_container_add(_window, _widget);
 
-        // Dismissal watches the top-level. Presses that land on the popup's own canvas stop there —
-        // they are menu interactions, never dismissals — while presses elsewhere in the application
-        // are redirected here by the GTK grab, and keys the content left unhandled still bubble up,
-        // which is what carries Escape.
-        NativeMethods.gtk_widget_add_events(_window, NativeMethods.GDK_BUTTON_PRESS_MASK | NativeMethods.GDK_KEY_PRESS_MASK | NativeMethods.GDK_POINTER_MOTION_MASK);
-        var data = GCHandle.ToIntPtr(_selfHandle);
-        unsafe
-        {
-            NativeMethods.g_signal_connect_data(
-                _window, "button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowButtonPress, data, 0, 0);
-            NativeMethods.g_signal_connect_data(
-                _window, "key-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowKeyPress, data, 0, 0);
+    // Dismissal watches the top-level. Presses that land on the popup's own canvas stop there —
+    // they are menu interactions, never dismissals — while presses elsewhere in the application
+    // are redirected here by the GTK grab, and keys the content left unhandled still bubble up,
+    // which is what carries Escape.
+    NativeMethods.gtk_widget_add_events(_window, NativeMethods.GDK_BUTTON_PRESS_MASK | NativeMethods.GDK_KEY_PRESS_MASK | NativeMethods.GDK_POINTER_MOTION_MASK);
+    var data = GCHandle.ToIntPtr(_selfHandle);
+    unsafe {
+      NativeMethods.g_signal_connect_data(
+          _window, "button-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowButtonPress, data, 0, 0);
+      NativeMethods.g_signal_connect_data(
+          _window, "key-press-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowKeyPress, data, 0, 0);
 
-            // The seat/GTK grab redirects motion over another window in the application to this one when it
-            // is the deepest menu level, but delivers it to the top-level rather than the canvas child — so
-            // the canvas motion pipeline never sees a move over a shallower menu level. Catching it here and
-            // reporting the screen point lets the menu re-highlight and cascade the level under the pointer.
-            NativeMethods.g_signal_connect_data(
-                _window, "motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowMotion, data, 0, 0);
+      // The seat/GTK grab redirects motion over another window in the application to this one when it
+      // is the deepest menu level, but delivers it to the top-level rather than the canvas child — so
+      // the canvas motion pipeline never sees a move over a shallower menu level. Catching it here and
+      // reporting the screen point lets the menu re-highlight and cascade the level under the pointer.
+      NativeMethods.g_signal_connect_data(
+          _window, "motion-notify-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowMotion, data, 0, 0);
 
-            // A window manager stealing the pointer/keyboard — Alt-Tab to another application, another
-            // app taking a grab — breaks our seat grab and fires grab-broken. That is the one focus
-            // change a light-dismiss surface must honor, the way Windows Forms closes a drop-down when
-            // its owner deactivates; the grab-shadow focus-out the owner reports meanwhile is not it.
-            NativeMethods.g_signal_connect_data(
-                _window, "grab-broken-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowGrabBroken, data, 0, 0);
-        }
+      // A window manager stealing the pointer/keyboard — Alt-Tab to another application, another
+      // app taking a grab — breaks our seat grab and fires grab-broken. That is the one focus
+      // change a light-dismiss surface must honor, the way Windows Forms closes a drop-down when
+      // its owner deactivates; the grab-shadow focus-out the owner reports meanwhile is not it.
+      NativeMethods.g_signal_connect_data(
+          _window, "grab-broken-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnWindowGrabBroken, data, 0, 0);
+    }
+  }
+
+  /// <inheritdoc />
+  public void SetParentPopup(IPopupPeer parent) {
+    // Wayland maps a menu as an xdg_popup, and a nested xdg_popup must chain to the top-most mapped
+    // popup — the level that opened this one — not the root window the whole cascade descends from.
+    // Left pointing at the owner window, GDK refuses the map ("Tried to map a popup with a non-top
+    // most parent") and the submenu silently never appears. Re-anchoring the transient parent to the
+    // opening level's top-level before the map builds the popup chain the server requires. X11 is
+    // indifferent to this, so the same call is simply harmless there.
+    if (parent is GtkPopupPeer level)
+      NativeMethods.gtk_window_set_transient_for(_window, level._window);
+  }
+
+  /// <inheritdoc />
+  public void ShowAt(Point screenLocation, Size size) {
+    // Say what kind of surface this is before it is mapped. A window manager reads the hint to
+    // decide whether the surface is an ordinary window that should take the focus and push its
+    // opener into the background, or a transient of it that should not; both kinds here are the
+    // latter. Set on every show because LightDismiss is written after construction.
+    NativeMethods.gtk_window_set_type_hint(
+        _window,
+        this.LightDismiss ? NativeMethods.GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU : NativeMethods.GDK_WINDOW_TYPE_HINT_TOOLTIP);
+    NativeMethods.gtk_window_move(_window, screenLocation.X, screenLocation.Y);
+
+    // A popup is sized here rather than through SetBounds, so record the size as this peer's
+    // bounds too: that is the rectangle the canvas clamps its allocation and clips its painting
+    // to, and leaving it stale would shrink the popup to whatever it last measured.
+    _bounds = new Rectangle(_bounds.Location, size);
+    NativeMethods.gtk_widget_set_size_request(_widget, size.Width, size.Height);
+    NativeMethods.gtk_widget_show_all(_window);
+    _shown = true;
+
+    // A passive surface takes no grab either, so the next press keeps its normal delivery path
+    // and reaches the widget the user aimed at.
+    if (!this.LightDismiss)
+      return;
+
+    this.TakeGrab();
+  }
+
+  /// <inheritdoc/>
+  public void Resize(Size size) {
+    if (!_shown)
+      return;
+
+    // Size only: no move, no re-show and no grab, so a menu narrowing under a filter keeps the
+    // grab it already holds.
+    _bounds = new Rectangle(_bounds.Location, size);
+    NativeMethods.gtk_widget_set_size_request(_widget, size.Width, size.Height);
+    NativeMethods.gtk_window_resize(_window, size.Width, size.Height);
+    this.InvalidateAll();
+  }
+
+  /// <summary>
+  /// Takes the pointer grab that makes this the light-dismiss surface. The seat grab routes pointer
+  /// events outside the application to the popup (owner events keep in-app delivery normal); the GTK
+  /// grab redirects the application's own events to it. Together they make every outside click land in
+  /// <see cref="OnWindowButtonPress"/>.
+  /// </summary>
+  private void TakeGrab() {
+    var seat = NativeMethods.gdk_display_get_default_seat(NativeMethods.gdk_display_get_default());
+    NativeMethods.gdk_seat_grab(
+        seat,
+        NativeMethods.gtk_widget_get_window(_window),
+        NativeMethods.GDK_SEAT_CAPABILITY_ALL_POINTING,
+        Bool(true),
+        0,
+        0,
+        0,
+        0);
+    NativeMethods.gtk_grab_add(_window);
+    _grabbed = true;
+  }
+
+  /// <summary>Whether the next grab-broken is the expected handoff to a child popup this level opened,
+  /// rather than a real focus change that should dismiss it.</summary>
+  private bool _expectGrabBroken;
+
+  /// <inheritdoc/>
+  public void ExpectGrabHandoff() => _expectGrabBroken = true;
+
+  /// <inheritdoc/>
+  public void Regrab() {
+    // Re-take the grab a now-closed child popup held, so this level again catches outside clicks and
+    // Escape. A no-op if it still holds the grab, is hidden, or never grabs.
+    if (_grabbed || !_shown || !this.LightDismiss || _window == 0)
+      return;
+
+    this.TakeGrab();
+  }
+
+  /// <inheritdoc />
+  public void Hide() {
+    // Cleared before the grabs are released: releasing the GDK seat grab can itself deliver a
+    // grab-broken event, and the handler must see the surface as already gone rather than dismiss
+    // it a second time.
+    _shown = false;
+
+    if (_grabbed) {
+      NativeMethods.gtk_grab_remove(_window);
+      NativeMethods.gdk_seat_ungrab(NativeMethods.gdk_display_get_default_seat(NativeMethods.gdk_display_get_default()));
+      _grabbed = false;
     }
 
-    /// <inheritdoc />
-    public void SetParentPopup(IPopupPeer parent)
-    {
-        // Wayland maps a menu as an xdg_popup, and a nested xdg_popup must chain to the top-most mapped
-        // popup — the level that opened this one — not the root window the whole cascade descends from.
-        // Left pointing at the owner window, GDK refuses the map ("Tried to map a popup with a non-top
-        // most parent") and the submenu silently never appears. Re-anchoring the transient parent to the
-        // opening level's top-level before the map builds the popup chain the server requires. X11 is
-        // indifferent to this, so the same call is simply harmless there.
-        if (parent is GtkPopupPeer level)
-            NativeMethods.gtk_window_set_transient_for(_window, level._window);
+    NativeMethods.gtk_widget_hide(_window);
+  }
+
+  /// <inheritdoc />
+  public override void Dispose() {
+    Hide();
+
+    // The base disposes the canvas (removing it from the window); the empty top-level follows.
+    base.Dispose();
+    NativeMethods.gtk_widget_destroy(_window);
+  }
+
+  /// <summary>Hides the surface and releases the grabs, then raises <see cref="Dismissed"/>. A no-op while hidden.</summary>
+  private void Dismiss() {
+    if (!_shown)
+      return;
+
+    Hide();
+    Dismissed?.Invoke(this, EventArgs.Empty);
+  }
+
+  /// <summary>
+  /// Whether a press at the given root (screen) coordinates lies outside the popup's own rectangle.
+  /// The grab redirects presses aimed at any other window here without rewriting their coordinates,
+  /// so <c>GdkEventButton.X/Y</c> still measures from whichever window the pointer was actually
+  /// over. Testing those against this popup's allocation reads a press near the main window's origin
+  /// as a press near the popup's origin and refuses to dismiss; only the root coordinates, mapped
+  /// through the popup's own origin, describe both windows in the same space.
+  /// </summary>
+  private bool IsOutside(int rootX, int rootY) {
+    var window = NativeMethods.gtk_widget_get_window(_window);
+    if (window == 0)
+      return true;
+
+    NativeMethods.gdk_window_get_origin(window, out var originX, out var originY);
+    var x = rootX - originX;
+    var y = rootY - originY;
+    var width = NativeMethods.gtk_widget_get_allocated_width(_window);
+    var height = NativeMethods.gtk_widget_get_allocated_height(_window);
+    return x < 0 || y < 0 || x >= width || y >= height;
+  }
+
+  /// <summary>Recovers the popup bound to a native callback's <c>user_data</c>.</summary>
+  private static GtkPopupPeer? PopupFromData(nint userData)
+      => userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkPopupPeer peer ? peer : null;
+
+  /// <summary>Native "button-press-event" handler on the popup top-level: presses outside dismiss.</summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static int OnWindowButtonPress(nint widget, nint eventPtr, nint userData) {
+    var peer = PopupFromData(userData);
+    if (peer is null)
+      return 0;
+
+    Point screen;
+    unsafe {
+      ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
+      if (!peer.IsOutside((int)e.XRoot, (int)e.YRoot))
+        return 0;
+
+      screen = new Point((int)e.XRoot, (int)e.YRoot);
     }
 
-    /// <inheritdoc />
-    public void ShowAt(Point screenLocation, Size size)
-    {
-        // Say what kind of surface this is before it is mapped. A window manager reads the hint to
-        // decide whether the surface is an ordinary window that should take the focus and push its
-        // opener into the background, or a transient of it that should not; both kinds here are the
-        // latter. Set on every show because LightDismiss is written after construction.
-        NativeMethods.gtk_window_set_type_hint(
-            _window,
-            this.LightDismiss ? NativeMethods.GDK_WINDOW_TYPE_HINT_DROPDOWN_MENU : NativeMethods.GDK_WINDOW_TYPE_HINT_TOOLTIP);
-        NativeMethods.gtk_window_move(_window, screenLocation.X, screenLocation.Y);
+    // The click landed outside this surface. Offer it to the owner first: a menu whose deeper level
+    // holds the grab routes a click on a shallower level there instead of dismissing the cascade. Only
+    // a click the owner does not claim is a genuine outside dismissal.
+    if (peer.OutsidePress?.Invoke(screen) == true)
+      return 1;
 
-        // A popup is sized here rather than through SetBounds, so record the size as this peer's
-        // bounds too: that is the rectangle the canvas clamps its allocation and clips its painting
-        // to, and leaving it stale would shrink the popup to whatever it last measured.
-        _bounds = new Rectangle(_bounds.Location, size);
-        NativeMethods.gtk_widget_set_size_request(_widget, size.Width, size.Height);
-        NativeMethods.gtk_widget_show_all(_window);
-        _shown = true;
+    peer.Dismiss();
+    return 1;
+  }
 
-        // A passive surface takes no grab either, so the next press keeps its normal delivery path
-        // and reaches the widget the user aimed at.
-        if (!this.LightDismiss)
-            return;
+  /// <summary>Native "motion-notify-event" handler on the popup top-level: motion the grab redirected
+  /// here from a shallower menu level (it arrives at the top-level, not the canvas) is reported to the
+  /// owner by screen point so the menu can track the level actually under the pointer.</summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static int OnWindowMotion(nint widget, nint eventPtr, nint userData) {
+    var peer = PopupFromData(userData);
+    if (peer?.OutsidePointerMove is not { } handler)
+      return 0;
 
-        this.TakeGrab();
+    unsafe {
+      ref var e = ref Unsafe.AsRef<GdkEventMotion>((void*)eventPtr);
+      if (peer.IsOutside((int)e.XRoot, (int)e.YRoot))
+        handler(new Point((int)e.XRoot, (int)e.YRoot));
     }
 
-    /// <inheritdoc/>
-    public void Resize(Size size)
-    {
-        if (!_shown)
-            return;
+    return 0;
+  }
 
-        // Size only: no move, no re-show and no grab, so a menu narrowing under a filter keeps the
-        // grab it already holds.
-        _bounds = new Rectangle(_bounds.Location, size);
-        NativeMethods.gtk_widget_set_size_request(_widget, size.Width, size.Height);
-        NativeMethods.gtk_window_resize(_window, size.Width, size.Height);
-        this.InvalidateAll();
+  /// <summary>
+  /// Native "grab-broken-event" handler on the popup top-level: an external grab took over — a
+  /// genuine window-manager focus change — so the surface dismisses. Our own <see cref="Hide"/>
+  /// clears <c>_shown</c> before it releases the grabs, so the ungrab it performs cannot re-enter
+  /// this as a dismissal.
+  /// </summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static int OnWindowGrabBroken(nint widget, nint eventPtr, nint userData) {
+    var peer = PopupFromData(userData);
+    if (peer is null)
+      return 0;
+
+    // A submenu this popup just opened takes the grab, breaking this one's — an expected handoff,
+    // not a dismissal. The break arrives asynchronously, after the open call returned, so a
+    // persistent flag (not a synchronous guard) is what catches it; the grab is now the child's.
+    if (peer._expectGrabBroken) {
+      peer._expectGrabBroken = false;
+      peer._grabbed = false;
+      return 0;
     }
 
-    /// <summary>
-    /// Takes the pointer grab that makes this the light-dismiss surface. The seat grab routes pointer
-    /// events outside the application to the popup (owner events keep in-app delivery normal); the GTK
-    /// grab redirects the application's own events to it. Together they make every outside click land in
-    /// <see cref="OnWindowButtonPress"/>.
-    /// </summary>
-    private void TakeGrab()
-    {
-        var seat = NativeMethods.gdk_display_get_default_seat(NativeMethods.gdk_display_get_default());
-        NativeMethods.gdk_seat_grab(
-            seat,
-            NativeMethods.gtk_widget_get_window(_window),
-            NativeMethods.GDK_SEAT_CAPABILITY_ALL_POINTING,
-            Bool(true),
-            0,
-            0,
-            0,
-            0);
-        NativeMethods.gtk_grab_add(_window);
-        _grabbed = true;
-    }
+    peer.Dismiss();
+    return 0; // let the event propagate; dismissal is a side effect, not a consumption
+  }
 
-    /// <summary>Whether the next grab-broken is the expected handoff to a child popup this level opened,
-    /// rather than a real focus change that should dismiss it.</summary>
-    private bool _expectGrabBroken;
+  /// <summary>Native "key-press-event" handler on the popup top-level: Escape dismisses.</summary>
+  [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+  private static int OnWindowKeyPress(nint widget, nint eventPtr, nint userData) {
+    var peer = PopupFromData(userData);
+    if (peer is null)
+      return 0;
 
-    /// <inheritdoc/>
-    public void ExpectGrabHandoff() => _expectGrabBroken = true;
-
-    /// <inheritdoc/>
-    public void Regrab()
-    {
-        // Re-take the grab a now-closed child popup held, so this level again catches outside clicks and
-        // Escape. A no-op if it still holds the grab, is hidden, or never grabs.
-        if (_grabbed || !_shown || !this.LightDismiss || _window == 0)
-            return;
-
-        this.TakeGrab();
-    }
-
-    /// <inheritdoc />
-    public void Hide()
-    {
-        // Cleared before the grabs are released: releasing the GDK seat grab can itself deliver a
-        // grab-broken event, and the handler must see the surface as already gone rather than dismiss
-        // it a second time.
-        _shown = false;
-
-        if (_grabbed)
-        {
-            NativeMethods.gtk_grab_remove(_window);
-            NativeMethods.gdk_seat_ungrab(NativeMethods.gdk_display_get_default_seat(NativeMethods.gdk_display_get_default()));
-            _grabbed = false;
-        }
-
-        NativeMethods.gtk_widget_hide(_window);
-    }
-
-    /// <inheritdoc />
-    public override void Dispose()
-    {
-        Hide();
-
-        // The base disposes the canvas (removing it from the window); the empty top-level follows.
-        base.Dispose();
-        NativeMethods.gtk_widget_destroy(_window);
-    }
-
-    /// <summary>Hides the surface and releases the grabs, then raises <see cref="Dismissed"/>. A no-op while hidden.</summary>
-    private void Dismiss()
-    {
-        if (!_shown)
-            return;
-
-        Hide();
-        Dismissed?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// Whether a press at the given root (screen) coordinates lies outside the popup's own rectangle.
-    /// The grab redirects presses aimed at any other window here without rewriting their coordinates,
-    /// so <c>GdkEventButton.X/Y</c> still measures from whichever window the pointer was actually
-    /// over. Testing those against this popup's allocation reads a press near the main window's origin
-    /// as a press near the popup's origin and refuses to dismiss; only the root coordinates, mapped
-    /// through the popup's own origin, describe both windows in the same space.
-    /// </summary>
-    private bool IsOutside(int rootX, int rootY)
-    {
-        var window = NativeMethods.gtk_widget_get_window(_window);
-        if (window == 0)
-            return true;
-
-        NativeMethods.gdk_window_get_origin(window, out var originX, out var originY);
-        var x = rootX - originX;
-        var y = rootY - originY;
-        var width = NativeMethods.gtk_widget_get_allocated_width(_window);
-        var height = NativeMethods.gtk_widget_get_allocated_height(_window);
-        return x < 0 || y < 0 || x >= width || y >= height;
-    }
-
-    /// <summary>Recovers the popup bound to a native callback's <c>user_data</c>.</summary>
-    private static GtkPopupPeer? PopupFromData(nint userData)
-        => userData != 0 && GCHandle.FromIntPtr(userData).Target is GtkPopupPeer peer ? peer : null;
-
-    /// <summary>Native "button-press-event" handler on the popup top-level: presses outside dismiss.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnWindowButtonPress(nint widget, nint eventPtr, nint userData)
-    {
-        var peer = PopupFromData(userData);
-        if (peer is null)
-            return 0;
-
-        Point screen;
-        unsafe
-        {
-            ref var e = ref Unsafe.AsRef<GdkEventButton>((void*)eventPtr);
-            if (!peer.IsOutside((int)e.XRoot, (int)e.YRoot))
-                return 0;
-
-            screen = new Point((int)e.XRoot, (int)e.YRoot);
-        }
-
-        // The click landed outside this surface. Offer it to the owner first: a menu whose deeper level
-        // holds the grab routes a click on a shallower level there instead of dismissing the cascade. Only
-        // a click the owner does not claim is a genuine outside dismissal.
-        if (peer.OutsidePress?.Invoke(screen) == true)
-            return 1;
-
-        peer.Dismiss();
-        return 1;
-    }
-
-    /// <summary>Native "motion-notify-event" handler on the popup top-level: motion the grab redirected
-    /// here from a shallower menu level (it arrives at the top-level, not the canvas) is reported to the
-    /// owner by screen point so the menu can track the level actually under the pointer.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnWindowMotion(nint widget, nint eventPtr, nint userData)
-    {
-        var peer = PopupFromData(userData);
-        if (peer?.OutsidePointerMove is not { } handler)
-            return 0;
-
-        unsafe
-        {
-            ref var e = ref Unsafe.AsRef<GdkEventMotion>((void*)eventPtr);
-            if (peer.IsOutside((int)e.XRoot, (int)e.YRoot))
-                handler(new Point((int)e.XRoot, (int)e.YRoot));
-        }
-
+    unsafe {
+      ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
+      if (e.KeyVal != NativeMethods.GDK_KEY_Escape)
         return 0;
     }
 
-    /// <summary>
-    /// Native "grab-broken-event" handler on the popup top-level: an external grab took over — a
-    /// genuine window-manager focus change — so the surface dismisses. Our own <see cref="Hide"/>
-    /// clears <c>_shown</c> before it releases the grabs, so the ungrab it performs cannot re-enter
-    /// this as a dismissal.
-    /// </summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnWindowGrabBroken(nint widget, nint eventPtr, nint userData)
-    {
-        var peer = PopupFromData(userData);
-        if (peer is null)
-            return 0;
-
-        // A submenu this popup just opened takes the grab, breaking this one's — an expected handoff,
-        // not a dismissal. The break arrives asynchronously, after the open call returned, so a
-        // persistent flag (not a synchronous guard) is what catches it; the grab is now the child's.
-        if (peer._expectGrabBroken)
-        {
-            peer._expectGrabBroken = false;
-            peer._grabbed = false;
-            return 0;
-        }
-
-        peer.Dismiss();
-        return 0; // let the event propagate; dismissal is a side effect, not a consumption
-    }
-
-    /// <summary>Native "key-press-event" handler on the popup top-level: Escape dismisses.</summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static int OnWindowKeyPress(nint widget, nint eventPtr, nint userData)
-    {
-        var peer = PopupFromData(userData);
-        if (peer is null)
-            return 0;
-
-        unsafe
-        {
-            ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-            if (e.KeyVal != NativeMethods.GDK_KEY_Escape)
-                return 0;
-        }
-
-        peer.Dismiss();
-        return 1;
-    }
+    peer.Dismiss();
+    return 1;
+  }
 }

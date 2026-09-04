@@ -6,29 +6,26 @@ namespace Hawkynt.NativeForms;
 /// <see cref="ToolStripDropDownButton"/>; the trailing arrow zone just makes the affordance visible.
 /// Down, Enter and Space open the menu as well.
 /// </summary>
-public class DropDownButton : DropDownButtonBase
-{
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        if (!this.Enabled || e.Button != MouseButtons.Left)
-            return;
+public class DropDownButton : DropDownButtonBase {
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) {
+    if (!this.Enabled || e.Button != MouseButtons.Left)
+      return;
 
-        this.Focus();
-        this.ShowDropDown();
-    }
+    this.Focus();
+    this.ShowDropDown();
+  }
 
-    /// <summary>Enter opens the drop-down, so it stays out of the form's AcceptButton routing.</summary>
-    protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter && this.Enabled;
+  /// <summary>Enter opens the drop-down, so it stays out of the form's AcceptButton routing.</summary>
+  protected override bool IsInputKey(Keys keyData) => keyData == Keys.Enter && this.Enabled;
 
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-        if (e.Handled || !this.Enabled || e.KeyCode is not (Keys.Enter or Keys.Space))
-            return;
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    base.OnKeyDown(e);
+    if (e.Handled || !this.Enabled || e.KeyCode is not (Keys.Enter or Keys.Space))
+      return;
 
-        this.ShowDropDown();
-        e.Handled = true;
-    }
+    this.ShowDropDown();
+    e.Handled = true;
+  }
 }

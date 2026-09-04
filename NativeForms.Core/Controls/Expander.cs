@@ -11,202 +11,183 @@ namespace Hawkynt.NativeForms;
 /// <see cref="Control.Visible"/> as <see langword="false"/>, because that getter is effective and the
 /// content genuinely is not on screen. A header click or the Space key toggles.
 /// </summary>
-public class Expander : OwnerDrawnControl
-{
-    private const int _GlyphSize = 8;
-    private const int _GlyphInset = 6;
-    private const int _TextGap = 6;
-    private const int _CheckSize = 13;
+public class Expander : OwnerDrawnControl {
+  private const int _GlyphSize = 8;
+  private const int _GlyphInset = 6;
+  private const int _TextGap = 6;
+  private const int _CheckSize = 13;
 
-    private int _expandedHeight;
+  private int _expandedHeight;
 
-    /// <summary>Whether the content area is shown. Defaults to <see langword="true"/>.</summary>
-    public bool Expanded
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>Whether the content area is shown. Defaults to <see langword="true"/>.</summary>
+  public bool Expanded {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
+      field = value;
 
-            // Height first, visibility second: the children's peers are moved into their restored
-            // places before they are shown again, so expanding never flashes them at the collapsed
-            // geometry.
-            if (value)
-                this.Height = Math.Max(_expandedHeight, this.HeaderHeight);
-            else
-            {
-                _expandedHeight = this.Height;
-                this.Height = this.HeaderHeight;
-            }
+      // Height first, visibility second: the children's peers are moved into their restored
+      // places before they are shown again, so expanding never flashes them at the collapsed
+      // geometry.
+      if (value)
+        this.Height = Math.Max(_expandedHeight, this.HeaderHeight);
+      else {
+        _expandedHeight = this.Height;
+        this.Height = this.HeaderHeight;
+      }
 
-            // The whole subtree, not just the direct children: a grandchild's peer is vetoed by its
-            // own parent, and nothing else recomputes that when the expander reopens.
-            if (this.ChildrenOrNull is { } children)
-                for (var i = 0; i < children.Count; ++i)
-                    children[i].PushPeerVisibleTree();
+      // The whole subtree, not just the direct children: a grandchild's peer is vetoed by its
+      // own parent, and nothing else recomputes that when the expander reopens.
+      if (this.ChildrenOrNull is { } children)
+        for (var i = 0; i < children.Count; ++i)
+          children[i].PushPeerVisibleTree();
 
-            this.Invalidate();
-            this.OnExpandedChanged(EventArgs.Empty);
-        }
-    } = true;
+      this.Invalidate();
+      this.OnExpandedChanged(EventArgs.Empty);
+    }
+  } = true;
 
-    /// <summary>
-    /// Turns the header's expand triangle into a check box — the checkable-group-box idiom, where ticking
-    /// the box opens the content and clearing it collapses it. <see cref="Checked"/> then mirrors
-    /// <see cref="Expanded"/>, so an application can bind the check state and drive the panel from it.
-    /// Defaults to <see langword="false"/> (the plain triangle).
-    /// </summary>
-    public bool ShowCheckBox
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>
+  /// Turns the header's expand triangle into a check box — the checkable-group-box idiom, where ticking
+  /// the box opens the content and clearing it collapses it. <see cref="Checked"/> then mirrors
+  /// <see cref="Expanded"/>, so an application can bind the check state and drive the panel from it.
+  /// Defaults to <see langword="false"/> (the plain triangle).
+  /// </summary>
+  public bool ShowCheckBox {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            this.Invalidate();
-        }
+      field = value;
+      this.Invalidate();
+    }
+  }
+
+  /// <summary>The header check box's state — an alias for <see cref="Expanded"/> (checked = open), so it
+  /// can be two-way bound. Meaningful mainly with <see cref="ShowCheckBox"/> on; setting it expands or
+  /// collapses either way.</summary>
+  public bool Checked {
+    get => this.Expanded;
+    set => this.Expanded = value;
+  }
+
+  /// <summary>Raised after <see cref="Checked"/> (i.e. <see cref="Expanded"/>) changes — the binding hook
+  /// for the check-box state.</summary>
+  public event EventHandler? CheckedChanged;
+
+  /// <summary>An optional icon painted in the header beside the caption (after the expand glyph);
+  /// <see cref="TextImageRelation"/> places it before or after the text.</summary>
+  public IImage? Image {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.UpdateImageAnimation();
+      this.Invalidate();
+    }
+  }
+
+  /// <inheritdoc/>
+  private protected override IImage? AnimatedImageSlot => this.Image;
+
+  /// <summary>Where the <see cref="Image"/> sits relative to the caption. Defaults to
+  /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
+  /// to put the icon after the text.</summary>
+  public TextImageRelation TextImageRelation {
+    get => field;
+    set {
+      if (field == value)
+        return;
+
+      field = value;
+      this.Invalidate();
+    }
+  } = TextImageRelation.ImageBeforeText;
+
+  /// <summary>Raised after <see cref="Expanded"/> changes.</summary>
+  public event EventHandler? ExpandedChanged;
+
+  /// <summary>The pixel height of the header row — the whole control while collapsed.</summary>
+  public int HeaderHeight => this.Theme.RowHeight;
+
+  /// <inheritdoc/>
+  protected override bool Focusable => true;
+
+  /// <summary>Raises <see cref="ExpandedChanged"/> and, since the check state tracks it, <see cref="CheckedChanged"/>.</summary>
+  protected virtual void OnExpandedChanged(EventArgs e) {
+    this.ExpandedChanged?.Invoke(this, e);
+    this.CheckedChanged?.Invoke(this, e);
+  }
+
+  /// <summary>
+  /// A collapsed expander hides its content wholesale. The child's <em>own</em> flag is what the
+  /// veto combines with, never the effective <see cref="Control.Visible"/>: that getter walks the
+  /// ancestor chain, so folding it in here would let a hidden ancestor latch a child's peer off
+  /// and leave it off once the ancestor came back — the chain is the native nesting's job, not
+  /// this veto's.
+  /// </summary>
+  private protected override bool GetChildPeerVisible(Control child) => this.Expanded && child.IsVisibleLocal;
+
+  /// <inheritdoc/>
+  protected override void OnMouseDown(MouseEventArgs e) => this.Focus();
+
+  /// <inheritdoc/>
+  protected override void OnMouseUp(MouseEventArgs e) {
+    if (e.Button == MouseButtons.Left && e.Y < this.HeaderHeight)
+      this.Expanded = !this.Expanded;
+  }
+
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    if (e.KeyCode != Keys.Space)
+      return;
+
+    this.Expanded = !this.Expanded;
+    e.Handled = true;
+  }
+
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var theme = this.Theme;
+    var headerHeight = this.HeaderHeight;
+    g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
+    g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, this.Width, headerHeight));
+    g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
+
+    int glyphWidth;
+    if (this.ShowCheckBox) {
+      var boxTop = (headerHeight - _CheckSize) / 2;
+      GlyphRenderer.DrawCheckBox(g, theme, new Rectangle(_GlyphInset, boxTop, _CheckSize, _CheckSize), this.Checked);
+      glyphWidth = _CheckSize;
+    } else {
+      var glyphTop = (headerHeight - _GlyphSize) / 2;
+      Glyphs.PaintTriangle(
+          g,
+          theme.ControlText,
+          new Rectangle(_GlyphInset, glyphTop, _GlyphSize, _GlyphSize),
+          this.Expanded ? GlyphDirection.Down : GlyphDirection.Right);
+      glyphWidth = _GlyphSize;
     }
 
-    /// <summary>The header check box's state — an alias for <see cref="Expanded"/> (checked = open), so it
-    /// can be two-way bound. Meaningful mainly with <see cref="ShowCheckBox"/> on; setting it expands or
-    /// collapses either way.</summary>
-    public bool Checked
-    {
-        get => this.Expanded;
-        set => this.Expanded = value;
+    var contentLeft = _GlyphInset + glyphWidth + _TextGap;
+    var content = new Rectangle(contentLeft, 0, Math.Max(0, this.Width - contentLeft), headerHeight);
+    var image = this.Image;
+    if (image is null) {
+      g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, content, ContentAlignment.MiddleLeft);
+      return;
     }
 
-    /// <summary>Raised after <see cref="Checked"/> (i.e. <see cref="Expanded"/>) changes — the binding hook
-    /// for the check-box state.</summary>
-    public event EventHandler? CheckedChanged;
-
-    /// <summary>An optional icon painted in the header beside the caption (after the expand glyph);
-    /// <see cref="TextImageRelation"/> places it before or after the text.</summary>
-    public IImage? Image
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.UpdateImageAnimation();
-            this.Invalidate();
-        }
-    }
-
-    /// <inheritdoc/>
-    private protected override IImage? AnimatedImageSlot => this.Image;
-
-    /// <summary>Where the <see cref="Image"/> sits relative to the caption. Defaults to
-    /// <see cref="TextImageRelation.ImageBeforeText"/>; set <see cref="TextImageRelation.TextBeforeImage"/>
-    /// to put the icon after the text.</summary>
-    public TextImageRelation TextImageRelation
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            this.Invalidate();
-        }
-    } = TextImageRelation.ImageBeforeText;
-
-    /// <summary>Raised after <see cref="Expanded"/> changes.</summary>
-    public event EventHandler? ExpandedChanged;
-
-    /// <summary>The pixel height of the header row — the whole control while collapsed.</summary>
-    public int HeaderHeight => this.Theme.RowHeight;
-
-    /// <inheritdoc/>
-    protected override bool Focusable => true;
-
-    /// <summary>Raises <see cref="ExpandedChanged"/> and, since the check state tracks it, <see cref="CheckedChanged"/>.</summary>
-    protected virtual void OnExpandedChanged(EventArgs e)
-    {
-        this.ExpandedChanged?.Invoke(this, e);
-        this.CheckedChanged?.Invoke(this, e);
-    }
-
-    /// <summary>
-    /// A collapsed expander hides its content wholesale. The child's <em>own</em> flag is what the
-    /// veto combines with, never the effective <see cref="Control.Visible"/>: that getter walks the
-    /// ancestor chain, so folding it in here would let a hidden ancestor latch a child's peer off
-    /// and leave it off once the ancestor came back — the chain is the native nesting's job, not
-    /// this veto's.
-    /// </summary>
-    private protected override bool GetChildPeerVisible(Control child) => this.Expanded && child.IsVisibleLocal;
-
-    /// <inheritdoc/>
-    protected override void OnMouseDown(MouseEventArgs e) => this.Focus();
-
-    /// <inheritdoc/>
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left && e.Y < this.HeaderHeight)
-            this.Expanded = !this.Expanded;
-    }
-
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.KeyCode != Keys.Space)
-            return;
-
-        this.Expanded = !this.Expanded;
-        e.Handled = true;
-    }
-
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        var headerHeight = this.HeaderHeight;
-        g.FillRectangle(theme.ControlBackground, new Rectangle(0, 0, this.Width, this.Height));
-        g.FillRectangle(theme.HeaderBackground, new Rectangle(0, 0, this.Width, headerHeight));
-        g.DrawRectangle(theme.Border, new Rectangle(0, 0, this.Width - 1, this.Height - 1));
-
-        int glyphWidth;
-        if (this.ShowCheckBox)
-        {
-            var boxTop = (headerHeight - _CheckSize) / 2;
-            GlyphRenderer.DrawCheckBox(g, theme, new Rectangle(_GlyphInset, boxTop, _CheckSize, _CheckSize), this.Checked);
-            glyphWidth = _CheckSize;
-        }
-        else
-        {
-            var glyphTop = (headerHeight - _GlyphSize) / 2;
-            Glyphs.PaintTriangle(
-                g,
-                theme.ControlText,
-                new Rectangle(_GlyphInset, glyphTop, _GlyphSize, _GlyphSize),
-                this.Expanded ? GlyphDirection.Down : GlyphDirection.Right);
-            glyphWidth = _GlyphSize;
-        }
-
-        var contentLeft = _GlyphInset + glyphWidth + _TextGap;
-        var content = new Rectangle(contentLeft, 0, Math.Max(0, this.Width - contentLeft), headerHeight);
-        var image = this.Image;
-        if (image is null)
-        {
-            g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, content, ContentAlignment.MiddleLeft);
-            return;
-        }
-
-        var captionSize = string.IsNullOrEmpty(this.Text) ? Size.Empty : g.MeasureText(this.Text, theme.DefaultFont);
-        var imageSize = new Size(image.Width, image.Height);
-        ContentLayout.Arrange(content, imageSize, captionSize, this.TextImageRelation, ContentAlignment.MiddleLeft, out var imageRect, out var textRect);
-        g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
-        if (!string.IsNullOrEmpty(this.Text))
-            g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
-    }
+    var captionSize = string.IsNullOrEmpty(this.Text) ? Size.Empty : g.MeasureText(this.Text, theme.DefaultFont);
+    var imageSize = new Size(image.Width, image.Height);
+    ContentLayout.Arrange(content, imageSize, captionSize, this.TextImageRelation, ContentAlignment.MiddleLeft, out var imageRect, out var textRect);
+    g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
+    if (!string.IsNullOrEmpty(this.Text))
+      g.DrawText(this.Text, theme.DefaultFont, theme.ControlText, textRect, ContentAlignment.MiddleLeft);
+  }
 }

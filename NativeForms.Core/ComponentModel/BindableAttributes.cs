@@ -30,12 +30,11 @@ public sealed class BindableAttribute : Attribute;
 /// directly on the type argument — the lookup is resolved by the JIT or the AOT compiler from the
 /// concrete type, with no instance, no dictionary of types, and nothing for a trimmer to fail to see.
 /// </remarks>
-public interface IBindableMembers
-{
-    /// <summary>
-    /// The accessor for the named public readable property, or <see langword="null"/> when the type has
-    /// no such member.
-    /// </summary>
-    /// <param name="memberName">The property name, matched exactly and case-sensitively.</param>
-    static abstract Func<object?, object?>? GetMemberAccessor(string memberName);
+public interface IBindableMembers {
+  /// <summary>
+  /// The accessor for the named public readable property, or <see langword="null"/> when the type has
+  /// no such member.
+  /// </summary>
+  /// <param name="memberName">The property name, matched exactly and case-sensitively.</param>
+  static abstract Func<object?, object?>? GetMemberAccessor(string memberName);
 }

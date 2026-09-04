@@ -7,18 +7,17 @@ namespace Hawkynt.NativeForms;
 /// followed by the member items, with items belonging to no listed group gathered under a trailing
 /// default section — matching <c>System.Windows.Forms.ListViewGroup</c>.
 /// </summary>
-public sealed class ListViewGroup
-{
-    /// <summary>Creates a group with an empty header.</summary>
-    public ListViewGroup() { }
+public sealed class ListViewGroup {
+  /// <summary>Creates a group with an empty header.</summary>
+  public ListViewGroup() { }
 
-    /// <summary>Creates a group with the given header caption.</summary>
-    /// <param name="header">The caption shown in the group's header row.</param>
-    public ListViewGroup(string header) => this.Header = header;
+  /// <summary>Creates a group with the given header caption.</summary>
+  /// <param name="header">The caption shown in the group's header row.</param>
+  public ListViewGroup(string header) => this.Header = header;
 
-    /// <summary>The caption shown in the group's header row.</summary>
-    public string Header { get; set; } = string.Empty;
+  /// <summary>The caption shown in the group's header row.</summary>
+  public string Header { get; set; } = string.Empty;
 
-    /// <summary>Arbitrary caller data associated with the group.</summary>
-    public object? Tag { get; set; }
+  /// <summary>Arbitrary caller data associated with the group.</summary>
+  public object? Tag { get; set; }
 }

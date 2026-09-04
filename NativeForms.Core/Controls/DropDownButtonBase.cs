@@ -11,137 +11,124 @@ namespace Hawkynt.NativeForms;
 /// <see cref="ContextMenuStrip"/> shows. Subclasses decide which gestures run an action and which
 /// open the menu.
 /// </summary>
-public abstract class DropDownButtonBase : OwnerDrawnControl
-{
-    /// <summary>The width of the trailing arrow zone.</summary>
-    internal const int ArrowZoneWidth = 12;
+public abstract class DropDownButtonBase : OwnerDrawnControl {
+  /// <summary>The width of the trailing arrow zone.</summary>
+  internal const int ArrowZoneWidth = 12;
 
-    private ToolStripItemCollection? _dropDownItems;
-    private MenuDropDown? _dropDown;
+  private ToolStripItemCollection? _dropDownItems;
+  private MenuDropDown? _dropDown;
 
-    /// <summary>The items shown when the drop-down opens, sharing the strip/menu item model. Lazily
-    /// created, so a button that never opens pays nothing for the collection.</summary>
-    public ToolStripItemCollection DropDownItems
-    {
-        get
-        {
-            var items = _dropDownItems;
-            if (items is null)
-            {
-                _dropDownItems = items = new();
-                items.Changed += (_, _) => this.Invalidate();
-            }
+  /// <summary>The items shown when the drop-down opens, sharing the strip/menu item model. Lazily
+  /// created, so a button that never opens pays nothing for the collection.</summary>
+  public ToolStripItemCollection DropDownItems {
+    get {
+      var items = _dropDownItems;
+      if (items is null) {
+        _dropDownItems = items = new();
+        items.Changed += (_, _) => this.Invalidate();
+      }
 
-            return items;
-        }
+      return items;
     }
+  }
 
-    /// <summary>Whether a drop-down would show anything, without materializing an empty collection.</summary>
-    public bool HasDropDownItems => _dropDownItems is { Count: > 0 };
+  /// <summary>Whether a drop-down would show anything, without materializing an empty collection.</summary>
+  public bool HasDropDownItems => _dropDownItems is { Count: > 0 };
 
-    /// <summary>Whether the drop-down cascade is currently open.</summary>
-    public bool IsDropDownOpen => _dropDown is { IsOpen: true };
+  /// <summary>Whether the drop-down cascade is currently open.</summary>
+  public bool IsDropDownOpen => _dropDown is { IsOpen: true };
 
-    /// <summary>An optional icon rendered before the caption through the shared content layout.</summary>
-    public IImage? Image
-    {
-        get => field;
-        set
-        {
-            if (field == value)
-                return;
+  /// <summary>An optional icon rendered before the caption through the shared content layout.</summary>
+  public IImage? Image {
+    get => field;
+    set {
+      if (field == value)
+        return;
 
-            field = value;
-            this.UpdateImageAnimation();
-            this.Invalidate();
-        }
+      field = value;
+      this.UpdateImageAnimation();
+      this.Invalidate();
     }
+  }
 
-    /// <inheritdoc/>
-    private protected override IImage? AnimatedImageSlot => this.Image;
+  /// <inheritdoc/>
+  private protected override IImage? AnimatedImageSlot => this.Image;
 
-    /// <inheritdoc/>
-    protected override bool Focusable => true;
+  /// <inheritdoc/>
+  protected override bool Focusable => true;
 
-    /// <summary>The lazily created drop-down engine; only valid while the control is realized.</summary>
-    private MenuDropDown Engine
-    {
-        get
-        {
-            var engine = _dropDown;
-            if (engine is null)
-            {
-                _dropDown = engine = new(this.Backend!, this.Theme);
-                engine.Closed += (_, _) => this.Invalidate();
-            }
+  /// <summary>The lazily created drop-down engine; only valid while the control is realized.</summary>
+  private MenuDropDown Engine {
+    get {
+      var engine = _dropDown;
+      if (engine is null) {
+        _dropDown = engine = new(this.Backend!, this.Theme);
+        engine.Closed += (_, _) => this.Invalidate();
+      }
 
-            // Refreshed on every access rather than captured once: the control may have been realized
-            // — or reparented onto another form — after the engine was built.
-            engine.Owner = this.OwnerWindowPeer;
-            return engine;
-        }
+      // Refreshed on every access rather than captured once: the control may have been realized
+      // — or reparented onto another form — after the engine was built.
+      engine.Owner = this.OwnerWindowPeer;
+      return engine;
     }
+  }
 
-    /// <summary>Opens the drop-down below the control, left-aligned with it. A no-op before
-    /// realization or while <see cref="DropDownItems"/> is empty.</summary>
-    public void ShowDropDown()
-    {
-        if (this.Backend is null || !this.HasDropDownItems)
-            return;
+  /// <summary>Opens the drop-down below the control, left-aligned with it. A no-op before
+  /// realization or while <see cref="DropDownItems"/> is empty.</summary>
+  public void ShowDropDown() {
+    if (this.Backend is null || !this.HasDropDownItems)
+      return;
 
-        this.Engine.Open(this.DropDownItems, this.PointToScreen(new(0, this.Height)));
-    }
+    this.Engine.Open(this.DropDownItems, this.PointToScreen(new(0, this.Height)));
+  }
 
-    /// <summary>Closes the drop-down cascade, if open.</summary>
-    public void CloseDropDown() => _dropDown?.CloseAll();
+  /// <summary>Closes the drop-down cascade, if open.</summary>
+  public void CloseDropDown() => _dropDown?.CloseAll();
 
-    /// <inheritdoc/>
-    private protected override void OnUnrealized()
-    {
-        base.OnUnrealized();
-        _dropDown?.CloseAll();
-        _dropDown = null;
-    }
+  /// <inheritdoc/>
+  private protected override void OnUnrealized() {
+    base.OnUnrealized();
+    _dropDown?.CloseAll();
+    _dropDown = null;
+  }
 
-    /// <inheritdoc/>
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (!this.Enabled || e.KeyCode is not Keys.Down)
-            return;
+  /// <inheritdoc/>
+  protected override void OnKeyDown(KeyEventArgs e) {
+    if (!this.Enabled || e.KeyCode is not Keys.Down)
+      return;
 
-        this.ShowDropDown();
-        e.Handled = true;
-    }
+    this.ShowDropDown();
+    e.Handled = true;
+  }
 
-    /// <inheritdoc/>
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        var theme = this.Theme;
-        GlyphRenderer.DrawButtonFace(g, theme, new Rectangle(0, 0, this.Width - 1, this.Height - 1), string.Empty, this.Enabled);
+  /// <inheritdoc/>
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics;
+    var theme = this.Theme;
+    GlyphRenderer.DrawButtonFace(g, theme, new Rectangle(0, 0, this.Width - 1, this.Height - 1), string.Empty, this.Enabled);
 
-        var textColor = this.Enabled ? theme.ControlText : theme.DisabledText;
-        var content = new Rectangle(0, 0, this.Width - ArrowZoneWidth, this.Height);
-        var image = this.Image;
-        ContentLayout.Arrange(
-            content,
-            image is null ? Size.Empty : new(image.Width, image.Height),
-            g.MeasureText(this.Text, theme.DefaultFont),
-            TextImageRelation.ImageBeforeText,
-            ContentAlignment.MiddleCenter,
-            out var imageRect,
-            out var textRect);
-        if (image is not null)
-            g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
+    var textColor = this.Enabled ? theme.ControlText : theme.DisabledText;
+    var content = new Rectangle(0, 0, this.Width - ArrowZoneWidth, this.Height);
+    var image = this.Image;
+    ContentLayout.Arrange(
+        content,
+        image is null ? Size.Empty : new(image.Width, image.Height),
+        g.MeasureText(this.Text, theme.DefaultFont),
+        TextImageRelation.ImageBeforeText,
+        ContentAlignment.MiddleCenter,
+        out var imageRect,
+        out var textRect);
+    if (image is not null)
+      g.DrawImage(this.CurrentFrameOf(image)!, imageRect);
 
-        if (this.Text.Length > 0)
-            g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleCenter);
+    if (this.Text.Length > 0)
+      g.DrawText(this.Text, theme.DefaultFont, textColor, textRect, ContentAlignment.MiddleCenter);
 
-        this.PaintArrowZone(g, theme, textColor);
-    }
+    this.PaintArrowZone(g, theme, textColor);
+  }
 
-    /// <summary>Paints the trailing arrow zone: the down triangle, plus whatever chrome the concrete
-    /// button adds (the split separator).</summary>
-    private protected virtual void PaintArrowZone(IGraphics g, ITheme theme, Color color)
-        => Glyphs.PaintTriangle(g, color, new(this.Width - ArrowZoneWidth + 3, (this.Height / 2) - 1, 6, 4), GlyphDirection.Down);
+  /// <summary>Paints the trailing arrow zone: the down triangle, plus whatever chrome the concrete
+  /// button adds (the split separator).</summary>
+  private protected virtual void PaintArrowZone(IGraphics g, ITheme theme, Color color)
+      => Glyphs.PaintTriangle(g, color, new(this.Width - ArrowZoneWidth + 3, (this.Height / 2) - 1, 6, 4), GlyphDirection.Down);
 }
