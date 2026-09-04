@@ -53,20 +53,20 @@ Inherits `OwnerDrawnControl`.
 | `Accordion` | `Accordion()` | Creates an empty accordion. |
 | `AllowUserToOrderPanes` | `bool AllowUserToOrderPanes { get; set; }` | Whether dragging a header up or down the stack reorders the sections (PRD §14). Off by default, for the reason `AllowUserToOrderItems` is: a navigation pane whose sections move when you brush past a header is worse than one that cannot be rearranged. |
 | `ExpandMode` | `AccordionExpandMode ExpandMode { get; set; }` | Whether opening a pane closes the others (`Single`, the default) or panes toggle independently. Switching to `Single` while several panes are open collapses all but the selected one. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `HeaderHeight` | `int HeaderHeight { get; }` | The pixel height of one header row. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icons `ImageIndex` indexes into, or `null`. |
 | `Panes` | `AccordionPaneCollection Panes { get; }` | The panes, top to bottom. Adding a pane parents it into `Controls`. |
 | `SelectedIndex` | `int SelectedIndex { get; set; }` | The index of the current pane — the open one under `Single`, the most recently opened one otherwise; -1 while none is open. Assigning expands that pane through the ordinary path, so `PaneExpanding` can still veto it. |
 | `SelectedPane` | `AccordionPane SelectedPane { get; set; }` | The current pane, or `null` while none is open. |
 | `GetHeaderBounds` | `Rectangle GetHeaderBounds(int index)` | The client rectangle of the header row of the pane at `index`, or `Empty` for an index outside the stack. Public because aiming a click at a header is otherwise guesswork for callers — tests and UI automation both need it. |
-| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Whether the control claims `keyData` for its own input, exempting the key from the owning form's dialog handling (Tab navigation, Enter → `AcceptButton`, Escape → `CancelButton`). The base claims nothing; controls that consume Enter or Escape themselves — an open drop-down, a grid edit — override this. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnPaneCollapsed` | `protected virtual void OnPaneCollapsed(AccordionPaneEventArgs e)` | Raises `PaneCollapsed`. |
 | `OnPaneExpanded` | `protected virtual void OnPaneExpanded(AccordionPaneEventArgs e)` | Raises `PaneExpanded`. |
 | `OnPaneExpanding` | `protected virtual void OnPaneExpanding(AccordionPaneCancelEventArgs e)` | Raises `PaneExpanding`. |
@@ -100,7 +100,7 @@ Inherits `Panel`.
 | `Expanded` | `bool Expanded { get; set; }` | Whether the pane body is shown. Assigning routes through the owning `Accordion`, so `Single` still collapses the siblings and `PaneExpanding` can still veto. A detached pane just records the flag. |
 | `ImageIndex` | `int ImageIndex { get; set; }` | The index of this pane's icon in the owning `ImageList`, or -1 for no icon. The icon is painted between the toggle glyph and the caption. |
 | `ImageKey` | `string ImageKey { get; set; }` | The key of this pane's icon in the owning `ImageList`, used when `ImageIndex` is unset (< 0). The index takes precedence when both are set. |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 
 #### `AccordionPaneCancelEventArgs`
 
@@ -252,7 +252,7 @@ Inherits `OwnerDrawnControl`.
 | `Breadcrumb` | `Breadcrumb()` | Creates an empty breadcrumb. |
 | `AutoCompleteSource` | `Func<string, IReadOnlyList<string>> AutoCompleteSource { get; set; }` | Supplies path completions for the edit field: given the text typed so far, returns candidate full paths. The first candidate that extends the typed text is appended and selected, so typing on replaces it and Enter accepts it. Delegate-driven, so it completes against a real directory, an archive listing or any virtual namespace. |
 | `Editable` | `bool Editable { get; set; }` | Whether clicking the bar's empty space turns it into an editable path field. Off by default; a caller can also drive it explicitly with `BeginEdit`. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `FullPath` | `string FullPath { get; }` | The whole path — the segment captions joined by `PathSeparator` — the text the edit field starts from. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icons the segments' `ImageIndex` point into. |
 | `IsEditing` | `bool IsEditing { get; }` | Whether the bar is currently showing its edit field rather than the crumbs. |
@@ -265,10 +265,10 @@ Inherits `OwnerDrawnControl`.
 | `BeginEdit` | `void BeginEdit()` | Switches the bar to its edit field, prefilled with `PathComposer`'s text or, left unset, `FullPath`, and focused. |
 | `EndEdit` | `void EndEdit(bool commit)` | Leaves the edit field. When `commit`, the typed path replaces the segments (through `PathParser`) and `PathEntered` fires; otherwise the crumbs are restored unchanged. |
 | `OnItemClicked` | `protected virtual void OnItemClicked(BreadcrumbItemEventArgs e)` | Raises `ItemClicked`. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnPathEntered` | `protected virtual void OnPathEntered(BreadcrumbPathEventArgs e)` | Raises `PathEntered`. |
 | `OnSubItemSelected` | `protected virtual void OnSubItemSelected(BreadcrumbItemEventArgs e)` | Raises `SubItemSelected`. |
 | `ItemClicked` | `event EventHandler<BreadcrumbItemEventArgs> ItemClicked` | Raised when a segment is clicked (after any `TrimOnClick` trim). |
@@ -346,17 +346,17 @@ Inherits `OwnerDrawnControl`.
 | `Focusable` | `protected override bool Focusable { get; }` | A button takes the keyboard on either path. |
 | `ImageAlign` | `ContentAlignment ImageAlign { get; set; }` | Where the image anchors within the button face. Honoured exactly by the painted face; advisory on the widget, which offers no free placement on any backend but is handed the value anyway so a capable one can use it. Defaults to `MiddleCenter`, matching Windows Forms. |
 | `Image` | `IImage Image { get; set; }` | The image shown on the button face, or `null` for a text-only button. An image on its own is rendered by the widget, which centres it on all three platforms. An image beside a caption is the promotion gate (§12): none of the three draws both the same way — GTK places the image, a classic Win32 button renders the bitmap alone and drops the caption, AppKit has its own idea — so a captioned image gives up the widget and is painted through the shared `ContentLayout`, which comes out identical everywhere. |
-| `IsNativeWidget` | `override bool IsNativeWidget { get; }` |  |
+| `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Forces this control onto a real platform widget (`true`) or onto the owner-drawn painter (`false`); `null` — the default — follows `PreferNativeWidgets`. Controls that have no platform counterpart ignore it entirely (PRD §12). |
 | `TextImageRelation` | `TextImageRelation TextImageRelation { get; set; }` | How image and text share the button face. Honoured exactly by the painted face — which is the half that draws whenever there is both an image and a caption to arrange. On the widget it is advisory: GTK maps the four directional values onto the button's image position (`Overlay` renders as `ImageBeforeText`), and Win32 offers no placement control at all. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Space and Enter work the button rather than reaching the form's accept routing. |
 | `OnClick` | `protected override void OnClick(EventArgs e)` | Raises `Click`, executes `Command` when its guard agrees, then reports `DialogResult` to the owning form. |
 | `OnKeyUp` | `protected override void OnKeyUp(KeyEventArgs e)` | Space and Enter activate on the key release, like the Windows Forms button base — a held key must not auto-repeat the click. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 
 #### `CalendarView`
 
@@ -370,7 +370,7 @@ Inherits `OwnerDrawnControl`.
 | `AppointmentCount` | `int AppointmentCount { get; }` | The number of appointments currently bound. |
 | `FirstDayOfWeek` | `DayOfWeek FirstDayOfWeek { get; set; }` | The day of week in the leftmost column of the week and month views. Defaults to Monday. |
 | `FirstVisibleDate` | `DateTime FirstVisibleDate { get; }` | The first date the current view shows. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `NowLineColor` | `Color NowLineColor { get; set; }` | The colour of the "now" line. Defaults to the shared alert red — no desktop publishes a themed "now" colour to query — so an application can match its own palette. |
 | `Now` | `DateTime Now { get; set; }` | The instant the "now" line and the today highlight read. Defaults to `Now`; settable, like `TodayDate`, so long-running views and tests stay deterministic. |
 | `SelectedAppointmentIndex` | `int SelectedAppointmentIndex { get; }` | The index of the selected appointment into the start-sorted snapshot, or -1. |
@@ -384,12 +384,12 @@ Inherits `OwnerDrawnControl`.
 | `GoToToday` | `void GoToToday()` | Jumps to today. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter opens the selected appointment, so it stays out of the form's AcceptButton routing. |
 | `Next` | `void Next()` | Steps the view forward one of its own units — a day, a week, a month. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `Previous` | `void Previous()` | Steps the view back one of its own units. |
 | `SetAppointments` | `void SetAppointments(IEnumerable<Appointment> appointments)` | Replaces the bound appointments from a ready sequence of `Appointment`s. |
 | `SetAppointments` | `void SetAppointments<T>(IEnumerable<T> items, Func<T, Appointment> selector)` | Replaces the bound appointments by projecting each source item through `selector` — the reflection-free binding the grid uses. Takes a start-sorted snapshot; mutating the source afterwards has no effect until the next call. |
@@ -432,7 +432,7 @@ Inherits `OwnerDrawnControl`.
 | `CheckBox` | `CheckBox()` |  |
 | `CheckState` | `CheckState CheckState { get; set; }` | The three-valued state. Setting it raises `CheckStateChanged`, and `CheckedChanged` as well whenever the change moved `Checked` — a box going from checked to indeterminate has changed state without changing that answer. |
 | `Checked` | `bool Checked { get; set; }` | Whether the box is checked. `Indeterminate` reads as `true` — the Windows Forms rule — so an application that only asks the boolean question never mistakes "mixed" for "off". Assigning projects back onto the two plain states. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Image` | `IImage Image { get; set; }` | An optional icon rendered between the check square and the caption through the shared content layout; the text shifts right to make room. |
 | `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Whether the control is currently backed by a real platform check box. |
 | `ThreeState` | `bool ThreeState { get; set; }` | Whether clicking cycles through `Indeterminate` as well. Off by default, so a plain box keeps toggling between two states; the third can still be assigned directly, which is how a box that summarises a set shows the set disagreeing without inviting the user to pick "mixed" by hand. |
@@ -440,8 +440,8 @@ Inherits `OwnerDrawnControl`.
 | `OnCheckedChanged` | `protected virtual void OnCheckedChanged(EventArgs e)` | Raises `CheckedChanged`. |
 | `OnClick` | `protected override void OnClick(EventArgs e)` | Advances `CheckState`, then raises `Click` — the Windows Forms order (`CheckedChanged` first), shared by mouse, Space and `PerformClick`. |
 | `OnKeyUp` | `protected override void OnKeyUp(KeyEventArgs e)` | Space toggles on the key release, like the Windows Forms button base — a held key must not auto-repeat the toggle. |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `Toggle` | `protected void Toggle()` | Toggles the checked state and raises `Click`. |
 | `CheckStateChanged` | `event EventHandler CheckStateChanged` | Raised when `CheckState` changes, including the moves between checked and indeterminate that leave `Checked` alone. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised when `Checked` changes. |
@@ -469,11 +469,11 @@ Inherits `ListBox`.
 | `CheckedIndices` | `IReadOnlyList<int> CheckedIndices { get; }` | The checked row indices, sorted ascending. A live view over the check states. |
 | `CheckedItems` | `IReadOnlyList<object> CheckedItems { get; }` | The checked items, in index order. A live view over the check states. |
 | `GetItemChecked` | `bool GetItemChecked(int index)` | Whether the item at the given index is checked. |
-| `OnDrawRow` | `protected override void OnDrawRow(IGraphics g, int index, Rectangle bounds, bool selected)` |  |
+| `OnDrawRow` | `protected override void OnDrawRow(IGraphics g, int index, Rectangle bounds, bool selected)` | Draws one row's content (icon and text) inside the given bounds; the selection highlight is already painted. Subclasses override to add leading adornments and delegate to the base with the remaining, right-shifted bounds. |
 | `OnItemCheck` | `protected virtual void OnItemCheck(ItemCheckEventArgs e)` | Raises `ItemCheck`. |
-| `OnItemsChanged` | `protected override void OnItemsChanged(ListChangedEventArgs e)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
+| `OnItemsChanged` | `protected override void OnItemsChanged(ListChangedEventArgs e)` | Reacts to a mutation of `Items`: keeps the selection, caret and anchor pointing at the same items (pruning what vanished), clamps the scroll position and repaints. Subclasses override to keep parallel per-item state aligned, then call the base. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
 | `SetItemChecked` | `void SetItemChecked(int index, bool value)` | Sets the item's check state, raising `ItemCheck` first; a handler may veto or redirect the change. Setting the state an item already has does nothing. |
 | `ItemCheck` | `event EventHandler<ItemCheckEventArgs> ItemCheck` | Raised before an item's check state flips; see `ItemCheckEventArgs`. |
 
@@ -499,7 +499,7 @@ Inherits `OwnerDrawnControl`.
 | `Cancelled` | `Action Cancelled { get; set; }` | Invoked when the user cancels with Escape. |
 | `Committed` | `Action Committed { get; set; }` | Invoked when the user commits: the OK affordance, or Enter on the final stage. |
 | `FinalStage` | `ClockFaceStage FinalStage { get; }` | The final stage of the current layout — the deepest hand `Precision` offers. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Invalidated` | `Action Invalidated { get; set; }` | Invoked whenever a host surface needs repainting — the popup-hosting hook, left `null` for a stand-alone control that repaints through its own canvas. |
 | `OriginalValue` | `TimeSpan OriginalValue { get; set; }` | The value the dial opened on — a host reverts to it on cancel. Assigning it does not raise `ValueChanged`. |
 | `Precision` | `ClockFacePrecision Precision { get; set; }` | How far the dial lets the user drill: hours only, hours+minutes, or hours+minutes+seconds. Lowering it while a now-hidden hand is active falls the stage back to the deepest one still shown. Defaults to `Minutes`. |
@@ -513,12 +513,12 @@ Inherits `OwnerDrawnControl`.
 | `HandleMouseUp` | `void HandleMouseUp(MouseEventArgs e)` | Ends a dial gesture: walks the user forward to the next hand, and — once the final hand the `Precision` offers has been set — commits, so picking the last part closes the dial without a separate OK. |
 | `HandleMouseWheel` | `void HandleMouseWheel(int delta)` | Nudges the active part one unit per wheel notch — up steps forward, down back. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | An open dial claims Enter/Escape and the arrows ahead of the form's dialog keys. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnStageChanged` | `protected virtual void OnStageChanged(EventArgs e)` | Raises `StageChanged`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `Paint` | `void Paint(IGraphics g, ITheme theme, Size size)` | Paints the whole dial into `size` with `theme`: the header readout and AM/PM toggle, the number ring(s), the hand and hub, and the OK affordance. |
@@ -568,7 +568,7 @@ Inherits `OwnerDrawnControl`.
 | `CaretColumn` | `int CaretColumn { get; }` | The caret column index (zero-based). |
 | `CaretLine` | `int CaretLine { get; }` | The caret line index (zero-based). |
 | `CompletionProvider` | `Func<string, IReadOnlyList<string>> CompletionProvider { get; set; }` | Produces completion candidates for the identifier prefix before the caret, or `null` for no autocomplete. Invoked on Ctrl+Space and as an identifier is typed; picking a candidate replaces the current word. Return an empty list to close the drop-down. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `HighlightCurrentLine` | `bool HighlightCurrentLine { get; set; }` | Whether the caret's line is tinted. Defaults to `true`. |
 | `Lines` | `IReadOnlyList<string> Lines { get; }` | The document lines. |
 | `ShowLineNumbers` | `bool ShowLineNumbers { get; set; }` | Whether the line-number gutter is drawn. Defaults to `true`. |
@@ -576,12 +576,12 @@ Inherits `OwnerDrawnControl`.
 | `Text` | `override string Text { get; set; }` | The whole document. Getting joins the lines with '\n'; setting splits on newlines and resets the caret to the start. |
 | `Tokenizer` | `Func<string, IReadOnlyList<CodeToken>> Tokenizer { get; set; }` | Splits a line into coloured spans, or `null` for uncoloured text. Called per visible line each paint — keep it cheap. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Tab indents and Enter inserts a line, so both are claimed from the form's dialog-key routing (Tab navigation, AcceptButton) and delivered to the editor instead. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` | Handles a typed character. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `ShowCompletion` | `void ShowCompletion()` | Opens or refilters the completion list for the identifier before the caret. |
 
 #### `CodeToken`
@@ -631,14 +631,14 @@ Inherits `OwnerDrawnControl`.
 | `AlphaEnabled` | `bool AlphaEnabled { get; set; }` | Whether the mixer offers an alpha bar and the face shows a transparency checkerboard behind a translucent colour. Defaults to `false` (opaque colours only). |
 | `CustomColors` | `IReadOnlyList<Color> CustomColors { get; }` | The user-saved custom colours (empty until `AddCustomColor` is called). At most sixteen are kept, oldest dropped first. |
 | `DroppedDown` | `bool DroppedDown { get; }` | Whether the mixer drop-down is currently open. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Palette` | `static IReadOnlyList<Color> Palette { get; }` | The standard colours the mixer offers, left to right, top to bottom. |
 | `SelectedColor` | `Color SelectedColor { get; set; }` | The chosen colour. Setting it repaints and raises `SelectedColorChanged`. |
 | `AddCustomColor` | `void AddCustomColor(Color color)` | Adds a colour to the custom palette (a ring buffer of sixteen), for the mixer's own slots. |
 | `CloseDropDown` | `void CloseDropDown()` | Closes the mixer drop-down. |
 | `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Space/Enter opens the drop-down, so the field is keyboard-reachable. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedColorChanged` | `protected virtual void OnSelectedColorChanged(EventArgs e)` | Raises `SelectedColorChanged`. |
 | `OpenDropDown` | `void OpenDropDown()` | Opens the mixer drop-down below the swatch. |
 | `SelectedColorChanged` | `event EventHandler SelectedColorChanged` | Raised when `SelectedColor` changes. |
@@ -694,7 +694,7 @@ Inherits `OwnerDrawnControl`.
 | `DisplaySelector` | `Func<object, string> DisplaySelector { get; set; }` | Produces the display text for an item. Defaults to `ToString()`. |
 | `DropDownStyle` | `ComboBoxStyle DropDownStyle { get; set; }` | How the field presents itself: closed and owner-painted (`DropDownList`, the default) or editable through a hosted native `TextBox` (`DropDown`). |
 | `DroppedDown` | `bool DroppedDown { get; set; }` | Whether the drop-down list is currently open. Settable, like its WinForms namesake. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `ImageIndexSelector` | `Func<object, int> ImageIndexSelector { get; set; }` | Optional selector mapping an item to its `ImageList` index; a negative index means no icon. `ImageSelector` wins when both are set. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icon store `ImageIndexSelector` indexes into, or `null` for none. |
 | `ImageSelector` | `Func<object, IImage> ImageSelector { get; set; }` | Optional selector producing an icon for an item; `null` for none. |
@@ -711,12 +711,12 @@ Inherits `OwnerDrawnControl`.
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | An open list claims Enter (commit) and Escape (close) ahead of the form's dialog keys. |
 | `OnDropDownClosed` | `protected virtual void OnDropDownClosed(EventArgs e)` | Raises `DropDownClosed`. |
 | `OnDropDown` | `protected virtual void OnDropDown(EventArgs e)` | Raises `DropDown`. |
-| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` |  |
-| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` | Raises `GotFocus`. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` | Handles a typed character. |
+| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` | Raises `LostFocus`. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `OpenDropDown` | `void OpenDropDown()` | Opens the drop-down below the field: field width, one row per item up to `MaxDropDownItems`, hover starting on the selected item. A no-op while already open or before the control is realized (only a live widget knows its screen position). |
 | `SetDataSource` | `void SetDataSource<T>(IEnumerable<T> items, string displayMember = null, string valueMember = null)` | Replaces the items from a sequence and resolves `displayMember` and `valueMember` to accessors at compile time, so the Windows Forms shape — a data source plus member names — works without reflection. |
@@ -952,7 +952,7 @@ Inherits `OwnerDrawnControl`.
 | `DataSource` | `IEnumerable DataSource { set; }` | Replaces the rows from any sequence (one-way binding convenience). |
 | `EditMode` | `DataGridViewEditMode EditMode { get; set; }` | How cells enter edit mode. Defaults to `EditOnKeystrokeOrF2`. |
 | `EditingControl` | `Control EditingControl { get; }` | The hosted editor control while a `Text`, `MaskedText`, `NumericUpDown` or `DomainUpDown` cell is in edit mode, or `null` (popup- and dialog-based kinds host no child control). |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `FullRowTextSelector` | `Func<object, string> FullRowTextSelector { get; set; }` | Optional selector merging a row into one full-width cell: a row whose result is non-`null` paints that text across every column (a group or separator row) and is skipped by selection, navigation and editing. Runs on the paint path — return a cached string, capture nothing. |
 | `HeaderHeight` | `protected int HeaderHeight { get; }` | The pixel height of the column-header row, or 0 when hidden. |
 | `HorizontalOffset` | `int HorizontalOffset { get; set; }` | The horizontal scroll offset in pixels, clamped so the non-frozen columns never scroll past their total width; they are shifted left by this amount while frozen columns stay put. |
@@ -1003,14 +1003,14 @@ Inherits `OwnerDrawnControl`.
 | `OnCellValidating` | `protected virtual void OnCellValidating(DataGridViewCellValidatingEventArgs e)` | Raises `CellValidating`. |
 | `OnColumnFilterChanged` | `protected virtual void OnColumnFilterChanged(DataGridViewCellEventArgs e)` | Raises `ColumnFilterChanged`. |
 | `OnCurrentCellDirtyStateChanged` | `protected virtual void OnCurrentCellDirtyStateChanged(EventArgs e)` | Raises `CurrentCellDirtyStateChanged`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` | Handles a typed character. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnPasteCompleted` | `protected virtual void OnPasteCompleted(EventArgs e)` | Raises `PasteCompleted`. |
 | `OnRowValidated` | `protected virtual void OnRowValidated(DataGridViewCellEventArgs e)` | Raises `RowValidated`. |
 | `OnRowValidating` | `protected virtual void OnRowValidating(DataGridViewCellCancelEventArgs e)` | Raises `RowValidating`. |
@@ -1239,7 +1239,7 @@ Inherits `OwnerDrawnControl`.
 | `DayBackgroundProvider` | `Func<DateTime, Color?> DayBackgroundProvider { get; set; }` | An optional per-day background colour for the drop-down calendar — shade holidays and the like. Applied the next time the calendar opens. |
 | `DayTooltipProvider` | `Func<DateTime, string> DayTooltipProvider { get; set; }` | An optional per-day tooltip for the drop-down calendar, shown on hover. |
 | `DroppedDown` | `bool DroppedDown { get; }` | Whether the calendar popup is currently open. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Format` | `DateTimePickerFormat Format { get; set; }` | How the closed field renders `Value`; always the invariant culture. |
 | `MaxDate` | `DateTime MaxDate { get; set; }` | The latest pickable date; assignments and steps clamp to it. |
 | `MinDate` | `DateTime MinDate { get; set; }` | The earliest pickable date; assignments and steps clamp to it. |
@@ -1249,11 +1249,11 @@ Inherits `OwnerDrawnControl`.
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | An open calendar claims Enter (pick) and Escape (close) ahead of the form's dialog keys. |
 | `OnCloseUp` | `protected virtual void OnCloseUp(EventArgs e)` | Raises `CloseUp`. |
 | `OnDropDown` | `protected virtual void OnDropDown(EventArgs e)` | Raises `DropDown`. |
-| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` | Raises `GotFocus`. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` | Raises `LostFocus`. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `OpenDropDown` | `void OpenDropDown()` | Opens the calendar popup below the field, its page centered on `Value`. A no-op while already open or before the control is realized (only a live widget knows its screen position). |
 | `CloseUp` | `event EventHandler CloseUp` | Raised when the calendar popup closes — by pick, cancel or light dismissal alike. |
@@ -1310,7 +1310,7 @@ Inherits `Panel`.
 | `Close` | `void Close()` | Removes the pane from the panel (raising `CloseRequested` first, which may veto it). Without an owner this is a no-op. |
 | `Float` | `void Float()` | Tears the pane off into its own floating window. |
 | `OnDockStateChanged` | `protected virtual void OnDockStateChanged(EventArgs e)` | Raises `DockStateChanged`. |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 | `ToggleAutoHide` | `void ToggleAutoHide()` | Collapses a docked pane to its auto-hide strip, or pins a collapsed one back. |
 | `CloseRequested` | `event EventHandler<CancelEventArgs> CloseRequested` | Raised before the pane closes; cancelling keeps it where it is. |
 | `DockStateChanged` | `event EventHandler DockStateChanged` | Raised after `DockState` changes. |
@@ -1355,20 +1355,20 @@ Inherits `OwnerDrawnControl`.
 | `ActiveContent` | `DockContent ActiveContent { get; }` | The pane with the active caption, or `null` when the panel is empty. |
 | `Contents` | `IReadOnlyList<DockContent> Contents { get; }` | Every pane the manager owns, in the order they were added. |
 | `DocumentTabStripEdge` | `TabAlignment DocumentTabStripEdge { get; set; }` | Which edge each tab group's document-tab strip sits on. `Top` and `Bottom` lay the tabs out in a horizontal row (bottom by default, the classic document well); `Left`/`Right` stack them in a vertical strip whose width fits the widest caption. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icons `ImageIndex` indexes into, or `null`. |
 | `ShowDocumentCaption` | `bool ShowDocumentCaption { get; set; }` | Whether the document area carries a caption bar of its own. Default `true`. |
 | `AddDocument` | `void AddDocument(DockContent content)` | Adds a pane to the central document well. |
 | `Add` | `void Add(DockContent content, DockState state = 2, DockEdge edge = 0)` | Adds a pane to the manager in the given state. A `Docked` or `AutoHide` pane clings to `edge`; a `Document` pane joins the central well. |
 | `DockToEdge` | `void DockToEdge(DockContent content, DockEdge edge)` | Docks a pane to one of the four edges, joining any existing group on that edge. |
-| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` |  |
+| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Whether the control claims `keyData` for its own input, exempting the key from the owning form's dialog handling (Tab navigation, Enter → `AcceptButton`, Escape → `CancelButton`). The base claims nothing; controls that consume Enter or Escape themselves — an open drop-down, a grid edit — override this. |
 | `LoadLayout` | `void LoadLayout(string layout, Func<string, DockContent> resolve)` | Restores an arrangement previously produced by `SaveLayout`. `resolve` maps a pane's persistence key back to the live `DockContent`; a key it cannot resolve is skipped. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `SaveLayout` | `string SaveLayout()` | Serialises the whole arrangement — the split tree, every pane's state, edge, active flag and floating-window bounds — to a compact, reflection-free string. |
 | `ActiveContentChanged` | `event EventHandler ActiveContentChanged` | Raised after `ActiveContent` changes. |
 
@@ -1410,11 +1410,11 @@ Inherits `UpDownBase`.
 | `SelectedIndex` | `int SelectedIndex { get; set; }` | The selected item's index, or -1 for none. Setting it mirrors the item into the editor and raises `SelectedItemChanged` when the value actually changes. |
 | `SelectedItem` | `string SelectedItem { get; set; }` | The selected item, or `null` for none. |
 | `Wrap` | `bool Wrap { get; set; }` | Whether stepping past either end wraps around to the other. |
-| `DownButton` | `override void DownButton()` |  |
+| `DownButton` | `override void DownButton()` | Steps the value one increment down. |
 | `OnSelectedItemChanged` | `protected virtual void OnSelectedItemChanged(EventArgs e)` | Raises `SelectedItemChanged`. |
-| `UpButton` | `override void UpButton()` |  |
-| `UpdateEditText` | `protected override void UpdateEditText()` |  |
-| `ValidateEditText` | `protected override void ValidateEditText()` |  |
+| `UpButton` | `override void UpButton()` | Steps the value one increment up. |
+| `UpdateEditText` | `protected override void UpdateEditText()` | Rewrites the editor from the current value, clearing any pending edit. |
+| `ValidateEditText` | `protected override void ValidateEditText()` | Commits the editor's text into the value: parse and clamp, or revert when invalid. |
 | `SelectedItemChanged` | `event EventHandler SelectedItemChanged` | Raised when the selection changes, by stepping, typing or assignment. |
 
 #### `DragDropEffects`
@@ -1454,8 +1454,8 @@ Inherits `DropDownButtonBase`.
 | --- | --- | --- |
 | `DropDownButton` | `DropDownButton()` |  |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter opens the drop-down, so it stays out of the form's AcceptButton routing. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
 
 #### `DropDownButtonBase`
 
@@ -1467,13 +1467,13 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `DropDownButtonBase` | `protected DropDownButtonBase()` |  |
 | `DropDownItems` | `ToolStripItemCollection DropDownItems { get; }` | The items shown when the drop-down opens, sharing the strip/menu item model. Lazily created, so a button that never opens pays nothing for the collection. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `HasDropDownItems` | `bool HasDropDownItems { get; }` | Whether a drop-down would show anything, without materializing an empty collection. |
 | `Image` | `IImage Image { get; set; }` | An optional icon rendered before the caption through the shared content layout. |
 | `IsDropDownOpen` | `bool IsDropDownOpen { get; }` | Whether the drop-down cascade is currently open. |
 | `CloseDropDown` | `void CloseDropDown()` | Closes the drop-down cascade, if open. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `ShowDropDown` | `void ShowDropDown()` | Opens the drop-down below the control, left-aligned with it. A no-op before realization or while `DropDownItems` is empty. |
 
 #### `Expander`
@@ -1487,16 +1487,16 @@ Inherits `OwnerDrawnControl`.
 | `Expander` | `Expander()` |  |
 | `Checked` | `bool Checked { get; set; }` | The header check box's state — an alias for `Expanded` (checked = open), so it can be two-way bound. Meaningful mainly with `ShowCheckBox` on; setting it expands or collapses either way. |
 | `Expanded` | `bool Expanded { get; set; }` | Whether the content area is shown. Defaults to `true`. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `HeaderHeight` | `int HeaderHeight { get; }` | The pixel height of the header row — the whole control while collapsed. |
 | `Image` | `IImage Image { get; set; }` | An optional icon painted in the header beside the caption (after the expand glyph); `TextImageRelation` places it before or after the text. |
 | `ShowCheckBox` | `bool ShowCheckBox { get; set; }` | Turns the header's expand triangle into a check box — the checkable-group-box idiom, where ticking the box opens the content and clearing it collapses it. `Checked` then mirrors `Expanded`, so an application can bind the check state and drive the panel from it. Defaults to `false` (the plain triangle). |
 | `TextImageRelation` | `TextImageRelation TextImageRelation { get; set; }` | Where the `Image` sits relative to the caption. Defaults to `ImageBeforeText`; set `TextBeforeImage` to put the icon after the text. |
 | `OnExpandedChanged` | `protected virtual void OnExpandedChanged(EventArgs e)` | Raises `ExpandedChanged` and, since the check state tracks it, `CheckedChanged`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised after `Checked` (i.e. `Expanded`) changes — the binding hook for the check-box state. |
 | `ExpandedChanged` | `event EventHandler ExpandedChanged` | Raised after `Expanded` changes. |
 
@@ -1866,18 +1866,18 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `GridPicker` | `GridPicker()` | Creates a table-size picker with the default 10×8 grid. |
 | `Columns` | `int Columns { get; }` | The hovered column count, or zero while nothing is hovered. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `MaxColumns` | `int MaxColumns { get; set; }` | The greatest number of columns the grid offers; at least one. |
 | `MaxRows` | `int MaxRows { get; set; }` | The greatest number of rows the grid offers; at least one. |
 | `PreferredSize` | `Size PreferredSize { get; }` | The natural pixel size of the grid plus its caption strip, under the current theme. |
 | `Rows` | `int Rows { get; }` | The hovered row count, or zero while nothing is hovered. |
-| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` |  |
+| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Whether the control claims `keyData` for its own input, exempting the key from the owning form's dialog handling (Tab navigation, Enter → `AcceptButton`, Escape → `CancelButton`). The base claims nothing; controls that consume Enter or Escape themselves — an open drop-down, a grid edit — override this. |
 | `OnCanceled` | `protected virtual void OnCanceled(EventArgs e)` | Raises `Canceled`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnRangeSelected` | `protected virtual void OnRangeSelected(GridRangeEventArgs e)` | Raises `RangeSelected`. |
 | `SetSelection` | `void SetSelection(int rows, int columns)` | Sets the hovered block programmatically, clamped into the grid. |
 | `Canceled` | `event EventHandler Canceled` | Raised when the pick is cancelled with Escape. |
@@ -1953,7 +1953,7 @@ Inherits `OwnerDrawnControl`.
 | `Image` | `IImage Image { get; set; }` | An optional icon rendered with the caption in the frame gap through the shared content layout; `TextImageRelation` places it before or after the text. |
 | `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Whether this frame is currently rendered by a real platform widget. |
 | `TextImageRelation` | `TextImageRelation TextImageRelation { get; set; }` | Where the `Image` sits relative to the caption. Defaults to `ImageBeforeText`; set `TextBeforeImage` to put the icon after the text. The header is a single horizontal strip, so the before/after values are the meaningful ones. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 
 #### `HScrollBar`
 
@@ -1988,10 +1988,10 @@ Inherits `OwnerDrawnControl`.
 | `Image` | `IImage Image { get; set; }` | The image shown beside the caption, or `null` for text only. |
 | `TextAlign` | `ContentAlignment TextAlign { get; set; }` | Where the whole image+text block anchors within the control's bounds. Defaults to `MiddleLeft`, the reading position a captioned icon wants. |
 | `TextImageRelation` | `TextImageRelation TextImageRelation { get; set; }` | How the image sits relative to the text. Defaults to `ImageBeforeText` — the icon leads, the caption follows. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
 | `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Raises `Click` for a press and release inside the label. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 
 #### `ImageList`
 
@@ -2037,8 +2037,8 @@ Inherits `OwnerDrawnControl`.
 | `Title` | `string Title { get; set; }` | The bold leading title. |
 | `OnActionClicked` | `protected virtual void OnActionClicked(EventArgs e)` | Raises `ActionClicked`. |
 | `OnClosed` | `protected virtual void OnClosed(EventArgs e)` | Raises `Closed`. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `ActionClicked` | `event EventHandler ActionClicked` | Raised when the action link is clicked. |
 | `Closed` | `event EventHandler Closed` | Raised when the close button is clicked; the bar hides itself first. |
 
@@ -2235,8 +2235,8 @@ Inherits `OwnerDrawnControl`.
 | `TextAlign` | `ContentAlignment TextAlign { get; set; }` | Where the text sits within the label's bounds. Win32 static controls honor the horizontal component plus a coarse vertical centering only; GTK honors all nine anchors. A label carrying an image is painted, and honors all nine everywhere. |
 | `TextImageRelation` | `TextImageRelation TextImageRelation { get; set; }` | How the image sits relative to the caption. Defaults to `ImageBeforeText` — the icon leads, the caption follows. |
 | `UseMnemonic` | `bool UseMnemonic { get; set; }` | Whether `&` in `Text` marks the following character as a mnemonic and renders it underlined (`&&` escapes a literal ampersand). Alt+mnemonic focuses the next tab stop after the label through the owning form's dialog-key chain — fed by owner-drawn surfaces; keys held inside native widgets cannot trigger it yet. Defaults to `true`. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 
 #### `LabelEditEventArgs`
 
@@ -2271,19 +2271,19 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `LinkLabel` | `LinkLabel()` |  |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Whether this link is currently rendered by a real platform widget. |
 | `LinkVisited` | `bool LinkVisited { get; set; }` | Whether the link has been followed; shifts the paint color toward the theme's grey. |
 | `Visited` | `bool Visited { get; set; }` | The pre-rename spelling of `LinkVisited`, kept until every caller has moved to the Windows Forms name. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter activates the link, so it stays out of the form's AcceptButton routing. |
-| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
+| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` | Raises `GotFocus`. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
 | `OnLinkClicked` | `protected virtual void OnLinkClicked(EventArgs e)` | Raises `LinkClicked`. |
-| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` | Raises `LostFocus`. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `LinkClicked` | `event EventHandler LinkClicked` | Raised when the link is activated (click inside the text, or Space/Enter while focused). |
 
 #### `ListBox`
@@ -2298,7 +2298,7 @@ Inherits `OwnerDrawnControl`.
 | `ContentWidth` | `protected int ContentWidth { get; }` | The width the rows have, which is the control's less whatever the bar takes. |
 | `DataSource` | `IEnumerable DataSource { set; }` | Replaces the items from any sequence (one-way binding convenience). |
 | `DisplaySelector` | `Func<object, string> DisplaySelector { get; set; }` | Produces the display text for an item. Defaults to `ToString()`. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `FocusedIndex` | `int FocusedIndex { get; }` | The caret row keyboard navigation operates on — independent of the selection in the multi modes — or -1 before any interaction. |
 | `ImageSelector` | `Func<object, IImage> ImageSelector { get; set; }` | Optional selector producing an icon for an item; `null` for none. |
 | `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Whether this list is currently rendered by a real platform widget. |
@@ -2317,12 +2317,12 @@ Inherits `OwnerDrawnControl`.
 | `IndexFromPoint` | `int IndexFromPoint(int x, int y)` | The index of the row at the given client coordinates, or -1 for none. |
 | `OnDrawRow` | `protected virtual void OnDrawRow(IGraphics g, int index, Rectangle bounds, bool selected)` | Draws one row's content (icon and text) inside the given bounds; the selection highlight is already painted. Subclasses override to add leading adornments and delegate to the base with the remaining, right-shifted bounds. |
 | `OnItemsChanged` | `protected virtual void OnItemsChanged(ListChangedEventArgs e)` | Reacts to a mutation of `Items`: keeps the selection, caret and anchor pointing at the same items (pruning what vanished), clamps the scroll position and repaints. Subclasses override to keep parallel per-item state aligned, then call the base. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `SetDataSource` | `void SetDataSource<T>(IEnumerable<T> items, string displayMember = null)` | Replaces the items from a sequence and resolves `displayMember` to an accessor at compile time, so the Windows Forms shape — a data source plus a member name — works without reflection. |
 | `SetSelected` | `void SetSelected(int index, bool value)` | Selects or deselects the row at the given index without touching the rest of the selection — the programmatic sibling of the multi-selection gestures, raising `SelectedIndexChanged` at most once per call. In `One` selecting a row replaces the previous selection. |
@@ -2341,7 +2341,7 @@ Inherits `OwnerDrawnControl`.
 | `CheckedIndices` | `IReadOnlyList<int> CheckedIndices { get; }` | The checked item indices, sorted ascending. A live view over the items' check states. |
 | `CheckedItems` | `IReadOnlyList<ListViewItem> CheckedItems { get; }` | The checked items, in index order. A live view over the items' check states. |
 | `Columns` | `ObservableList<ColumnHeader> Columns { get; }` | The columns shown in Details view. Mutating this collection repaints the control. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `FocusedIndex` | `int FocusedIndex { get; }` | The caret item keyboard navigation operates on, or -1 before any interaction. |
 | `FullRowSelect` | `bool FullRowSelect { get; set; }` | Whether clicking anywhere on a Details row selects it. Defaults to `true`. |
 | `Groups` | `ObservableList<ListViewGroup> Groups { get; }` | The groups items can join via `Group`, rendered in this order. |
@@ -2377,12 +2377,12 @@ Inherits `OwnerDrawnControl`.
 | `OnItemActivate` | `protected virtual void OnItemActivate(EventArgs e)` | Raises `ItemActivate`. |
 | `OnItemCheck` | `protected virtual void OnItemCheck(ItemCheckEventArgs e)` | Raises `ItemCheck`. |
 | `OnItemChecked` | `protected virtual void OnItemChecked(ItemCheckedEventArgs e)` | Raises `ItemChecked`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `SetDataSource` | `void SetDataSource<T>(IEnumerable<T> items, Func<T, ListViewItem> itemFactory)` | Replaces the rows from a model sequence (one-way binding convenience, the `DataSource` parity for this control). Because a row here is a structured `ListViewItem` rather than a single display string, the mapping is a reflection-free item factory instead of a display selector. Each produced item whose `Tag` the factory left `null` gets its source model stored there, so the selection maps back to the model. A `null` sequence just clears. |
 | `Sort` | `void Sort()` | Sorts `Items` in place — stably — by `ItemSorter` when set, else by the active column's text in the `Sorting` direction; a no-op while neither is active. Selected items stay selected and the caret follows its item. See the class remarks for why this mutates the collection where `DataGridView` sorts by indirection. |
@@ -2486,17 +2486,17 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `MenuStrip` | `MenuStrip()` | Creates an empty menu bar. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Items` | `ToolStripItemCollection Items { get; }` | The top-level items. Mutating the collection (or any item in it) repaints the bar. |
 | `OpenIndex` | `int OpenIndex { get; }` | The index of the top-level item whose drop-down is open, or -1. |
 | `CloseDropDown` | `void CloseDropDown()` | Closes the open drop-down cascade, if any. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Claims the keys an open menu (or a keyboard-hovered bar) consumes, keeping the form's dialog-key handling — Enter → AcceptButton, Escape → CancelButton, Tab navigation — out of a running menu interaction. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnKeyPress` | `protected override void OnKeyPress(KeyPressEventArgs e)` | Handles a typed character. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OpenDropDown` | `void OpenDropDown(int index)` | Opens the drop-down of the item at `index` below the bar. |
 
 #### `MessageBox`
@@ -2556,7 +2556,7 @@ Inherits `OwnerDrawnControl`.
 | `DayBackgroundProvider` | `Func<DateTime, Color?> DayBackgroundProvider { get; set; }` | An optional per-day background colour — shade holidays, deadlines and the like. In-month days only; the selection still paints over it. |
 | `DayTooltipProvider` | `Func<DateTime, string> DayTooltipProvider { get; set; }` | An optional per-day tooltip text, shown on hover. |
 | `FirstDayOfWeek` | `DayOfWeek FirstDayOfWeek { get; set; }` | The day of week shown in the leftmost column. Defaults to Monday. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `MaxDate` | `DateTime MaxDate { get; set; }` | The latest selectable day; later cells paint disabled and reject clicks. |
 | `MaxSelectionCount` | `int MaxSelectionCount { get; set; }` | The largest number of days a selection may span. Shrinking it trims the current range. |
 | `MinDate` | `DateTime MinDate { get; set; }` | The earliest selectable day; earlier cells paint disabled and reject clicks. |
@@ -2566,15 +2566,15 @@ Inherits `OwnerDrawnControl`.
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter picks the highlighted date, so it stays out of the form's AcceptButton routing. |
 | `OnDateChanged` | `protected virtual void OnDateChanged(DateRangeEventArgs e)` | Raises `DateChanged`. |
 | `OnDateSelected` | `protected virtual void OnDateSelected(DateRangeEventArgs e)` | Raises `DateSelected`. |
-| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` | Raises `GotFocus`. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` | Raises `LostFocus`. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `SetSelectionRange` | `void SetSelectionRange(DateTime start, DateTime end)` | Selects the given range in one call, swapping reversed ends and capping the span at `MaxSelectionCount` days. |
 | `DateChanged` | `event EventHandler<DateRangeEventArgs> DateChanged` | Raised whenever the selected range changes, by gesture or assignment. |
 | `DateSelected` | `event EventHandler<DateRangeEventArgs> DateSelected` | Raised when the user commits a selection: the click gesture ends or Enter/Space lands. |
@@ -2635,16 +2635,16 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `NavigationView` | `NavigationView()` |  |
 | `Collapsed` | `bool Collapsed { get; set; }` | Whether the rail is collapsed to an icons-only strip. Toggled by the hamburger button. Collapsing narrows the rail to `_CollapsedWidth` and expanding restores the width it had before, so the content region beside it reflows automatically. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icon source for the item images. |
 | `Items` | `IReadOnlyList<string> Items { get; }` | The item captions, top to bottom. |
 | `PreferredWidth` | `int PreferredWidth { get; }` | The width the rail wants: a fixed strip while collapsed, otherwise its current width. |
 | `SelectedIndex` | `int SelectedIndex { get; set; }` | The selected item, or `-1` when empty. |
 | `AddItem` | `int AddItem(string text, int imageIndex = -1)` | Adds a navigation item; returns its index. |
 | `OnCollapsedChanged` | `protected virtual void OnCollapsedChanged(EventArgs e)` | Raises `CollapsedChanged`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `CollapsedChanged` | `event EventHandler CollapsedChanged` | Raised when `Collapsed` changes — the host resizes the rail in response. |
 | `SelectedIndexChanged` | `event EventHandler SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
@@ -2693,11 +2693,11 @@ Inherits `UpDownBase`.
 | `Minimum` | `decimal Minimum { get; set; }` | The lowest value the spinner accepts. Raising it above `Maximum` drags the maximum along; the current value re-clamps. |
 | `ThousandsSeparator` | `bool ThousandsSeparator { get; set; }` | Whether the editor groups digits with the culture's thousands separator. Typed input parses with or without separators either way. Defaults to `false`. |
 | `Value` | `decimal Value { get; set; }` | The current value, clamped to [`Minimum`, `Maximum`]. Reading it commits a pending typed edit first, so callers always see what the user entered. |
-| `DownButton` | `override void DownButton()` |  |
+| `DownButton` | `override void DownButton()` | Steps the value one increment down. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
-| `UpButton` | `override void UpButton()` |  |
-| `UpdateEditText` | `protected override void UpdateEditText()` |  |
-| `ValidateEditText` | `protected override void ValidateEditText()` |  |
+| `UpButton` | `override void UpButton()` | Steps the value one increment up. |
+| `UpdateEditText` | `protected override void UpdateEditText()` | Rewrites the editor from the current value, clearing any pending edit. |
+| `ValidateEditText` | `protected override void ValidateEditText()` | Commits the editor's text into the value: parse and clamp, or revert when invalid. |
 | `ValueChanged` | `event EventHandler ValueChanged` | Raised when `Value` changes, by stepping, typing or assignment. |
 
 #### `OpenFileDialog`
@@ -2731,7 +2731,7 @@ Inherits `Control`.
 | --- | --- | --- |
 | `OwnerDrawnControl` | `protected OwnerDrawnControl()` |  |
 | `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
-| `IsNativeWidget` | `override bool IsNativeWidget { get; }` |  |
+| `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Forces this control onto a real platform widget (`true`) or onto the owner-drawn painter (`false`); `null` — the default — follows `PreferNativeWidgets`. Controls that have no platform counterpart ignore it entirely (PRD §12). |
 | `Theme` | `protected ITheme Theme { get; }` | The native theme to paint with; the fallback until the control is realized. |
 | `Invalidate` | `override void Invalidate()` | Requests a full repaint of the canvas surface. |
 | `Invalidate` | `override void Invalidate(Rectangle region)` | Requests a repaint of a sub-region of the canvas surface. |
@@ -2744,8 +2744,8 @@ Inherits `Control`.
 | `OnMouseUp` | `protected virtual void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
 | `OnMouseWheel` | `protected virtual void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
 | `OnPaint` | `protected virtual void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
-| `OnRightToLeftChanged` | `protected override void OnRightToLeftChanged(EventArgs e)` |  |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnRightToLeftChanged` | `protected override void OnRightToLeftChanged(EventArgs e)` | Hook for subclasses when `RightToLeft` changes; owner-drawn controls repaint. |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 
 #### `Padding`
 
@@ -2790,11 +2790,11 @@ Inherits `OwnerDrawnControl`.
 | `AutoScroll` | `bool AutoScroll { get; set; }` | Whether the panel scrolls children that overflow its client area. Turning it off snaps the scroll offset back to zero. |
 | `BorderStyle` | `BorderStyle BorderStyle { get; set; }` | The border drawn around the panel. |
 | `DisplayRectangle` | `override Rectangle DisplayRectangle { get; }` | The client rectangle available to content, with the band a visible scrollbar occupies taken out — exactly like Windows Forms, where showing a scrollbar shrinks the client area so docked and anchored children are never laid out underneath one. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 
 #### `PathPickerBase`
 
@@ -2804,16 +2804,16 @@ Inherits `OwnerDrawnControl`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `PathExists` | `bool PathExists { get; }` | Whether the committed `SelectedPath` pointed at something real when it was last evaluated (see the class remarks for when that is). An empty path reports `false` without being flagged as broken. |
 | `PlaceholderText` | `string PlaceholderText { get; set; }` | The greyed hint shown while the field is empty. |
 | `ReadOnlyText` | `bool ReadOnlyText { get; set; }` | Whether the field is display-only: the path can still be selected and copied, but only the browse button may change it. Defaults to `false`. |
 | `SelectedPath` | `string SelectedPath { get; set; }` | The committed path. Assigning rewrites the editor, re-evaluates `PathExists` and raises `PathChanged` when the value actually changed. |
 | `Text` | `override string Text { get; set; }` | The live content of the hosted editor, including an edit not committed yet. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter commits the typed path, so it stays out of the form's AcceptButton routing. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnPathChanged` | `protected virtual void OnPathChanged(EventArgs e)` | Raises `PathChanged`. |
 | `PerformBrowse` | `void PerformBrowse()` | Opens the browse dialog exactly as a click on the button would, and commits an OK. |
 | `PathChanged` | `event EventHandler PathChanged` | Raised after `SelectedPath` changed, however it was committed. |
@@ -2833,7 +2833,7 @@ Inherits `OwnerDrawnControl`.
 | `TransparencyGridColor1` | `Color TransparencyGridColor1 { get; set; }` | The two colours of the transparency backdrop checkerboard (see `TransparencyGridSize`). |
 | `TransparencyGridColor2` | `Color TransparencyGridColor2 { get; set; }` | The two colours of the transparency backdrop checkerboard (see `TransparencyGridSize`). |
 | `TransparencyGridSize` | `int TransparencyGridSize { get; set; }` | The checker tile size, in pixels, of a transparency backdrop drawn behind the image so translucent regions read against a grid instead of a flat fill. `0` (the default) keeps the plain `ControlBackground` fill; any positive value turns the checkerboard on. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 
 #### `PictureBoxSizeMode`
 
@@ -2865,7 +2865,7 @@ Inherits `OwnerDrawnControl`.
 | `Step` | `int Step { get; set; }` | The amount `PerformStep` advances `Value` by. |
 | `Style` | `ProgressBarStyle Style { get; set; }` | How the bar presents progress. Switching to `Marquee` starts the animation timer; switching away stops it. |
 | `Value` | `int Value { get; set; }` | The current progress, clamped to [`Minimum`, `Maximum`]. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `PerformStep` | `void PerformStep()` | Advances `Value` by `Step`, clamped at `Maximum`. |
 | `ValueChanged` | `event EventHandler ValueChanged` | Raised when `Value` changes. |
@@ -2890,7 +2890,7 @@ Inherits `OwnerDrawnControl`.
 | `ProgressTile` | `ProgressTile()` |  |
 | `Clickable` | `bool Clickable { get; set; }` | Whether the tile behaves as a button: focusable, hover-highlighted, and raising `Click` on a click or Space. Defaults to `false`. |
 | `Compact` | `bool Compact { get; set; }` | Whether to use the short, one-row layout: the icon on the left with the caption stacked directly over the usage bar on its right, the two together sized to the icon's height for a tight visual fit. The `SecondaryText` line is not shown in this mode. Defaults to `false` (the full three-line tile). |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Image` | `IImage Image { get; set; }` | The icon shown at the leading edge, or `null` for a text-only tile. |
 | `IsWarning` | `bool IsWarning { get; }` | Whether the bar is currently past `WarningThreshold`. |
 | `Maximum` | `int Maximum { get; set; }` | The highest value the usage bar can represent. |
@@ -2900,10 +2900,10 @@ Inherits `OwnerDrawnControl`.
 | `WarningColor` | `Color WarningColor { get; set; }` | The fill used past `WarningThreshold`. Defaults to the alert red Explorer paints a nearly-full drive in. |
 | `WarningThreshold` | `int WarningThreshold { get; set; }` | The value at which the bar switches to `WarningColor`, in `Value`'s own units. 0 — the default — leaves the warning off and the bar always accent-coloured. |
 | `OnKeyUp` | `protected override void OnKeyUp(KeyEventArgs e)` | Space activates on the key release, like every other button face in the toolkit. |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `ValueChanged` | `event EventHandler ValueChanged` | Raised when `Value` changes. |
 
@@ -2916,7 +2916,7 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `PropertyGrid` | `PropertyGrid()` | Creates an empty property grid. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Rows` | `IReadOnlyList<PropertyGridRow> Rows { get; }` | The rows, in insertion order; categories are formed from their `Category`. |
 | `SelectedRow` | `PropertyGridRow SelectedRow { get; }` | The selected row, or `null`. |
 | `AddEnumRow` | `PropertyGridRow AddEnumRow<TEnum>(string name, Func<TEnum> get, Action<TEnum> set, string category = null, string description = null)` | Adds a drop-down row for an enum, its options being the enum's names — fully generic, so it stays reflection-free and AOT-safe. |
@@ -2925,11 +2925,11 @@ Inherits `OwnerDrawnControl`.
 | `AddRow` | `PropertyGridRow AddRow<T>(string name, Func<T> get, Action<T> set, string category = null, string description = null, double? minimum = null, double? maximum = null)` | Adds a strongly-typed row, inferring the editor and the value's text formatting / parsing from `T` at compile time — no per-row `Get`/`Set` string plumbing and no reflection: `bool` → check box, `bool?` → tristate, a numeric type → number (clamped to `minimum`/ `maximum`, or nullable → allows empty), `Color` → colour picker, everything else → text. Use `AddEnumRow` for an enum drop-down. |
 | `AddRow` | `void AddRow(PropertyGridRow row)` | Appends a row. Rows sharing a `Category` group under one header. |
 | `ClearRows` | `void ClearRows()` | Removes every row. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnPropertyValueChanged` | `protected virtual void OnPropertyValueChanged(PropertyValueChangedEventArgs e)` | Raises `PropertyValueChanged`. |
 | `PropertyValueChanged` | `event EventHandler<PropertyValueChangedEventArgs> PropertyValueChanged` | Raised after an editor commits a new value to a row. |
 
@@ -2993,15 +2993,15 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `RadioButton` | `RadioButton()` |  |
 | `Checked` | `bool Checked { get; set; }` | Whether this button is the selected one in its group. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Image` | `IImage Image { get; set; }` | An optional icon rendered between the ring and the caption through the shared content layout; the text shifts right to make room. |
 | `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Whether this button is currently rendered by a real platform widget. |
 | `OnCheckedChanged` | `protected virtual void OnCheckedChanged(EventArgs e)` | Raises `CheckedChanged`. |
 | `OnClick` | `protected override void OnClick(EventArgs e)` | Checks the button, then raises `Click` — the Windows Forms order (`CheckedChanged` first), shared by mouse, Space and `PerformClick`. |
 | `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` | Focus arriving while no mouse press is in flight checks the button, like tabbing onto a Windows Forms radio selects it. The pipeline records the press before click-to-focus runs, so `IsMousePressInFlight` is the honest keyboard gate — a click defers selection to the click path and selects exactly once. |
 | `OnKeyUp` | `protected override void OnKeyUp(KeyEventArgs e)` | Space selects on the key release, like the Windows Forms button base — a held key must not auto-repeat the click. |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `Select` | `protected void Select()` | Selects this button (checking it) and raises `Click`. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised when `Checked` changes. |
 
@@ -3014,17 +3014,17 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `RangeSlider` | `RangeSlider()` |  |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `LowerValue` | `int LowerValue { get; set; }` | The lower thumb's value, clamped to [`Minimum`, `UpperValue`]. |
 | `Maximum` | `int Maximum { get; set; }` | The value at the end of the track. |
 | `Minimum` | `int Minimum { get; set; }` | The value at the start of the track. |
 | `SmallChange` | `int SmallChange { get; set; }` | The step an arrow key nudges the active thumb by. At least 1. |
 | `UpperValue` | `int UpperValue { get; set; }` | The upper thumb's value, clamped to [`LowerValue`, `Maximum`]. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnRangeChanged` | `protected virtual void OnRangeChanged(EventArgs e)` | Raises `RangeChanged`. |
 | `RangeChanged` | `event EventHandler RangeChanged` | Raised when either `LowerValue` or `UpperValue` changes. |
 
@@ -3064,7 +3064,7 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `Ribbon` | `Ribbon()` | Creates an empty ribbon. |
 | `ContextualTabGroups` | `RibbonContextualTabGroupCollection ContextualTabGroups { get; }` | The contextual tab groups — colour-coded tab families shown only in context. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `GroupAreaHeight` | `int GroupAreaHeight { get; }` | The pixel height of the group area below the tab strip; zero while minimized. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icons `ImageIndex` and the items' image indices point into, or `null`. |
 | `Minimized` | `bool Minimized { get; set; }` | Whether the group area is folded away, leaving only the tab strip — the Office "minimize the ribbon" state. Hosted controls go with it; the tabs stay clickable. |
@@ -3074,13 +3074,13 @@ Inherits `OwnerDrawnControl`.
 | `SelectedTab` | `RibbonTab SelectedTab { get; set; }` | The selected tab, or `null` while there are no tabs. |
 | `TabStripHeight` | `int TabStripHeight { get; }` | The pixel height of the tab strip along the top. |
 | `Tabs` | `RibbonTabCollection Tabs { get; }` | The tabs, left to right. The first one added becomes the selected one. |
-| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Whether the control claims `keyData` for its own input, exempting the key from the owning form's dialog handling (Tab navigation, Enter → `AcceptButton`, Escape → `CancelButton`). The base claims nothing; controls that consume Enter or Escape themselves — an open drop-down, a grid edit — override this. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `MinimizedChanged` | `event EventHandler MinimizedChanged` | Raised after `Minimized` changes. |
 | `PreferredHeightChanged` | `event EventHandler PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, so a host can re-flow the content sitting below it. |
@@ -3263,7 +3263,7 @@ Inherits `RibbonItem`.
 | `RibbonToggleButton` | `RibbonToggleButton(string text)` | Creates a large toggle button with the given caption. |
 | `RibbonToggleButton` | `RibbonToggleButton(string text, RibbonItemSize size)` | Creates a toggle button with the given caption and size. |
 | `Checked` | `bool Checked { get; set; }` | Whether the button is latched down. |
-| `OnClick` | `protected override void OnClick(EventArgs e)` |  |
+| `OnClick` | `protected override void OnClick(EventArgs e)` | Raises `Click`. Subclasses toggle their check state before delegating here. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised after `Checked` changes. |
 
 #### `RichTextBox`
@@ -3338,11 +3338,11 @@ Inherits `OwnerDrawnControl`.
 | `Minimum` | `int Minimum { get; set; }` | The value at the start of the track. |
 | `SmallChange` | `int SmallChange { get; set; }` | The step an arrow click scrolls by. At least 1. |
 | `Value` | `int Value { get; set; }` | The current scroll position, clamped to [`Minimum`, `Maximum - LargeChange + 1`]. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnScroll` | `protected virtual void OnScroll(ScrollEventArgs e)` | Raises `Scroll`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `Scroll` | `event EventHandler<ScrollEventArgs> Scroll` | Raised for every user scroll gesture, carrying the gesture type. |
@@ -3385,13 +3385,13 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `SearchBox` | `SearchBox()` | Creates the search field and its hosted editor. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `PlaceholderText` | `string PlaceholderText { get; set; }` | The greyed hint shown while the box is empty. Defaults to "Search". |
 | `Text` | `override string Text { get; set; }` | The search text, forwarded to the hosted editor. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter commits the search, so it stays out of the form's AcceptButton routing. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSearchCleared` | `protected virtual void OnSearchCleared(EventArgs e)` | Raises `SearchCleared`. |
 | `OnSearchCommitted` | `protected virtual void OnSearchCommitted(EventArgs e)` | Raises `SearchCommitted`. |
 | `SearchCleared` | `event EventHandler SearchCleared` | Raised after the clear (×) zone emptied the box. |
@@ -3406,13 +3406,13 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `SegmentedControl` | `SegmentedControl()` |  |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Segments` | `IReadOnlyList<string> Segments { get; }` | The segment captions, left to right. |
 | `SelectedIndex` | `int SelectedIndex { get; set; }` | The selected segment, or `-1` when there are none. Setting it repaints and raises `SelectedIndexChanged`. |
 | `SelectedSegment` | `string SelectedSegment { get; }` | The caption of the selected segment, or `null`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `SetSegments` | `void SetSegments(params string[] labels)` | Replaces the segment captions, left to right; the selection lands on the first segment. |
 | `SelectedIndexChanged` | `event EventHandler SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
@@ -3459,9 +3459,9 @@ Inherits `DropDownButtonBase`.
 | `SplitButton` | `SplitButton()` |  |
 | `Command` | `ICommand Command { get; set; }` | The MVVM command the main zone invokes. Its `CanExecute` gates the main action at click time — a view-model guard silently swallows the click — while the arrow zone and the drop-down stay available. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter runs the main action, so it stays out of the form's AcceptButton routing. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
 | `PerformMainClick` | `void PerformMainClick()` | Runs the main action as a main-zone click would: raises `Click` and executes `Command`. A no-op while disabled or while the command declines. |
 
 #### `SplitContainer`
@@ -3474,7 +3474,7 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `SplitContainer` | `SplitContainer()` | Creates a split container with its two panels already parented. |
 | `FixedPanel` | `FixedPanel FixedPanel { get; set; }` | Which panel keeps its size when the container resizes. The default `None` scales `SplitterDistance` proportionally — the Windows Forms default behavior. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Orientation` | `Orientation Orientation { get; set; }` | The direction of the splitter bar. The default `Vertical` puts the panels side by side; `Horizontal` stacks them. |
 | `Panel1Collapsed` | `bool Panel1Collapsed { get; set; }` | Whether `Panel1` is collapsed: its peer hides and `Panel2` takes the whole area, with no splitter to drag. Collapsing it un-collapses `Panel2` — only one panel can be collapsed at a time, like the classic control. |
 | `Panel1MinSize` | `int Panel1MinSize { get; set; }` | The smallest size `Panel1` may be squeezed to. |
@@ -3484,12 +3484,12 @@ Inherits `OwnerDrawnControl`.
 | `Panel2` | `Panel Panel2 { get; }` | The right (or bottom) panel. |
 | `SplitterDistance` | `int SplitterDistance { get; set; }` | The pixel size of `Panel1` along the split axis. Assignments clamp to `Panel1MinSize`/`Panel2MinSize` against the current control size. |
 | `SplitterWidth` | `int SplitterWidth { get; set; }` | The thickness of the splitter bar in pixels. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSplitterMoved` | `protected virtual void OnSplitterMoved(EventArgs e)` | Raises `SplitterMoved`. |
 | `SplitterMoved` | `event EventHandler SplitterMoved` | Raised when a splitter move is committed (mouse release or keyboard nudge). |
 
@@ -3505,7 +3505,7 @@ Inherits `OwnerDrawnControl`.
 | `Items` | `ToolStripItemCollection Items { get; }` | The panels. Mutating the collection (or any item in it) repaints the bar. |
 | `SizingGrip` | `bool SizingGrip { get; set; }` | Whether the resize grip is painted in the bottom-right corner. |
 | `GetItemWidth` | `int GetItemWidth(int index)` | The pixel width panel `index` currently occupies — fixed panels their measured width, springs their equal share of the leftover. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 
 #### `Strings`
 
@@ -3546,18 +3546,18 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `TabControl` | `TabControl()` | Creates an empty tab control. |
 | `Alignment` | `TabAlignment Alignment { get; set; }` | Which edge the header strip is painted along; `Top` by default. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `HeaderHeight` | `int HeaderHeight { get; }` | The pixel height of a horizontal header strip (and the height of each stacked side tab). |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icons referenced by each page's `ImageIndex`, or `null`. |
 | `SelectedIndex` | `int SelectedIndex { get; set; }` | The index of the visible page, or -1 while there are no pages. |
 | `SelectedTab` | `TabPage SelectedTab { get; set; }` | The visible page, or `null` while there are no pages. |
 | `ShowCloseButtons` | `bool ShowCloseButtons { get; set; }` | Whether each tab paints a close (×) button; off by default. |
 | `TabPages` | `TabPageCollection TabPages { get; }` | The pages, in tab order. Adding a page parents it into `Controls`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `OnTabClosed` | `protected virtual void OnTabClosed(TabPageEventArgs e)` | Raises `TabClosed`. |
 | `OnTabClosing` | `protected virtual void OnTabClosing(TabPageCancelEventArgs e)` | Raises `TabClosing`. |
@@ -3577,7 +3577,7 @@ Inherits `Panel`.
 | `TabPage` | `TabPage(string text)` | Creates a page with the given tab caption. |
 | `ImageIndex` | `int ImageIndex { get; set; }` | The index of this page's icon in the owning `ImageList`, or -1 for no icon. The icon is painted before the caption in the tab header. |
 | `ImageKey` | `string ImageKey { get; set; }` | The key of this page's icon in the owning `ImageList`, used when `ImageIndex` is unset (< 0). The index takes precedence when both are set. |
-| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` |  |
+| `OnTextChanged` | `protected override void OnTextChanged(EventArgs e)` | Raises `TextChanged`. |
 
 #### `TabPageCancelEventArgs`
 
@@ -3637,7 +3637,7 @@ Inherits `Panel`.
 | `GetCellPosition` | `TableLayoutPanelCellPosition GetCellPosition(Control control)` | The cell a control was pinned to, or (-1, -1) while it auto-places. |
 | `GetColumnSpan` | `int GetColumnSpan(Control control)` | The number of columns the control spans; 1 by default. |
 | `GetRowSpan` | `int GetRowSpan(Control control)` | The number of rows the control spans; 1 by default. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `SetCellPosition` | `void SetCellPosition(Control control, int column, int row)` | Pins a control to the given cell; auto-placement flows the other children around it. |
 | `SetColumnSpan` | `void SetColumnSpan(Control control, int value)` | Stretches a control across the given number of columns. |
 | `SetRowSpan` | `void SetRowSpan(Control control, int value)` | Stretches a control across the given number of rows. |
@@ -3710,7 +3710,7 @@ Inherits `Control`.
 | `UseSystemPasswordChar` | `bool UseSystemPasswordChar { get; set; }` | Masks input with the platform's standard password glyph, overriding `PasswordChar`. |
 | `AppendText` | `void AppendText(string text)` | Appends `text` to the content and parks the caret at the end — the classic log-window helper. |
 | `Clear` | `void Clear()` | Empties the box, raising `TextChanged` when it held text. |
-| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` |  |
+| `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Whether the control claims `keyData` for its own input, exempting the key from the owning form's dialog handling (Tab navigation, Enter → `AcceptButton`, Escape → `CancelButton`). The base claims nothing; controls that consume Enter or Escape themselves — an open drop-down, a grid edit — override this. |
 | `OnKeyDown` | `protected virtual void OnKeyDown(KeyEventArgs e)` | Raises `KeyDown`. |
 | `SelectAll` | `void SelectAll()` | Selects the whole content. |
 | `Select` | `void Select(int start, int length)` | Selects the given run of text (the caret moves to its start); negative values clamp to zero. Buffered until realization and forwarded to the live widget like the `SelectionStart`/`SelectionLength` setters. |
@@ -3737,7 +3737,7 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `TimePicker` | `TimePicker()` |  |
 | `ClockDroppedDown` | `bool ClockDroppedDown { get; }` | Whether the double-click clock face is currently open. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `MaxTime` | `TimeSpan MaxTime { get; set; }` | The latest pickable time; assignments and steps clamp to it. |
 | `MinTime` | `TimeSpan MinTime { get; set; }` | The earliest pickable time; assignments and steps clamp to it. |
 | `SelectedField` | `TimePickerField SelectedField { get; set; }` | The part the caret sits on — what the spinner buttons and the Up/Down keys step. Assigning a part the current layout does not show (seconds while `ShowSeconds` is off, AM/PM while `Use24HourClock` is on) falls back to the hour. |
@@ -3748,14 +3748,14 @@ Inherits `OwnerDrawnControl`.
 | `CloseClock` | `void CloseClock()` | Closes the clock face, keeping whatever value is showing. A no-op while closed. |
 | `DownButton` | `void DownButton()` | Steps the selected part one increment down. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Left/Right pick the part, so they stay out of the form's dialog-key routing. |
-| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` |  |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnGotFocus` | `protected override void OnGotFocus(EventArgs e)` | Raises `GotFocus`. |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` | Raises `LostFocus`. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `OpenClock` | `void OpenClock()` | Opens the analog clock face below the field, its hand on `Value` and its first stage the hour. A no-op while already open or before the control is realized (only a live widget knows its screen position). Committing keeps the picked value; Escape or an outside click reverts to the value the field held when it opened. |
 | `SelectNextField` | `void SelectNextField()` | Moves the caret to the next visible part, stopping at the last one. |
@@ -3808,12 +3808,12 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `ToggleSwitch` | `ToggleSwitch()` |  |
 | `Checked` | `bool Checked { get; set; }` | Whether the switch is on. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `OnCheckedChanged` | `protected virtual void OnCheckedChanged(EventArgs e)` | Raises `CheckedChanged`. |
 | `OnClick` | `protected override void OnClick(EventArgs e)` | Toggles `Checked`, then raises `Click` — the Windows Forms order (`CheckedChanged` first), shared by mouse, Space and `PerformClick`. |
 | `OnKeyUp` | `protected override void OnKeyUp(KeyEventArgs e)` | Space toggles on the key release, like the Windows Forms button base — a held key must not auto-repeat the toggle. |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `Toggle` | `protected void Toggle()` | Toggles the switch and raises `Click`. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised when `Checked` changes. |
 
@@ -3829,14 +3829,14 @@ Inherits `OwnerDrawnControl`.
 | `AllowDuplicates` | `bool AllowDuplicates { get; set; }` | Whether the same token may be added twice. Defaults to `false`. |
 | `AutoCompleteSource` | `Func<string, IReadOnlyList<string>> AutoCompleteSource { get; set; }` | A filter over a typed prefix producing suggestions dropped down under the editor, or `null` for no autocomplete. |
 | `ChipStyleProvider` | `Func<string, TokenChipStyle> ChipStyleProvider { get; set; }` | An optional per-chip style (fill, text colour, font style) chosen from the token text, so a host can colour-code chips or italicise/bolden them. `null` uses the accent-tinted default. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `PlaceholderText` | `string PlaceholderText { get; set; }` | The greyed hint shown while the field is empty. |
 | `Tokens` | `IReadOnlyList<string> Tokens { get; }` | The committed chips, in order. |
 | `AddToken` | `void AddToken(string text)` | Adds `text` as a chip (unless empty or a rejected duplicate). |
 | `ClearTokens` | `void ClearTokens()` | Clears every chip. |
 | `IsInputKey` | `protected override bool IsInputKey(Keys keyData)` | Enter and comma commit a chip, so they stay out of the form's AcceptButton routing. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnTokensChanged` | `protected virtual void OnTokensChanged(EventArgs e)` | Raises `TokensChanged`. |
 | `RemoveToken` | `void RemoveToken(int index)` | Removes the chip at `index`; a no-op if out of range. |
 | `TokensChanged` | `event EventHandler TokensChanged` | Raised whenever the chip set changes (add or remove). |
@@ -3864,11 +3864,11 @@ Inherits `OwnerDrawnControl`.
 | `HasOverflow` | `bool HasOverflow { get; }` | Whether the bar currently needs the overflow chevron. |
 | `Items` | `ToolStripItemCollection Items { get; }` | The toolbar items. Mutating the collection (or any item in it) repaints the bar. |
 | `OnItemOrderChanged` | `protected virtual void OnItemOrderChanged(int index)` | Raises `ItemOrderChanged`. |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `ItemOrderChanged` | `event EventHandler<int> ItemOrderChanged` | Raised after a drag moved an item, with the index it landed on. |
 
 #### `ToolStripButton`
@@ -3883,7 +3883,7 @@ Inherits `ToolStripItem`.
 | `ToolStripButton` | `ToolStripButton(string text)` | Creates a toolbar button with the given caption. |
 | `CheckOnClick` | `bool CheckOnClick { get; set; }` | Whether clicking toggles `Checked` automatically. |
 | `Checked` | `bool Checked { get; set; }` | Whether the button is latched down (toggle state). |
-| `OnClick` | `protected override void OnClick(EventArgs e)` |  |
+| `OnClick` | `protected override void OnClick(EventArgs e)` | Raises `Click`. Subclasses toggle their check state before delegating here. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised after `Checked` changes. |
 
 #### `ToolStripControlHost`
@@ -3977,7 +3977,7 @@ Inherits `ToolStripDropDownItem`.
 | `Checked` | `bool Checked { get; set; }` | Whether the item shows its check (or radio) mark. Checking an item that belongs to a `CheckedGroup` unchecks its sibling group members. |
 | `ShortcutKeyDisplayString` | `string ShortcutKeyDisplayString { get; set; }` | Overrides the shortcut text shown right-aligned in the drop-down; `null` renders the formatted `ShortcutKeys`. |
 | `ShortcutKeys` | `Keys ShortcutKeys { get; set; }` | The shortcut chord that activates this item, for example `Keys.Control \| Keys.S`, or `None`. Dispatched by the owning `MenuStrip`. |
-| `OnClick` | `protected override void OnClick(EventArgs e)` |  |
+| `OnClick` | `protected override void OnClick(EventArgs e)` | Raises `Click`. Subclasses toggle their check state before delegating here. |
 | `CheckedChanged` | `event EventHandler CheckedChanged` | Raised after `Checked` changes. |
 
 #### `ToolStripProgressBarItem`
@@ -4053,7 +4053,7 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `TrackBar` | `TrackBar()` |  |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `IsNativeWidget` | `override bool IsNativeWidget { get; }` | Whether the control is currently backed by a real platform slider. |
 | `LargeChange` | `int LargeChange { get; set; }` | The step a track click or PageUp/PageDown changes the value by. At least 1. |
 | `Maximum` | `int Maximum { get; set; }` | The value at the end of the track. |
@@ -4063,11 +4063,11 @@ Inherits `OwnerDrawnControl`.
 | `TickFrequency` | `int TickFrequency { get; set; }` | The value spacing between tick marks. At least 1. |
 | `TickStyle` | `TickStyle TickStyle { get; set; }` | Where tick marks are displayed relative to the track. |
 | `Value` | `int Value { get; set; }` | The current position, clamped to [`Minimum`, `Maximum`]. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnScroll` | `protected virtual void OnScroll(EventArgs e)` | Raises `Scroll`. |
 | `OnValueChanged` | `protected virtual void OnValueChanged(EventArgs e)` | Raises `ValueChanged`. |
 | `Scroll` | `event EventHandler Scroll` | Raised for every user gesture that moves the value — thumb drag, arrow and page keys, Home/End and track clicks — but never for programmatic `Value` writes, mirroring the `Scroll`/`ValueChanged` split. |
@@ -4085,7 +4085,7 @@ Inherits `OwnerDrawnControl`.
 | `CheckBoxes` | `bool CheckBoxes { get; set; }` | Whether every node shows a themed check box in the tree column. Defaults to `false`. |
 | `Columns` | `ObservableList<TreeListViewColumn> Columns { get; }` | The columns. Index 0 is the tree column; the rest render their `TextSelector` text. Mutating the collection — or any column's caption, width or alignment — repaints the control. |
 | `ContentWidth` | `protected int ContentWidth { get; }` | The width the rows and the header have, which is the control's less any bar. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `FrozenWidth` | `protected int FrozenWidth { get; }` | The width of the pinned run at the left, which never scrolls. |
 | `HeaderHeight` | `int HeaderHeight { get; }` | The pixel height reserved for the header row (0 while headers are hidden). |
 | `HorizontalOffset` | `int HorizontalOffset { get; set; }` | How far the columns are scrolled sideways, in pixels. |
@@ -4116,12 +4116,12 @@ Inherits `OwnerDrawnControl`.
 | `OnBeforeSelect` | `protected virtual void OnBeforeSelect(TreeViewCancelEventArgs e)` | Raises `BeforeSelect`. |
 | `OnCellPaint` | `protected virtual void OnCellPaint(TreeListViewCellPaintEventArgs e)` | Raises `CellPaint`. |
 | `OnColumnClick` | `protected virtual void OnColumnClick(ColumnClickEventArgs e)` | Raises `ColumnClick`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `RowAt` | `int RowAt(Point point)` | Which row is under a point in the control's own coordinates, or -1 for none. |
 | `RowOf` | `int RowOf(TreeNode node)` | The row a node occupies in the flattened tree, or -1 when it is not visible. |
 | `SetDataSource` | `void SetDataSource<T>(IEnumerable<T> roots, Func<T, string> text, Func<T, IEnumerable<T>> children, int maxDepth = 32)` | Replaces the tree from a data source: one node per item, labeled via `text`, nested via `children` and carrying the item in `Tag`. The hierarchy is built eagerly, cut off after `maxDepth` levels so cyclic object graphs terminate. |
@@ -4242,7 +4242,7 @@ Inherits `OwnerDrawnControl`.
 | `AllowReorder` | `bool AllowReorder { get; set; }` | Whether nodes can be dragged within the tree to reorder or reparent them, with a live insertion marker. Off by default. While on, pressing a node and dragging past a few pixels starts a drag (`ItemDrag`); the pointer's position within the target row picks above / onto / below; `NodeDragOver` can reject a target and `NodeDrop` can veto the release. A node is never droppable into its own subtree. This is intra-tree node movement, distinct from the cross-control `AllowDrop` data drag. |
 | `AutoExpandDelay` | `int AutoExpandDelay { get; set; }` | How long the pointer must dwell on a collapsed node while dragging before it auto-expands, in milliseconds. Defaults to 700; set to 0 to disable hover-expansion. Only active during a drag. |
 | `CheckBoxes` | `bool CheckBoxes { get; set; }` | Whether every node shows a themed check box. Defaults to `false`. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icon store for `ImageIndex`, or `null` for no icons. |
 | `IsEditing` | `bool IsEditing { get; }` | Whether a label edit is currently open. |
 | `ItemHeight` | `int ItemHeight { get; set; }` | The pixel height of a row (also the indent per level). Defaults to the theme row height. |
@@ -4272,15 +4272,15 @@ Inherits `OwnerDrawnControl`.
 | `OnBeforeLabelEdit` | `protected virtual void OnBeforeLabelEdit(NodeLabelEditEventArgs e)` | Raises `BeforeLabelEdit`. |
 | `OnBeforeSelect` | `protected virtual void OnBeforeSelect(TreeViewCancelEventArgs e)` | Raises `BeforeSelect`. |
 | `OnItemDrag` | `protected virtual void OnItemDrag(TreeViewEventArgs e)` | Raises `ItemDrag`. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
 | `OnNodeDragOver` | `protected virtual void OnNodeDragOver(TreeNodeDragEventArgs e)` | Raises `NodeDragOver`. |
 | `OnNodeDrop` | `protected virtual void OnNodeDrop(TreeNodeDragEventArgs e)` | Raises `NodeDrop`. |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `AfterCheck` | `event EventHandler<TreeViewEventArgs> AfterCheck` | Raised after a node's `Checked` state changed. |
 | `AfterCollapse` | `event EventHandler<TreeViewEventArgs> AfterCollapse` | Raised after a node collapsed. |
 | `AfterExpand` | `event EventHandler<TreeViewEventArgs> AfterExpand` | Raised after a node expanded. |
@@ -4337,16 +4337,16 @@ Inherits `OwnerDrawnControl`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `UpDownBase` | `protected UpDownBase()` | Creates the spinner shell and its hosted editor. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `Text` | `override string Text { get; set; }` | The content of the hosted editor. Assigning counts as a pending user edit, committed at the next commit point. |
 | `UserEdit` | `protected bool UserEdit { get; }` | Whether the editor holds a user edit that has not been committed yet. |
 | `DownButton` | `abstract void DownButton()` | Steps the value one increment down. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnLostFocus` | `protected override void OnLostFocus(EventArgs e)` | Raises `LostFocus`. |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseLeave` | `protected override void OnMouseLeave(EventArgs e)` | Handles the pointer leaving the control. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `SetEditorText` | `protected void SetEditorText(string text)` | Writes programmatic text into the editor without flagging a user edit. |
 | `UpButton` | `abstract void UpButton()` | Steps the value one increment up. |
 | `UpdateEditText` | `protected abstract void UpdateEditText()` | Rewrites the editor from the current value, clearing any pending edit. |
@@ -4372,7 +4372,7 @@ Inherits `OwnerDrawnControl`.
 | --- | --- | --- |
 | `ZoomPanel` | `ZoomPanel()` |  |
 | `ContentSize` | `Size ContentSize { get; set; }` | The size of the content in its own pixels; set explicitly when there is no `Image` but a `PaintContent` host draws the content. |
-| `Focusable` | `protected override bool Focusable { get; }` |  |
+| `Focusable` | `protected override bool Focusable { get; }` | Owner-drawn surfaces take no focus by default; interactive controls override. |
 | `GridColor` | `Color GridColor { get; set; }` | The grid line colour. Defaults to the theme grid line. |
 | `GridSize` | `int GridSize { get; set; }` | The content-space spacing of an overlaid grid, in pixels; `0` (the default) draws no grid. The grid is only drawn once a cell is at least a few device pixels wide. |
 | `Image` | `IImage Image { get; set; }` | The image shown as the content, or `null`. Setting it adopts its size as the `ContentSize` and fits it to the window. |
@@ -4384,12 +4384,12 @@ Inherits `OwnerDrawnControl`.
 | `Zoom` | `double Zoom { get; set; }` | The current scale factor (1.0 = actual size). Clamped to [`MinZoom`, `MaxZoom`]; setting it zooms about the viewport centre. |
 | `ActualSize` | `void ActualSize()` | Resets the zoom to 1.0 and centres the content. |
 | `FitToWindow` | `void FitToWindow()` | Scales the content to fit entirely within the viewport and centres it. |
-| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` |  |
-| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` |  |
-| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` |  |
-| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` |  |
-| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` |  |
-| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` |  |
+| `OnKeyDown` | `protected override void OnKeyDown(KeyEventArgs e)` | Handles a key press (down). |
+| `OnMouseDown` | `protected override void OnMouseDown(MouseEventArgs e)` | Handles a mouse-button press. |
+| `OnMouseMove` | `protected override void OnMouseMove(MouseEventArgs e)` | Handles pointer movement. |
+| `OnMouseUp` | `protected override void OnMouseUp(MouseEventArgs e)` | Handles a mouse-button release. |
+| `OnMouseWheel` | `protected override void OnMouseWheel(MouseEventArgs e)` | Handles a mouse-wheel turn. |
+| `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnZoomChanged` | `protected virtual void OnZoomChanged(EventArgs e)` | Raises `ZoomChanged`. |
 | `ZoomTo` | `void ZoomTo(double zoom, int anchorX, int anchorY)` | Zooms to `zoom` keeping the content point under the given viewport-local pixel fixed under it. |
 | `PaintContent` | `event EventHandler<ZoomPanelPaintEventArgs> PaintContent` | Raised while painting so a host can draw scaled/panned content over the panel. |
@@ -4912,10 +4912,10 @@ Implements `IContainer`, `IDisposable`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Container` | `Container()` |  |
-| `Components` | `IReadOnlyList<Component> Components { get; }` |  |
-| `Add` | `void Add(Component component)` |  |
+| `Components` | `IReadOnlyList<Component> Components { get; }` | The owned components, in the order they were added. |
+| `Add` | `void Add(Component component)` | Takes ownership of a component (removing it from any previous container). |
 | `Dispose` | `void Dispose()` | Disposes every owned component, last-added first, and empties the container. |
-| `Remove` | `void Remove(Component component)` |  |
+| `Remove` | `void Remove(Component component)` | Releases a component from this container without disposing it. |
 
 #### `IContainer`
 
@@ -5124,25 +5124,25 @@ Implements `ITheme`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `DefaultTheme` | `DefaultTheme()` |  |
-| `Accent` | `Color Accent { get; }` |  |
-| `Border` | `Color Border { get; }` |  |
-| `ButtonCornerRadius` | `int ButtonCornerRadius { get; }` |  |
-| `ControlBackground` | `Color ControlBackground { get; }` |  |
-| `ControlText` | `Color ControlText { get; }` |  |
-| `DefaultFont` | `Font DefaultFont { get; }` |  |
-| `DisabledText` | `Color DisabledText { get; }` |  |
-| `DoubleClickTime` | `int DoubleClickTime { get; }` |  |
-| `FieldBackground` | `Color FieldBackground { get; }` |  |
-| `GridLine` | `Color GridLine { get; }` |  |
-| `HeaderBackground` | `Color HeaderBackground { get; }` |  |
-| `HeaderText` | `Color HeaderText { get; }` |  |
+| `Accent` | `Color Accent { get; }` | The system accent color (focus, checkmarks, selection tint). |
+| `Border` | `Color Border { get; }` | Border/separator color. |
+| `ButtonCornerRadius` | `int ButtonCornerRadius { get; }` | The corner radius the desktop rounds a push button to, in logical pixels; 0 for square corners. |
+| `ControlBackground` | `Color ControlBackground { get; }` | Background of a control surface (panels, buttons at rest). |
+| `ControlText` | `Color ControlText { get; }` | Primary text color on a control. |
+| `DefaultFont` | `Font DefaultFont { get; }` | The default UI font. |
+| `DisabledText` | `Color DisabledText { get; }` | Text color for disabled elements. |
+| `DoubleClickTime` | `int DoubleClickTime { get; }` | The maximum interval, in milliseconds, between two clicks that count as a double-click — the user's own setting (`GetDoubleClickTime` on Windows, the `gtk-double-click-time` setting on GTK), 500 in the fallback theme. |
+| `FieldBackground` | `Color FieldBackground { get; }` | Background of editable/list fields (text boxes, list boxes, grid cells). |
+| `GridLine` | `Color GridLine { get; }` | Grid line color for tabular controls. |
+| `HeaderBackground` | `Color HeaderBackground { get; }` | Background of a column/row header. |
+| `HeaderText` | `Color HeaderText { get; }` | Text color of a header. |
 | `Instance` | `static DefaultTheme Instance { get; }` | The shared instance. |
-| `IsHighContrast` | `bool IsHighContrast { get; }` |  |
-| `RowHeight` | `int RowHeight { get; }` |  |
-| `ScrollBarSize` | `int ScrollBarSize { get; }` |  |
-| `SelectionBackground` | `Color SelectionBackground { get; }` |  |
-| `SelectionText` | `Color SelectionText { get; }` |  |
-| `WindowBackground` | `Color WindowBackground { get; }` |  |
+| `IsHighContrast` | `bool IsHighContrast { get; }` | Whether the desktop runs a high-contrast scheme (Windows: `SPI_GETHIGHCONTRAST`; GTK: a HighContrast theme name). Owner-drawn chrome that would blend colors should fall back to the plain palette entries while this is set. |
+| `RowHeight` | `int RowHeight { get; }` | The natural height of a list/grid row, in logical pixels (primary-monitor scale). |
+| `ScrollBarSize` | `int ScrollBarSize { get; }` | The thickness of a scrollbar, in logical pixels (primary-monitor scale). |
+| `SelectionBackground` | `Color SelectionBackground { get; }` | Background of a selected item. |
+| `SelectionText` | `Color SelectionText { get; }` | Text color on a selected item. |
+| `WindowBackground` | `Color WindowBackground { get; }` | Background of a top-level window. |
 
 #### `Font`
 
