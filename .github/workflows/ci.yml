@@ -24,6 +24,8 @@ jobs:
   ci:
     uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-ci.yml@v1
     with:
+      repo-readme: true
+      repo-readme-gui: true
       solution: NativeForms.sln
       dotnet-version: '10.0.x'
       os-matrix: '["ubuntu-latest","windows-latest","macos-latest"]'
