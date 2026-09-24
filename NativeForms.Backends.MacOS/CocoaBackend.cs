@@ -5,16 +5,11 @@ using Hawkynt.NativeForms.Drawing;
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
 /// <summary>
-/// The macOS (Cocoa/AppKit) backend. This is currently a wired-but-unimplemented placeholder: it
-/// reports support on macOS and fails with an explicit, actionable message rather than pretending to
-/// draw. Implementing it — <c>NSApplication</c>, <c>NSWindow</c>, <c>NSButton</c>, <c>NSTextField</c>
-/// via <c>objc_msgSend</c> P/Invoke — is tracked in <c>docs/PRD.md</c>.
+/// The macOS Cocoa/AppKit backend. It implements native windows, controls, dialogs, menus and
+/// owner-drawn rendering through CoreGraphics/CoreText. Platform-specific gaps are documented in
+/// <c>docs/backends.md</c> and tracked in <c>docs/PRD.md</c>.
 /// </summary>
 public sealed class CocoaBackend : IPlatformBackend {
-  private const string _NotImplemented =
-      "The NativeForms Cocoa (macOS) backend is not implemented yet — see docs/PRD.md for status. "
-      + "Until then, run on Windows (Win32) or Linux (GTK).";
-
   /// <inheritdoc/>
   public string Name => "Cocoa";
 
