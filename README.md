@@ -18,7 +18,7 @@
 [![NuGet Gtk](https://img.shields.io/nuget/v/Hawkynt.NativeForms.Backends.Gtk?label=Backends.Gtk)](https://www.nuget.org/packages/Hawkynt.NativeForms.Backends.Gtk/)
 
 > A fast, tiny, trim/AOT-compatible UI toolkit with a Windows Forms-shaped API. Windows, buttons,
-> labels and text boxes are real platform widgets (Win32, GTK) driven via P/Invoke; every other
+> labels and text boxes are real platform widgets (Win32, GTK, Cocoa) driven via native interop; every other
 > control is owner-drawn in the host platform's own visual style.
 
 ![The demo gallery: buttons, MVVM bindings and toggles, drawn natively](docs/screenshots/01-basics.png)
@@ -37,7 +37,7 @@ box by box, rather than leaving the gap to be discovered.
 
 - The `System.Windows.Forms` API surface — forms, controls, events, layout containers, docking
 - Real native widgets for windows and text-bearing primitives; owner-drawn controls elsewhere, in the host's visual style
-- Windows and Linux/GTK backends today, with a macOS backend tracked in the PRD
+- Windows/Win32, Linux/GTK and macOS/Cocoa backends, with platform-specific gaps tracked in the PRD
 - A large control inventory: `DataGridView`, ribbon, scheduler, property grid, code editor, pickers, toasts
 - A demo gallery with a headless autopilot, which is what generates the screenshots below
 
@@ -47,13 +47,14 @@ box by box, rather than leaving the gap to be discovered.
 dotnet add package Hawkynt.NativeForms                     # controls, layout, binding, theming
 dotnet add package Hawkynt.NativeForms.Backends.Windows    # add the platforms you ship on
 dotnet add package Hawkynt.NativeForms.Backends.Gtk
+dotnet add package Hawkynt.NativeForms.Backends.MacOS
 ```
 
 Each backend is its own package, so an app carries only the platforms it targets — and a backend it
 references but never registers is dropped again by the trimmer. The core package brings the
 `[GridEditable]` source generator with it as a compile-time analyzer; nothing to reference, and no
-reflection reaches the running app. `Hawkynt.NativeForms.Backends.MacOS` is published for the same
-completeness, but every entry point still throws (see [Status](#-status)).
+reflection reaches the running app. The Cocoa backend uses AppKit and CoreGraphics/CoreText through
+Objective-C runtime interop; see [Backends compared](docs/backends.md) for its current coverage and gaps.
 
 ## 🚀 Quick start
 
@@ -103,7 +104,7 @@ NativeForms lets you write desktop UI with the ergonomics of `System.Windows.For
   [`Button`](docs/controls/button.md), [`Label`](docs/controls/label.md),
   [`TextBox`](docs/controls/textbox.md), [`MaskedTextBox`](docs/controls/maskedtextbox.md) and
   [`RichTextBox`](docs/controls/richtextbox.md). These are genuine `HWND`s / `GtkWidget*`s, so caret,
-  IME, selection and accessibility come from the OS. The platform's own
+  IME and selection come from the OS. The platform's own
   [`MessageBox` and common dialogs](docs/controls/dialogs.md) are used directly too, and
   [`Timer`](docs/controls/timer.md) (a native timer source) and
   [`NotifyIcon`](docs/controls/notifyicon.md) (Windows tray only) are non-visual native resources.
@@ -120,6 +121,11 @@ properties stay inside what the platform widget supports is a tracked workstream
 
 It is built to be **small and quick**: reflection-free, `IsAotCompatible`, buffered peer state,
 value-type geometry, and no per-frame allocation — kilobytes of managed overhead, not megabytes.
+
+**Platform support, honestly.** Windows/Win32, Linux/GTK and macOS/Cocoa backends are implemented.
+The Cocoa backend is under active completion: its native windows, event loop, painting, dialogs and
+widget peers are exercised by a macOS CI probe, while platform-specific behavior and remaining gaps
+are documented in [Backends compared](docs/backends.md) and the [PRD](docs/PRD.md).
 
 **WinForms compatibility, honestly.** The API is WinForms-shaped, not WinForms-cloned: porting is
 mostly a namespace swap, but reflection-bound surfaces (`DataBindings`, `DisplayMember`) become
@@ -162,9 +168,9 @@ representative property settings, plus the MVVM counter wiring.
 
 **`docs/PRD.md`** is the authoritative checklist of every control and feature — per-control
 acceptance criteria (§7), the milestone roadmap (§10), and the tested/demo-ed/documented coverage
-matrix (§11). The control inventory above is implemented and tested on **Windows and Linux**; the PRD
-tracks the rest box-by-box: the focus model, DPI/dark-mode live switching, accessibility, the macOS
-backend, native-peer promotion (§12), and the items it explicitly marks later/optional.
+matrix (§11). The control inventory above is implemented and tested on **Windows and Linux**, with Cocoa coverage
+advancing through its own macOS CI probe. The PRD tracks remaining work box-by-box, including
+accessibility and platform polish.
 
 ## 🏗️ Architecture
 
@@ -172,18 +178,18 @@ backend, native-peer promotion (§12), and the items it explicitly marks later/o
 Hawkynt.NativeForms                     Core: controls, layout, events, data-binding (no native code)
 Hawkynt.NativeForms.Backends.Windows    Win32   via [LibraryImport]   — shipping
 Hawkynt.NativeForms.Backends.Gtk        GTK 3   via [LibraryImport]   — shipping
-Hawkynt.NativeForms.Backends.MacOS      Cocoa                         — NOT IMPLEMENTED (stub)
+Hawkynt.NativeForms.Backends.MacOS      Cocoa/AppKit                    — implemented; platform gaps remain
 ```
 
 Core never calls a native API; it drives platform **peers** through `IPlatformBackend`. An app
 registers the backends it ships — both for "one binary, every platform", or just one to shrink a
 single-platform build.
 
-**Platform support today: Windows and Linux.** macOS is a **future vision, not a shipped feature** —
-`NativeForms.Backends.MacOS` is a stub whose every member throws `PlatformNotSupportedException` with
-an actionable message. Nothing renders on macOS yet. The Cocoa/AppKit implementation (`NSApplication`,
-`NSWindow`, `NSButton`, `NSTextField` over `objc_msgSend`) is planned in
-[PRD §10, milestone M9](docs/PRD.md#10-milestones-the-completion-roadmap).
+Core remains platform-agnostic and drives backend **peers** through `IPlatformBackend`. The Cocoa
+backend creates AppKit windows and native peers, runs the application loop, draws owner-drawn controls
+with CoreGraphics/CoreText, and provides native dialogs and menus. macOS CI builds it and probes the
+demo gallery against AppKit. Coverage and known behavior differences are recorded in
+[docs/backends.md](docs/backends.md); remaining platform-polish work is tracked in [PRD §10, M9](docs/PRD.md#10-milestones-the-completion-roadmap).
 
 ## 🛠️ Building
 

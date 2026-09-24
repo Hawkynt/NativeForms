@@ -66,7 +66,7 @@ A child's logical `Bounds` is not always the rectangle its peer occupies. The co
 |---|---|---|
 | `NativeForms.Backends.Windows` | `Hawkynt.NativeForms.Backends.Windows` | Win32 (user32/GDI) via `[LibraryImport]`; classic `GetMessage` loop; theme from OS metrics |
 | `NativeForms.Backends.Gtk` | `Hawkynt.NativeForms.Backends.Gtk` | GTK 3 via `[LibraryImport]`; `gtk_init` exactly once; Cairo/Pango drawing; theme from `GtkStyleContext` |
-| `NativeForms.Backends.MacOS` | `Hawkynt.NativeForms.Backends.MacOS` | Cocoa placeholder — `IsSupported` is true on macOS but every factory method throws `PlatformNotSupportedException` with an actionable message |
+| `NativeForms.Backends.MacOS` | `Hawkynt.NativeForms.Backends.MacOS` | Cocoa/AppKit backend — native window, control, menu and dialog peers plus CoreGraphics/CoreText owner-drawn rendering; platform gaps are documented in [Backends compared](backends.md) |
 
 Every backend type compiles on every OS; `IsSupported` gates it at run time, so a single binary can carry all three.
 

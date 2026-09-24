@@ -13,7 +13,7 @@
 
 #### `CocoaBackend`
 
-The macOS (Cocoa/AppKit) backend. This is currently a wired-but-unimplemented placeholder: it reports support on macOS and fails with an explicit, actionable message rather than pretending to draw. Implementing it — `NSApplication`, `NSWindow`, `NSButton`, `NSTextField` via `objc_msgSend` P/Invoke — is tracked in `docs/PRD.md`.
+The macOS Cocoa/AppKit backend. It implements native windows, controls, dialogs, menus and owner-drawn rendering through CoreGraphics/CoreText. Platform-specific gaps are documented in `docs/backends.md` and tracked in `docs/PRD.md`.
 
 Implements `IPlatformBackend`.
 
