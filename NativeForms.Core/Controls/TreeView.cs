@@ -209,6 +209,24 @@ public class TreeView : OwnerDrawnControl, ITreeNodeHost {
   /// <summary>The number of rows the expanded part of the tree currently occupies.</summary>
   public int VisibleNodeCount => _rows.Count;
 
+  /// <summary>
+  /// The node whose row contains the given client coordinates, or <see langword="null"/> below the
+  /// last row or outside the client area. The whole row width counts, indent and glyph cell included —
+  /// the same row a press there would act on. A drop target converts
+  /// <see cref="DragEventArgs.X"/>/<see cref="DragEventArgs.Y"/> (screen space) to client space first.
+  /// </summary>
+  public TreeNode? GetNodeAt(int x, int y) {
+    // Checked explicitly: integer division truncates toward zero, so y = -1 would land on the top row.
+    if (x < 0 || y < 0 || x >= this.Width || y >= this.Height)
+      return null;
+
+    var row = _rows.TopIndex + (y / this.ItemHeight);
+    return row < _rows.Count ? _rows[row] : null;
+  }
+
+  /// <summary>The node whose row contains the given client point; see <see cref="GetNodeAt(int, int)"/>.</summary>
+  public TreeNode? GetNodeAt(Point pt) => this.GetNodeAt(pt.X, pt.Y);
+
   /// <summary>Raised before <see cref="SelectedNode"/> changes to a node — on every selection path,
   /// mouse, keyboard and assignment alike; set <see cref="TreeViewCancelEventArgs.Cancel"/> to keep
   /// the current selection.</summary>
