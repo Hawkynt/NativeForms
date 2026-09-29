@@ -15,7 +15,9 @@ namespace Hawkynt.NativeForms;
 /// group into titled sections (<see cref="Groups"/>/<see cref="ShowGroups"/>), sort in place
 /// (<see cref="Sorting"/>/<see cref="ItemSorter"/>/<see cref="Sort"/>, with <see cref="ColumnClick"/>
 /// on the Details header) and edit their labels through a hosted native text box
-/// (<see cref="LabelEdit"/>/<see cref="BeginEdit"/>). Selection follows the classic control:
+/// (<see cref="LabelEdit"/>/<see cref="BeginEdit"/>). Pressing an item and dragging past a few pixels
+/// raises <see cref="ItemDrag"/>, and <see cref="GetItemAt"/> resolves a client point to its item, so
+/// rows can be dragged onto other controls with <see cref="Control.DoDragDrop"/>. Selection follows the classic control:
 /// <see cref="MultiSelect"/> (default) gives the extended Ctrl/Shift model with sorted
 /// <see cref="SelectedIndices"/> and one <see cref="SelectedIndexChanged"/> per gesture. Painting is
 /// virtualized to the visible row window in every view, so it stays cheap for very large
@@ -80,6 +82,23 @@ public class ListView : OwnerDrawnControl {
 
   private int _lastClickIndex = -1;
   private long _lastClickTicks;
+
+  private const int _DragThreshold = 4;   // pixels the pointer must travel before a press becomes a drag
+
+  // Item-drag candidate: the item under the last left press, -1 while no press on an item is armed.
+  private int _pressIndex = -1;
+  private int _pressX, _pressY;
+  private DeferredClick _deferredClick;   // the press's selection effect, held back until release
+
+  /// <summary>
+  /// A press on an already-selected item keeps the selection intact so the whole set can be dragged;
+  /// what a click would have done to it lands on release instead, and only if no drag started.
+  /// </summary>
+  private enum DeferredClick : byte {
+    None,
+    SelectOnly,
+    Toggle,
+  }
 
   private ListViewItem? _virtualPlaceholder;
 
@@ -440,6 +459,17 @@ public class ListView : OwnerDrawnControl {
   public event EventHandler<LabelEditEventArgs>? AfterLabelEdit;
 
   /// <summary>
+  /// Raised when the user starts dragging an item: the left button was pressed on an item (not on
+  /// empty space, which starts a rubber band, nor on a check glyph, the header or the scroll bar) and
+  /// the pointer travelled a few pixels. <see cref="ItemDragEventArgs.Item"/> is the pressed
+  /// <see cref="ListViewItem"/> — in <see cref="VirtualMode"/>, the one <see cref="RetrieveVirtualItem"/>
+  /// served for that row. The rest of the press is the drag's: it neither changes the selection nor
+  /// counts toward a double-click, and a handler that calls <see cref="Control.DoDragDrop"/> hands the
+  /// remaining pointer stream to the drag session.
+  /// </summary>
+  public event EventHandler<ItemDragEventArgs>? ItemDrag;
+
+  /// <summary>
   /// Replaces the rows from a model sequence (one-way binding convenience, the
   /// <see cref="ListBox.DataSource"/> parity for this control). Because a row here is a structured
   /// <see cref="ListViewItem"/> rather than a single display string, the mapping is a
@@ -580,6 +610,9 @@ public class ListView : OwnerDrawnControl {
 
   /// <summary>Raises <see cref="AfterLabelEdit"/>.</summary>
   protected virtual void OnAfterLabelEdit(LabelEditEventArgs e) => this.AfterLabelEdit?.Invoke(this, e);
+
+  /// <summary>Raises <see cref="ItemDrag"/>.</summary>
+  protected virtual void OnItemDrag(ItemDragEventArgs e) => this.ItemDrag?.Invoke(this, e);
 
   // --- Flattened presentation ------------------------------------------------------------------
   //
@@ -1266,6 +1299,20 @@ public class ListView : OwnerDrawnControl {
     return -1;
   }
 
+  /// <summary>
+  /// The item at the given client coordinates, or <see langword="null"/> over the header, a group
+  /// header, the scroll bar or empty space. The whole cell counts — in Details the full row width, in
+  /// the icon views the full grid cell, not just the icon and label. In <see cref="VirtualMode"/> the
+  /// item is fetched through <see cref="RetrieveVirtualItem"/>, as Windows Forms does.
+  /// </summary>
+  public ListViewItem? GetItemAt(int x, int y) {
+    if (this.ScrollBarVisible && x >= this.Width - _ScrollBarWidth)
+      return null;
+
+    var index = this.HitTest(x, y, out _);
+    return index >= 0 && this.TryGetRowItem(index, out var item) ? item : null;
+  }
+
   /// <summary>Whether the given point hits the check glyph of the cell (overlay corner in the
   /// LargeIcon/Tile views, inline leading glyph elsewhere).</summary>
   private bool IsInCheckGlyph(int x, int y, Rectangle cellBounds) {
@@ -1281,6 +1328,8 @@ public class ListView : OwnerDrawnControl {
     this.Focus();
     if (e.Button != MouseButtons.Left)
       return;
+
+    this.DisarmItemDrag();
 
     this.EndEdit(cancel: false); // a click anywhere is a commit point for a pending label edit
 
@@ -1311,6 +1360,9 @@ public class ListView : OwnerDrawnControl {
     }
 
     _focusedIndex = index;
+    _pressIndex = index;
+    _pressX = e.X;
+    _pressY = e.Y;
     if (this.MultiSelect && e.Shift) {
       if (_anchorIndex < 0)
         _anchorIndex = index;
@@ -1320,7 +1372,11 @@ public class ListView : OwnerDrawnControl {
     }
 
     _anchorIndex = index;
-    this.FinishSelectionGesture(this.MultiSelect && e.Control ? this.ToggleCore(index) : this.SelectOnlyCore(index));
+    var toggle = this.MultiSelect && e.Control;
+    if (this.IsSelected(index) && (toggle || _selectedIndices.Count > 1))
+      _deferredClick = toggle ? DeferredClick.Toggle : DeferredClick.SelectOnly;
+    else
+      this.FinishSelectionGesture(toggle ? this.ToggleCore(index) : this.SelectOnlyCore(index));
 
     var now = Environment.TickCount64;
     if (index == _lastClickIndex && now - _lastClickTicks <= _DoubleClickMs) {
@@ -1374,13 +1430,50 @@ public class ListView : OwnerDrawnControl {
       return;
     }
 
+    // The press flag, not the move's button field, is the "button is down" signal — platform
+    // motion events don't reliably carry it, so tracking it from the down/up pair is portable.
+    if (_pressIndex >= 0) {
+      this.TrackItemPress(e);
+      return;
+    }
+
     this.DragMarquee(e);
   }
 
   /// <inheritdoc/>
   protected override void OnMouseUp(MouseEventArgs e) {
     _draggingScroll = false;
+    var index = _pressIndex;
+    var deferred = _deferredClick;
+    this.DisarmItemDrag();
+    if (deferred != DeferredClick.None && index < this.RowSourceCount)
+      this.FinishSelectionGesture(deferred == DeferredClick.Toggle ? this.ToggleCore(index) : this.SelectOnlyCore(index));
+
     this.EndMarquee();
+  }
+
+  /// <inheritdoc/>
+  protected override void OnMouseLeave(EventArgs e) => this.DisarmItemDrag(); // a release outside never reaches us
+
+  // --- Item drag -------------------------------------------------------------------------------
+
+  /// <summary>Raises <see cref="ItemDrag"/> once the armed press travelled <see cref="_DragThreshold"/>
+  /// pixels on either axis; the press is spent either way the handler goes.</summary>
+  private void TrackItemPress(MouseEventArgs e) {
+    if (Math.Abs(e.X - _pressX) < _DragThreshold && Math.Abs(e.Y - _pressY) < _DragThreshold)
+      return;
+
+    var index = _pressIndex;
+    this.DisarmItemDrag();
+    _lastClickIndex = -1; // a drag is not the first half of a double-click
+    if (this.TryGetRowItem(index, out var item))
+      this.OnItemDrag(new ItemDragEventArgs(MouseButtons.Left, item));
+  }
+
+  /// <summary>Forgets the item-press candidate and any selection change it held back.</summary>
+  private void DisarmItemDrag() {
+    _pressIndex = -1;
+    _deferredClick = DeferredClick.None;
   }
 
   // --- Rubber-band selection -------------------------------------------------------------------

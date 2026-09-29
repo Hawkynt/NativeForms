@@ -452,7 +452,10 @@ strategy (may differ per platform; note exceptions inline).
       header rows), checkboxes (`ItemCheck` veto + corner overlay in icon views), MultiExtended
       selection (ListBox engine parity), in-place sorting (`ColumnClick`, `Sorting`,
       `ItemSorter`, stable `ObservableList.Sort`), label editing (hosted TextBox, F2), header
-      sort arrows, virtualized paint in every view done; virtual-mode item API and
+      sort arrows, virtualized paint in every view, `GetItemAt` client hit-testing (every view,
+      groups, header, scroll bar, virtual rows), `ItemDrag` (`ItemDragEventArgs`: a left press on an
+      item that travels 4 px; empty space stays a rubber band, and a press on an already-selected item
+      defers its click to release so a multi-selection drags whole) done; virtual-mode item API and
       `ColumnHeader` change-repaint wiring (`Changed` is only observed by TreeListView) pending
 - [~] `TreeView` (owner) — nodes with expand/collapse (themed +/− glyphs, cancelable
       Before/After pipeline), per-node icons (`ImageIndex`/`SelectedImageIndex` via `ImageList`,
