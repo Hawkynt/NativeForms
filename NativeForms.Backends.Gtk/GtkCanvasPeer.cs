@@ -301,6 +301,45 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer {
     return modifiers;
   }
 
+  /// <summary>
+  /// Maps a key event to the physical key the Windows Forms contract describes. <see cref="Keys.D2"/>
+  /// names the key marked 2 whatever Shift does to it, but GDK reports the symbol the layout
+  /// produces: Shift+2 is <c>@</c> on a US layout, and on AZERTY the unshifted digit row is
+  /// <c>&amp; é " …</c>. Either way the event mapped to nothing, so Ctrl+Shift+2 and every other
+  /// shifted-digit accelerator never fired. When the symbol maps to nothing, the same physical key
+  /// is looked up at the other shift level.
+  /// </summary>
+  internal static Keys ToKey(in GdkEventKey e) {
+    var key = ToKey(e.KeyVal);
+    if (key != Keys.None)
+      return key;
+
+    var keymap = NativeMethods.gdk_keymap_get_for_display(NativeMethods.gdk_display_get_default());
+    if (keymap == 0)
+      return Keys.None;
+
+    return NativeMethods.gdk_keymap_translate_keyboard_state(
+        keymap, e.HardwareKeycode, e.State ^ NativeMethods.GDK_SHIFT_MASK, e.Group,
+        out var otherLevel, out _, out _, out _) != 0
+        ? ToKey(e.KeyVal, otherLevel)
+        : Keys.None;
+  }
+
+  /// <summary>
+  /// The key for <paramref name="keyval"/>, or — when it maps to nothing — for the same physical
+  /// key's symbol at the other shift level, <paramref name="otherLevelKeyval"/>, if that is a digit.
+  /// Only digits are recovered this way: letters already map at both levels, and a symbol that
+  /// changes into another symbol names no <see cref="Keys"/> member either way.
+  /// </summary>
+  internal static Keys ToKey(uint keyval, uint otherLevelKeyval) {
+    var key = ToKey(keyval);
+    if (key != Keys.None)
+      return key;
+
+    var other = ToKey(otherLevelKeyval);
+    return other is >= Keys.D0 and <= Keys.D9 ? other : Keys.None;
+  }
+
   /// <summary>Maps a GDK key symbol to the toolkit's <see cref="Keys"/> (or <see cref="Keys.None"/>).</summary>
   internal static Keys ToKey(uint keyval) => keyval switch {
     NativeMethods.GDK_KEY_BackSpace => Keys.Back,
@@ -490,7 +529,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer {
     bool handled;
     unsafe {
       ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-      handled = peer.RaiseKeyDown(ToKey(e.KeyVal), ToModifiers(e.State));
+      handled = peer.RaiseKeyDown(ToKey(in e), ToModifiers(e.State));
 
       var unicode = NativeMethods.gdk_keyval_to_unicode(e.KeyVal);
       if (unicode is >= 0x20 and not 0x7F and <= 0xFFFF)
@@ -510,7 +549,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer {
     bool handled;
     unsafe {
       ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-      handled = peer.RaiseKeyUp(ToKey(e.KeyVal), ToModifiers(e.State));
+      handled = peer.RaiseKeyUp(ToKey(in e), ToModifiers(e.State));
     }
 
     return handled ? 1 : 0;

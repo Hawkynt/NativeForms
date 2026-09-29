@@ -376,7 +376,7 @@ internal sealed class GtkTextBoxPeer : GtkControlPeer, ITextBoxPeer {
 
     unsafe {
       ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-      return peer.RaiseKeyDown(GtkCanvasPeer.ToKey(e.KeyVal), GtkCanvasPeer.ToModifiers(e.State)) ? 1 : 0;
+      return peer.RaiseKeyDown(GtkCanvasPeer.ToKey(in e), GtkCanvasPeer.ToModifiers(e.State)) ? 1 : 0;
     }
   }
 
