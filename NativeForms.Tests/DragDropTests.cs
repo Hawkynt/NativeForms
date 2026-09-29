@@ -5,7 +5,7 @@ using Hawkynt.NativeForms.Tests.Fakes;
 namespace Hawkynt.NativeForms.Tests;
 
 /// <summary>
-/// The in-process drag-and-drop engine: a drag started with <see cref="Control.DoDragDrop"/>
+/// The in-process drag-and-drop engine: a drag started with <see cref="Control.DoDragDrop(object, DragDropEffects)"/>
 /// consumes the source's mouse stream, hit-tests the window tree in screen space, and raises the
 /// WinForms-shaped enter/over/leave/drop sequence on <see cref="Control.AllowDrop"/> targets.
 /// Everything runs on the headless backend; screen geometry comes from the peers'

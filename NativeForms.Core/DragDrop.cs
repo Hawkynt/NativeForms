@@ -26,7 +26,7 @@ public enum DragDropEffects {
 /// by setting <see cref="Effect"/> — leaving it <see cref="DragDropEffects.None"/> refuses the drop.
 /// </summary>
 public sealed class DragEventArgs(object data, DragDropEffects allowedEffect, int x, int y) : EventArgs {
-  /// <summary>The payload the drag source handed to <see cref="Control.DoDragDrop"/>, or a payload translated by a native backend.</summary>
+  /// <summary>The payload the drag source handed to <see cref="Control.DoDragDrop(object, DragDropEffects)"/>, or a payload translated by a native backend.</summary>
   public object Data { get; } = data;
 
   /// <summary>The effects the drag source permits.</summary>
@@ -49,7 +49,8 @@ public sealed class DragEventArgs(object data, DragDropEffects allowedEffect, in
 /// The toolkit's drag-and-drop routing engine (PRD §8). In-process drags are driven by the source's
 /// mouse stream; operating-system-originated drops are translated by a platform backend and forwarded
 /// through <see cref="Backends.ExternalDropBridge"/>. Both routes share the same hit-testing and
-/// <see cref="Control.AllowDrop"/> semantics.
+/// <see cref="Control.AllowDrop"/> semantics. A file list leaving the source's window is handed over
+/// to the operating system through <see cref="Backends.IFileDragSourcePeer"/>.
 /// </summary>
 internal static class DragDropSession {
   /// <summary>The control that started the active drag, or <see langword="null"/> when idle.</summary>
@@ -59,15 +60,30 @@ internal static class DragDropSession {
   private static DragDropEffects _allowed;
   private static Control? _target;
   private static DragDropEffects _effect;
+  private static Action<DragDropEffects>? _completed;
 
-  /// <summary>Starts a drag; any drag still in flight is abandoned first (its target gets a leave).</summary>
-  internal static void Begin(Control source, object data, DragDropEffects allowedEffects) {
-    _target?.RaiseDragLeave();
+  /// <summary>The native drag a file list may be handed to when the pointer leaves the window, or <see langword="null"/>.</summary>
+  private static Backends.IFileDragSourcePeer? _handover;
+  private static string[]? _paths;
+
+  /// <summary>
+  /// Starts a drag; any drag still in flight is abandoned first (its target gets a leave). A file list
+  /// on a peer that can drag files natively is armed for the handover in <see cref="RouteMouseMove"/>.
+  /// </summary>
+  internal static void Begin(Control source, object data, DragDropEffects allowedEffects, Action<DragDropEffects>? completed) {
+    Abandon();
     Source = source;
     _data = data;
     _allowed = allowedEffects;
     _target = null;
     _effect = DragDropEffects.None;
+    _completed = completed;
+    if ((allowedEffects & DragDropEffects.All) != DragDropEffects.None
+        && source.Peer is Backends.IFileDragSourcePeer handover
+        && TryGetFileList(data, out var paths)) {
+      _handover = handover;
+      _paths = paths;
+    }
   }
 
   /// <summary>
@@ -80,7 +96,13 @@ internal static class DragDropSession {
       return false;
 
     var screen = source.PointToScreen(e.Location);
-    var target = FindDropTarget(RootOf(source), screen);
+    var root = RootOf(source);
+    if (_handover is { } handover && !ScreenRectangleOf(root).Contains(screen)) {
+      HandOver(source, handover);
+      return true;
+    }
+
+    var target = FindDropTarget(root, screen);
     if (!ReferenceEquals(target, _target)) {
       _target?.RaiseDragLeave();
       _target = target;
@@ -112,17 +134,50 @@ internal static class DragDropSession {
     var allowed = _allowed;
     var target = _target;
     var effect = _effect;
+    var completed = _completed;
     Reset(); // idle again before handlers run, so a handler may start the next drag
 
     if (target is null)
-      return true;
-
-    if (effect == DragDropEffects.None)
+      effect = DragDropEffects.None;
+    else if (effect == DragDropEffects.None)
       target.RaiseDragLeave();
     else
       target.RaiseDragDrop(new DragEventArgs(data, allowed, screen.X, screen.Y) { Effect = effect });
 
+    completed?.Invoke(effect);
     return true;
+  }
+
+  /// <summary>
+  /// Hands the drag of a file list to the operating system as the pointer leaves the window: the
+  /// in-process target is left, the session goes idle, and the source's peer runs the native drag,
+  /// which reports the final effect to the caller of <see cref="Control.DoDragDrop(object, DragDropEffects, Action{DragDropEffects})"/>.
+  /// A peer that declines gets the session back unchanged, and is not asked again for this drag.
+  /// </summary>
+  private static void HandOver(Control source, Backends.IFileDragSourcePeer handover) {
+    _target?.RaiseDragLeave();
+    _target = null;
+    _effect = DragDropEffects.None;
+
+    var data = _data!;
+    var allowed = _allowed;
+    var completed = _completed;
+    var paths = _paths!;
+    var native = allowed & DragDropEffects.All;
+
+    // Idle before the platform runs: a modal drag (Win32) completes inside this call, and its
+    // completion handler may start the next drag.
+    Reset();
+    if (handover.TryBeginFileDrag(paths, native, effect => completed?.Invoke(effect & native))) {
+      // The platform consumes the button release, so the press this control saw never ends.
+      (source as OwnerDrawnControl)?.ForgetMousePress();
+      return;
+    }
+
+    Source = source;
+    _data = data;
+    _allowed = allowed;
+    _completed = completed;
   }
 
   /// <summary>
@@ -157,13 +212,56 @@ internal static class DragDropSession {
     return effect;
   }
 
+  /// <summary>
+  /// Ends any in-process drag still in flight without dropping: its current target gets a leave and the
+  /// source's mouse stream is its own again. Idle sessions are left untouched.
+  /// </summary>
+  private static void Abandon() {
+    if (Source is null)
+      return;
+
+    var target = _target;
+    var completed = _completed;
+    Reset();
+    target?.RaiseDragLeave();
+    completed?.Invoke(DragDropEffects.None);
+  }
+
+  /// <summary>
+  /// Whether <paramref name="data"/> is a file list an operating-system drag can carry: a non-empty
+  /// <c>string[]</c> whose every entry is a fully qualified path naming an existing file or directory.
+  /// A string array is an ordinary in-process payload too, so anything short of that is not an error —
+  /// it just stays in process.
+  /// </summary>
+  internal static bool TryGetFileList(object data, out string[] paths) {
+    paths = [];
+    if (data is not string[] { Length: > 0 } candidates)
+      return false;
+
+    foreach (var path in candidates)
+      if (string.IsNullOrEmpty(path)
+          || !Path.IsPathFullyQualified(path)
+          || !(File.Exists(path) || Directory.Exists(path)))
+        return false;
+
+    paths = candidates;
+    return true;
+  }
+
   /// <summary>Returns the session to idle without raising anything.</summary>
   private static void Reset() {
     Source = null;
     _data = null;
     _target = null;
     _effect = DragDropEffects.None;
+    _completed = null;
+    _handover = null;
+    _paths = null;
   }
+
+  /// <summary>Where <paramref name="control"/> sits on screen — for the root, the window a handover leaves.</summary>
+  private static Rectangle ScreenRectangleOf(Control control)
+      => new(control.PointToScreen(Point.Empty), control.Bounds.Size);
 
   /// <summary>The top of <paramref name="control"/>'s parent chain — the window the drag stays within.</summary>
   private static Control RootOf(Control control) {
