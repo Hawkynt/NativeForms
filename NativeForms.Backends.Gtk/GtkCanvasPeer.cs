@@ -19,7 +19,7 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// buffered and placed as soon as the widget exists. <see cref="GtkPopupPeer"/> derives from it,
 /// hosting the same canvas widget inside a popup top-level for the light-dismiss surface.
 /// </summary>
-internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer {
+internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer, IFileDragSourcePeer {
   private const int GdkEventMask =
       NativeMethods.GDK_BUTTON_PRESS_MASK
       | NativeMethods.GDK_BUTTON_RELEASE_MASK
@@ -144,6 +144,23 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer {
   public void InvalidateAll() {
     if (_widget != 0)
       NativeMethods.gtk_widget_queue_draw(_widget);
+  }
+
+  /// <summary>The widget the drag-source signals were connected to, so each widget is wired once.</summary>
+  private nint _dragSourceWidget;
+
+  /// <inheritdoc />
+  /// <remarks>An asynchronous GTK drag; see <see cref="GtkFileDragSource"/>.</remarks>
+  public bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed) {
+    if (_widget == 0)
+      return false;
+
+    if (_dragSourceWidget != _widget) {
+      GtkFileDragSource.Connect(_widget);
+      _dragSourceWidget = _widget;
+    }
+
+    return GtkFileDragSource.TryDrag(_widget, paths, allowedEffects, completed);
   }
 
   /// <inheritdoc />
