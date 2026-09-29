@@ -473,6 +473,19 @@ internal static partial class CocoaRuntime {
   [LibraryImport(_ObjC)]
   internal static partial void objc_registerClassPair(nint cls);
 
+  /// <summary>Looks a protocol up by name; zero when no loaded framework declares it.</summary>
+  [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
+  internal static partial nint objc_getProtocol(string name);
+
+  /// <summary>Declares that a runtime class conforms to a protocol.</summary>
+  [LibraryImport(_ObjC)]
+  [return: MarshalAs(UnmanagedType.U1)]
+  internal static partial bool class_addProtocol(nint cls, nint protocol);
+
+  /// <summary>Sends a message taking a rectangle and an object, such as a dragging item's frame and image.</summary>
+  [LibraryImport(_ObjC, EntryPoint = "objc_msgSend")]
+  internal static partial void SendRectObject(nint receiver, nint selector, CGRect rect, nint argument);
+
   /// <summary>Attaches a method to a runtime class; <paramref name="types"/> is the encoded signature.</summary>
   [LibraryImport(_ObjC, StringMarshalling = StringMarshalling.Utf8)]
   [return: MarshalAs(UnmanagedType.U1)]
