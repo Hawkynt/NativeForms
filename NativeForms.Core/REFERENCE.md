@@ -3212,6 +3212,7 @@ Inherits `ToolStripItem`.
 | --- | --- | --- |
 | `RibbonItem` | `protected RibbonItem()` |  |
 | `ItemSize` | `RibbonItemSize ItemSize { get; set; }` | Whether the item takes the full group height or one of three stacked rows. |
+| `ShortcutKeys` | `Keys ShortcutKeys { get; set; }` | A form-wide key chord that clicks the item — the ribbon counterpart of `ShortcutKeys`. It fires from whichever control has focus, on any tab, while the item is visible and enabled; `None` registers nothing. |
 
 #### `RibbonItemSize`
 
