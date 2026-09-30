@@ -821,8 +821,9 @@ strategy (may differ per platform; note exceptions inline).
       client width while their logical `Bounds` stay left-to-right (verified in pixels)
 - [x] Localization: `NativeForms.Strings` providers cover every built-in string (OS dialogs localize themselves)
 - [~] Drag & drop: in-process `DoDragDrop`/`AllowDrop`/`Drag*` events (mouse-capture session,
-      all backends incl. headless) done; OS file drops into a window arrive as a final drop through
-      `ExternalDropBridge`; a richer OS drop-target protocol (continuous hover) is pending.
+      all backends incl. headless) done; OS file drops into a window arrive through
+      `ExternalDropBridge` — with the whole hover (`DragEnter`/`DragOver`/`DragLeave`/`Drop`) on Win32,
+      as a final drop on GTK and macOS, whose continuous hover is pending.
       Clipboard: text set/get seams done (DGV copy/paste)
   - [x] Files dragged out to the operating system: a `string[]` of existing, fully qualified paths
         passed to `DoDragDrop` stays in process while the pointer is over the window and is handed to
@@ -837,6 +838,31 @@ strategy (may differ per platform; note exceptions inline).
         input onto an independent PyGObject drop target, and onto an in-app target
   - [ ] macOS: `NSDraggingSession` of `NSURL` items — implemented, operation mapping tested, not yet
         verified on a Mac
+  - [x] Virtual files (`VirtualFile`: content produced on demand, validated relative path, folders via
+        `VirtualFile.Directory`): a `VirtualFile[]` dragged out stays in process inside the window
+        (targets get the same array) and goes to `IVirtualFileDragSourcePeer` when it leaves, or — on a
+        peer that can only drag paths — is written into a temporary folder and dragged as a `string[]`;
+        writing into a destination stages each top-level entry as `.<name>.<random>.partial` in the
+        destination and renames it once complete, never replacing an existing name (`name (2).ext`).
+        OS drops without paths arrive as a `VirtualFile[]` readable during the `DragDrop` handler
+        (headless-tested: path equivalence classes, lengths beyond 4 GB, staging, collisions, failures,
+        handover, fallback, hover sequence)
+  - [x] Win32 drop-in: OLE `IDropTarget` (`RegisterDragDrop` on an STA UI thread, `WM_DROPFILES`
+        fallback) with continuous hover; `CF_HDROP` → `string[]`, else `CFSTR_FILEDESCRIPTORW` +
+        `CFSTR_FILECONTENTS` (`IStream`/`HGLOBAL`, `IStorage` refused) → `VirtualFile[]` — verified
+        through the vtable in tests, and with real shell data objects (files on disk; ZIP entries from
+        Explorer's compressed-folder view, which offers descriptors only) fed to the drop target
+  - [x] Win32 drag-out: `SHDoDragDrop` over a hand-built `IDataObject` (file descriptors with size,
+        time and folder attributes; `FileContents` as an `IStream` over the app's stream) — verified
+        through the vtable in tests, and by Explorer's own folder `IDropTarget` consuming it: every
+        file byte-identical, incl. 6 MB, unknown-length, zero-length, Unicode and nested/empty folders
+  - [x] GTK drag-out: XDS (`XdndDirectSave0`) for a single file, written as a `.partial` in the target's
+        folder and renamed; `text/uri-list` of lazily written temporary files otherwise — verified
+        under Xvfb with XTest input onto a PyGObject/Xlib XDS target (temporary name observed while
+        writing, collision numbering, `E` on a failing stream, `F` for a remote host, URI-list fallback)
+  - [ ] macOS virtual files: `NSFilePromiseProvider` drag-out and `NSFilePromiseReceiver` drop-in —
+        implemented, promise delegate tested through `objc_msgSend` on the macOS runner, not verified
+        with Finder or Mail
 - [x] `ImageDecoder`: pure-managed multi-format decode into a frame model (`DecodedImage`/`ImageFrame`,
       ARGB + per-frame delay + loop count) via a magic-byte `Decode` dispatcher — PNG (8-bit, all
       filters, non-interlaced), BMP (8/24/32-bit BI_RGB), JPEG (baseline + progressive DCT, any
