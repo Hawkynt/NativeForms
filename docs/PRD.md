@@ -452,7 +452,10 @@ strategy (may differ per platform; note exceptions inline).
       header rows), checkboxes (`ItemCheck` veto + corner overlay in icon views), MultiExtended
       selection (ListBox engine parity), in-place sorting (`ColumnClick`, `Sorting`,
       `ItemSorter`, stable `ObservableList.Sort`), label editing (hosted TextBox, F2), header
-      sort arrows, virtualized paint in every view done; virtual-mode item API and
+      sort arrows, virtualized paint in every view, `GetItemAt` client hit-testing (every view,
+      groups, header, scroll bar, virtual rows), `ItemDrag` (`ItemDragEventArgs`: a left press on an
+      item that travels 4 px; empty space stays a rubber band, and a press on an already-selected item
+      defers its click to release so a multi-selection drags whole) done; virtual-mode item API and
       `ColumnHeader` change-repaint wiring (`Changed` is only observed by TreeListView) pending
 - [~] `TreeView` (owner) — nodes with expand/collapse (themed +/− glyphs, cancelable
       Before/After pipeline), per-node icons (`ImageIndex`/`SelectedImageIndex` via `ImageList`,
@@ -461,7 +464,8 @@ strategy (may differ per platform; note exceptions inline).
       virtualized paint over the lazily re-flattened visible-node list (100k nodes bounded), drag
       reorder/reparent (`AllowReorder`, `ItemDrag`/`NodeDragOver`/`NodeDrop`, above/onto/below
       insertion marker, translucent drag image `ShowDragImage`, own-subtree guard, hover auto-expand),
-      lazy child population on first expand via a per-node delegate (`SetChildLoader`, virtual trees) done;
+      lazy child population on first expand via a per-node delegate (`SetChildLoader`, virtual trees),
+      `GetNodeAt` client hit-testing (so a drop target resolves the node under the pointer) done;
       label editing (TextBox overlay) and state images pending
 - [~] `TreeListView` (owner) — TreeView × ListView-Details hybrid done: hierarchy in the first
       column + selector-driven sub-item columns (`TreeListViewColumn`), shared engine pieces

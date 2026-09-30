@@ -44,7 +44,9 @@ internal sealed class ListViewSelectionTests {
     canvas.RaiseMouseDown(10, 49, MouseButtons.Left, KeyModifiers.Control); // + row 2
     Assert.That(list.SelectedIndices, Is.EqualTo(new[] { 0, 2 }));
 
+    // Removing a selected item waits for the release, so a Ctrl+drag can still carry it.
     canvas.RaiseMouseDown(10, 5, MouseButtons.Left, KeyModifiers.Control); // - row 0
+    canvas.RaiseMouseUp(10, 5, MouseButtons.Left, KeyModifiers.Control);
     Assert.That(list.SelectedIndices, Is.EqualTo(new[] { 2 }));
   }
 

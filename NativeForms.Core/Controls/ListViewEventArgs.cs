@@ -44,3 +44,16 @@ public sealed class LabelEditEventArgs(int item, string? label) : EventArgs {
   /// <summary>Set by a handler to veto the pending edit (before) or discard the entered text (after).</summary>
   public bool CancelEdit { get; set; }
 }
+
+/// <summary>
+/// Announces that the user started dragging an item: the pointer was pressed on it and travelled past
+/// the drag threshold. The usual handler calls <see cref="Control.DoDragDrop"/> with
+/// <see cref="Item"/>; see <see cref="ListView.ItemDrag"/>.
+/// </summary>
+public sealed class ItemDragEventArgs(MouseButtons button, object? item) : EventArgs {
+  /// <summary>The mouse button held down during the drag.</summary>
+  public MouseButtons Button { get; } = button;
+
+  /// <summary>The item being dragged — a <see cref="ListViewItem"/> when raised by <see cref="ListView"/>.</summary>
+  public object? Item { get; } = item;
+}
