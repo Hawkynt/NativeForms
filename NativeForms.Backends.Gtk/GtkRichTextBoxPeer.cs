@@ -755,7 +755,7 @@ internal sealed class GtkRichTextBoxPeer : GtkControlPeer, IRichTextBoxPeer {
 
     unsafe {
       ref var e = ref Unsafe.AsRef<GdkEventKey>((void*)eventPtr);
-      var args = new KeyEventArgs(GtkCanvasPeer.ToKey(e.KeyVal), GtkCanvasPeer.ToModifiers(e.State));
+      var args = new KeyEventArgs(GtkCanvasPeer.ToKey(in e), GtkCanvasPeer.ToModifiers(e.State));
       handler(peer, args);
       return args.Handled ? 1 : 0;
     }

@@ -88,6 +88,25 @@ internal static partial class NativeMethods {
   [LibraryImport(Gdk)]
   internal static partial nint gdk_display_get_default();
 
+  /// <summary>Returns the <c>GdkKeymap</c> of a display; owned by GDK, never freed.</summary>
+  [LibraryImport(Gdk)]
+  internal static partial nint gdk_keymap_get_for_display(nint display);
+
+  /// <summary>
+  /// Translates a hardware keycode under a given modifier state and group into the key symbol it
+  /// produces. Returns nonzero on success.
+  /// </summary>
+  [LibraryImport(Gdk)]
+  internal static partial int gdk_keymap_translate_keyboard_state(
+      nint keymap,
+      uint hardwareKeycode,
+      uint state,
+      int group,
+      out uint keyval,
+      out int effectiveGroup,
+      out int level,
+      out uint consumedModifiers);
+
   /// <summary>
   /// Creates a cursor from a CSS cursor name ("pointer", "text", "ew-resize" …), or returns 0 for
   /// an unknown name. The returned reference is owned by the caller; this backend caches one per
@@ -420,7 +439,10 @@ internal struct GdkEventWindowState {
   public int NewWindowState;
 }
 
-/// <summary>The leading fields of <c>GdkEventKey</c> — enough to read modifiers and the key symbol.</summary>
+/// <summary>
+/// <c>GdkEventKey</c> up to the keyboard group: the modifiers, the key symbol, and the physical key
+/// it came from. The trailing <c>is_modifier</c> bit-field is never read, so it is left off.
+/// </summary>
 [StructLayout(LayoutKind.Sequential)]
 internal struct GdkEventKey {
   /// <summary>The <c>GdkEventType</c> discriminator.</summary>
@@ -440,4 +462,16 @@ internal struct GdkEventKey {
 
   /// <summary>The key symbol (<c>GDK_KEY_*</c>).</summary>
   public uint KeyVal;
+
+  /// <summary>Deprecated length of <see cref="String"/>.</summary>
+  public int Length;
+
+  /// <summary>Deprecated text of the key (<c>gchar*</c>).</summary>
+  public nint String;
+
+  /// <summary>The raw code of the physical key.</summary>
+  public ushort HardwareKeycode;
+
+  /// <summary>The keyboard group (layout) the key was pressed in.</summary>
+  public byte Group;
 }

@@ -35,6 +35,26 @@ internal sealed class GtkKeyMappingTests {
   public void The_keyval_above_the_function_block_is_not_mistaken_for_one()
       => Assert.That(GtkCanvasPeer.ToKey(0xffca), Is.EqualTo(Keys.None));
 
+  // --- the physical key behind a shifted symbol ------------------------------------------------
+
+  [TestCase('@', '2', Keys.D2, TestName = "Shift+2 on a US layout is the 2 key")]
+  [TestCase('#', '3', Keys.D3, TestName = "Shift+3 on a US layout is the 3 key")]
+  [TestCase(')', '0', Keys.D0, TestName = "Shift+0 on a US layout is the 0 key")]
+  [TestCase('&', '1', Keys.D1, TestName = "the unshifted 1 key on AZERTY is the 1 key")]
+  [TestCase('"', '2', Keys.D2, TestName = "Shift+2 on a German layout is the 2 key")]
+  public void A_shifted_digit_maps_to_its_physical_key(char symbol, char otherLevel, Keys expected)
+      => Assert.That(GtkCanvasPeer.ToKey(symbol, otherLevel), Is.EqualTo(expected));
+
+  [Test]
+  public void A_symbol_that_already_maps_is_not_second_guessed()
+      => Assert.That(GtkCanvasPeer.ToKey('a', '1'), Is.EqualTo(Keys.A));
+
+  [TestCase('!', '?', TestName = "a symbol whose other level is a symbol")]
+  [TestCase('@', 'q', TestName = "a symbol whose other level is a letter (AltGr layouts)")]
+  [TestCase('@', '\0', TestName = "a symbol with nothing at the other level")]
+  public void A_symbol_with_no_digit_behind_it_stays_unmapped(char symbol, char otherLevel)
+      => Assert.That(GtkCanvasPeer.ToKey(symbol, otherLevel), Is.EqualTo(Keys.None));
+
   [Test]
   public void Letters_digits_and_navigation_still_map_after_the_function_block_was_added() {
     Assert.Multiple(() => {
