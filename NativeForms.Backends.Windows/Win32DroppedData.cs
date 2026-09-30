@@ -43,6 +43,10 @@ internal sealed unsafe class Win32DroppedData {
     if (dataObject == 0)
       return null;
 
+    // A drag out of this thread coming back delivers what it was started with.
+    if (Win32FileDragSource.OutgoingPayload(dataObject) is { } own)
+      return new Win32DroppedData(own);
+
     if (ReadPaths(dataObject) is { Length: > 0 } paths)
       return new Win32DroppedData(paths);
 
