@@ -10,22 +10,18 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// <para>
 /// <c>SHDoDragDrop</c> is modal: it runs OLE's own message loop until the button is released and
 /// returns the effect the target performed, which is reported before this returns. The core only
-/// hands a drag over once the pointer has left the application's window, because OLE does not treat
-/// our <c>DragAcceptFiles</c> windows as drop targets for a drag this thread started itself: a drop
-/// back inside the window during the shell drag is refused (measured, not assumed).
+/// hands a drag over once the pointer has left the application's window. Should the pointer come
+/// back, the window's own OLE drop target (<see cref="Win32DropTarget"/>) receives the drag like any
+/// other.
 /// </para>
 /// <para>
 /// OLE drag and drop needs the UI thread to be a single-threaded apartment. The runtime makes a
 /// <c>Main</c> without <c>[STAThread]</c> a multithreaded one before any code runs, and that cannot
-/// be undone, so <see cref="NativeMethods.OleInitialize"/> fails there with <c>RPC_E_CHANGED_MODE</c>: the
-/// drag then declines and stays in process. Windows Forms makes the same demand.
+/// be undone, so OLE cannot be initialized there (<see cref="Win32Ole"/>): the drag then declines and
+/// stays in process. Windows Forms makes the same demand.
 /// </para>
 /// </remarks>
 internal static unsafe class Win32FileDragSource {
-  /// <summary>Whether OLE is usable on this thread: 0 not yet asked, 1 yes, -1 no.</summary>
-  [ThreadStatic]
-  private static int _oleState;
-
   /// <summary>Runs the shell drag of <paramref name="paths"/> from <paramref name="hwnd"/>.</summary>
   /// <returns><see langword="false"/> when no drag could be started, so the drag stays in process;
   /// otherwise the drag has already ended and <paramref name="completed"/> has been told its effect.</returns>
@@ -33,7 +29,7 @@ internal static unsafe class Win32FileDragSource {
     DragDropEffects effect;
 
     // SHDoDragDrop with no button held drops at once, wherever the pointer happens to be.
-    if (hwnd == 0 || paths.Length == 0 || !IsMouseButtonHeld() || !EnsureOle())
+    if (hwnd == 0 || paths.Length == 0 || !IsMouseButtonHeld() || !Win32Ole.EnsureInitialized())
       return false;
 
     var pidls = new nint[paths.Length];
@@ -83,14 +79,4 @@ internal static unsafe class Win32FileDragSource {
       => (NativeMethods.GetKeyState(NativeMethods.VK_LBUTTON) & 0x8000) != 0
       || (NativeMethods.GetKeyState(NativeMethods.VK_RBUTTON) & 0x8000) != 0
       || (NativeMethods.GetKeyState(NativeMethods.VK_MBUTTON) & 0x8000) != 0;
-
-  /// <summary>Initializes OLE on this thread once; answers whether it is usable.</summary>
-  /// <remarks>The initialization is kept for the thread's lifetime rather than balanced per drag, so
-  /// a drag never tears down an apartment something else on the thread may since rely on.</remarks>
-  private static bool EnsureOle() {
-    if (_oleState == 0)
-      _oleState = NativeMethods.OleInitialize(0) >= 0 ? 1 : -1;
-
-    return _oleState > 0;
-  }
 }
