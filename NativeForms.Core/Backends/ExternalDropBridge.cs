@@ -9,7 +9,7 @@ namespace Hawkynt.NativeForms.Backends;
 /// </summary>
 /// <remarks>
 /// This is intentionally not a second drag-and-drop engine. In-process drags continue to flow through
-/// <see cref="Control.DoDragDrop"/>; native backends only translate their platform file-drop protocol
+/// <see cref="Control.DoDragDrop(object, DragDropEffects)"/>; native backends only translate their platform file-drop protocol
 /// into the same <see cref="Control.AllowDrop"/>, <see cref="Control.DragEnter"/> and
 /// <see cref="Control.DragDrop"/> path. Backends may use the returned effect to acknowledge protocols
 /// that require an acceptance result.

@@ -808,7 +808,8 @@ Base class for every visual element. The API mirrors `System.Windows.Forms.Contr
 | `Width` | `int Width { get; set; }` | The width in pixels. |
 | `BeginInvoke` | `void BeginInvoke(Action action)` | Queues `action` for execution on the UI thread and returns immediately. Callable from any thread. |
 | `CurrentFrameOf` | `protected IImage CurrentFrameOf(IImage image)` | Resolves an image to the frame to paint now: an `AnimatedImage` yields its current frame — frozen and greyed while the control is disabled — and a still image yields itself. Draw or push this rather than the raw image so an animated image assigned to a plain image property animates. |
-| `DoDragDrop` | `void DoDragDrop(object data, DragDropEffects allowedEffects)` | Starts an in-process drag with this control as the source. The call returns immediately — unlike WinForms there is no nested message loop — and the drag then follows the source's captured mouse stream: targets with `AllowDrop` receive `DragEnter`/ `DragOver`/`DragLeave`, and releasing the button raises `DragDrop` on the target that accepted an effect. The source must be a realized `OwnerDrawnControl` (only those own a mouse stream); in-process only — OS-level drag sources and drop targets are tracked in `docs/PRD.md` §8. |
+| `DoDragDrop` | `void DoDragDrop(object data, DragDropEffects allowedEffects)` | Starts a drag with this control as the source. The call returns immediately — unlike WinForms there is no nested message loop — and the drag then follows the source's captured mouse stream: targets with `AllowDrop` receive `DragEnter`/`DragOver`/ `DragLeave`, and releasing the button raises `DragDrop` on the target that accepted an effect. The source must be a realized `OwnerDrawnControl` (only those own a mouse stream). |
+| `DoDragDrop` | `void DoDragDrop(object data, DragDropEffects allowedEffects, Action<DragDropEffects> completed)` | Starts a drag with this control as the source, as `DoDragDrop` does, and reports how it ended. |
 | `FindForm` | `Form FindForm()` | The form this control sits on — itself for a form — or `null` while unparented. |
 | `Focus` | `void Focus()` | Moves keyboard focus to this control by asking the peer (`SetFocus` on Win32, `gtk_widget_grab_focus` on GTK). A no-op while `CanFocus` is `false`; `Focused` flips when the platform reports the change. On a composite the focus lands on its `FocusTarget`. |
 | `Invalidate` | `virtual void Invalidate()` | Requests a full repaint. Owner-drawn controls forward to their canvas surface; controls backed by a native widget repaint themselves through the platform and treat this as a no-op — `IControlPeer` exposes no invalidation seam. |
@@ -4430,7 +4431,7 @@ Inherits `EventArgs`.
 
 ### Namespace `Hawkynt.NativeForms.Backends`
 
-[`BackendRegistry`](#backendregistry) · [`ContextMenuRequestedEventArgs`](#contextmenurequestedeventargs) · [`ExternalDropBridge`](#externaldropbridge) · [`FileDialogFilter`](#filedialogfilter) · [`FileDialogKind`](#filedialogkind) · [`FileDialogOptions`](#filedialogoptions) · [`IButtonPeer`](#ibuttonpeer) · [`ICanvasPeer`](#icanvaspeer) · [`ICheckBoxPeer`](#icheckboxpeer) · [`IComboBoxPeer`](#icomboboxpeer) · [`IContainerPeer`](#icontainerpeer) · [`IControlPeer`](#icontrolpeer) · [`IGroupBoxPeer`](#igroupboxpeer) · [`ILabelPeer`](#ilabelpeer) · [`ILinkLabelPeer`](#ilinklabelpeer) · [`IListBoxPeer`](#ilistboxpeer) · [`INotifyIconPeer`](#inotifyiconpeer) · [`IPlatformBackend`](#iplatformbackend) · [`IPopupPeer`](#ipopuppeer) · [`IProgressBarPeer`](#iprogressbarpeer) · [`IRadioButtonPeer`](#iradiobuttonpeer) · [`IRichTextBoxPeer`](#irichtextboxpeer) · [`IScrollBarPeer`](#iscrollbarpeer) · [`ITextBoxPeer`](#itextboxpeer) · [`ITimerPeer`](#itimerpeer) · [`ITrackBarPeer`](#itrackbarpeer) · [`ITrackBarTickPeer`](#itrackbartickpeer) · [`IWindowPeer`](#iwindowpeer)
+[`BackendRegistry`](#backendregistry) · [`ContextMenuRequestedEventArgs`](#contextmenurequestedeventargs) · [`ExternalDropBridge`](#externaldropbridge) · [`FileDialogFilter`](#filedialogfilter) · [`FileDialogKind`](#filedialogkind) · [`FileDialogOptions`](#filedialogoptions) · [`IButtonPeer`](#ibuttonpeer) · [`ICanvasPeer`](#icanvaspeer) · [`ICheckBoxPeer`](#icheckboxpeer) · [`IComboBoxPeer`](#icomboboxpeer) · [`IContainerPeer`](#icontainerpeer) · [`IControlPeer`](#icontrolpeer) · [`IFileDragSourcePeer`](#ifiledragsourcepeer) · [`IGroupBoxPeer`](#igroupboxpeer) · [`ILabelPeer`](#ilabelpeer) · [`ILinkLabelPeer`](#ilinklabelpeer) · [`IListBoxPeer`](#ilistboxpeer) · [`INotifyIconPeer`](#inotifyiconpeer) · [`IPlatformBackend`](#iplatformbackend) · [`IPopupPeer`](#ipopuppeer) · [`IProgressBarPeer`](#iprogressbarpeer) · [`IRadioButtonPeer`](#iradiobuttonpeer) · [`IRichTextBoxPeer`](#irichtextboxpeer) · [`IScrollBarPeer`](#iscrollbarpeer) · [`ITextBoxPeer`](#itextboxpeer) · [`ITimerPeer`](#itimerpeer) · [`ITrackBarPeer`](#itrackbarpeer) · [`ITrackBarTickPeer`](#itrackbartickpeer) · [`IWindowPeer`](#iwindowpeer)
 
 #### `BackendRegistry`
 
@@ -4594,6 +4595,14 @@ Implements `IDisposable`.
 | `LostFocus` | `event EventHandler LostFocus` | Raised when the widget loses keyboard focus — the counterpart of `GotFocus`. |
 | `PointerLeave` | `event EventHandler PointerLeave` | Raised when the pointer leaves the widget — the counterpart of `PointerMove`. |
 | `PointerMove` | `event EventHandler<MouseEventArgs> PointerMove` | Raised while the pointer moves over the widget, with the location in the widget's own client space — the `motion-notify-event` signal on GTK, the subclassed `WM_MOUSEMOVE` on Win32. Every peer delivers this, native children included, so hover-driven features (`ToolTip`) work uniformly rather than only on owner-drawn surfaces. |
+
+#### `IFileDragSourcePeer`
+
+Optional capability of a control peer: it can hand a list of files to the operating system's own drag-and-drop, so the files can be dropped onto the platform file manager or any other application (the `SHDoDragDrop` shell drag on Win32, a `text/uri-list` drag on GTK, an `NSDraggingSession` of file URLs on macOS).
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `TryBeginFileDrag` | `bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed)` | Starts an operating-system drag of `paths` from this peer, called from within the peer's own pointer-move notification while a button is held. |
 
 #### `IGroupBoxPeer`
 

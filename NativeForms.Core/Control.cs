@@ -956,17 +956,44 @@ public abstract class Control {
   internal void RaiseDragDrop(DragEventArgs e) => this.OnDragDrop(e);
 
   /// <summary>
-  /// Starts an in-process drag with this control as the source. The call returns immediately —
-  /// unlike WinForms there is no nested message loop — and the drag then follows the source's
-  /// captured mouse stream: targets with <see cref="AllowDrop"/> receive <see cref="DragEnter"/>/
-  /// <see cref="DragOver"/>/<see cref="DragLeave"/>, and releasing the button raises
-  /// <see cref="DragDrop"/> on the target that accepted an effect. The source must be a realized
-  /// <see cref="OwnerDrawnControl"/> (only those own a mouse stream); in-process only — OS-level
-  /// drag sources and drop targets are tracked in <c>docs/PRD.md</c> §8.
+  /// Starts a drag with this control as the source. The call returns immediately — unlike WinForms
+  /// there is no nested message loop — and the drag then follows the source's captured mouse stream:
+  /// targets with <see cref="AllowDrop"/> receive <see cref="DragEnter"/>/<see cref="DragOver"/>/
+  /// <see cref="DragLeave"/>, and releasing the button raises <see cref="DragDrop"/> on the target that
+  /// accepted an effect. The source must be a realized <see cref="OwnerDrawnControl"/> (only those own
+  /// a mouse stream).
   /// </summary>
-  public void DoDragDrop(object data, DragDropEffects allowedEffects) {
+  /// <remarks>
+  /// A <c>string[]</c> whose entries are all fully qualified paths of existing files or directories is
+  /// a file list. It is dragged in process like any payload while the pointer stays over this
+  /// control's window; when the pointer leaves the window with the button held, and the source's peer
+  /// implements <see cref="IFileDragSourcePeer"/>, the drag is handed to the operating system, so the
+  /// files can be dropped onto the platform's file manager or any other application. Every other
+  /// payload stays in process. On Win32 the handover needs the UI thread to be a single-threaded
+  /// apartment (<c>[STAThread]</c> on <c>Main</c>, which Windows Forms demands too); without it the
+  /// drag simply stays in process.
+  /// </remarks>
+  /// <param name="data">The payload; a <c>string[]</c> of existing absolute paths is a file list.</param>
+  /// <param name="allowedEffects">The effects the source permits.</param>
+  public void DoDragDrop(object data, DragDropEffects allowedEffects) => this.DoDragDrop(data, allowedEffects, null);
+
+  /// <summary>
+  /// Starts a drag with this control as the source, as <see cref="DoDragDrop(object, DragDropEffects)"/>
+  /// does, and reports how it ended.
+  /// </summary>
+  /// <remarks>
+  /// This is where Windows Forms' <c>DoDragDrop</c> return value arrives. Its drag is modal and returns
+  /// the effect; here the drag outlives the call, so the effect is delivered to
+  /// <paramref name="completed"/> instead — exactly once, on the UI thread: the effect an in-process
+  /// target accepted, the effect the operating-system target performed after a handover, or
+  /// <see cref="DragDropEffects.None"/> when the drag was refused, cancelled or abandoned for another.
+  /// </remarks>
+  /// <param name="data">The payload; a <c>string[]</c> of existing absolute paths is a file list.</param>
+  /// <param name="allowedEffects">The effects the source permits.</param>
+  /// <param name="completed">Receives the final effect, or <see langword="null"/> to ignore it.</param>
+  public void DoDragDrop(object data, DragDropEffects allowedEffects, Action<DragDropEffects>? completed) {
     ArgumentNullException.ThrowIfNull(data);
-    DragDropSession.Begin(this, data, allowedEffects);
+    DragDropSession.Begin(this, data, allowedEffects, completed);
   }
 
   /// <summary>Programmatically triggers the <see cref="Click"/> event — a no-op while the control

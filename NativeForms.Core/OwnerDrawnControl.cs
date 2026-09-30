@@ -30,6 +30,10 @@ public abstract class OwnerDrawnControl : Control {
   /// distinguish a click from keyboard navigation.</summary>
   private protected bool IsMousePressInFlight { get; private set; }
 
+  /// <summary>Ends the press an operating-system drag took over: the platform consumed its button
+  /// release, so the canvas never reports one.</summary>
+  internal void ForgetMousePress() => this.IsMousePressInFlight = false;
+
   /// <summary>Requests a full repaint of the canvas surface.</summary>
   public override void Invalidate() => _canvas?.InvalidateAll();
 

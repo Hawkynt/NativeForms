@@ -20,6 +20,7 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Accessibility                             | ATK                           | MSAA, borrowed from a shadow control     | NSAccessibility                                                                                                                              |
 | Mouse & keyboard                          | complete                      | complete                                 | press, drag, wheel, keys, focus; CI witnesses posted clicks toggling and focusing controls and posted keys reaching editors, hover only wired |
 | Dialogs (message box, file, colour, font) | complete                      | complete                                 | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
+| Drag files out to the OS                  | `text/uri-list`, verified     | shell drag, needs `[STAThread]`          | `NSDraggingSession`, not verified                                                                                                            |
 | CI verification                           | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + `NSEvent`s posted into the application's own queue (no Accessibility grant needed), reporting                                 |
 
 ## Side by side
@@ -1114,6 +1115,33 @@ gallery's "Multiline placeholder (empty)" is blank on macOS and blank on Windows
 GTK does, and is sound there because the toolkit owns that surface's exposure; here the caret, the
 selection and the scroll position all belong to AppKit's layout manager, so the toolkit would be
 putting text where the editor is about to put a caret and neither would know about the other.
+
+## Dragging files out to the operating system
+
+`DoDragDrop` with a `string[]` of existing, fully qualified paths is a file list. It is dragged in
+process while the pointer stays over the window — in-app targets get the whole `DragEnter`/`DragOver`/
+`DragLeave`/`DragDrop` sequence with the original array — and is handed to the platform the moment the
+pointer leaves the window with the button held. `DoDragDrop(data, effects, completed)` hears the final
+effect once: an in-app target's, the platform target's, or `None`.
+
+Handing over at the window edge is a measured compromise, not a preference. A native drag from the
+first pixel was tried on Win32 first: OLE does not deliver a drag this thread started to our own
+`DragAcceptFiles` windows, so every in-app target went dead. The price is that a file dragged out and
+back into the window arrives only on GTK (and, untested, macOS), where the window is a native drop
+target; on Win32 it is refused.
+
+|             | **GTK 3**                                                    | **Win32**                                                          | **Cocoa**                                         |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------- |
+| Native drag | `gtk_drag_begin_with_coordinates`, `text/uri-list`           | `SHDoDragDrop` over the shell item array's own data object         | `beginDraggingSessionWithItems:` of `NSURL` items |
+| Modal       | no — `drag-end` reports the action                           | yes — the effect is known when the call returns                    | no — `draggingSession:endedAtPoint:operation:`    |
+| Needs       | a button held in the event being dispatched                  | an STA UI thread (`[STAThread]` on `Main`) and a held button       | a mouse press or drag as `[NSApp currentEvent]`   |
+| Without it  | stays in process                                             | stays in process (an MTA thread answers `RPC_E_CHANGED_MODE`)      | stays in process                                  |
+| Verified    | Xvfb + xdotool onto a PyGObject target: escaped URIs, `COPY` | by hand: into an Explorer folder, byte-identical, completion `Copy` | **not verified** — written without a Mac          |
+
+The Win32 requirement deserves its own warning because the demo trips it: a program written with
+top-level statements has no `Main` to put `[STAThread]` on, so its UI thread is MTA and file drags stay
+in process. Windows Forms makes the same demand; an application that wants the shell drag writes an
+explicit `[STAThread] static void Main`.
 
 ## How the screenshots are produced
 

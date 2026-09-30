@@ -18,7 +18,7 @@ namespace Hawkynt.NativeForms.Backends.Windows;
 /// moment it is created. <see cref="Win32PopupPeer"/> derives from it, reusing the same window class,
 /// procedure and event pipeline for the light-dismiss popup surface.
 /// </summary>
-internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer {
+internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer, IFileDragSourcePeer {
   /// <summary>The shared canvas window class every owner-drawn surface (canvas or popup) is built from.</summary>
   private protected const string ClassName = "HawkyntNativeFormsCanvas";
 
@@ -62,6 +62,11 @@ internal unsafe class Win32CanvasPeer : Win32ChildPeer, ICanvasPeer {
 
   /// <inheritdoc/>
   public event EventHandler<KeyPressEventArgs>? KeyPress;
+
+  /// <inheritdoc/>
+  /// <remarks>A modal shell drag; see <see cref="Win32FileDragSource"/>.</remarks>
+  public bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
+      => Win32FileDragSource.TryDrag(this.Handle, paths, allowedEffects, completed);
 
   /// <inheritdoc/>
   protected override string WindowClass => ClassName;

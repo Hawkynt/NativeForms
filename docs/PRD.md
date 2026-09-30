@@ -821,8 +821,22 @@ strategy (may differ per platform; note exceptions inline).
       client width while their logical `Bounds` stay left-to-right (verified in pixels)
 - [x] Localization: `NativeForms.Strings` providers cover every built-in string (OS dialogs localize themselves)
 - [~] Drag & drop: in-process `DoDragDrop`/`AllowDrop`/`Drag*` events (mouse-capture session,
-      all backends incl. headless) done; OS-level OLE/GTK DnD pending (COM vtables excluded by
-      the interop rules). Clipboard: text set/get seams done (DGV copy/paste)
+      all backends incl. headless) done; OS file drops into a window arrive as a final drop through
+      `ExternalDropBridge`; a richer OS drop-target protocol (continuous hover) is pending.
+      Clipboard: text set/get seams done (DGV copy/paste)
+  - [x] Files dragged out to the operating system: a `string[]` of existing, fully qualified paths
+        passed to `DoDragDrop` stays in process while the pointer is over the window and is handed to
+        the optional `IFileDragSourcePeer` of the source's peer when it leaves; any other payload, and
+        a peer that is missing or declines, stays in process. `DoDragDrop(data, effects, completed)`
+        reports the final effect once (headless-tested: handover, window edges, fallback, payload
+        equivalence classes, effect filtering, completion)
+  - [x] Win32: shell drag (`SHParseDisplayName` → `IShellItemArray` → `BHID_DataObject` →
+        `SHDoDragDrop`, vtable-called), needs an STA UI thread (`[STAThread]`) — verified by hand
+        into an Explorer folder, onto an in-app target, and staying in process on an MTA thread
+  - [x] GTK: `text/uri-list` drag with `g_filename_to_uri` URIs — verified under Xvfb with real XTest
+        input onto an independent PyGObject drop target, and onto an in-app target
+  - [ ] macOS: `NSDraggingSession` of `NSURL` items — implemented, operation mapping tested, not yet
+        verified on a Mac
 - [x] `ImageDecoder`: pure-managed multi-format decode into a frame model (`DecodedImage`/`ImageFrame`,
       ARGB + per-frame delay + loop count) via a magic-byte `Decode` dispatcher — PNG (8-bit, all
       filters, non-interlaced), BMP (8/24/32-bit BI_RGB), JPEG (baseline + progressive DCT, any
@@ -1513,7 +1527,8 @@ next change starts from a considered list instead of an inbox.
 9. **`CodeTextBox` depth.** Find & replace, bracket matching, code folding, word wrap, multi-caret —
    in that order. Each is self-contained and independently testable.
 10. **Drag & drop between controls.** `AllowDrop` exists on `Control` and `TreeView` has intra-tree
-   reordering, but there is no cross-control or cross-application data transfer.
+   reordering; across applications only file lists travel (dropped in, and dragged out), with no
+   richer data transfer.
 11. **Localization beyond `Strings`.** Day/month names come from the OS, but the toolkit's own
     literals live in one static class with no per-culture resource path and no RTL mirroring of
     owner-drawn layout.

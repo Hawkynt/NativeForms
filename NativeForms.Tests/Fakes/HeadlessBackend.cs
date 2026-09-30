@@ -909,10 +909,22 @@ internal sealed class HeadlessImage(int width, int height) : IImage {
 }
 
 /// <summary>A canvas peer whose events tests can raise directly, with a recording graphics surface.</summary>
-internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer {
+internal class HeadlessCanvasPeer : HeadlessPeer, ICanvasPeer, IFileDragSourcePeer {
   public List<IControlPeer> Children { get; } = [];
   public bool Focusable { get; private set; }
   public int InvalidateCount { get; private set; }
+
+  /// <summary>
+  /// Scripts the operating-system file drag. <see langword="null"/> (the default) declines, like a
+  /// platform without one; otherwise it runs in place of the native drag with the paths, the allowed
+  /// effects and the completion callback, and answers whether the drag started. It may complete at
+  /// once, as the modal Win32 drag does, or keep the callback for later, as GTK and macOS do.
+  /// </summary>
+  public Func<string[], DragDropEffects, Action<DragDropEffects>, bool>? NativeFileDrag { get; set; }
+
+  /// <inheritdoc/>
+  public bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
+      => this.NativeFileDrag?.Invoke(paths, allowedEffects, completed) ?? false;
 
   /// <inheritdoc/>
   internal override IReadOnlyList<IControlPeer> ChildPeers => this.Children;
