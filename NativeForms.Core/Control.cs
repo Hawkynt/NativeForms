@@ -972,8 +972,17 @@ public abstract class Control {
   /// payload stays in process. On Win32 the handover needs the UI thread to be a single-threaded
   /// apartment (<c>[STAThread]</c> on <c>Main</c>, which Windows Forms demands too); without it the
   /// drag simply stays in process.
+  /// <para>
+  /// A non-empty <c>VirtualFile[]</c> is handed over the same way, as files whose content is produced
+  /// only when the drop target asks for it (<see cref="VirtualFile"/>), and in-process targets receive
+  /// that same array. The target's own storage is written directly: Explorer pulls each file's stream
+  /// into the destination itself, and on GTK (direct save) and macOS (file promises) the content is
+  /// written into the destination folder under a temporary name and renamed once complete. A backend
+  /// that can only drag existing paths gets the files written into a private temporary folder when
+  /// the pointer leaves the window, and drags those paths instead.
+  /// </para>
   /// </remarks>
-  /// <param name="data">The payload; a <c>string[]</c> of existing absolute paths is a file list.</param>
+  /// <param name="data">The payload; a <c>string[]</c> of existing absolute paths is a file list, a <c>VirtualFile[]</c> a list of files produced on demand.</param>
   /// <param name="allowedEffects">The effects the source permits.</param>
   public void DoDragDrop(object data, DragDropEffects allowedEffects) => this.DoDragDrop(data, allowedEffects, null);
 
@@ -988,7 +997,7 @@ public abstract class Control {
   /// target accepted, the effect the operating-system target performed after a handover, or
   /// <see cref="DragDropEffects.None"/> when the drag was refused, cancelled or abandoned for another.
   /// </remarks>
-  /// <param name="data">The payload; a <c>string[]</c> of existing absolute paths is a file list.</param>
+  /// <param name="data">The payload; a <c>string[]</c> of existing absolute paths is a file list, a <c>VirtualFile[]</c> a list of files produced on demand.</param>
   /// <param name="allowedEffects">The effects the source permits.</param>
   /// <param name="completed">Receives the final effect, or <see langword="null"/> to ignore it.</param>
   public void DoDragDrop(object data, DragDropEffects allowedEffects, Action<DragDropEffects>? completed) {

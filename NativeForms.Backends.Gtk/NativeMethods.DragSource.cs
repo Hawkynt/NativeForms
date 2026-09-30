@@ -4,10 +4,14 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 
 /// <summary>
 /// The GTK 3 drag-source surface behind dragging files out of a window (PRD §8): a target list of
-/// <c>text/uri-list</c>, <c>gtk_drag_begin_with_coordinates</c> with the event being dispatched, and the
-/// selection-data call that answers the drop target's request for the URIs.
+/// <c>text/uri-list</c> (and <c>XdndDirectSave0</c> for a virtual file), <c>gtk_drag_begin_with_coordinates</c>
+/// with the event being dispatched, the selection-data calls that answer the drop target, and the
+/// window property the direct-save protocol exchanges the destination through.
 /// </summary>
-internal static partial class NativeMethods {
+internal static unsafe partial class NativeMethods {
+  /// <summary><c>GDK_PROP_MODE_REPLACE</c>.</summary>
+  internal const int GDK_PROP_MODE_REPLACE = 0;
+
   /// <summary><c>GDK_ACTION_MOVE</c>.</summary>
   internal const int GDK_ACTION_MOVE = 4;
 
@@ -68,4 +72,56 @@ internal static partial class NativeMethods {
   /// </summary>
   [LibraryImport(GLib, StringMarshalling = StringMarshalling.Utf8)]
   internal static partial nint g_filename_to_uri(string filename, nint hostname, nint error);
+
+  /// <summary>
+  /// Converts a <c>file://</c> URI into a local file name, freed with <see cref="g_free"/>, and hands
+  /// out its host part (freed the same way, zero when there is none); zero when it is not a file URI.
+  /// </summary>
+  [LibraryImport(GLib)]
+  internal static partial nint g_filename_from_uri(byte* uri, out nint hostname, nint error);
+
+  /// <summary>The machine's host name, owned by GLib.</summary>
+  [LibraryImport(GLib)]
+  internal static partial nint g_get_host_name();
+
+  /// <summary>The name of a GObject type.</summary>
+  [LibraryImport(GObject)]
+  internal static partial nint g_type_name(nuint type);
+
+  /// <summary>Adds one target to a target list.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_target_list_add(nint list, nint target, uint flags, uint info);
+
+  /// <summary>The window a drag was started from — the one the direct-save property lives on.</summary>
+  [LibraryImport(Gdk)]
+  internal static partial nint gdk_drag_context_get_source_window(nint context);
+
+  /// <summary>The display a window belongs to.</summary>
+  [LibraryImport(Gdk)]
+  internal static partial nint gdk_window_get_display(nint window);
+
+  /// <summary>Sets a window property (X11 only).</summary>
+  [LibraryImport(Gdk)]
+  internal static partial void gdk_property_change(nint window, nint property, nint type, int format, int mode, byte* data, int elements);
+
+  /// <summary>
+  /// Reads a window property; <paramref name="type"/> zero accepts any type. The data is freed with
+  /// <see cref="g_free"/>.
+  /// </summary>
+  [LibraryImport(Gdk)]
+  internal static partial int gdk_property_get(
+      nint window, nint property, nint type, nuint offset, nuint length, int delete,
+      out nint actualType, out int actualFormat, out int actualLength, out nint data);
+
+  /// <summary>Deletes a window property.</summary>
+  [LibraryImport(Gdk)]
+  internal static partial void gdk_property_delete(nint window, nint property);
+
+  /// <summary>The target a drop target asked a selection for.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial nint gtk_selection_data_get_target(nint selectionData);
+
+  /// <summary>Answers a drop target's request with raw data of <paramref name="type"/>.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_selection_data_set(nint selectionData, nint type, int format, byte* data, int length);
 }

@@ -224,7 +224,14 @@ internal sealed class HeadlessBackend : IPlatformBackend {
   public ILabelPeer CreateLabel() => this.Track(new HeadlessLabelPeer());
   public ITextBoxPeer CreateTextBox() => this.Track(new HeadlessTextBoxPeer());
   public IRichTextBoxPeer CreateRichTextBox() => this.Track(new HeadlessRichTextBoxPeer());
-  public ICanvasPeer CreateCanvas() => this.Track(new HeadlessCanvasPeer());
+  /// <summary>
+  /// Whether canvases this fake creates can also drag virtual files natively
+  /// (<see cref="HeadlessVirtualFileCanvasPeer"/>). Off by default, which models a backend that can
+  /// only drag existing paths — the one the core's temporary-folder fallback serves.
+  /// </summary>
+  public bool OfferVirtualFileDrag { get; set; }
+
+  public ICanvasPeer CreateCanvas() => this.Track(this.OfferVirtualFileDrag ? new HeadlessVirtualFileCanvasPeer() : new HeadlessCanvasPeer());
   public IPopupPeer CreatePopup(IWindowPeer? owner) => this.Track(new HeadlessPopupPeer { OwnerWindow = owner });
   public IImage CreateImage(int width, int height, ReadOnlySpan<int> argb) => new HeadlessImage(width, height);
 
@@ -906,6 +913,19 @@ internal sealed class HeadlessImage(int width, int height) : IImage {
   public int Width { get; } = width;
   public int Height { get; } = height;
   public void Dispose() { }
+}
+
+/// <summary>A canvas peer that can also drag virtual files natively; created when <see cref="HeadlessBackend.OfferVirtualFileDrag"/> is set.</summary>
+internal sealed class HeadlessVirtualFileCanvasPeer : HeadlessCanvasPeer, IVirtualFileDragSourcePeer {
+  /// <summary>
+  /// Scripts the operating-system drag of virtual files, the way <see cref="HeadlessCanvasPeer.NativeFileDrag"/>
+  /// scripts the drag of paths; <see langword="null"/> declines.
+  /// </summary>
+  public Func<VirtualFile[], DragDropEffects, Action<DragDropEffects>, bool>? NativeVirtualFileDrag { get; set; }
+
+  /// <inheritdoc/>
+  public bool TryBeginVirtualFileDrag(VirtualFile[] files, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
+      => this.NativeVirtualFileDrag?.Invoke(files, allowedEffects, completed) ?? false;
 }
 
 /// <summary>A canvas peer whose events tests can raise directly, with a recording graphics surface.</summary>

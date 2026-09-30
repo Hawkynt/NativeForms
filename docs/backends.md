@@ -21,6 +21,8 @@ own in-process capture. Nothing is staged, and nothing is a mock-up.
 | Mouse & keyboard                          | complete                      | complete                                 | press, drag, wheel, keys, focus; CI witnesses posted clicks toggling and focusing controls and posted keys reaching editors, hover only wired |
 | Dialogs (message box, file, colour, font) | complete                      | complete                                 | all four native (`NSAlert`, `NSOpen`/`NSSavePanel`, `NSColorPanel`, `NSFontPanel`); the two panels have no Cancel, so cancelling is inferred |
 | Drag files out to the OS                  | `text/uri-list`, verified     | shell drag, needs `[STAThread]`          | `NSDraggingSession`, not verified                                                                                                            |
+| Virtual files out (`VirtualFile[]`)       | XDS + URI list, verified      | descriptors + `IStream`, verified        | file promises; delegate tested, drag not verified                                                                                            |
+| Drops in                                  | final drop, file URIs         | OLE `IDropTarget`: hover + virtual files | final drop, file URLs + file promises (promises not verified)                                                                                |
 | CI verification                           | autopilot, 160 checks, gating | 16-page shoot + real `SendInput`, gating | 16-page shoot + `NSEvent`s posted into the application's own queue (no Accessibility grant needed), reporting                                 |
 
 ## Side by side
@@ -1125,10 +1127,13 @@ pointer leaves the window with the button held. `DoDragDrop(data, effects, compl
 effect once: an in-app target's, the platform target's, or `None`.
 
 Handing over at the window edge is a measured compromise, not a preference. A native drag from the
-first pixel was tried on Win32 first: OLE does not deliver a drag this thread started to our own
-`DragAcceptFiles` windows, so every in-app target went dead. The price is that a file dragged out and
-back into the window arrives only on GTK (and, untested, macOS), where the window is a native drop
-target; on Win32 it is refused.
+first pixel was tried on Win32 first: OLE does not deliver a drag this thread started to
+`DragAcceptFiles` windows, so every in-app target went dead. Win32 windows now register an OLE drop
+target instead (see [Virtual files](#virtual-files)), so a drag taken out of the window and back in
+reaches it like any other drag — the data object is recognized as the drag in flight and the original
+payload delivered (macOS does the same through the dragging source) — but neither return trip is
+verified by hand. GTK has no such recognition: a drag coming back arrives as whatever the window's
+`text/uri-list` drop target reads, for virtual files the paths of their temporary copies.
 
 |             | **GTK 3**                                                    | **Win32**                                                          | **Cocoa**                                         |
 | ----------- | ------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------- |
@@ -1142,6 +1147,54 @@ The Win32 requirement deserves its own warning because the demo trips it: a prog
 top-level statements has no `Main` to put `[STAThread]` on, so its UI thread is MTA and file drags stay
 in process. Windows Forms makes the same demand; an application that wants the shell drag writes an
 explicit `[STAThread] static void Main`.
+
+## Virtual files
+
+A `VirtualFile` is a file whose content is produced on demand — an archive entry extracted as it is
+read, a mail attachment, a download — described by a `/`-separated relative path (validated: never
+rooted, no drive, no empty, `.` or `..` segment), an optional length and write time, and a
+`Func<Stream>`. `VirtualFile.Directory(path)` carries folders, so a drag can move a tree.
+
+**Dragging out.** `DoDragDrop(VirtualFile[] files, effects, completed)` is dragged in process like any
+payload — in-app targets get the same array — and handed to the platform when the pointer leaves the
+window. Nothing is extracted before a drop target asks, and nothing is staged on another volume: the
+content goes straight to the target's storage.
+
+|                  | **GTK 3**                                                                                     | **Win32**                                                                                  | **Cocoa**                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Protocol         | XDS (`XdndDirectSave0`) for a single file, `text/uri-list` for everything else                | `CFSTR_FILEDESCRIPTORW` + `CFSTR_FILECONTENTS` (`IStream`, or `HGLOBAL` if only that)      | one `NSFilePromiseProvider` per top-level entry                                   |
+| Who writes       | the source, into the folder the target names                                                  | the target: Explorer reads each stream into the file it creates                            | the source, into the URL the target names                                         |
+| Partial files    | written as `.<name>.<random>.partial` in the destination, renamed once complete                | Explorer's policy, not ours                                                                | written as `.<name>.<random>.partial` in the destination, renamed once complete    |
+| Existing names   | never replaced: `name (2).ext`                                                                | Explorer asks                                                                              | never replaced: `name (2).ext`                                                    |
+| Content read on  | the UI thread, while the target waits for the XDS answer                                      | the UI thread, inside `SHDoDragDrop`'s modal loop                                          | the main queue, when AppKit asks                                                  |
+| Verified         | Xvfb + openbox, XTest input onto a PyGObject/Xlib XDS target written from the spec             | COM vtable tests + Explorer's own folder `IDropTarget` consuming the data object           | promise delegate driven through `objc_msgSend` on the macOS runner; no Finder drop |
+
+XDS carries exactly one file, so a drag of several entries or of a folder offers GTK targets only
+`text/uri-list`: the entries are written into a private temporary folder the first time a target asks
+for the URIs (the folder is removed when the process exits). A destination on another host is answered
+`F`, a failed write `E`, and either completes the drag with `None`. GTK's selection timeout (30 s
+without progress) bounds how long a target waits; a slower stream still completes on disk.
+
+A backend peer that can only drag paths (`IFileDragSourcePeer` without `IVirtualFileDragSourcePeer`)
+gets the core's fallback: the files are written into a unique temporary folder when the pointer leaves
+the window and dragged as a `string[]`.
+
+**Dropping in.** Files without a path — Outlook attachments, browser downloads, archive managers —
+arrive as a `VirtualFile[]` in `DragEventArgs.Data`; real files still arrive as a `string[]`, also when
+the source offers both (Explorer does). Their content is pulled from the source, and the source only
+answers while the drop is delivered, so read it inside the `DragDrop` handler, on the UI thread;
+afterwards `OpenRead` throws `InvalidOperationException`. That is the safer choice over copying every
+file into memory up front: nothing is pulled for a drop the target refuses, and an application that
+needs the content later copies it where it wants while the handler runs.
+
+| **GTK 3**                                                             | **Win32**                                                                                                                                                                             | **Cocoa**                                                                                                                                         |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text/uri-list` only; GTK sources (Thunderbird, Evolution, file-roller) hand over file URIs, so no XDS target is implemented | an OLE `IDropTarget` (`RegisterDragDrop`, STA UI thread; `WM_DROPFILES` when OLE is unavailable) with the whole hover: `DragEnter`/`DragOver`/`DragLeave`/`DragDrop` reach managed targets continuously. `CF_HDROP` first, else file descriptors with `FileContents` per index as `IStream` or `HGLOBAL`; `IStorage` (Outlook `.msg` mails) throws `NotSupportedException` | `NSFilePromiseReceiver` into a temporary folder — the drop waits up to a minute for the source — then a `VirtualFile[]` over the received files, removed after the handler |
+
+Win32 drop-in was verified by feeding the drop target real shell data objects without a drag: one for
+files on disk (a `string[]`), and one for entries inside a ZIP file as Explorer's compressed-folder view
+exposes them (file descriptors only — a `VirtualFile[]` whose content was read byte-identical in the
+handler). A drop from Outlook itself was not tried.
 
 ## How the screenshots are produced
 

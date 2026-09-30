@@ -19,7 +19,7 @@ namespace Hawkynt.NativeForms.Backends.Gtk;
 /// buffered and placed as soon as the widget exists. <see cref="GtkPopupPeer"/> derives from it,
 /// hosting the same canvas widget inside a popup top-level for the light-dismiss surface.
 /// </summary>
-internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer, IFileDragSourcePeer {
+internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer, IFileDragSourcePeer, IVirtualFileDragSourcePeer {
   private const int GdkEventMask =
       NativeMethods.GDK_BUTTON_PRESS_MASK
       | NativeMethods.GDK_BUTTON_RELEASE_MASK
@@ -151,7 +151,16 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer, IFileDragSourcePeer 
 
   /// <inheritdoc />
   /// <remarks>An asynchronous GTK drag; see <see cref="GtkFileDragSource"/>.</remarks>
-  public bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed) {
+  public bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
+      => this.ConnectDragSource() && GtkFileDragSource.TryDrag(_widget, paths, allowedEffects, completed);
+
+  /// <inheritdoc />
+  /// <remarks>An asynchronous GTK drag offering direct save (XDS) and a URI list; see <see cref="GtkFileDragSource"/>.</remarks>
+  public bool TryBeginVirtualFileDrag(VirtualFile[] files, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
+      => this.ConnectDragSource() && GtkFileDragSource.TryDragVirtual(_widget, files, allowedEffects, completed);
+
+  /// <summary>Wires the drag-source signals to the current widget once; answers whether there is a widget.</summary>
+  private bool ConnectDragSource() {
     if (_widget == 0)
       return false;
 
@@ -160,7 +169,7 @@ internal class GtkCanvasPeer : GtkControlPeer, ICanvasPeer, IFileDragSourcePeer 
       _dragSourceWidget = _widget;
     }
 
-    return GtkFileDragSource.TryDrag(_widget, paths, allowedEffects, completed);
+    return true;
   }
 
   /// <inheritdoc />

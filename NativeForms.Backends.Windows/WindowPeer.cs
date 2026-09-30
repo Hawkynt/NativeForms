@@ -36,6 +36,10 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
 
   /// <summary>Whether the modal window was closed (hidden); ends the <see cref="RunModal"/> loop.</summary>
   private bool _modalClosed;
+
+  /// <summary>Whether an OLE drop target is registered on the window (else it takes <c>WM_DROPFILES</c>).</summary>
+  private bool _oleDropTarget;
+
   private bool _quitsOnClose = true;
 
   /// <summary>Whether <see cref="Show"/> ran; before that, a window-state wish stays buffered.</summary>
@@ -83,7 +87,9 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
 
     if (Handle != 0) {
       _windows[Handle] = this;
-      NativeMethods.DragAcceptFiles(Handle, true);
+      _oleDropTarget = Win32DropTarget.Register(Handle, this);
+      if (!_oleDropTarget)
+        NativeMethods.DragAcceptFiles(Handle, true);
     }
   }
 
@@ -295,29 +301,21 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
     handler.Invoke(this, new Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top));
   }
 
-  /// <summary>Translates a shell <c>HDROP</c> into the toolkit's file-drop payload.</summary>
+  /// <summary>Unregisters the OLE drop target while the window still exists, releasing OLE's reference.</summary>
+  private void RevokeDropTarget(nint hwnd) {
+    if (!_oleDropTarget)
+      return;
+
+    _oleDropTarget = false;
+    NativeMethods.RevokeDragDrop(hwnd);
+  }
+
+  /// <summary>Translates a shell <c>HDROP</c> into the toolkit's file-drop payload — the fallback
+  /// for a window without an OLE drop target.</summary>
   private void OnDropFiles(nint hDrop) {
     try {
-      if (!NativeMethods.DragQueryPoint(hDrop, out var clientPoint))
+      if (!NativeMethods.DragQueryPoint(hDrop, out var clientPoint) || Win32DroppedData.ReadDropFiles(hDrop) is not { } files)
         return;
-
-      var count = NativeMethods.DragQueryFileW(hDrop, uint.MaxValue, null, 0);
-      if (count == 0 || count > int.MaxValue)
-        return;
-
-      var files = new string[(int)count];
-      for (uint i = 0; i < count; ++i) {
-        var length = NativeMethods.DragQueryFileW(hDrop, i, null, 0);
-        if (length >= int.MaxValue)
-          return;
-
-        var capacity = checked((int)length + 1);
-        var buffer = new char[capacity];
-        fixed (char* destination = buffer) {
-          var written = NativeMethods.DragQueryFileW(hDrop, i, destination, (uint)capacity);
-          files[i] = new string(buffer.AsSpan(0, (int)written));
-        }
-      }
 
       var screenPoint = this.PointToScreen(new Point(clientPoint.x, clientPoint.y));
       ExternalDropBridge.Route(this, files, DragDropEffects.Copy, screenPoint);
@@ -628,6 +626,7 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
           // A modal window already announced its close on WM_CLOSE; destruction is then
           // just the core disposing the peer and must neither re-notify nor quit the loop.
           var notify = !destroyedWindow._modalClosed;
+          destroyedWindow.RevokeDropTarget(hwnd);
           destroyedWindow.Handle = 0;
           if (notify) {
             destroyedWindow.RaiseClosed();
@@ -648,6 +647,7 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
   /// <inheritdoc/>
   public override void Dispose() {
     if (Handle != 0) {
+      this.RevokeDropTarget(Handle);
       NativeMethods.DragAcceptFiles(Handle, false);
       _windows.TryRemove(Handle, out _);
     }

@@ -5,9 +5,12 @@ using System.Runtime.InteropServices;
 namespace Hawkynt.NativeForms.Backends.MacOS;
 
 /// <summary>
-/// AppKit's external file-drop destination for a top-level window. The existing flipped content view
-/// registers only <c>NSPasteboardTypeFileURL</c>; successful drops are translated to the same managed
-/// file-list payload and <see cref="ExternalDropBridge"/> path the Win32 and GTK backends use.
+/// AppKit's external file-drop destination for a top-level window. The flipped content view registers
+/// <c>NSPasteboardTypeFileURL</c> and the file-promise types; file URLs are translated to the same
+/// managed file-list payload and <see cref="ExternalDropBridge"/> path the Win32 and GTK backends use,
+/// and promised files (Mail attachments, browser downloads, …) are received into a temporary folder
+/// and delivered as a <c>VirtualFile[]</c> (<see cref="CocoaFilePromises"/>). A drag this process
+/// started itself that comes back delivers its original payload.
 /// </summary>
 internal static unsafe class CocoaExternalDrop {
   private const nuint _Copy = 1; // NSDragOperationCopy
@@ -39,12 +42,18 @@ internal static unsafe class CocoaExternalDrop {
     }
 
     var fileType = CocoaRuntime.Constant("NSPasteboardTypeFileURL");
-    var arrays = CocoaRuntime.objc_getClass("NSArray");
+    var arrays = CocoaRuntime.objc_getClass("NSMutableArray");
     var types = fileType == 0 || arrays == 0
         ? 0
         : CocoaRuntime.SendPointer(arrays, CocoaRuntime.sel_registerName("arrayWithObject:"), fileType);
     if (types == 0)
       return;
+
+    // The pasteboard types a file promise travels under, so promised files are offered to us too.
+    var receivers = CocoaRuntime.objc_getClass("NSFilePromiseReceiver");
+    var promiseTypes = receivers == 0 ? 0 : CocoaRuntime.SendPointer(receivers, CocoaRuntime.sel_registerName("readableDraggedTypes"));
+    if (promiseTypes != 0)
+      CocoaRuntime.SendVoid(types, CocoaRuntime.sel_registerName("addObjectsFromArray:"), promiseTypes);
 
     _windows[view] = owner;
     CocoaRuntime.SendVoid(view, CocoaRuntime.sel_registerName("registerForDraggedTypes:"), types);
@@ -77,10 +86,6 @@ internal static unsafe class CocoaExternalDrop {
       if (!_windows.TryGetValue(self, out var owner) || draggingInfo == 0)
         return 0;
 
-      var files = ReadFiles(draggingInfo);
-      if (files.Length == 0)
-        return 0;
-
       var location = CocoaRuntime.SendPoint(draggingInfo, CocoaRuntime.sel_registerName("draggingLocation"));
       var local = CocoaRuntime.SendConvert(
           self,
@@ -88,13 +93,33 @@ internal static unsafe class CocoaExternalDrop {
           location,
           0);
       var screen = owner.PointToScreen(new Point((int)Math.Round(local.X), (int)Math.Round(local.Y)));
-      return ExternalDropBridge.Route(owner, files, DragDropEffects.Copy, screen) == DragDropEffects.Copy
-          ? (byte)1
-          : (byte)0;
+
+      // A drag this process started, coming back: its original payload.
+      var source = CocoaRuntime.SendPointer(draggingInfo, CocoaRuntime.sel_registerName("draggingSource"));
+      if (CocoaFileDragSource.PayloadOf(source) is { } own)
+        return Deliver(owner, own, screen);
+
+      var files = ReadFiles(draggingInfo);
+      if (files.Length > 0)
+        return Deliver(owner, files, screen);
+
+      var pasteboard = CocoaRuntime.SendPointer(draggingInfo, CocoaRuntime.sel_registerName("draggingPasteboard"));
+      if (CocoaFilePromises.Receive(pasteboard) is not { } promised)
+        return 0;
+
+      try {
+        return Deliver(owner, promised.Files, screen);
+      } finally {
+        // Dropped virtual files are read while the drop is delivered; the received copies go now.
+        CocoaFilePromises.TryDelete(promised.Folder);
+      }
     } catch {
       return 0;
     }
   }
+
+  private static byte Deliver(CocoaWindowPeer owner, object payload, Point screen)
+      => ExternalDropBridge.Route(owner, payload, DragDropEffects.Copy, screen) == DragDropEffects.Copy ? (byte)1 : (byte)0;
 
   private static string[] ReadFiles(nint draggingInfo) {
     var pasteboard = CocoaRuntime.SendPointer(draggingInfo, CocoaRuntime.sel_registerName("draggingPasteboard"));

@@ -50,7 +50,9 @@ public sealed class DragEventArgs(object data, DragDropEffects allowedEffect, in
 /// mouse stream; operating-system-originated drops are translated by a platform backend and forwarded
 /// through <see cref="Backends.ExternalDropBridge"/>. Both routes share the same hit-testing and
 /// <see cref="Control.AllowDrop"/> semantics. A file list leaving the source's window is handed over
-/// to the operating system through <see cref="Backends.IFileDragSourcePeer"/>.
+/// to the operating system through <see cref="Backends.IFileDragSourcePeer"/>, and a
+/// <c>VirtualFile[]</c> through <see cref="Backends.IVirtualFileDragSourcePeer"/> — or, on a peer that
+/// can only drag paths, written into a temporary folder and handed over as a file list.
 /// </summary>
 internal static class DragDropSession {
   /// <summary>The control that started the active drag, or <see langword="null"/> when idle.</summary>
@@ -66,9 +68,16 @@ internal static class DragDropSession {
   private static Backends.IFileDragSourcePeer? _handover;
   private static string[]? _paths;
 
+  /// <summary>The native drag virtual files may be handed to when the pointer leaves the window, or <see langword="null"/>.</summary>
+  private static Backends.IVirtualFileDragSourcePeer? _virtualHandover;
+
+  /// <summary>The virtual files of the drag, for either handover.</summary>
+  private static VirtualFile[]? _files;
+
   /// <summary>
   /// Starts a drag; any drag still in flight is abandoned first (its target gets a leave). A file list
-  /// on a peer that can drag files natively is armed for the handover in <see cref="RouteMouseMove"/>.
+  /// on a peer that can drag files natively is armed for the handover in <see cref="RouteMouseMove"/>,
+  /// and so are virtual files on a peer that can drag either them or paths.
   /// </summary>
   internal static void Begin(Control source, object data, DragDropEffects allowedEffects, Action<DragDropEffects>? completed) {
     Abandon();
@@ -78,9 +87,19 @@ internal static class DragDropSession {
     _target = null;
     _effect = DragDropEffects.None;
     _completed = completed;
-    if ((allowedEffects & DragDropEffects.All) != DragDropEffects.None
-        && source.Peer is Backends.IFileDragSourcePeer handover
-        && TryGetFileList(data, out var paths)) {
+    if ((allowedEffects & DragDropEffects.All) == DragDropEffects.None)
+      return;
+
+    if (TryGetVirtualFiles(data, out var files)) {
+      if (source.Peer is Backends.IVirtualFileDragSourcePeer virtualHandover)
+        _virtualHandover = virtualHandover;
+      else if (source.Peer is Backends.IFileDragSourcePeer pathHandover)
+        _handover = pathHandover;
+      else
+        return;
+
+      _files = files;
+    } else if (source.Peer is Backends.IFileDragSourcePeer handover && TryGetFileList(data, out var paths)) {
       _handover = handover;
       _paths = paths;
     }
@@ -97,8 +116,8 @@ internal static class DragDropSession {
 
     var screen = source.PointToScreen(e.Location);
     var root = RootOf(source);
-    if (_handover is { } handover && !ScreenRectangleOf(root).Contains(screen)) {
-      HandOver(source, handover);
+    if ((_handover is not null || _virtualHandover is not null) && !ScreenRectangleOf(root).Contains(screen)) {
+      HandOver(source);
       return true;
     }
 
@@ -149,12 +168,15 @@ internal static class DragDropSession {
   }
 
   /// <summary>
-  /// Hands the drag of a file list to the operating system as the pointer leaves the window: the
-  /// in-process target is left, the session goes idle, and the source's peer runs the native drag,
-  /// which reports the final effect to the caller of <see cref="Control.DoDragDrop(object, DragDropEffects, Action{DragDropEffects})"/>.
-  /// A peer that declines gets the session back unchanged, and is not asked again for this drag.
+  /// Hands the drag of a file list or of virtual files to the operating system as the pointer leaves
+  /// the window: the in-process target is left, the session goes idle, and the source's peer runs the
+  /// native drag, which reports the final effect to the caller of
+  /// <see cref="Control.DoDragDrop(object, DragDropEffects, Action{DragDropEffects})"/>. Virtual files
+  /// on a peer that can only drag paths are written into a temporary folder first. A peer that
+  /// declines — or content that cannot be written — gets the session back unchanged, and is not asked
+  /// again for this drag.
   /// </summary>
-  private static void HandOver(Control source, Backends.IFileDragSourcePeer handover) {
+  private static void HandOver(Control source) {
     _target?.RaiseDragLeave();
     _target = null;
     _effect = DragDropEffects.None;
@@ -162,13 +184,20 @@ internal static class DragDropSession {
     var data = _data!;
     var allowed = _allowed;
     var completed = _completed;
-    var paths = _paths!;
+    var handover = _handover;
+    var virtualHandover = _virtualHandover;
+    var paths = _paths;
+    var files = _files;
     var native = allowed & DragDropEffects.All;
+    void Complete(DragDropEffects effect) => completed?.Invoke(effect & native);
 
     // Idle before the platform runs: a modal drag (Win32) completes inside this call, and its
     // completion handler may start the next drag.
     Reset();
-    if (handover.TryBeginFileDrag(paths, native, effect => completed?.Invoke(effect & native))) {
+    var started = virtualHandover is not null
+        ? virtualHandover.TryBeginVirtualFileDrag(files!, native, Complete)
+        : (paths ?? TryMaterialize(files!)) is { } list && handover!.TryBeginFileDrag(list, native, Complete);
+    if (started) {
       // The platform consumes the button release, so the press this control saw never ends.
       (source as OwnerDrawnControl)?.ForgetMousePress();
       return;
@@ -181,13 +210,26 @@ internal static class DragDropSession {
   }
 
   /// <summary>
+  /// Writes virtual files into a temporary folder for a peer that can only drag paths; <see langword="null"/>
+  /// when their content cannot be produced, which keeps the drag in process rather than unwinding an
+  /// application exception into the platform's pointer callback.
+  /// </summary>
+  private static string[]? TryMaterialize(VirtualFile[] files) {
+    try {
+      return VirtualFileWriter.Materialize(files);
+    } catch (Exception) {
+      return null;
+    }
+  }
+
+  /// <summary>
   /// Routes one final drop delivered by an operating-system backend. Native file-drop protocols do
   /// not all expose the same hover lifecycle (the Win32 shell path, for example, only delivers the
   /// final <c>WM_DROPFILES</c>), so this intentionally synthesizes only the common contract:
   /// <see cref="Control.DragEnter"/> decides whether the target accepts the payload, a rejection is
   /// paired with <see cref="Control.DragLeave"/>, and an accepted payload raises
-  /// <see cref="Control.DragDrop"/>. Continuous <see cref="Control.DragOver"/> remains available to
-  /// in-process drags and to a future richer native protocol bridge.
+  /// <see cref="Control.DragDrop"/>. A protocol that reports the whole hover (OLE's
+  /// <c>IDropTarget</c>) uses <see cref="ExternalDragOver"/> and its siblings instead.
   /// </summary>
   internal static DragDropEffects RouteExternalDrop(
       Control root,
@@ -209,6 +251,89 @@ internal static class DragDropSession {
     target.RaiseDragDrop(new DragEventArgs(data, allowedEffects, screenLocation.X, screenLocation.Y) {
       Effect = effect,
     });
+    return effect;
+  }
+
+  /// <summary>One operating-system drag hovering over a window: its payload and the target it is over.</summary>
+  internal sealed class ExternalDrag {
+    internal object? Data;
+    internal Control? Target;
+    internal DragDropEffects Effect;
+  }
+
+  /// <summary>
+  /// An operating-system drag entered the window: any stale hover is left, and the target under the
+  /// pointer gets <see cref="Control.DragEnter"/>. Returns the effect it accepted.
+  /// </summary>
+  internal static DragDropEffects ExternalDragEnter(Control root, ExternalDrag drag, object data, DragDropEffects allowedEffects, Point screen) {
+    ExternalDragLeave(drag);
+    drag.Data = data;
+    return ExternalDragOver(root, drag, allowedEffects, screen);
+  }
+
+  /// <summary>
+  /// An operating-system drag moved within the window: the same enter/over/leave sequence an
+  /// in-process drag raises in <see cref="RouteMouseMove"/>. Returns the effect of the target now under
+  /// the pointer.
+  /// </summary>
+  internal static DragDropEffects ExternalDragOver(Control root, ExternalDrag drag, DragDropEffects allowedEffects, Point screen) {
+    if (drag.Data is not { } data)
+      return DragDropEffects.None;
+
+    var target = FindDropTarget(root, screen);
+    if (!ReferenceEquals(target, drag.Target)) {
+      drag.Target?.RaiseDragLeave();
+      drag.Target = target;
+      drag.Effect = DragDropEffects.None;
+      if (target is not null) {
+        var args = new DragEventArgs(data, allowedEffects, screen.X, screen.Y);
+        target.RaiseDragEnter(args);
+        drag.Effect = args.Effect & allowedEffects;
+      }
+    } else if (target is not null) {
+      var args = new DragEventArgs(data, allowedEffects, screen.X, screen.Y) { Effect = drag.Effect };
+      target.RaiseDragOver(args);
+      drag.Effect = args.Effect & allowedEffects;
+    }
+
+    return drag.Effect;
+  }
+
+  /// <summary>An operating-system drag left the window or was cancelled: its target gets a leave.</summary>
+  internal static void ExternalDragLeave(ExternalDrag drag) {
+    var target = drag.Target;
+    drag.Data = null;
+    drag.Target = null;
+    drag.Effect = DragDropEffects.None;
+    target?.RaiseDragLeave();
+  }
+
+  /// <summary>
+  /// An operating-system drag was released over the window: the target that accepted an effect gets
+  /// <see cref="Control.DragDrop"/>, one that refused gets a leave, and the hover ends either way.
+  /// Returns the effect of the drop.
+  /// </summary>
+  internal static DragDropEffects ExternalDrop(Control root, ExternalDrag drag, DragDropEffects allowedEffects, Point screen) {
+    if (drag.Data is not { } data)
+      return DragDropEffects.None;
+
+    if (!ReferenceEquals(FindDropTarget(root, screen), drag.Target))
+      ExternalDragOver(root, drag, allowedEffects, screen);
+
+    var target = drag.Target;
+    var effect = drag.Effect & allowedEffects;
+    drag.Data = null;
+    drag.Target = null;
+    drag.Effect = DragDropEffects.None;
+    if (target is null)
+      return DragDropEffects.None;
+
+    if (effect == DragDropEffects.None) {
+      target.RaiseDragLeave();
+      return DragDropEffects.None;
+    }
+
+    target.RaiseDragDrop(new DragEventArgs(data, allowedEffects, screen.X, screen.Y) { Effect = effect });
     return effect;
   }
 
@@ -248,6 +373,20 @@ internal static class DragDropSession {
     return true;
   }
 
+  /// <summary>Whether <paramref name="data"/> is a non-empty <c>VirtualFile[]</c> without null entries.</summary>
+  internal static bool TryGetVirtualFiles(object data, out VirtualFile[] files) {
+    files = [];
+    if (data is not VirtualFile[] { Length: > 0 } candidates)
+      return false;
+
+    foreach (var file in candidates)
+      if (file is null)
+        return false;
+
+    files = candidates;
+    return true;
+  }
+
   /// <summary>Returns the session to idle without raising anything.</summary>
   private static void Reset() {
     Source = null;
@@ -257,6 +396,8 @@ internal static class DragDropSession {
     _completed = null;
     _handover = null;
     _paths = null;
+    _virtualHandover = null;
+    _files = null;
   }
 
   /// <summary>Where <paramref name="control"/> sits on screen — for the root, the window a handover leaves.</summary>
