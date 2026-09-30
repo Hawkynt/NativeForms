@@ -430,6 +430,9 @@ public class Form : Control {
       if (child is MenuStrip strip && strip.ProcessShortcut(keyData))
         return true;
 
+      if (child is Ribbon ribbon && ribbon.ProcessShortcut(keyData))
+        return true;
+
       if (DispatchMenuShortcut(child, keyData))
         return true;
     }

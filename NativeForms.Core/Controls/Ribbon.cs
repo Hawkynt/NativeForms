@@ -217,6 +217,44 @@ public class Ribbon : OwnerDrawnControl {
   /// <summary>Raised when <see cref="SelectedIndex"/> changes.</summary>
   public event EventHandler? SelectedIndexChanged;
 
+  /// <summary>
+  /// Clicks the first visible, enabled item whose <see cref="RibbonItem.ShortcutKeys"/> equals
+  /// <paramref name="keyData"/>: the Quick Access Toolbar first, then every tab in order — not only
+  /// the selected one, since a shortcut belongs to the command, not to the page showing it — skipping
+  /// the tabs of a hidden contextual group. Returns whether one fired.
+  /// </summary>
+  internal bool ProcessShortcut(Keys keyData) {
+    if (keyData == Keys.None || !this.Enabled)
+      return false;
+
+    for (var i = 0; i < this.QuickAccessItems.Count; ++i)
+      if (TryFire(this.QuickAccessItems[i], keyData))
+        return true;
+
+    for (var t = 0; t < this.Tabs.Count; ++t) {
+      var tab = this.Tabs[t];
+      if (!tab.IsStripVisible)
+        continue;
+
+      for (var g = 0; g < tab.Groups.Count; ++g) {
+        var items = tab.Groups[g].Items;
+        for (var i = 0; i < items.Count; ++i)
+          if (items[i] is RibbonItem item && TryFire(item, keyData))
+            return true;
+      }
+    }
+
+    return false;
+
+    static bool TryFire(RibbonItem item, Keys keyData) {
+      if (item.ShortcutKeys != keyData || !item.Visible || !item.Enabled)
+        return false;
+
+      item.PerformClick();
+      return true;
+    }
+  }
+
   /// <summary>Raised after <see cref="Minimized"/> changes.</summary>
   public event EventHandler? MinimizedChanged;
 

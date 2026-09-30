@@ -104,6 +104,152 @@ internal sealed class RibbonTests {
     Assert.That(clicked, Is.EqualTo(new[] { "Paste", "Cut", "Copy", "Format" }));
   }
 
+  // --- Shortcut keys -----------------------------------------------------------------------------
+
+  /// <summary>A form with a ribbon and a focusable check box, realized, with the box focused.</summary>
+  private static (Form Form, CheckBox Box, HeadlessBackend Backend) FormWith(Ribbon ribbon) {
+    var form = new Form { Bounds = new(0, 0, 800, 400) };
+    var box = new CheckBox { Bounds = new(0, 200, 100, 20) };
+    form.Controls.Add(ribbon);
+    form.Controls.Add(box);
+    var backend = new HeadlessBackend();
+    Application.Run(form, backend);
+    box.Focus();
+    return (form, box, backend);
+  }
+
+  private static void Press(HeadlessBackend backend, Control focused, Keys key, KeyModifiers modifiers)
+    => ((HeadlessCanvasPeer)focused.Peer!).RaiseKeyDown(key, modifiers);
+
+  [Test]
+  public void A_shortcut_clicks_its_ribbon_item_form_wide_from_the_focused_control() {
+    var ribbon = HomeAndInsert(out var clipboard, out _, out _);
+    var clicks = 0;
+    var paste = (RibbonItem)clipboard.Items[0];
+    paste.ShortcutKeys = Keys.Control | Keys.V;
+    paste.Click += (_, _) => ++clicks;
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.V, KeyModifiers.Control);
+
+    Assert.That(clicks, Is.EqualTo(1));
+  }
+
+  [Test]
+  public void A_shortcut_on_a_tab_that_is_not_showing_still_fires() {
+    var ribbon = HomeAndInsert(out _, out _, out var insert);
+    var picture = new RibbonButton("Picture") { ShortcutKeys = Keys.Control | Keys.Shift | Keys.P };
+    var clicks = 0;
+    picture.Click += (_, _) => ++clicks;
+    var group = new RibbonGroup("Illustrations");
+    group.Items.Add(picture);
+    insert.Groups.Add(group);
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.P, KeyModifiers.Control | KeyModifiers.Shift);
+
+    Assert.That(ribbon.SelectedTab?.Text, Is.EqualTo("Home"), "precondition: Insert is not the tab on show");
+    Assert.That(clicks, Is.EqualTo(1));
+  }
+
+  [Test]
+  public void A_quick_access_shortcut_fires() {
+    var ribbon = HomeAndInsert(out _, out _, out _);
+    var back = new RibbonButton("Back") { ShortcutKeys = Keys.Alt | Keys.Left };
+    var clicks = 0;
+    back.Click += (_, _) => ++clicks;
+    ribbon.QuickAccessItems.Add(back);
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.Left, KeyModifiers.Alt);
+
+    Assert.That(clicks, Is.EqualTo(1));
+  }
+
+  [Test]
+  public void A_disabled_or_hidden_item_does_not_take_its_shortcut() {
+    var ribbon = HomeAndInsert(out var clipboard, out _, out _);
+    var clicks = 0;
+    var cut = (RibbonItem)clipboard.Items[1];
+    cut.ShortcutKeys = Keys.Control | Keys.X;
+    cut.Enabled = false;
+    cut.Click += (_, _) => ++clicks;
+    var copy = (RibbonItem)clipboard.Items[2];
+    copy.ShortcutKeys = Keys.Control | Keys.C;
+    copy.Visible = false;
+    copy.Click += (_, _) => ++clicks;
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.X, KeyModifiers.Control);
+    Press(backend, box, Keys.C, KeyModifiers.Control);
+
+    Assert.That(clicks, Is.Zero);
+  }
+
+  [Test]
+  public void A_shortcut_on_a_hidden_contextual_tab_does_not_fire_until_the_tab_shows() {
+    var ribbon = HomeAndInsert(out _, out _, out _);
+    var tools = new RibbonContextualTabGroup("Picture Tools", Color.Orange) { Visible = false };
+    var format = new RibbonTab("Format");
+    var crop = new RibbonButton("Crop") { ShortcutKeys = Keys.Control | Keys.K };
+    var clicks = 0;
+    crop.Click += (_, _) => ++clicks;
+    var group = new RibbonGroup("Size");
+    group.Items.Add(crop);
+    format.Groups.Add(group);
+    ribbon.Tabs.Add(format);
+    tools.Add(format);
+    ribbon.ContextualTabGroups.Add(tools);
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.K, KeyModifiers.Control);
+    Assert.That(clicks, Is.Zero, "the contextual tab is not on show");
+
+    tools.Visible = true;
+    Press(backend, box, Keys.K, KeyModifiers.Control);
+    Assert.That(clicks, Is.EqualTo(1));
+  }
+
+  [Test]
+  public void A_toggle_shortcut_flips_the_toggle() {
+    var ribbon = HomeAndInsert(out _, out var font, out _);
+    var bold = new RibbonToggleButton("Bold", RibbonItemSize.Small) { ShortcutKeys = Keys.Control | Keys.B };
+    font.Items.Add(bold);
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.B, KeyModifiers.Control);
+
+    Assert.That(bold.Checked, Is.True);
+  }
+
+  [Test]
+  public void A_caption_change_keeps_the_shortcut() {
+    // The chord shares a lazily allocated slot with the caption-wrap cache; re-measuring must not drop it.
+    var ribbon = HomeAndInsert(out var clipboard, out _, out _);
+    var paste = (RibbonItem)clipboard.Items[0];
+    paste.ShortcutKeys = Keys.Control | Keys.V;
+    var clicks = 0;
+    paste.Click += (_, _) => ++clicks;
+    var (_, box, backend) = FormWith(ribbon);
+
+    paste.Text = "Paste special with a much longer caption";
+    Press(backend, box, Keys.V, KeyModifiers.Control);
+
+    Assert.That((paste.ShortcutKeys, clicks), Is.EqualTo((Keys.Control | Keys.V, 1)));
+  }
+
+  [Test]
+  public void An_unregistered_chord_is_left_alone() {
+    var ribbon = HomeAndInsert(out var clipboard, out _, out _);
+    var clicks = 0;
+    ((RibbonItem)clipboard.Items[0]).Click += (_, _) => ++clicks;
+    var (_, box, backend) = FormWith(ribbon);
+
+    Press(backend, box, Keys.Q, KeyModifiers.Control);
+
+    Assert.That(clicks, Is.Zero, "Keys.None on every item registers nothing");
+  }
+
   [Test]
   public void A_ribbon_button_runs_its_command() {
     var ribbon = HomeAndInsert(out var clipboard, out _, out _);
