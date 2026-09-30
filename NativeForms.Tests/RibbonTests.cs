@@ -841,4 +841,113 @@ internal sealed class RibbonTests {
 
     Assert.That(clicks, Is.Zero);
   }
+
+  // --- Natural height ---------------------------------------------------------------------------
+
+  /// <summary>A group whose large item wraps onto two caption lines, beside three stacked small items.</summary>
+  private static Ribbon TallestContent(int height) {
+    var ribbon = new Ribbon { Bounds = new(0, 0, 600, height) };
+    var home = new RibbonTab("Home");
+    var organize = new RibbonGroup("Organize");
+    organize.Items.AddRange(
+        new RibbonButton("New Folder"), // 70px of text against a 60px caption: wraps onto two lines
+        new RibbonButton("Rename", RibbonItemSize.Small),
+        new RibbonButton("Delete", RibbonItemSize.Small),
+        new RibbonButton("Invert", RibbonItemSize.Small));
+    home.Groups.Add(organize);
+    ribbon.Tabs.Add(home);
+    return ribbon;
+  }
+
+  [Test]
+  public void The_natural_height_is_the_strip_the_group_padding_the_caption_and_the_tallest_column() {
+    var ribbon = TallestContent(50);
+    Realize(ribbon, out _);
+
+    // Headless: row 22, text line 16. Three small rows need 66; a large item needs its 32px icon
+    // with a 2px inset above and a 2px gap below (36), two 16px caption lines and a 2px foot: 70.
+    // Caption strip 16.
+    Assert.That(ribbon.NaturalHeight, Is.EqualTo(_TabStrip + (2 * 4) + 16 + 70));
+  }
+
+  [Test]
+  public void At_its_natural_height_no_item_text_runs_into_the_group_captions() {
+    var ribbon = TallestContent(50);
+    var canvas = Realize(ribbon, out _);
+    ribbon.Height = ribbon.NaturalHeight;
+
+    var g = canvas.RaisePaint();
+
+    var group = ribbon.SelectedTab!.Groups[0].Bounds;
+    var captionTop = group.Bottom - 16 - 1;
+    var items = g.TextRects.Where(t => t.Text is "New" or "Folder" or "Rename" or "Delete" or "Invert").ToList();
+    Assert.Multiple(() => {
+      Assert.That(items.Select(t => t.Text), Is.EquivalentTo(new[] { "New", "Folder", "Rename", "Delete", "Invert" }));
+      foreach (var (text, bounds) in items)
+        Assert.That(bounds.Y + Math.Min(bounds.Height, 16) <= captionTop && bounds.Height >= 16, Is.True,
+            $"\"{text}\" at {bounds} has no room for a 16px line above the caption strip at {captionTop}");
+      var caption = g.TextRects.Single(t => t.Text == "Organize").Bounds;
+      Assert.That(caption.Height, Is.GreaterThanOrEqualTo(16), "the group caption holds a whole line");
+      Assert.That(caption.Bottom, Is.LessThanOrEqualTo(ribbon.Height));
+    });
+  }
+
+  [Test]
+  public void A_theme_with_taller_rows_asks_for_a_taller_ribbon() {
+    var ribbon = TallestContent(50);
+    var backend = new HeadlessBackend { Theme = new StubTheme { RowHeight = 33 } }; // ~150% scaling
+    var form = new Form { Bounds = new(0, 0, 800, 400) };
+    form.Controls.Add(ribbon);
+    Application.Run(form, backend);
+
+    // Strip 33+4, three 33px rows (99) outgrow the large item (70), caption 33-6.
+    Assert.That(ribbon.NaturalHeight, Is.EqualTo(37 + (2 * 4) + 27 + 99));
+  }
+
+  [Test]
+  public void Without_a_backend_the_natural_height_still_leaves_room_for_the_rows() {
+    var ribbon = TallestContent(50);
+
+    Assert.That(ribbon.NaturalHeight, Is.GreaterThanOrEqualTo(_TabStrip + (3 * 22) + (2 * 4) + 16));
+  }
+
+  [Test]
+  public void Realizing_announces_the_natural_height_so_a_host_can_size_to_it() {
+    var ribbon = TallestContent(50);
+    var announced = 0;
+    ribbon.PreferredHeightChanged += (_, _) => ++announced;
+
+    Realize(ribbon, out _);
+
+    Assert.That(announced, Is.EqualTo(1), "before realization there is no font to measure with; afterwards there is");
+  }
+
+  [Test]
+  public void A_theme_change_that_alters_the_metrics_announces_the_new_natural_height() {
+    var ribbon = TallestContent(50);
+    Realize(ribbon, out var backend);
+    var announced = 0;
+    ribbon.PreferredHeightChanged += (_, _) => ++announced;
+
+    backend.Theme = new StubTheme { RowHeight = 33 };
+    backend.FireThemeChanged();
+
+    Assert.Multiple(() => {
+      Assert.That(announced, Is.EqualTo(1));
+      Assert.That(ribbon.NaturalHeight, Is.EqualTo(37 + (2 * 4) + 27 + 99));
+    });
+  }
+
+  [Test]
+  public void A_theme_change_that_keeps_the_metrics_announces_nothing() {
+    var ribbon = TallestContent(50);
+    Realize(ribbon, out var backend);
+    var announced = 0;
+    ribbon.PreferredHeightChanged += (_, _) => ++announced;
+
+    backend.Theme = new StubTheme(); // new colours, same row height and font
+    backend.FireThemeChanged();
+
+    Assert.That(announced, Is.Zero);
+  }
 }

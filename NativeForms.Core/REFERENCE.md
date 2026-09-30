@@ -3085,6 +3085,7 @@ Inherits `OwnerDrawnControl`.
 | `GroupAreaHeight` | `int GroupAreaHeight { get; }` | The pixel height of the group area below the tab strip; zero while minimized. |
 | `ImageList` | `ImageList ImageList { get; set; }` | The icons `ImageIndex` and the items' image indices point into, or `null`. |
 | `Minimized` | `bool Minimized { get; set; }` | Whether the group area is folded away, leaving only the tab strip — the Office "minimize the ribbon" state. Hosted controls go with it; the tabs stay clickable. |
+| `NaturalHeight` | `int NaturalHeight { get; }` | The height at which every item fits: the tab strip, then a group area holding three small items at the theme's row height or a large item's icon over two caption lines, whichever is taller, plus the group padding and a caption strip that holds a whole line. The theme's row height and font follow the display's scaling, so this does too; a host with no reason to choose a height of its own sizes the ribbon to this rather than to a fixed number. |
 | `PreferredHeight` | `int PreferredHeight { get; }` | The height the ribbon wants to be: just the `TabStripHeight` while `Minimized`, else the strip plus a full group area. Minimizing already shrinks the control to it and raises `PreferredHeightChanged`; this getter lets a host read the target directly. |
 | `QuickAccessItems` | `RibbonQuickAccessCollection QuickAccessItems { get; }` | The Quick Access Toolbar — icon-only command buttons at the right of the tab strip, reachable from any tab. |
 | `SelectedIndex` | `int SelectedIndex { get; set; }` | The index of the selected tab, or -1 while there are no tabs. |
@@ -3100,7 +3101,7 @@ Inherits `OwnerDrawnControl`.
 | `OnPaint` | `protected override void OnPaint(PaintEventArgs e)` | Paints the control. Override to draw through `Graphics`. |
 | `OnSelectedIndexChanged` | `protected virtual void OnSelectedIndexChanged(EventArgs e)` | Raises `SelectedIndexChanged`. |
 | `MinimizedChanged` | `event EventHandler MinimizedChanged` | Raised after `Minimized` changes. |
-| `PreferredHeightChanged` | `event EventHandler PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, so a host can re-flow the content sitting below it. |
+| `PreferredHeightChanged` | `event EventHandler PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, or after `NaturalHeight` changes because the font could first be measured or a theme or DPI change altered it, so a host can resize the ribbon and re-flow the content sitting below it. |
 | `SelectedIndexChanged` | `event EventHandler SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
 
 #### `RibbonButton`
