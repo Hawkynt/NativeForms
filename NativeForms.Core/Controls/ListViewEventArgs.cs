@@ -47,7 +47,7 @@ public sealed class LabelEditEventArgs(int item, string? label) : EventArgs {
 
 /// <summary>
 /// Announces that the user started dragging an item: the pointer was pressed on it and travelled past
-/// the drag threshold. The usual handler calls <see cref="Control.DoDragDrop"/> with
+/// the drag threshold. The usual handler calls <see cref="Control.DoDragDrop(object, DragDropEffects)"/> with
 /// <see cref="Item"/>; see <see cref="ListView.ItemDrag"/>.
 /// </summary>
 public sealed class ItemDragEventArgs(MouseButtons button, object? item) : EventArgs {
