@@ -50,6 +50,13 @@ table.RangeSelected += (_, e) => InsertTable(e.Rows, e.Columns);
 tables.Items.Add(table);
 ```
 
+Give it the height its items need at the current font and scaling, rather than a fixed number of
+pixels that only fits one display:
+
+```csharp
+ribbon.Height = ribbon.NaturalHeight;
+```
+
 The ribbon has no automatic layout owner, so re-flow the content below when it minimizes:
 
 ```csharp
@@ -66,6 +73,7 @@ ribbon.PreferredHeightChanged += (_, _) => LayoutContentBelow(ribbon.Bottom);
 | `GroupAreaHeight` | `int` (get) | remaining height | Pixel height of the group area; `0` while minimized. |
 | `ImageList` | `ImageList?` | `null` | The icons the groups' and items' image indices point into. |
 | `Minimized` | `bool` | `false` | Collapses the ribbon onto its tab strip — the control shrinks its own `Height` to `TabStripHeight` (remembering the expanded height to restore) so a plain container re-flows the content below. Hosted controls go with it; the tabs stay clickable and open a flyout. |
+| `NaturalHeight` | `int` (get) | measured | The height at which every item fits: the tab strip, three small rows at the theme's row height or a large icon over two caption lines (whichever is taller), the group padding and a one-line caption strip. Follows the theme's font and row height, and so the display's scaling. Size the ribbon to this rather than to a fixed number: `ribbon.Height = ribbon.NaturalHeight`. |
 | `PreferredHeight` | `int` (get) | `Height` | The height the ribbon wants: `TabStripHeight` while minimized, else the strip plus a full group area. Minimizing already shrinks the control to it. |
 | `QuickAccessItems` | `RibbonQuickAccessCollection` | empty | Icon-only `RibbonButton` commands painted at the right of the tab strip, reachable from any tab. Each button's `Click`/`Command`, `Enabled` and icon behave as anywhere else; the tabs are clipped so they never run under the toolbar. |
 | `SelectedIndex` | `int` | `-1` | Index of the selected tab, `-1` while there are no tabs. Out-of-range values coerce to `-1`. |

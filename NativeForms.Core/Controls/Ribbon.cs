@@ -94,6 +94,9 @@ public class Ribbon : OwnerDrawnControl {
   /// one font key between them.</summary>
   private Font _measuredFont;
 
+  /// <summary>The height of one line of text in <see cref="_measuredFont"/>; zero until measured.</summary>
+  private int _lineHeight;
+
   private int _selectedIndex = -1;
   private int _hotTab = -1;
   private int _hotQat = -1;
@@ -384,6 +387,7 @@ public class Ribbon : OwnerDrawnControl {
       return font;
 
     _measuredFont = font;
+    _lineHeight = 0;
     for (var i = 0; i < this.Tabs.Count; ++i)
       this.Tabs[i].InvalidateMeasurements();
 
@@ -465,8 +469,39 @@ public class Ribbon : OwnerDrawnControl {
   private int GroupContentHeight(int areaHeight)
       => Math.Max(0, areaHeight - this.CaptionStripHeight() - (2 * _GroupPadding));
 
-  /// <summary>The height of the caption strip along a group's bottom edge.</summary>
-  private int CaptionStripHeight() => Math.Max(12, this.Theme.RowHeight - 6);
+  /// <summary>The height of the caption strip along a group's bottom edge: room for one line.</summary>
+  private int CaptionStripHeight() => Math.Max(Math.Max(12, this.Theme.RowHeight - 6), this.LineHeight());
+
+  /// <summary>
+  /// The height of one line of text in the theme font, measured once per font. Before a backend
+  /// exists there is nothing to measure with, and the caption strip's own height stands in.
+  /// </summary>
+  private int LineHeight() {
+    var font = this.MeasurementFont();
+    if (_lineHeight > 0)
+      return _lineHeight;
+
+    if (this.Backend is not { } backend)
+      return Math.Max(12, this.Theme.RowHeight - 6);
+
+    return _lineHeight = Math.Max(1, backend.MeasureText("Ag", font).Height);
+  }
+
+  /// <summary>
+  /// The height at which every item fits: the tab strip, then a group area holding three small
+  /// items at the theme's row height or a large item's icon over two caption lines, whichever is
+  /// taller, plus the group padding and a caption strip that holds a whole line. The theme's row
+  /// height and font follow the display's scaling, so this does too; a host with no reason to
+  /// choose a height of its own sizes the ribbon to this rather than to a fixed number.
+  /// </summary>
+  public int NaturalHeight {
+    get {
+      var line = this.LineHeight();
+      var smallColumn = _SmallRowsPerColumn * this.Theme.RowHeight;
+      var largeItem = 2 + _LargeIconSize + 2 + (2 * line) + 2; // inset, icon, gap, two lines, foot — as PaintItem places them
+      return this.TabStripHeight + (2 * _GroupPadding) + this.CaptionStripHeight() + Math.Max(smallColumn, largeItem);
+    }
+  }
 
   // --- Layout -----------------------------------------------------------------------------------
 
