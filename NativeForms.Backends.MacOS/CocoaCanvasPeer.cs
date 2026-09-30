@@ -21,7 +21,7 @@ namespace Hawkynt.NativeForms.Backends.MacOS;
 /// the same name fails, and a gallery has dozens of canvases.
 /// </para>
 /// </remarks>
-internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer, ICocoaFocusTarget, IFileDragSourcePeer {
+internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer, ICocoaFocusTarget, IFileDragSourcePeer, IVirtualFileDragSourcePeer {
   /// <summary>The runtime class, built on first use.</summary>
   private static nint _viewClass;
 
@@ -112,6 +112,11 @@ internal sealed unsafe class CocoaCanvasPeer : ICanvasPeer, ICocoaFocusTarget, I
   /// <remarks>An asynchronous AppKit dragging session; see <see cref="CocoaFileDragSource"/>.</remarks>
   public bool TryBeginFileDrag(string[] paths, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
       => CocoaFileDragSource.TryDrag(_view, paths, allowedEffects, completed);
+
+  /// <inheritdoc/>
+  /// <remarks>An asynchronous AppKit dragging session of file promises; see <see cref="CocoaFilePromises"/>.</remarks>
+  public bool TryBeginVirtualFileDrag(VirtualFile[] files, DragDropEffects allowedEffects, Action<DragDropEffects> completed)
+      => CocoaFileDragSource.TryDragVirtual(_view, files, allowedEffects, completed);
 
   /// <summary>
   /// Whether a view is one this backend built, and therefore one that answers
