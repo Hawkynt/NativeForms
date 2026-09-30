@@ -18,15 +18,35 @@ namespace Hawkynt.NativeForms;
 public abstract class RibbonItem : ToolStripItem {
   private int _cachedTextWidth = -1;
 
-  /// <summary>The two-line wrap of a large caption, allocated lazily so a small item — or a large
-  /// item that never wraps — keeps a single null reference rather than three inline fields.</summary>
-  private sealed class WrapCache {
+  /// <summary>
+  /// The rarely needed per-item state, allocated lazily so a typical item keeps a single null
+  /// reference: the two-line wrap of a large caption, and a shortcut chord. Only items that wrap or
+  /// carry a shortcut ever allocate it.
+  /// </summary>
+  private sealed class Extras {
+    public bool WrapValid;
     public string Line1 = string.Empty;
     public string? Line2;
     public int Width;
+    public Keys Shortcut;
   }
 
-  private WrapCache? _wrap;
+  private Extras? _extras;
+
+  /// <summary>
+  /// A form-wide key chord that clicks the item — the ribbon counterpart of
+  /// <see cref="ToolStripMenuItem.ShortcutKeys"/>. It fires from whichever control has focus, on any
+  /// tab, while the item is visible and enabled; <see cref="Keys.None"/> registers nothing.
+  /// </summary>
+  public Keys ShortcutKeys {
+    get => _extras?.Shortcut ?? Keys.None;
+    set {
+      if (value == Keys.None && _extras is null)
+        return;
+
+      (_extras ??= new()).Shortcut = value;
+    }
+  }
 
   /// <summary>Whether the item takes the full group height or one of three stacked rows.</summary>
   public RibbonItemSize ItemSize {
@@ -65,7 +85,8 @@ public abstract class RibbonItem : ToolStripItem {
   /// <summary>Drops the measured width, so the next paint measures the caption again.</summary>
   internal void InvalidateMeasurement() {
     _cachedTextWidth = -1;
-    _wrap = null;
+    if (_extras is { } extras)
+      extras.WrapValid = false;
   }
 
   /// <summary>
@@ -76,7 +97,7 @@ public abstract class RibbonItem : ToolStripItem {
   /// path allocates nothing once warm; only a cache miss splits the string.
   /// </summary>
   internal (string Line1, string? Line2, int Width) WrapLarge(IPlatformBackend? backend, Font font, int maxWidth) {
-    if (_wrap is { } cached)
+    if (_extras is { WrapValid: true } cached)
       return (cached.Line1, cached.Line2, cached.Width);
 
     var text = this.DisplayText;
@@ -105,7 +126,11 @@ public abstract class RibbonItem : ToolStripItem {
   }
 
   private (string, string?, int) CacheWrap(string line1, string? line2, int width) {
-    _wrap = new WrapCache { Line1 = line1, Line2 = line2, Width = width };
+    var extras = _extras ??= new();
+    extras.Line1 = line1;
+    extras.Line2 = line2;
+    extras.Width = width;
+    extras.WrapValid = true;
     return (line1, line2, width);
   }
 }
