@@ -8,7 +8,7 @@ namespace Hawkynt.NativeForms.Tests;
 /// The two <see cref="ListView"/> members an application needs to drag rows elsewhere:
 /// <see cref="ListView.GetItemAt"/> resolves a client point to the item under it in every view, and
 /// <see cref="ListView.ItemDrag"/> announces that a press on an item travelled far enough to be a drag
-/// — the moment a handler calls <see cref="Control.DoDragDrop"/>. A press that does not travel stays a
+/// — the moment a handler calls <see cref="Control.DoDragDrop(object, DragDropEffects)"/>. A press that does not travel stays a
 /// click, and a press on empty space stays a rubber band.
 /// </summary>
 [TestFixture]

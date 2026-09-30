@@ -17,7 +17,7 @@ namespace Hawkynt.NativeForms;
 /// on the Details header) and edit their labels through a hosted native text box
 /// (<see cref="LabelEdit"/>/<see cref="BeginEdit"/>). Pressing an item and dragging past a few pixels
 /// raises <see cref="ItemDrag"/>, and <see cref="GetItemAt"/> resolves a client point to its item, so
-/// rows can be dragged onto other controls with <see cref="Control.DoDragDrop"/>. Selection follows the classic control:
+/// rows can be dragged onto other controls with <see cref="Control.DoDragDrop(object, DragDropEffects)"/>. Selection follows the classic control:
 /// <see cref="MultiSelect"/> (default) gives the extended Ctrl/Shift model with sorted
 /// <see cref="SelectedIndices"/> and one <see cref="SelectedIndexChanged"/> per gesture. Painting is
 /// virtualized to the visible row window in every view, so it stays cheap for very large
@@ -464,7 +464,7 @@ public class ListView : OwnerDrawnControl {
   /// the pointer travelled a few pixels. <see cref="ItemDragEventArgs.Item"/> is the pressed
   /// <see cref="ListViewItem"/> — in <see cref="VirtualMode"/>, the one <see cref="RetrieveVirtualItem"/>
   /// served for that row. The rest of the press is the drag's: it neither changes the selection nor
-  /// counts toward a double-click, and a handler that calls <see cref="Control.DoDragDrop"/> hands the
+  /// counts toward a double-click, and a handler that calls <see cref="Control.DoDragDrop(object, DragDropEffects)"/> hands the
   /// remaining pointer stream to the drag session.
   /// </summary>
   public event EventHandler<ItemDragEventArgs>? ItemDrag;
