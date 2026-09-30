@@ -100,8 +100,15 @@ public abstract class OwnerDrawnControl : Control {
       return;
 
     this.Theme = backend.Theme;
+    this.OnThemeChanged();
     this.Invalidate();
   }
+
+  /// <summary>
+  /// The control has adopted a fresh theme snapshot — new colours, and possibly a new font or row
+  /// height after a DPI change. A control whose size follows those metrics re-measures here.
+  /// </summary>
+  private protected virtual void OnThemeChanged() { }
 
   /// <summary>Repaints when the effective font, colors or padding change — set directly or inherited.</summary>
   private protected override void OnAppearanceChanged() => this.Invalidate();

@@ -55,6 +55,7 @@ pixels that only fits one display:
 
 ```csharp
 ribbon.Height = ribbon.NaturalHeight;
+ribbon.PreferredHeightChanged += (_, _) => ribbon.Height = ribbon.Minimized ? ribbon.TabStripHeight : ribbon.NaturalHeight;
 ```
 
 The ribbon has no automatic layout owner, so re-flow the content below when it minimizes:
@@ -86,7 +87,7 @@ ribbon.PreferredHeightChanged += (_, _) => LayoutContentBelow(ribbon.Bottom);
 | Event | Description |
 |---|---|
 | `MinimizedChanged` | Raised after `Minimized` changes. |
-| `PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, so a host can re-flow the content below it. |
+| `PreferredHeightChanged` | Raised after `PreferredHeight` changes because the ribbon was minimized or restored, and after `NaturalHeight` changes — once the font can first be measured on realization, and when a theme or DPI change alters the row height or font — so a host can resize the ribbon and re-flow the content below it. |
 | `SelectedIndexChanged` | Raised when `SelectedIndex` changes. |
 
 ### RibbonTab

@@ -910,4 +910,44 @@ internal sealed class RibbonTests {
 
     Assert.That(ribbon.NaturalHeight, Is.GreaterThanOrEqualTo(_TabStrip + (3 * 22) + (2 * 4) + 16));
   }
+
+  [Test]
+  public void Realizing_announces_the_natural_height_so_a_host_can_size_to_it() {
+    var ribbon = TallestContent(50);
+    var announced = 0;
+    ribbon.PreferredHeightChanged += (_, _) => ++announced;
+
+    Realize(ribbon, out _);
+
+    Assert.That(announced, Is.EqualTo(1), "before realization there is no font to measure with; afterwards there is");
+  }
+
+  [Test]
+  public void A_theme_change_that_alters_the_metrics_announces_the_new_natural_height() {
+    var ribbon = TallestContent(50);
+    Realize(ribbon, out var backend);
+    var announced = 0;
+    ribbon.PreferredHeightChanged += (_, _) => ++announced;
+
+    backend.Theme = new StubTheme { RowHeight = 33 };
+    backend.FireThemeChanged();
+
+    Assert.Multiple(() => {
+      Assert.That(announced, Is.EqualTo(1));
+      Assert.That(ribbon.NaturalHeight, Is.EqualTo(37 + (2 * 4) + 27 + 99));
+    });
+  }
+
+  [Test]
+  public void A_theme_change_that_keeps_the_metrics_announces_nothing() {
+    var ribbon = TallestContent(50);
+    Realize(ribbon, out var backend);
+    var announced = 0;
+    ribbon.PreferredHeightChanged += (_, _) => ++announced;
+
+    backend.Theme = new StubTheme(); // new colours, same row height and font
+    backend.FireThemeChanged();
+
+    Assert.That(announced, Is.Zero);
+  }
 }

@@ -97,6 +97,9 @@ public class Ribbon : OwnerDrawnControl {
   /// <summary>The height of one line of text in <see cref="_measuredFont"/>; zero until measured.</summary>
   private int _lineHeight;
 
+  /// <summary>The <see cref="NaturalHeight"/> last announced through <see cref="PreferredHeightChanged"/>.</summary>
+  private int _announcedNaturalHeight;
+
   private int _selectedIndex = -1;
   private int _hotTab = -1;
   private int _hotQat = -1;
@@ -262,7 +265,9 @@ public class Ribbon : OwnerDrawnControl {
   public event EventHandler? MinimizedChanged;
 
   /// <summary>Raised after <see cref="PreferredHeight"/> changes because the ribbon was minimized or
-  /// restored, so a host can re-flow the content sitting below it.</summary>
+  /// restored, or after <see cref="NaturalHeight"/> changes because the font could first be measured
+  /// or a theme or DPI change altered it, so a host can resize the ribbon and re-flow the content
+  /// sitting below it.</summary>
   public event EventHandler? PreferredHeightChanged;
 
   /// <summary>The pixel height of the tab strip along the top.</summary>
@@ -629,6 +634,28 @@ public class Ribbon : OwnerDrawnControl {
 
     this.PerformLayout();
     this.PushHostedVisibility();
+    this.AnnounceNaturalHeight();
+  }
+
+  /// <inheritdoc/>
+  private protected override void OnThemeChanged() {
+    base.OnThemeChanged();
+    this.PerformLayout();
+    this.AnnounceNaturalHeight();
+  }
+
+  /// <summary>
+  /// Raises <see cref="PreferredHeightChanged"/> when <see cref="NaturalHeight"/> differs from the
+  /// last one announced: once the backend can measure the font, and after a theme or DPI change
+  /// alters the row height or the font. A host sizing the ribbon to its natural height re-flows.
+  /// </summary>
+  private void AnnounceNaturalHeight() {
+    var natural = this.NaturalHeight;
+    if (natural == _announcedNaturalHeight)
+      return;
+
+    _announcedNaturalHeight = natural;
+    this.PreferredHeightChanged?.Invoke(this, EventArgs.Empty);
   }
 
   /// <inheritdoc/>
