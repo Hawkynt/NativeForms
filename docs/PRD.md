@@ -769,6 +769,15 @@ strategy (may differ per platform; note exceptions inline).
         because that is what it is from the toolkit's side: every pixel metric — default font, row height,
         scroll-bar thickness, the owner-drawn metrics of §5 — is read from `ITheme` and derived from the
         DPI, so the listeners that already re-measure are exactly the ones that must.
+  - [x] **A form's size is its client area on Win32 too**, as it always was on GTK. The window peer sized
+        the *outer* rectangle to the form's `Size`, so the layout pass laid children into an area a frame
+        larger than the one they got: at 150% a bottom-docked status bar lost 56 px — a caption and a
+        border — off the bottom edge, and less at 100% only because the frame is thinner. The peer now
+        grows the window by `AdjustWindowRectExForDpi` at the window's own DPI (not `AdjustWindowRectEx`,
+        which answers for the system DPI the process started with), reports a native resize back as the
+        client size, converts `MinimumSize`/`MaximumSize` into tracking sizes the same way, and keeps
+        the client area when `FormBorderStyle` changes the frame. Found by a port's ribbon window;
+        pinned by `Win32FormClientAreaTests` at the display's DPI and at a DPI-unaware 96.
   - [ ] `Control.LogicalToDevice` exists but is called in two places, both of them the same tooltip
         cursor offset (`ToolTip.ShowPopup` and `ToolStrip`'s own tip), so authored layout, font sizes
         and control metrics are still in device pixels. Making scaling apply to
