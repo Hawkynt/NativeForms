@@ -108,7 +108,19 @@ internal sealed partial class MainForm {
         new RibbonButton("Zoom") { ImageList = _icons, ImageIndex = _IconGear },
         new RibbonButton("100 %", RibbonItemSize.Small),
         new RibbonButton("Fit", RibbonItemSize.Small));
-    view.Groups.Add(zoom);
+    // Owner-drawn fields: they size to a small row and keep working when the group collapses into
+    // its flyout, which a hosted ComboBox or NumericUpDown cannot follow into a popup.
+    var pageSetup = new RibbonGroup("Page Setup") { ImageIndex = _IconFile };
+    var paper = new RibbonComboBox("Paper") { FieldWidth = 90 };
+    paper.Items.AddRange(["A4", "A5", "Letter", "Legal"]);
+    paper.SelectedIndex = 0;
+    paper.SelectedIndexChanged += (_, _) => this.SetStatus($"Ribbon: paper \"{paper.SelectedItem}\".");
+    var margin = new RibbonSpinner("Margin") { FieldWidth = 60, Minimum = 0, Maximum = 50, Value = 20 };
+    margin.ValueChanged += (_, _) => this.SetStatus($"Ribbon: margin {margin.Value} mm.");
+    var scale = new RibbonSpinner("Scale") { FieldWidth = 60, Minimum = 0.5m, Maximum = 4m, Increment = 0.25m, DecimalPlaces = 2, Value = 1m };
+    scale.ValueChanged += (_, _) => this.SetStatus($"Ribbon: scale {scale.Value}.");
+    pageSetup.Items.AddRange(paper, margin, scale);
+    view.Groups.AddRange(zoom, pageSetup);
 
     ribbon.Tabs.AddRange(home, insert, view);
     ribbon.SelectedIndexChanged += (_, _)
@@ -253,6 +265,9 @@ internal sealed partial class MainForm {
       italic.Checked = italicChecked;
       folders.SelectedIndex = folderIndex;
       styleCombo.SelectedIndex = styleIndex;
+      paper.SelectedIndex = 0;
+      margin.Value = 20;
+      scale.Value = 1m;
     });
 
     this.Publish("ribbon.page", page);

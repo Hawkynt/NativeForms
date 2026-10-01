@@ -21,7 +21,7 @@ namespace Hawkynt.NativeForms;
 /// is minimized or the group has collapsed. Every measured caption width is cached on its item and
 /// keyed by the theme font, so the pointer path never re-measures text.
 /// </remarks>
-public class Ribbon : OwnerDrawnControl {
+public partial class Ribbon : OwnerDrawnControl {
   /// <summary>Horizontal padding of a tab caption in the strip.</summary>
   private const int _TabPadding = 12;
 
@@ -70,8 +70,6 @@ public class Ribbon : OwnerDrawnControl {
   /// eat the trailing <c>GDK_2BUTTON_PRESS</c> a real double-click delivers as an extra press,
   /// short enough that a deliberate follow-up click still lands.</summary>
   private const long _ToggleGuardMs = 60;
-
-  private MenuDropDown? _dropDown;
 
   /// <summary>The height to restore to when the ribbon is un-minimized, captured the moment it was
   /// minimized so a plain container can re-flow the content below.</summary>
@@ -173,6 +171,7 @@ public class Ribbon : OwnerDrawnControl {
       if (clamped == _selectedIndex)
         return;
 
+      this.CloseFieldPopups();
       _selectedIndex = clamped;
       _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
       this.PerformLayout();
@@ -199,6 +198,7 @@ public class Ribbon : OwnerDrawnControl {
         return;
 
       field = value;
+      this.CloseFieldPopups();
       this.CloseFlyout();
 
       // Office folds the whole group area away: the control shrinks to just its tab strip,
@@ -330,6 +330,7 @@ public class Ribbon : OwnerDrawnControl {
     this.PerformLayout();
     this.PushHostedVisibility();
     this.Invalidate();
+    this.InvalidateOpenFlyouts();
   }
 
   /// <summary>Parents every hosted control that is not a child of this ribbon yet.</summary>
@@ -405,6 +406,9 @@ public class Ribbon : OwnerDrawnControl {
     if (item is RibbonHostItem host)
       return host.HostWidth + (2 * _ItemPadding);
 
+    if (item is RibbonFieldItem field)
+      return this.FieldItemWidth(field, font);
+
     if (item.ItemSize == RibbonItemSize.Large)
       return Math.Max(_MinLargeItemWidth, item.WrapLarge(this.Backend, font, _MaxLargeCaptionWidth).Width + (2 * _ItemPadding));
 
@@ -428,7 +432,7 @@ public class Ribbon : OwnerDrawnControl {
       return 0;
 
     var first = (RibbonItem)items[cursor];
-    if (first.ItemSize == RibbonItemSize.Large) {
+    if (IsLargeLayout(first)) {
       slots[0] = cursor++;
       count = 1;
       isLarge = true;
@@ -442,7 +446,7 @@ public class Ribbon : OwnerDrawnControl {
         continue;
       }
 
-      if (item.ItemSize == RibbonItemSize.Large)
+      if (IsLargeLayout(item))
         break;
 
       width = Math.Max(width, this.ItemWidth(item));
@@ -451,6 +455,10 @@ public class Ribbon : OwnerDrawnControl {
 
     return width;
   }
+
+  /// <summary>Whether an item takes a whole column at full group height. A field never does: a value box
+  /// stretched over the group height would not read as a field, so it stacks like a small item.</summary>
+  private static bool IsLargeLayout(RibbonItem item) => item.ItemSize == RibbonItemSize.Large && item is not RibbonFieldItem;
 
   /// <summary>The natural pixel width of a group — its columns, or its caption when that is wider.</summary>
   private int GroupWidth(RibbonGroup group) {
@@ -661,8 +669,7 @@ public class Ribbon : OwnerDrawnControl {
   /// <inheritdoc/>
   private protected override void OnUnrealized() {
     base.OnUnrealized();
-    _dropDown?.CloseAll();
-    _dropDown = null;
+    this.DisposeFieldPopups();
 
     _flyoutPopup?.Dispose();
     _flyoutPopup = null;
@@ -672,16 +679,6 @@ public class Ribbon : OwnerDrawnControl {
     _gridPopup = null;
     _gridCore = null;
     _gridButton = null;
-  }
-
-  /// <summary>The lazily created drop-down engine a collapsed group opens into, with its owning
-  /// window refreshed on every access so each popup is anchored to the current form.</summary>
-  private MenuDropDown Engine {
-    get {
-      var engine = _dropDown ??= new(this.Backend!, this.Theme);
-      engine.Owner = this.OwnerWindowPeer;
-      return engine;
-    }
   }
 
   // --- Hit testing ------------------------------------------------------------------------------
@@ -716,16 +713,22 @@ public class Ribbon : OwnerDrawnControl {
 
   /// <summary>The index of the item within a group under a client point, for a group area of the
   /// given height, or -1.</summary>
-  private int HitTestItem(RibbonGroup group, int x, int y, int areaHeight) {
-    if (group.IsCollapsed)
+  private int HitTestItem(RibbonGroup group, int x, int y, int areaHeight)
+      => this.HitTestItem(group, group.Bounds, group.IsCollapsed, x, y, areaHeight, out _);
+
+  /// <summary>The index of the item under a point for a group laid out at <paramref name="groupBounds"/>
+  /// — on whichever surface shows it — with the item's rectangle, or -1.</summary>
+  private int HitTestItem(RibbonGroup group, Rectangle groupBounds, bool collapsed, int x, int y, int areaHeight, out Rectangle itemBounds) {
+    itemBounds = Rectangle.Empty;
+    if (collapsed)
       return -1;
 
     Span<int> slots = stackalloc int[_SmallRowsPerColumn];
     var contentHeight = this.GroupContentHeight(areaHeight);
     var rowHeight = contentHeight / _SmallRowsPerColumn;
     var cursor = 0;
-    var left = group.Bounds.X + _GroupPadding;
-    var top = group.Bounds.Y + _GroupPadding;
+    var left = groupBounds.X + _GroupPadding;
+    var top = groupBounds.Y + _GroupPadding;
     while (cursor < group.Items.Count) {
       var width = this.ScanColumn(group, ref cursor, slots, out var count, out var isLarge);
       if (count == 0)
@@ -737,8 +740,10 @@ public class Ribbon : OwnerDrawnControl {
               ? new Rectangle(left, top, width, contentHeight)
               : new Rectangle(left, top + (j * rowHeight), width, rowHeight);
 
-          if (bounds.Contains(x, y))
+          if (bounds.Contains(x, y)) {
+            itemBounds = bounds;
             return slots[j];
+          }
         }
 
       left += width;
@@ -755,6 +760,11 @@ public class Ribbon : OwnerDrawnControl {
     if (e.Button != MouseButtons.Left)
       return;
 
+    // A press on a field belongs to the field; any other press ends what the last field was doing.
+    if (this.TryPressFieldOnRibbon(e.X, e.Y))
+      return;
+
+    this.EndFieldInteraction();
     if (e.Y < this.TabStripHeight) {
       var qat = this.HitTestQuickAccess(e.X);
       if (qat >= 0) {
@@ -772,7 +782,7 @@ public class Ribbon : OwnerDrawnControl {
 
     var group = selected.Groups[groupIndex];
     if (group.IsCollapsed) {
-      this.OpenGroupDropDown(group);
+      this.OpenGroupFlyout(group, RibbonSurface.Ribbon);
       return;
     }
 
@@ -838,10 +848,15 @@ public class Ribbon : OwnerDrawnControl {
   }
 
   /// <inheritdoc/>
-  protected override bool IsInputKey(Keys keyData) => keyData is Keys.Left or Keys.Right;
+  protected override bool IsInputKey(Keys keyData) => keyData is Keys.Left or Keys.Right || this.FieldWantsKey(keyData);
 
   /// <inheritdoc/>
   protected override void OnKeyDown(KeyEventArgs e) {
+    if (this.HandleFieldKeyDown(e)) {
+      e.Handled = true;
+      return;
+    }
+
     var count = this.Tabs.Count;
     if (count == 0)
       return;
@@ -896,14 +911,6 @@ public class Ribbon : OwnerDrawnControl {
     }
 
     return -1;
-  }
-
-  /// <summary>Opens a collapsed group's items as a popup menu under its button.</summary>
-  private void OpenGroupDropDown(RibbonGroup group) {
-    if (this.Backend is null || group.Items.Count == 0)
-      return;
-
-    this.Engine.Open(group.Items, this.PointToScreen(new(group.Bounds.X, group.Bounds.Bottom)));
   }
 
   /// <summary>
@@ -968,7 +975,7 @@ public class Ribbon : OwnerDrawnControl {
 
     var popup = _flyoutPopup ??= this.CreateFlyoutPopup();
     _flyoutShown = true;
-    this.OwnsOpenPopup = true;
+    this.SyncOwnsOpenPopup();
     _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
     popup.ShowAt(this.PointToScreen(new Point(0, this.TabStripHeight)), new Size(this.Width, areaHeight));
   }
@@ -979,7 +986,8 @@ public class Ribbon : OwnerDrawnControl {
       return;
 
     _flyoutShown = false;
-    this.OwnsOpenPopup = false;
+    this.CloseFieldPopupsOn(RibbonSurface.TabFlyout);
+    this.SyncOwnsOpenPopup();
     _hotGroup = _hotItem = _pressedGroup = _pressedItem = -1;
     _flyoutPopup?.Hide();
     this.Invalidate();
@@ -993,12 +1001,18 @@ public class Ribbon : OwnerDrawnControl {
     popup.MouseDown += (_, e) => this.OnFlyoutMouseDown(e);
     popup.KeyDown += (_, e) => // backends with a keyboard grab route keys here
     {
+      if (this.HandleFieldKeyDown(e)) {
+        e.Handled = true;
+        return;
+      }
+
       if (e.KeyCode is not Keys.Escape)
         return;
 
       this.CloseFlyout();
       e.Handled = true;
     };
+    popup.KeyPress += (_, e) => this.HandleFieldKeyPress(e);
     popup.Dismissed += (_, _) => this.CloseFlyout();
     return popup;
   }
@@ -1039,7 +1053,19 @@ public class Ribbon : OwnerDrawnControl {
       return;
 
     var group = tab.Groups[groupIndex];
-    var itemIndex = this.HitTestItem(group, e.X, e.Y, areaHeight);
+    if (group.IsCollapsed) {
+      this.EndFieldInteraction();
+      this.OpenGroupFlyout(group, RibbonSurface.TabFlyout);
+      return;
+    }
+
+    var itemIndex = this.HitTestItem(group, group.Bounds, false, e.X, e.Y, areaHeight, out var itemBounds);
+    if (itemIndex >= 0 && group.Items[itemIndex] is RibbonFieldItem field) {
+      this.PressField(field, itemBounds, e.X, e.Y, RibbonSurface.TabFlyout);
+      return;
+    }
+
+    this.EndFieldInteraction();
     if (itemIndex < 0 || group.Items[itemIndex] is RibbonHostItem || !group.Items[itemIndex].Enabled)
       return;
 
@@ -1070,8 +1096,13 @@ public class Ribbon : OwnerDrawnControl {
 
     var contentHeight = this.GroupContentHeight(areaHeight);
     var captionHeight = this.CaptionStripHeight();
-    for (var i = 0; i < tab.Groups.Count; ++i)
-      this.PaintGroup(g, theme, tab.Groups[i], i, contentHeight, captionHeight, flyout: true);
+    for (var i = 0; i < tab.Groups.Count; ++i) {
+      var group = tab.Groups[i];
+      this.PaintGroup(
+          g, theme, group, group.Bounds, group.IsCollapsed,
+          i == _hotGroup ? _hotItem : -1, i == _pressedGroup ? _pressedItem : -1,
+          contentHeight, captionHeight, RibbonSurface.TabFlyout);
+    }
 
     g.DrawRectangle(theme.Border, new Rectangle(0, 0, size.Width - 1, size.Height - 1));
   }
@@ -1105,7 +1136,7 @@ public class Ribbon : OwnerDrawnControl {
     _gridCore.MaxRows = button.MaxRows;
     _gridCore.ClearHover();
     _gridSize = _gridCore.PreferredSize(this.Theme);
-    this.OwnsOpenPopup = true;
+    this.SyncOwnsOpenPopup();
     popup.ShowAt(this.PointToScreen(new Point(group.Bounds.X, group.Bounds.Bottom)), _gridSize);
   }
 
@@ -1142,7 +1173,7 @@ public class Ribbon : OwnerDrawnControl {
       return;
 
     _gridButton = null;
-    this.OwnsOpenPopup = false;
+    this.SyncOwnsOpenPopup();
     _gridPopup?.Hide();
   }
 
@@ -1170,8 +1201,13 @@ public class Ribbon : OwnerDrawnControl {
 
     var contentHeight = this.GroupContentHeight(this.GroupAreaHeight);
     var captionHeight = this.CaptionStripHeight();
-    for (var i = 0; i < tab.Groups.Count; ++i)
-      this.PaintGroup(g, theme, tab.Groups[i], i, contentHeight, captionHeight);
+    for (var i = 0; i < tab.Groups.Count; ++i) {
+      var group = tab.Groups[i];
+      this.PaintGroup(
+          g, theme, group, group.Bounds, group.IsCollapsed,
+          i == _hotGroup ? _hotItem : -1, i == _pressedGroup ? _pressedItem : -1,
+          contentHeight, captionHeight, RibbonSurface.Ribbon);
+    }
   }
 
   /// <summary>Paints the tab captions, the accent underline and the hover feedback.</summary>
@@ -1257,9 +1293,12 @@ public class Ribbon : OwnerDrawnControl {
     return index >= 0 && index < count ? index : -1;
   }
 
-  /// <summary>Paints one group: its frame, its items (or its collapsed button) and its caption strip.</summary>
-  private void PaintGroup(IGraphics g, ITheme theme, RibbonGroup group, int groupIndex, int contentHeight, int captionHeight, bool flyout = false) {
-    var bounds = group.Bounds;
+  /// <summary>Paints one group at <paramref name="bounds"/> on a surface: its frame, its items (or its
+  /// collapsed button) and its caption strip. <paramref name="hotItem"/> and <paramref name="pressedItem"/>
+  /// index into the group's items, -1 for none.</summary>
+  private void PaintGroup(
+      IGraphics g, ITheme theme, RibbonGroup group, Rectangle bounds, bool collapsed,
+      int hotItem, int pressedItem, int contentHeight, int captionHeight, RibbonSurface surface) {
     if (bounds.Width <= 0 || bounds.Height <= 0)
       return;
 
@@ -1269,7 +1308,7 @@ public class Ribbon : OwnerDrawnControl {
     g.FillRectangle(theme.HeaderBackground, captionRect);
     g.DrawText(group.Text, theme.DefaultFont, theme.HeaderText, captionRect, ContentAlignment.MiddleCenter);
 
-    if (group.IsCollapsed) {
+    if (collapsed) {
       this.PaintCollapsedGroup(g, theme, group, bounds, contentHeight);
       return;
     }
@@ -1296,13 +1335,19 @@ public class Ribbon : OwnerDrawnControl {
         // the expanded ribbon. The flyout shows a placeholder glyph in its slot instead; the
         // expanded ribbon skips it, because the live control sits there.
         if (item is RibbonHostItem) {
-          if (flyout)
+          if (surface != RibbonSurface.Ribbon)
             this.PaintHostPlaceholder(g, theme, rect);
 
           continue;
         }
 
-        this.PaintItem(g, theme, item, groupIndex, slots[j], rect, isLarge);
+        var hovered = slots[j] == hotItem && item.Enabled;
+        if (item is RibbonFieldItem field) {
+          this.PaintField(g, theme, field, rect, hovered, surface);
+          continue;
+        }
+
+        this.PaintItem(g, theme, item, slots[j] == pressedItem, hovered, rect, isLarge);
       }
 
       x += width;
@@ -1328,9 +1373,7 @@ public class Ribbon : OwnerDrawnControl {
   }
 
   /// <summary>Paints one item in its current hover/pressed/checked state, large or small.</summary>
-  private void PaintItem(IGraphics g, ITheme theme, RibbonItem item, int groupIndex, int itemIndex, Rectangle bounds, bool isLarge) {
-    var pressed = groupIndex == _pressedGroup && itemIndex == _pressedItem;
-    var hovered = groupIndex == _hotGroup && itemIndex == _hotItem && item.Enabled;
+  private void PaintItem(IGraphics g, ITheme theme, RibbonItem item, bool pressed, bool hovered, Rectangle bounds, bool isLarge) {
     var isChecked = item is RibbonToggleButton { Checked: true };
 
     if (pressed)
