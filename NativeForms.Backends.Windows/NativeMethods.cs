@@ -492,6 +492,18 @@ internal static partial class NativeMethods {
   [return: MarshalAs(UnmanagedType.Bool)]
   internal static partial bool GetWindowRect(nint hWnd, out RECT lpRect);
 
+  /// <summary>Grows a client rectangle, in place, to the window rectangle a frame of the given styles needs —
+  /// measured at the system DPI the process started with.</summary>
+  [LibraryImport("user32.dll")]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  internal static unsafe partial bool AdjustWindowRectEx(RECT* lpRect, uint dwStyle, [MarshalAs(UnmanagedType.Bool)] bool bMenu, uint dwExStyle);
+
+  /// <summary><see cref="AdjustWindowRectEx"/> at an explicit DPI — the one a per-monitor-aware window needs.
+  /// Present since Windows 10 1607.</summary>
+  [LibraryImport("user32.dll")]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  internal static unsafe partial bool AdjustWindowRectExForDpi(RECT* lpRect, uint dwStyle, [MarshalAs(UnmanagedType.Bool)] bool bMenu, uint dwExStyle, uint dpi);
+
   /// <summary>Sets the opacity (and optional color key) of a <see cref="WS_EX_LAYERED"/> window.</summary>
   [LibraryImport("user32.dll")]
   [return: MarshalAs(UnmanagedType.Bool)]

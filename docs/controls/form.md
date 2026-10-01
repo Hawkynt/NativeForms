@@ -88,7 +88,7 @@ Properties:
 | `AcceptButton` | `Button?` | `null` | The button Enter clicks through the dialog-key chain (see above) |
 | `ActiveControl` | `Control?` | `null` | The child holding keyboard focus, tracked from peer focus events. Assigning focuses the control; assigned before the form is shown, it becomes the initial focus instead of the first tab stop — the WinForms contract |
 | `CancelButton` | `Button?` | `null` | The button Escape clicks; assigning gives it `DialogResult.Cancel` when it has none |
-| `ClientSize` | `Size` | — | The size of the form. **Caveat:** WinForms subtracts the non-client frame here; no peer reports its non-client metrics yet, so for now `ClientSize` equals `Size` on every platform — a documented platform gap, not a contract |
+| `ClientSize` | `Size` | — | The client area, which is also what `Size` means here: on every platform the form's size is the area its children are laid out into. Win32 grows the native window by the caption and borders measured at the window's own DPI; GTK sizes the content and leaves the frame to the window manager. `Location` is the outer top-left |
 | `DialogResult` | `DialogResult` | `None` | The verdict `ShowDialog` reports; setting a non-`None` value on a modally shown form closes it |
 | `FormBorderStyle` | `FormBorderStyle` | `Sizable` | The frame the native window wears; live-toggled after realization |
 | `MinimizeBox` / `MaximizeBox` | `bool` | `true` | Caption buttons; advisory on GTK (the window manager owns the caption) |
@@ -120,7 +120,7 @@ Methods:
 ## Differences from System.Windows.Forms.Form
 
 - **`StartPosition` defaults to `Manual`**, not `WindowsDefaultLocation` (see window management above).
-- **`ClientSize` currently equals `Size`** — no non-client subtraction yet (see the API table).
+- **`Size` is the client size, and equals `ClientSize`.** WinForms counts the frame in `Size`; here the frame is the platform's (a GTK window manager's decorations are not measurable before the window maps), so the form is sized by what it holds. A port that set `Size` to fit its content gets that content back unclipped; one that compensated for the frame by hand gets a window a frame larger.
 - **No `KeyPreview`.** The form-level dialog-key chain covers shortcuts, mnemonics, Tab, Enter and Escape from owner-drawn surfaces, but there is no general first-look at every keystroke; native widgets consume their keys internally.
 - **`Load` fires on every show**, because the form unrealizes between shows (WinForms fires it once per handle creation — effectively the same rule, but handles die more often here).
 - **MDI is a non-goal** (see Notes).

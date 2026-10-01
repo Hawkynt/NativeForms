@@ -670,9 +670,10 @@ public class Form : Control {
   }
 
   /// <summary>
-  /// The size of the form. Windows Forms subtracts the non-client frame here; no peer reports its
-  /// non-client metrics yet, so for now <see cref="ClientSize"/> equals <see cref="Control.Size"/>
-  /// on every platform — a documented platform gap, not a contract.
+  /// The client area — the space children are laid out into — which on every platform is also what
+  /// <see cref="Control.Size"/> means for a form: the window peer adds the non-client frame itself
+  /// (on Win32 the caption and borders measured at the window's DPI; on GTK the window manager's
+  /// decorations). Windows Forms counts the frame in <c>Size</c>; here the two are equal.
   /// </summary>
   public Size ClientSize {
     get => this.Size;

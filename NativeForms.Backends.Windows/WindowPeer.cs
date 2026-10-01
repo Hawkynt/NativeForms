@@ -94,6 +94,24 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
   }
 
   /// <inheritdoc/>
+  /// <remarks>
+  /// The toolkit's form bounds are the outer top-left and the <em>client</em> size — what GTK's
+  /// <c>gtk_window_resize</c> already means, and what the layout pass lays children out into. The
+  /// native window is grown by the frame measured at its own DPI (<see cref="Win32FrameInsets"/>), so
+  /// a bottom-docked strip sits inside the client area rather than under the bottom border; sizing the
+  /// outer rectangle to the client size lost a caption's height off the bottom of every form, and a
+  /// larger one the higher the display scale.
+  /// </remarks>
+  public override void SetBounds(Rectangle bounds) {
+    _bounds = bounds;
+    if (Handle == 0)
+      return;
+
+    var outer = Win32FrameInsets.Measure(Handle).ToOuter(bounds.Size);
+    NativeMethods.MoveWindow(Handle, bounds.X, bounds.Y, outer.Width, outer.Height, true);
+  }
+
+  /// <inheritdoc/>
   public void AddChild(IControlPeer child) {
     ArgumentNullException.ThrowIfNull(child);
     if (child is not Win32ChildPeer childPeer)
@@ -259,18 +277,29 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
       _ => 0,
     };
 
+    // The frame changes thickness with the style, so the outer size is re-derived from the client size
+    // the window has now: changing the border keeps the client area, as it does in Windows Forms.
+    var client = this.ClientSize();
     NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWL_STYLE, (nint)(style | visible));
     NativeMethods.SetWindowLongPtrW(Handle, NativeMethods.GWL_EXSTYLE, (nint)exStyle);
+    var outer = Win32FrameInsets.Measure(Handle).ToOuter(client);
+    var keepSize = client.IsEmpty || _windowState != FormWindowState.Normal;
     NativeMethods.SetWindowPos(
         Handle,
         0,
         0,
         0,
-        0,
-        0,
-        NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER
-        | NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_FRAMECHANGED);
+        outer.Width,
+        outer.Height,
+        NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE
+        | NativeMethods.SWP_FRAMECHANGED | (keepSize ? NativeMethods.SWP_NOSIZE : 0));
   }
+
+  /// <summary>The native client area's size, or empty when there is no window.</summary>
+  private Size ClientSize()
+      => Handle != 0 && NativeMethods.GetClientRect(Handle, out var client)
+          ? new Size(client.right - client.left, client.bottom - client.top)
+          : Size.Empty;
 
   /// <summary>
   /// Handles a native size change: syncs the minimized/maximized/restored state (raising
@@ -293,12 +322,13 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
       this.RaiseNativeBounds();
   }
 
-  /// <summary>Reports the window's current screen rectangle through <see cref="BoundsChangedByUser"/>.</summary>
+  /// <summary>Reports the window's outer top-left and client size through <see cref="BoundsChangedByUser"/> —
+  /// the same pair <see cref="SetBounds"/> takes.</summary>
   private void RaiseNativeBounds() {
     if (Handle == 0 || BoundsChangedByUser is not { } handler || !NativeMethods.GetWindowRect(Handle, out var rect))
       return;
 
-    handler.Invoke(this, new Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top));
+    handler.Invoke(this, new Rectangle(new Point(rect.left, rect.top), this.ClientSize()));
   }
 
   /// <summary>Unregisters the OLE drop target while the window still exists, releasing OLE's reference.</summary>
@@ -577,8 +607,10 @@ internal sealed unsafe class WindowPeer : Win32ControlPeer, IWindowPeer {
         // (zero components stay at the system defaults the struct arrives with).
         if (_windows.TryGetValue(hwnd, out var limitedWindow)) {
           var info = (NativeMethods.MINMAXINFO*)lParam;
-          var min = limitedWindow._minSize;
-          var max = limitedWindow._maxSize;
+          // The limits are client sizes like the bounds; the tracking sizes are outer ones.
+          var insets = Win32FrameInsets.Measure(hwnd);
+          var min = insets.ToOuterLimit(limitedWindow._minSize);
+          var max = insets.ToOuterLimit(limitedWindow._maxSize);
           if (min.Width > 0)
             info->ptMinTrackSize.x = min.Width;
           if (min.Height > 0)
