@@ -649,8 +649,8 @@ strategy (may differ per platform; note exceptions inline).
       full group height) and `Small` items stacked three per column; `RibbonButton`,
       `RibbonToggleButton` and `RibbonHostItem` (hosts a real `Control`), all deriving from
       `ToolStripItem` so `ICommand` wiring and mnemonics come for free; group overflow collapsing
-      right-to-left into a `MenuDropDown` button, keyboard tab switching, and per-ribbon font-keyed
-      width caches
+      right-to-left into a drop-down button that opens the group's own layout in a flyout, keyboard
+      tab switching, and per-ribbon font-keyed width caches
   - [x] `Minimized` collapses the ribbon onto its tab strip (the control shrinks its own `Height` and
         raises `PreferredHeightChanged` so a plain container re-flows the content below); double-click
         a tab toggles it; while minimized a tab click floats that tab's groups as a transient
@@ -676,6 +676,26 @@ strategy (may differ per platform; note exceptions inline).
   - [x] The tab-click flyout shows only item glyphs — a hosted control never re-parents into the
         popup; its slot paints a recessed placeholder box instead, while the live control stays put
         under the expanded ribbon
+  - [x] Owner-drawn fields — `RibbonComboBox` (drop-down list: `Items`, `SelectedIndex`/`SelectedItem`,
+        `SelectedIndexChanged`) and `RibbonSpinner` (`Minimum`/`Maximum`/`Value`/`Increment`/
+        `DecimalPlaces`, `ValueChanged`), both with a caption and a `FieldWidth`, on a shared
+        `RibbonFieldItem` base. A field always takes one stacked row — a hosted native control is taller
+        than a small row on GTK and was clipped — paints in the theme, opens its list through the popup
+        engine (chained to the flyout it sits in, with the grab handed over and back), and takes typed
+        input: digits, the culture's decimal separator, a minus sign only where the range allows one;
+        Enter, a click elsewhere, focus loss or the flyout closing commits, rounded and clamped, an
+        unparsable entry reverts and Escape cancels. The edit state lives on the ribbon (one lazily
+        created object for all fields and the group flyout), so a combo box costs ~32 B and a spinner
+        ~96 B over a toolbar button and `RibbonButton` stays inside its budget
+  - [x] A collapsed group opens its own layout in a flyout under its button — the Office behaviour —
+        instead of a menu, because a field has no menu-row form. All three surfaces (the ribbon, the
+        group flyout, the minimized tab flyout) paint and hit-test through the same group code, so a
+        field behaves alike on each, and a collapsed group inside the tab flyout opens its flyout
+        chained to it. Buttons still run and close the flyout behind them; a field leaves it open for
+        the next value. A `RibbonHostItem` is not moved into either flyout — re-parenting a live native
+        widget into a non-activating popup breaks its focus and input on both backends — so its slot
+        paints a placeholder there instead of vanishing; the owner-drawn fields are the way to keep a
+        value editable in a collapsed group
   - [ ] KeyTips (deferred — a `MenuStrip` above the ribbon already covers the application-menu case)
 - [x] `SearchBox` — hosted native TextBox + magnifier glyph + clear (×) with `SearchCleared`, and
       `SearchCommitted` on Enter from either surface: the seam this waited for is
@@ -1221,7 +1241,7 @@ same commit. `—` = not applicable.
 | `SplitContainer`                                                                 | ✔     | ✔    | [controls/splitcontainer.md](controls/splitcontainer.md)                                             |
 | `Expander`                                                                       | ✔     | ✔    | [controls/expander.md](controls/expander.md)                                                         |
 | `Accordion` / `AccordionPane`                                                    | ✔     | ✔    | [controls/accordion.md](controls/accordion.md)                                                       |
-| `Ribbon` (tabs, groups, item model, overflow, minimize-to-strip + tab flyout)    | ✔     | ✔    | [controls/ribbon.md](controls/ribbon.md)                                                             |
+| `Ribbon` (tabs, groups, items + fields, group/tab flyouts, minimize-to-strip)    | ✔     | ✔    | [controls/ribbon.md](controls/ribbon.md)                                                             |
 | `GridPicker` / `RibbonGridButton` (Office table-size chooser)                    | ✔     | ✔    | [controls/gridpicker.md](controls/gridpicker.md)                                                     |
 | `DockPanel` / `DockContent` (dock, float, tab, split, auto-hide, persistence)    | ✔     | ✔    | [controls/dockpanel.md](controls/dockpanel.md)                                                       |
 | `FlowLayoutPanel`                                                                | ✔     | ✔    | [controls/flowlayoutpanel.md](controls/flowlayoutpanel.md)                                           |

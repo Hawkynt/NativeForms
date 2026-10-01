@@ -5,8 +5,10 @@
 ![Ribbon in the NativeForms demo](../screenshots/08-ribbon.png)
 > framed box with its caption along the bottom edge. Items come large (big icon over the caption,
 > full group height) or small (three stacked per column). Groups that no longer fit collapse into a
-> drop-down button; `Minimized` collapses the ribbon onto its tab strip and a tab click then floats
-> that tab's groups as a transient flyout. A `RibbonGridButton` opens an Office-style table picker.
+> drop-down button that opens the group's layout in a flyout; `Minimized` collapses the ribbon onto its
+> tab strip and a tab click then floats that tab's groups as a transient flyout. A `RibbonGridButton`
+> opens an Office-style table picker; `RibbonComboBox` and `RibbonSpinner` are owner-drawn fields that
+> work on all of these surfaces.
 
 `Hawkynt.NativeForms.Ribbon` · strategy: **owner-drawn** · peer: `ICanvasPeer`
 
@@ -40,6 +42,20 @@ A group can host a real control among its buttons:
 ```csharp
 var styles = new RibbonGroup("Styles");
 styles.Items.Add(new RibbonHostItem(styleComboBox) { HostWidth = 140 });
+```
+
+Fields are drawn by the ribbon, take one small row each and keep working in a collapsed group's
+flyout — prefer them to hosting a `ComboBox` or `NumericUpDown`:
+
+```csharp
+var setup = new RibbonGroup("Page Setup");
+var paper = new RibbonComboBox("Paper") { FieldWidth = 90 };
+paper.Items.AddRange(["A4", "A5", "Letter", "Legal"]);
+paper.SelectedIndex = 0;
+paper.SelectedIndexChanged += (_, _) => SetPaper(paper.SelectedItem);
+var margin = new RibbonSpinner("Margin") { FieldWidth = 60, Minimum = 0, Maximum = 50, Value = 20 };
+margin.ValueChanged += (_, _) => SetMargin(margin.Value);
+setup.Items.AddRange(paper, margin);
 ```
 
 A `RibbonGridButton` opens an Office-style table-size [`GridPicker`](gridpicker.md) under itself:
@@ -129,6 +145,9 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
 | `RibbonButton` | Nothing — a push button. Constructors: `()`, `(string text)`, `(string text, RibbonItemSize size)`. |
 | `RibbonToggleButton` | `Checked` (`bool`) and `CheckedChanged`; a click flips `Checked` and the ribbon paints it held down. Same constructors. |
 | `RibbonHostItem` | `Control` (the hosted control) and `HostWidth` (`int`, default `120`). Constructor: `(Control control)`; defaults to `Small`. |
+| `RibbonComboBox` | A drop-down list field: `Items` (`ObservableList<string>`, created on first use), `SelectedIndex` (`int`, `-1` = none; out of range selects nothing, list edits keep the same entry selected), `SelectedItem` (`string?`), `SelectedIndexChanged`, and `FieldWidth`. Clicking it opens the entries under the box; the arrows walk the open list, Enter commits, Escape closes it unchanged; with the box clicked and the list closed, Up/Down change the selection and Alt+Down / F4 open it. Constructors: `()`, `(string text)` — the text is the caption left of the box. |
+| `RibbonSpinner` | A numeric up/down field: `Minimum` (`0`), `Maximum` (`100`), `Value` (always clamped; raising `Minimum` past `Maximum` drags it along and vice versa), `Increment` (`1`, never negative), `DecimalPlaces` (`0`–`28`), `ValueChanged`, and `FieldWidth`. The arrows step it; clicking the number edits it — digits, the culture's decimal separator when decimals are shown and a minus sign only when `Minimum` is below zero, the first keystroke replacing the value. Enter, a click elsewhere, focus loss or the flyout closing commits (rounded to `DecimalPlaces`, clamped); an entry that does not parse reverts, Escape cancels, Up/Down step while editing. Same constructors. |
+| `RibbonFieldItem` | The abstract base of the two fields: `FieldWidth` (`int`, default `80`, positive) — the width of the value box, beside the caption and optional icon. A field always takes one stacked row, whatever its `ItemSize`. |
 | `RibbonGridButton` | `MaxColumns` (`int`, default `10`), `MaxRows` (`int`, default `8`) and `RangeSelected` (`EventHandler<GridRangeEventArgs>`). A click opens a [`GridPicker`](gridpicker.md) in a popup under the button instead of firing a plain click; `RangeSelected` reports the chosen `Rows`×`Columns`. Same constructors as `RibbonButton`. |
 
 ### RibbonItemSize
@@ -151,9 +170,16 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
   small items stack three to a column. A group is as wide as its columns, or as its caption when
   that is wider, plus padding.
 - **Overflow.** When the groups outgrow the width, the rightmost ones collapse — one at a time,
-  Office-style — into a fixed-width drop-down button that opens that group's items as a popup menu
-  through the shared `MenuDropDown` engine. Widening the ribbon unfolds them again. Because the
-  items are `ToolStripItem`s, no translation layer is needed to show them in a menu.
+  Office-style — into a fixed-width drop-down button that opens the group's own layout, at its
+  natural width, in a light-dismiss flyout under the button. Every item works there as on the
+  expanded ribbon: a button runs and closes the flyout, a field keeps it open for the next value, a
+  combo box's list opens chained to it. Escape or an outside click closes it, committing a pending
+  spinner entry. Widening the ribbon unfolds the groups again.
+- **Hosted controls in a flyout.** A `RibbonHostItem` is never moved into a flyout — neither the
+  collapsed group's nor the minimized tab flyout. Re-parenting a live native widget into a
+  non-activating popup breaks its keyboard focus and input on both backends, so its slot paints a
+  recessed placeholder instead, and the control stays hidden until its group unfolds. Use
+  `RibbonComboBox` / `RibbonSpinner` for values that must stay editable when a group collapses.
 - **Minimize.** `Minimized` collapses the ribbon onto its tab strip: the control shrinks its own
   `Height` to `TabStripHeight`, remembers the height to restore, and raises `PreferredHeightChanged`
   so a plain container can lift the content below (there is no automatic layout owner). Restoring
@@ -161,9 +187,9 @@ already carries `Text` (with `&` mnemonic parsing), `Image` / `ImageList` + `Ima
 - **Tab-click flyout.** While minimized, clicking a tab floats that tab's groups as a transient
   flyout — a light-dismiss popup (the same `IPopupPeer` engine the menus and drop-downs use)
   anchored directly under the strip, full ribbon width, painting exactly the group area the expanded
-  ribbon would. It dismisses on an outside click, on Escape, and once an item inside it is activated;
-  selecting a different tab swaps it. Hosted controls are not re-parented into the flyout, so only
-  their item glyphs would show — the flyout is a button surface.
+  ribbon would. It dismisses on an outside click, on Escape, and once a button inside it is activated;
+  selecting a different tab swaps it. Fields work in it; a collapsed group in it opens its own flyout
+  chained to it; hosted controls show a placeholder (see above).
 - **Keyboard** (the control is focusable): Left/Right move the tab selection without wrapping,
   Ctrl+Tab / Ctrl+Shift+Tab cycle with wraparound.
 - **Measurement is cached.** Every caption width is cached and dropped only when the caption changes

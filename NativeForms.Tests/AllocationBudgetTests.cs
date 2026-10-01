@@ -267,6 +267,20 @@ internal sealed class AllocationBudgetTests {
   }
 
   [Test]
+  public void Ribbon_fields_stay_small_per_instance() {
+    // A field is an item, not a control: no hosted editor, no peer, and its items list is created
+    // only when someone asks for it. The edit state lives on the ribbon, one at a time.
+    var baseline = MeasurePerInstance(static () => new ToolStripButton("Paste"));
+    var combo = MeasurePerInstance(static () => new RibbonComboBox("Mode"));
+    var spinner = MeasurePerInstance(static () => new RibbonSpinner("Passes"));
+
+    Assert.Multiple(() => {
+      Assert.That(combo, Is.LessThan(baseline + 40), $"RibbonComboBox ~{combo:F0} bytes vs ToolStripButton ~{baseline:F0}");
+      Assert.That(spinner, Is.LessThan(baseline + 104), $"RibbonSpinner ~{spinner:F0} bytes vs ToolStripButton ~{baseline:F0}");
+    });
+  }
+
+  [Test]
   public void A_populated_ribbon_stays_within_a_few_kilobytes() {
     // The structural worst case the toolkit ships: three tabs, six groups, twenty-four items.
     // If a ribbon of that size cost tens of kilobytes the design would be wrong, not the budget.

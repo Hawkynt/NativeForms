@@ -736,6 +736,59 @@ internal sealed class PaintAllocationTests {
   }
 
   [Test]
+  public void Ribbon_fields_steady_state_repaint_allocates_nothing() {
+    // A combo box and a spinner paint a label, a framed value and their arrows on every frame: the
+    // value text must come from a cache, not from formatting the number per paint.
+    var ribbon = new Ribbon { Bounds = new(0, 0, 600, 120) };
+    var home = new RibbonTab("Home");
+    var group = new RibbonGroup("Defrag");
+    var combo = new RibbonComboBox("Mode");
+    combo.Items.AddRange(["Fast", "Full"]);
+    combo.SelectedIndex = 1;
+    group.Items.AddRange(combo, new RibbonSpinner("Passes") { DecimalPlaces = 2, Value = 3.5m });
+    home.Groups.Add(group);
+    ribbon.Tabs.Add(home);
+
+    Assert.That(MeasureSteadyStatePaint(ribbon), Is.Zero);
+  }
+
+  [Test]
+  public void Collapsed_group_flyout_steady_state_repaint_allocates_nothing() {
+    var ribbon = new Ribbon { Bounds = new(0, 0, 200, 120) };
+    var home = new RibbonTab("Home");
+    var clipboard = new RibbonGroup("Clipboard");
+    clipboard.Items.AddRange(
+        new RibbonButton("Paste"),
+        new RibbonButton("Cut", RibbonItemSize.Small),
+        new RibbonButton("Copy", RibbonItemSize.Small),
+        new RibbonButton("Format", RibbonItemSize.Small));
+    var fields = new RibbonGroup("Fields");
+    var combo = new RibbonComboBox("Mode");
+    combo.Items.AddRange(["Fast", "Full"]);
+    combo.SelectedIndex = 0;
+    fields.Items.AddRange(combo, new RibbonSpinner("Passes"));
+    home.Groups.AddRange(clipboard, fields);
+    ribbon.Tabs.Add(home);
+
+    var backend = new HeadlessBackend();
+    var form = new Form { Bounds = new(0, 0, 640, 480) };
+    form.Controls.Add(ribbon);
+    Application.Run(form, backend);
+    backend.Created.OfType<HeadlessCanvasPeer>().First().RaiseMouseDown(fields.Bounds.X + 20, fields.Bounds.Y + 20);
+
+    var popup = backend.Created.OfType<HeadlessPopupPeer>().Single();
+    var graphics = new NullGraphics();
+    for (var pass = 0; pass < 2; ++pass)
+      popup.RaisePaint(graphics);
+
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    for (var i = 0; i < _Frames; ++i)
+      popup.RaisePaint(graphics);
+
+    Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
+  }
+
+  [Test]
   public void Ribbon_with_a_collapsed_group_steady_state_repaint_allocates_nothing() {
     // Narrow enough that the rightmost group folds into its drop-down button, which is a
     // different paint branch from a laid-out group.
