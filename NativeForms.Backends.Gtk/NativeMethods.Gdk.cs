@@ -153,6 +153,11 @@ internal static partial class NativeMethods {
   [LibraryImport(Gdk)]
   internal static partial void gdk_window_get_origin(nint window, out int x, out int y);
 
+  /// <summary>Copies a <c>GdkEvent</c> so it can be dispatched again; the caller owns the copy and
+  /// frees it with <see cref="gdk_event_free"/>.</summary>
+  [LibraryImport(Gdk)]
+  internal static partial nint gdk_event_copy(nint @event);
+
   // --- Monitors -------------------------------------------------------------------------------
 
   /// <summary>Returns the display's primary <c>GdkMonitor</c>, or 0 when none is marked primary.</summary>

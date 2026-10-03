@@ -262,7 +262,33 @@ internal sealed class GtkPopupPeer : GtkCanvasPeer, IPopupPeer {
       return 1;
 
     peer.Dismiss();
+    peer.ReplayPress(eventPtr);
     return 1;
+  }
+
+  /// <summary>Re-dispatches the press that dismissed this popup so the widget it was aimed at still
+  /// receives it. Under the grabs the press arrives here with its original target window preserved;
+  /// copying it and feeding it back through <c>gtk_main_do_event</c> lets GTK route it to the control
+  /// underneath, so one right-click closes this menu and opens the one on that control in a single
+  /// gesture. A press aimed at the popup's own window was already handled and is left alone.</summary>
+  private void ReplayPress(nint eventPtr) {
+    var copy = NativeMethods.gdk_event_copy(eventPtr);
+    if (copy == 0)
+      return;
+
+    try {
+      unsafe {
+        ref var replay = ref Unsafe.AsRef<GdkEventButton>((void*)copy);
+        if (replay.Window == NativeMethods.gtk_widget_get_window(_window))
+          return;
+
+        replay.SendEvent = 1;
+      }
+
+      NativeMethods.gtk_main_do_event(copy);
+    } finally {
+      NativeMethods.gdk_event_free(copy);
+    }
   }
 
   /// <summary>Native "motion-notify-event" handler on the popup top-level: motion the grab redirected
