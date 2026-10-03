@@ -136,6 +136,7 @@ public class MenuStrip : OwnerDrawnControl {
           _openIndex = -1;
           this.Invalidate();
         };
+        engine.BarMove = this.OnBarMove;
       }
 
       // Refreshed on every access rather than captured once: the bar may have been realized
@@ -184,6 +185,22 @@ public class MenuStrip : OwnerDrawnControl {
     if (index == _openIndex)
       this.CloseDropDown();
     else
+      this.OpenDropDown(index);
+  }
+
+  /// <summary>
+  /// Motion the open drop-down's grab redirected to its own surface, reported in screen coordinates.
+  /// While a menu is open the bar never sees such motion directly, so this is the only way the
+  /// classic gesture — sliding along the bar switches the open menu live — survives the grab: map the
+  /// point back onto the bar and open that item's drop-down.
+  /// </summary>
+  private void OnBarMove(Point screen) {
+    if (_openIndex < 0)
+      return;
+
+    var origin = this.PointToScreen(Point.Empty);
+    var index = this.ItemAt(screen.X - origin.X);
+    if (index >= 0 && index != _openIndex)
       this.OpenDropDown(index);
   }
 

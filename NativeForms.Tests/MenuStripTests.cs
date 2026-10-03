@@ -186,6 +186,26 @@ internal sealed class MenuStripTests {
   }
 
   [Test]
+  public void Sliding_onto_a_sibling_item_while_a_menu_is_open_switches_the_menu() {
+    var strip = CreateFileMenu(out _, out _, out var canvas, out var backend);
+    canvas.RaiseMouseDown(5, 5); // open File
+
+    // While the drop-down holds the grab/capture, motion over the bar is delivered to the popup
+    // surface instead — the same screen point the display server would report. File's popup sits at
+    // (100,224); "Edit" spans bar x 44..88, i.e. screen (148,212): popup-local (48,-12), outside
+    // every level.
+    var first = PopupOf(backend);
+    first.RaiseMouseMove(48, -12);
+
+    var second = PopupOf(backend, 1);
+    Assert.Multiple(() => {
+      Assert.That(strip.OpenIndex, Is.EqualTo(1), "the open menu must slide to Edit");
+      Assert.That(second.IsShown, Is.True, "Edit's drop-down must open");
+      Assert.That(first.IsShown, Is.False, "File's drop-down must close");
+    });
+  }
+
+  [Test]
   public void Drop_down_paints_text_shortcut_separator_and_hover() {
     CreateFileMenu(out _, out _, out var canvas, out var backend);
     canvas.RaiseMouseDown(5, 5);
