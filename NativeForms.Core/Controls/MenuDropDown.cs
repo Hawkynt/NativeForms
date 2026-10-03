@@ -52,6 +52,14 @@ internal sealed class MenuDropDown {
     public string Filter = string.Empty;
   }
 
+  /// <summary>
+  /// Motion the open cascade's grab/capture redirected away from the control underneath, reported in
+  /// screen coordinates when it lands on no level of the cascade at all — a menu bar uses it to slide
+  /// its open top-level menu to the item the pointer slid onto, the gesture the grab would otherwise
+  /// swallow. Left null by owners with no such surface.
+  /// </summary>
+  internal Action<Point>? BarMove;
+
   /// <summary>Creates an engine bound to the backend whose popups and text metrics it uses.</summary>
   public MenuDropDown(IPlatformBackend backend, ITheme theme) {
     _backend = backend;
@@ -425,17 +433,26 @@ internal sealed class MenuDropDown {
     // pointer is actually over, so moving back onto the parent updates its highlight and can open a
     // sibling submenu — without this, an open submenu freezes hover tracking on every level above it.
     var screen = new Point(level.Location.X + e.X, level.Location.Y + e.Y);
+    var overAnyLevel = false;
     for (var i = _levels.Count - 1; i >= 0; --i) {
       var over = _levels[i];
       if (!new Rectangle(over.Location, over.Size).Contains(screen))
         continue;
 
+      overAnyLevel = true;
       if (!ReferenceEquals(over, level)) {
         this.OnLevelMouseMove(over, new MouseEventArgs(e.Button, screen.X - over.Location.X, screen.Y - over.Location.Y, e.Delta));
         return;
       }
 
       break;
+    }
+
+    // The point is on no level of the cascade — the pointer is over whatever the menu was covering
+    // the surface of, typically the owning bar. Hand it to the owner so it can follow the pointer.
+    if (!overAnyLevel) {
+      this.BarMove?.Invoke(screen);
+      return;
     }
 
     var index = this.ItemAt(level, e.Y);
