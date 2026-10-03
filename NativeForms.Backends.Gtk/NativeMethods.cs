@@ -294,6 +294,11 @@ internal static partial class NativeMethods {
   [LibraryImport(Gtk)]
   internal static partial void gtk_grab_remove(nint widget);
 
+  /// <summary>Runs one event through GTK's normal dispatch — the same path a hardware event takes,
+  /// ending at the widget that owns the event's window.</summary>
+  [LibraryImport(Gtk)]
+  internal static partial void gtk_main_do_event(nint @event);
+
   // --- Buttons and labels ---------------------------------------------------------------------
 
   /// <summary>Creates a <c>GtkScale</c> over a new adjustment for the given orientation.</summary>
